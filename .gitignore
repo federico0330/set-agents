@@ -1,0 +1,28 @@
+# Local build and installation artifacts
+.build/
+.staging/
+.backups/
+*.tmp
+*.log
+
+# Local credentials and environment overrides
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# Editor and operating-system noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Language caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/

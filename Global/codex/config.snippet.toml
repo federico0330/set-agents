@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MCP en Codex — TODOS APAGADOS por defecto. Descomentá el bloque SOLO después de
+# que el usuario lo autorice. (Codex lanza todo [mcp_servers.x] que esté activo.)
+# Multi-agente queda activo.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[features]
+multi_agent = true
+
+[agents]
+max_depth = 2
+max_threads = 4
+
+# --- Engram (memoria) — encender solo para documentar bugs/fixes/detalles críticos ---
+# [mcp_servers.engram]
+# command = "engram"
+# args = ["mcp", "--tools=agent"]
+
+# --- Context7 (docs actuales) — encender solo cuando haga falta doc externa de versión ---
+# [mcp_servers.context7]
+# url = "https://mcp.context7.com/mcp"
+
+# --- Playwright (navegador propio para verificación E2E) ---
+# [mcp_servers.playwright]
+# command = "npx"
+# args = ["-y", "@playwright/mcp@latest"]
+
+# --- Brave por CDP (controla un Brave que abrís vos) ---
+# Abrí Brave con:  brave --remote-debugging-port=9222
+# [mcp_servers.brave-cdp]
+# command = "npx"
+# args = ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://localhost:9222"]
