@@ -81,16 +81,35 @@ def effective_specials():
 
 
 def legacy_prompt_bytes(relative):
-    source = subprocess.run(
-        ["git", "show", f"HEAD:{relative.as_posix()}"],
-        cwd=Path(__file__).resolve().parents[2],
-        text=False,
+    repo = Path(__file__).resolve().parents[2]
+
+    def git_show(ref):
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{relative.as_posix()}"],
+            cwd=repo,
+            text=False,
+            capture_output=True,
+            check=False,
+        )
+        return result.stdout if result.returncode == 0 else None
+
+    # Prefer the version still shipped at HEAD. Once HEAD drops a legacy prompt, fall
+    # back to the version just before its deletion, so the installer keeps recognizing
+    # (and cleaning) stale copies left by an older install even after HEAD moves on.
+    current = git_show("HEAD")
+    if current is not None:
+        return current
+    deletion = subprocess.run(
+        ["git", "rev-list", "-1", "HEAD", "--", relative.as_posix()],
+        cwd=repo,
+        text=True,
         capture_output=True,
         check=False,
     )
-    if source.returncode != 0:
+    commit = deletion.stdout.strip()
+    if deletion.returncode != 0 or not commit:
         return None
-    return source.stdout
+    return git_show(f"{commit}^")
 
 
 def merge_codex(current):
