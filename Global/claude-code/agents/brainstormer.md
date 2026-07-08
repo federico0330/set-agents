@@ -1,8 +1,14 @@
 ---
 name: brainstormer
-description: Brainstormer — divergent idea generation with explicit tradeoffs
+description: "Brainstormer \u2014 divergent idea generation with explicit tradeoffs"
 tools: Read, Grep, Glob, Bash
 model: sonnet
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "python3 ~/.claude/hooks/claude_bash_guard.py"
 ---
 
 # Brainstormer — divergent idea generation with explicit tradeoffs

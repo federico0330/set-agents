@@ -1,8 +1,14 @@
 ---
 name: blue-team
-description: Blue-Team — defensive hardening, detection, and mitigation design (read-only)
+description: "Blue-Team \u2014 defensive hardening, detection, and mitigation design (read-only)"
 tools: Read, Grep, Glob, Bash
 model: opus
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "python3 ~/.claude/hooks/claude_bash_guard.py"
 ---
 
 # Blue-Team — defensive hardening, detection, and mitigation design (read-only)

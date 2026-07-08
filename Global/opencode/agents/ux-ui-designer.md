@@ -1,35 +1,46 @@
 ---
-description: UX-UI-Designer — frontend design, design tokens, accessibility, error UX
+description: "UX-UI-Designer \u2014 frontend design, design tokens, accessibility, error UX"
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: opencode-go/glm-5.1
 temperature: 0.3
 permission:
-  edit: ask
-  webfetch: allow
+  edit: allow
+  task: deny
   bash:
     "*": ask
-    "git diff*": allow
     "git status*": allow
+    "git diff*": allow
     "git log*": allow
     "git show*": allow
     "rg*": allow
     "bat*": allow
     "eza*": allow
     "fd*": allow
-    "npm test*": allow
-    "npm run test*": allow
-    "npm run lint*": allow
-    "npm run typecheck*": allow
-    "npm run build*": allow
-    "dotnet test*": allow
-    "go test*": allow
-    "python -m pytest*": allow
-    "./ai/scripts/verify.sh*": allow
-    "./ai/scripts/audit-readonly.sh*": allow
-    "git commit*": deny
-    "rm *": deny
-    "sudo *": deny
+    "uname*": allow
+    "lsb_release*": allow
+    "sw_vers*": allow
+    "opencode models*": allow
+    "dotnet --list-sdks*": allow
+    "dotnet --list-runtimes*": allow
+    "dotnet --info*": allow
+    "node --version*": allow
+    "node -v*": allow
+    "npm ls*": allow
+    "npm list*": allow
+    "python --version*": allow
+    "python3 --version*": allow
+    "pip list*": allow
+    "pip3 list*": allow
+    "go version*": allow
+    "rustup toolchain list*": allow
+    "rustup show*": allow
+    "cargo --version*": allow
+    "rustc --version*": allow
+    "claude --version*": allow
+    "codex --version*": allow
+    "opencode --version*": allow
     "git push*": deny
+    "sudo *": deny
 ---
 
 # UX-UI-Designer — frontend design, design tokens, accessibility, error UX

@@ -1,35 +1,79 @@
 ---
-description: Red-Team — offensive review: try to break it (authorized, read-only)
+description: "Red-Team \u2014 offensive review: try to break it (authorized, read-only)"
 mode: subagent
-model: opencode/glm-5.2
+model: opencode-go/glm-5.1
 temperature: 0.0
 permission:
   edit: deny
-  webfetch: allow
+  task: deny
   bash:
-    "*": ask
-    "git diff*": allow
+    "*": deny
     "git status*": allow
+    "git diff*": allow
     "git log*": allow
     "git show*": allow
     "rg*": allow
     "bat*": allow
     "eza*": allow
     "fd*": allow
-    "npm test*": allow
-    "npm run test*": allow
-    "npm run lint*": allow
-    "npm run typecheck*": allow
-    "npm run build*": allow
-    "dotnet test*": allow
-    "go test*": allow
-    "python -m pytest*": allow
-    "./ai/scripts/verify.sh*": allow
-    "./ai/scripts/audit-readonly.sh*": allow
+    "uname*": allow
+    "lsb_release*": allow
+    "sw_vers*": allow
+    "opencode models*": allow
+    "dotnet --list-sdks*": allow
+    "dotnet --list-runtimes*": allow
+    "dotnet --info*": allow
+    "node --version*": allow
+    "node -v*": allow
+    "npm ls*": allow
+    "npm list*": allow
+    "python --version*": allow
+    "python3 --version*": allow
+    "pip list*": allow
+    "pip3 list*": allow
+    "go version*": allow
+    "rustup toolchain list*": allow
+    "rustup show*": allow
+    "cargo --version*": allow
+    "rustc --version*": allow
+    "claude --version*": allow
+    "codex --version*": allow
+    "opencode --version*": allow
+    "* > *": deny
+    "*>*": deny
+    "* >> *": deny
+    "*>>*": deny
+    "* < *": deny
+    "*<*": deny
+    "* << *": deny
+    "*<<*": deny
+    "* | *": deny
+    "*|*": deny
+    "* && *": deny
+    "*&&*": deny
+    "* ; *": deny
+    "*;*": deny
+    "*`*": deny
+    "*$(*": deny
+    "*mcp.sh*": deny
+    "*loop.sh*": deny
+    "git add*": deny
     "git commit*": deny
+    "git push*": deny
+    "gh *": deny
+    "* install*": deny
+    "sed -i*": deny
+    "tee *": deny
     "rm *": deny
     "sudo *": deny
-    "git push*": deny
+    "*--output*": deny
+    "*--ext-diff*": deny
+    "*--pre*": deny
+    "*--exec*": deny
+    "fd * -x *": deny
+    "node * -e *": deny
+    "* -exec *": deny
+    "*-toolexec*": deny
 ---
 
 # Red-Team — offensive review: try to break it (authorized, read-only)
@@ -55,7 +99,8 @@ security-sensitive. Pairs with `@security-auditor` (defensive) and `@blue-team` 
 - No DoS execution, no attacks on third parties, no persistence/backdoors. Report, don't exploit further.
 
 ## Finding schema
-- `id`: RED-001 · `severity` · `attack_path` (steps) · `precondition` · `evidence` · `impact` ·
+Binary: a finding IS a practical, reproducible attack path. Rank by real impact; do not grade severity.
+- `id`: RED-001 · `attack_path` (steps) · `precondition` · `evidence` · `impact` ·
   `suggested_mitigation` (handoff to blue-team) · `verification`.
 
 ## Output

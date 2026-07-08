@@ -1,8 +1,9 @@
 ---
 name: refactor-specialist
-description: Refactor-Specialist — behavior-preserving refactors under a test net
+description: "Refactor-Specialist \u2014 behavior-preserving refactors under a test net"
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: sonnet
+
 ---
 
 # Refactor-Specialist — behavior-preserving refactors under a test net

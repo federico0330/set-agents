@@ -16,11 +16,16 @@ into a process that proves its own output. **Loop engineering** = controlled cyc
 
 ## The canonical loop
 ```
-task → implement → verify(gate) → audit(read-only) → repair(findings) → verify → audit → memory → stop
+task → implement → audit(read-only, vs spec/design/acceptance) → repair(findings) → audit → … until no findings
+     → regression tests(test-writer) → verify(gate) → memory → stop
 ```
+The **read-only audit against the spec/design is the primary gate**, not tests: a passing test does not prove the
+code returns what the spec expects. Regression tests are written only after the audit loop converges, as proof of
+the already-correct behavior — never as a guardrail to implement, and never weakened to pass.
 Rules that make it safe:
 - `MAX_ITER` cap (default 4).
-- Deterministic verification (`ai/scripts/verify.sh`) decides gates — not the model's opinion.
+- Deterministic verification (`ai/scripts/verify.sh`) runs build/lint each iteration and, once regression tests
+  exist, runs them too — but the auditor, not a green suite, decides convergence.
 - The auditor is a DIFFERENT agent/run than the implementer (separation of duties).
 - Findings must be actionable (`id, severity, file:line, evidence, impact, minimal_fix, verification`).
 - Stop if the same failure/audit state repeats (hash the state and compare).

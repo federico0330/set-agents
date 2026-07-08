@@ -8,7 +8,7 @@
 multi_agent = true
 
 [agents]
-max_depth = 2
+max_depth = 1
 max_threads = 4
 
 # --- Engram (memoria) — encender solo para documentar bugs/fixes/detalles críticos ---

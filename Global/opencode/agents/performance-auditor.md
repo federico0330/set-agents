@@ -1,35 +1,79 @@
 ---
-description: Performance-Auditor — read-only scalability and query-efficiency review
+description: "Performance-Auditor \u2014 read-only scalability and query-efficiency review"
 mode: subagent
-model: opencode/kimi-k2.6
+model: opencode-go/glm-5.1
 temperature: 0.0
 permission:
   edit: deny
-  webfetch: allow
+  task: deny
   bash:
-    "*": ask
-    "git diff*": allow
+    "*": deny
     "git status*": allow
+    "git diff*": allow
     "git log*": allow
     "git show*": allow
     "rg*": allow
     "bat*": allow
     "eza*": allow
     "fd*": allow
-    "npm test*": allow
-    "npm run test*": allow
-    "npm run lint*": allow
-    "npm run typecheck*": allow
-    "npm run build*": allow
-    "dotnet test*": allow
-    "go test*": allow
-    "python -m pytest*": allow
-    "./ai/scripts/verify.sh*": allow
-    "./ai/scripts/audit-readonly.sh*": allow
+    "uname*": allow
+    "lsb_release*": allow
+    "sw_vers*": allow
+    "opencode models*": allow
+    "dotnet --list-sdks*": allow
+    "dotnet --list-runtimes*": allow
+    "dotnet --info*": allow
+    "node --version*": allow
+    "node -v*": allow
+    "npm ls*": allow
+    "npm list*": allow
+    "python --version*": allow
+    "python3 --version*": allow
+    "pip list*": allow
+    "pip3 list*": allow
+    "go version*": allow
+    "rustup toolchain list*": allow
+    "rustup show*": allow
+    "cargo --version*": allow
+    "rustc --version*": allow
+    "claude --version*": allow
+    "codex --version*": allow
+    "opencode --version*": allow
+    "* > *": deny
+    "*>*": deny
+    "* >> *": deny
+    "*>>*": deny
+    "* < *": deny
+    "*<*": deny
+    "* << *": deny
+    "*<<*": deny
+    "* | *": deny
+    "*|*": deny
+    "* && *": deny
+    "*&&*": deny
+    "* ; *": deny
+    "*;*": deny
+    "*`*": deny
+    "*$(*": deny
+    "*mcp.sh*": deny
+    "*loop.sh*": deny
+    "git add*": deny
     "git commit*": deny
+    "git push*": deny
+    "gh *": deny
+    "* install*": deny
+    "sed -i*": deny
+    "tee *": deny
     "rm *": deny
     "sudo *": deny
-    "git push*": deny
+    "*--output*": deny
+    "*--ext-diff*": deny
+    "*--pre*": deny
+    "*--exec*": deny
+    "fd * -x *": deny
+    "node * -e *": deny
+    "* -exec *": deny
+    "*-toolexec*": deny
 ---
 
 # Performance-Auditor — read-only scalability and query-efficiency review
@@ -54,8 +98,9 @@ with data volume or traffic.
 
 ## Procedure
 For each data path in the diff, estimate cost at 10×–1000× current rows. Identify the query plan risk and the
-concrete fix. Report with the finding schema (`id` PERF-001, severity, file:line, evidence, impact at scale,
+concrete fix. Report with the finding schema (`id` PERF-001, file:line, evidence, impact at scale,
 minimal_fix, verification — e.g. "EXPLAIN shows index seek not scan", "query count is O(1) not O(n)").
+A finding IS a blocking scalability problem; do not grade severity.
 
 ## Output
-`PERF_PASS: no concrete findings.` or findings (blocker → minor).
+`PERF_PASS: no concrete findings.` or findings, most-impactful first.

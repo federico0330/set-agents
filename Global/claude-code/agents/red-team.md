@@ -1,8 +1,14 @@
 ---
 name: red-team
-description: Red-Team — offensive review: try to break it (authorized, read-only)
+description: "Red-Team \u2014 offensive review: try to break it (authorized, read-only)"
 tools: Read, Grep, Glob, Bash
 model: opus
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "python3 ~/.claude/hooks/claude_bash_guard.py"
 ---
 
 # Red-Team — offensive review: try to break it (authorized, read-only)
@@ -28,7 +34,8 @@ security-sensitive. Pairs with `@security-auditor` (defensive) and `@blue-team` 
 - No DoS execution, no attacks on third parties, no persistence/backdoors. Report, don't exploit further.
 
 ## Finding schema
-- `id`: RED-001 · `severity` · `attack_path` (steps) · `precondition` · `evidence` · `impact` ·
+Binary: a finding IS a practical, reproducible attack path. Rank by real impact; do not grade severity.
+- `id`: RED-001 · `attack_path` (steps) · `precondition` · `evidence` · `impact` ·
   `suggested_mitigation` (handoff to blue-team) · `verification`.
 
 ## Output

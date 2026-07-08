@@ -1,35 +1,79 @@
 ---
-description: Security-Auditor — read-only application security review (defensive)
+description: "Security-Auditor \u2014 read-only application security review (defensive)"
 mode: subagent
-model: opencode/gpt-5.3-codex
+model: openai/gpt-5.5
 temperature: 0.0
 permission:
   edit: deny
-  webfetch: allow
+  task: deny
   bash:
-    "*": ask
-    "git diff*": allow
+    "*": deny
     "git status*": allow
+    "git diff*": allow
     "git log*": allow
     "git show*": allow
     "rg*": allow
     "bat*": allow
     "eza*": allow
     "fd*": allow
-    "npm test*": allow
-    "npm run test*": allow
-    "npm run lint*": allow
-    "npm run typecheck*": allow
-    "npm run build*": allow
-    "dotnet test*": allow
-    "go test*": allow
-    "python -m pytest*": allow
-    "./ai/scripts/verify.sh*": allow
-    "./ai/scripts/audit-readonly.sh*": allow
+    "uname*": allow
+    "lsb_release*": allow
+    "sw_vers*": allow
+    "opencode models*": allow
+    "dotnet --list-sdks*": allow
+    "dotnet --list-runtimes*": allow
+    "dotnet --info*": allow
+    "node --version*": allow
+    "node -v*": allow
+    "npm ls*": allow
+    "npm list*": allow
+    "python --version*": allow
+    "python3 --version*": allow
+    "pip list*": allow
+    "pip3 list*": allow
+    "go version*": allow
+    "rustup toolchain list*": allow
+    "rustup show*": allow
+    "cargo --version*": allow
+    "rustc --version*": allow
+    "claude --version*": allow
+    "codex --version*": allow
+    "opencode --version*": allow
+    "* > *": deny
+    "*>*": deny
+    "* >> *": deny
+    "*>>*": deny
+    "* < *": deny
+    "*<*": deny
+    "* << *": deny
+    "*<<*": deny
+    "* | *": deny
+    "*|*": deny
+    "* && *": deny
+    "*&&*": deny
+    "* ; *": deny
+    "*;*": deny
+    "*`*": deny
+    "*$(*": deny
+    "*mcp.sh*": deny
+    "*loop.sh*": deny
+    "git add*": deny
     "git commit*": deny
+    "git push*": deny
+    "gh *": deny
+    "* install*": deny
+    "sed -i*": deny
+    "tee *": deny
     "rm *": deny
     "sudo *": deny
-    "git push*": deny
+    "*--output*": deny
+    "*--ext-diff*": deny
+    "*--pre*": deny
+    "*--exec*": deny
+    "fd * -x *": deny
+    "node * -e *": deny
+    "* -exec *": deny
+    "*-toolexec*": deny
 ---
 
 # Security-Auditor — read-only application security review (defensive)
@@ -55,9 +99,9 @@ serialization, external services, or anything that moves money or exposes data.
 callers. 3. Prove exploitability where possible (concrete request/sequence). 4. Report with the finding schema.
 
 ## Finding schema
-- `id`: SEC-001 · `severity`: blocker|major|minor · `file:line` · `evidence` · `impact` (attacker gain) ·
-  `minimal_fix` · `verification`.
+Binary: a finding IS a blocking security problem. Only report exploitable/real risk, not theoretical nits.
+- `id`: SEC-001 · `file:line` · `evidence` · `impact` (attacker gain) · `minimal_fix` · `verification`.
 
 ## Output
-`SECURITY_PASS: no concrete findings.` or the findings list (blocker → minor). Coordinate with `@red-team`
-(offense) and `@blue-team` (hardening/detection).
+`SECURITY_PASS: no concrete findings.` or the findings list, most-impactful first (no severity grades).
+Coordinate with `@red-team` (offense) and `@blue-team` (hardening/detection).

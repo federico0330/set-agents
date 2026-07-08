@@ -1,8 +1,9 @@
 ---
 name: ux-ui-designer
-description: UX-UI-Designer — frontend design, design tokens, accessibility, error UX
+description: "UX-UI-Designer \u2014 frontend design, design tokens, accessibility, error UX"
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: sonnet
+
 ---
 
 # UX-UI-Designer — frontend design, design tokens, accessibility, error UX

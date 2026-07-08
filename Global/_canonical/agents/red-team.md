@@ -21,7 +21,8 @@ security-sensitive. Pairs with `@security-auditor` (defensive) and `@blue-team` 
 - No DoS execution, no attacks on third parties, no persistence/backdoors. Report, don't exploit further.
 
 ## Finding schema
-- `id`: RED-001 · `severity` · `attack_path` (steps) · `precondition` · `evidence` · `impact` ·
+Binary: a finding IS a practical, reproducible attack path. Rank by real impact; do not grade severity.
+- `id`: RED-001 · `attack_path` (steps) · `precondition` · `evidence` · `impact` ·
   `suggested_mitigation` (handoff to blue-team) · `verification`.
 
 ## Output

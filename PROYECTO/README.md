@@ -7,7 +7,7 @@ AGENTS.md                      # reglas del proyecto (editá los placeholders)
 docs/specs/<id>/{spec,plan,tasks,acceptance}.md
 docs/adr/0001-*.md
 docs/ai/memory-log.md
-ai/scripts/{verify.sh,audit-readonly.sh,loop.sh}   # chmod +x
+ai/scripts/{verify.sh,audit-readonly.sh,loop.sh}   # deterministic gates and optional worker loop
 ```
 
 ## Overrides locales (opcional)
@@ -21,7 +21,7 @@ Los globales siguen disponibles; lo local tiene más precedencia dentro del repo
 2. Reflejá tu stack en `ai/scripts/verify.sh`.
 3. `chmod +x ai/scripts/*.sh`.
 4. En OpenCode: `/sdd-start <idea>` → `/next-task T-001` → `@auditor` / `@db-auditor` según el gate.
-5. O loop automático: `./ai/scripts/loop.sh T-001 4`.
+5. Run read-only audits, repair concrete findings, and require `adversarial-judge` before release.
 6. **Agente en el loop**: pegá `prompt.md` como primer mensaje y la IA orquesta el loop sola
    (para solo en cortes duros o para pedirte encender un MCP).
 

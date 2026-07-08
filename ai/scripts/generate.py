@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""Generate and validate native harness artifacts from roles.tsv."""
+
+import argparse
+import csv
+import json
+import re
+import shutil
+import sys
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+CANON = ROOT / "Global/_canonical"
+SHARED = ROOT / "Global/_shared"
+REQUIRED = {
+    "role", "mode", "temperature", "capability", "duty", "opencode_go",
+    "opencode_zen", "opencode_local", "claude_model", "codex_model", "codex_effort",
+}
+PROFILE_COLUMN = {"go-zen": "opencode_go", "zen": "opencode_zen", "local": "opencode_local"}
+CAPABILITIES = {"coord-ro", "review-ro", "docs-rw", "factory-rw", "code-rw", "gate-ro", "release", "memory-rw", "run-ro"}
+READ_ONLY = {"coord-ro", "review-ro"}
+IMPLEMENT_DUTIES = {"implement"}
+REVIEW_DUTIES = {"audit", "judge"}
+MUTATING_CAPABILITIES = {"docs-rw", "factory-rw", "code-rw", "release", "memory-rw"}
+
+
+def die(message):
+    raise ValueError(message)
+
+
+def load_roles(profile, roles_path=None):
+    with Path(roles_path or ROOT / "roles.tsv").open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if set(reader.fieldnames or ()) != REQUIRED:
+            die("roles.tsv has an invalid header")
+        roles = list(reader)
+    names = [row["role"] for row in roles]
+    if len(names) != len(set(names)):
+        die("roles.tsv contains duplicate roles")
+    if profile not in PROFILE_COLUMN:
+        die(f"unsupported profile: {profile}")
+    for row in roles:
+        row["opencode_model"] = row[PROFILE_COLUMN[profile]]
+        if row["capability"] not in CAPABILITIES:
+            die(f"{row['role']}: invalid capability {row['capability']}")
+        if row["mode"] not in {"primary", "subagent"}:
+            die(f"{row['role']}: invalid mode")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*/[A-Za-z0-9][A-Za-z0-9._:-]*", row["opencode_model"]):
+            die(f"{row['role']}: invalid OpenCode model id")
+        if row["claude_model"] not in {"opus", "sonnet", "haiku", "fable"}:
+            die(f"{row['role']}: invalid Claude model alias")
+        if not re.fullmatch(r"gpt-5\.(?:4(?:-mini)?|5)", row["codex_model"]):
+            die(f"{row['role']}: invalid Codex model id")
+        if not (CANON / "agents" / f"{row['role']}.md").is_file():
+            die(f"{row['role']}: missing canonical prompt")
+        if row["duty"] in REVIEW_DUTIES and row["capability"] != "review-ro":
+            die(f"separation violation: {row['role']} reviews with mutating capability {row['capability']}")
+        if row["duty"] == "implement" and row["capability"] != "code-rw":
+            die(f"separation violation: {row['role']} implements without code-rw")
+
+    implementers = [r for r in roles if r["duty"] in IMPLEMENT_DUTIES]
+    reviewers = [r for r in roles if r["duty"] in REVIEW_DUTIES]
+    family = {
+        "opencode_model": lambda value: re.sub(r"(?:-mini|-flash-free|-code-free)$", "", value),
+        "claude_model": lambda value: value,
+        "codex_model": lambda value: value.removesuffix("-mini"),
+    }
+    for field in ("opencode_model", "claude_model", "codex_model"):
+        implementation_models = {family[field](r[field]) for r in implementers}
+        for reviewer in reviewers:
+            if family[field](reviewer[field]) in implementation_models:
+                die(f"separation violation: {reviewer['role']} shares {field}={reviewer[field]} with implementation")
+    if not any(r["duty"] == "judge" for r in roles):
+        die("adversarial judge is required")
+    return roles
+
+
+def description(body):
+    match = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
+    return match.group(1) if match else "Specialized harness agent"
+
+
+def oc_permissions(capability, roles):
+    safe = [
+        '    "git status*": allow', '    "git diff*": allow', '    "git log*": allow',
+        '    "git show*": allow', '    "rg*": allow', '    "bat*": allow', '    "eza*": allow',
+        '    "fd*": allow', '    "uname*": allow', '    "lsb_release*": allow', '    "sw_vers*": allow',
+        '    "opencode models*": allow', '    "dotnet --list-sdks*": allow',
+        '    "dotnet --list-runtimes*": allow', '    "dotnet --info*": allow',
+        '    "node --version*": allow', '    "node -v*": allow', '    "npm ls*": allow',
+        '    "npm list*": allow', '    "python --version*": allow', '    "python3 --version*": allow',
+        '    "pip list*": allow', '    "pip3 list*": allow', '    "go version*": allow',
+        '    "rustup toolchain list*": allow', '    "rustup show*": allow', '    "cargo --version*": allow',
+        '    "rustc --version*": allow', '    "claude --version*": allow', '    "codex --version*": allow',
+        '    "opencode --version*": allow',
+    ]
+    hard_denies = [
+        '    "* > *": deny', '    "*>*": deny', '    "* >> *": deny', '    "*>>*": deny',
+        '    "* < *": deny', '    "*<*": deny', '    "* << *": deny', '    "*<<*": deny',
+        '    "* | *": deny', '    "*|*": deny', '    "* && *": deny', '    "*&&*": deny',
+        '    "* ; *": deny', '    "*;*": deny', '    "*`*": deny', '    "*$(*": deny', '    "*mcp.sh*": deny',
+        '    "*loop.sh*": deny', '    "git add*": deny', '    "git commit*": deny',
+        '    "git push*": deny', '    "gh *": deny', '    "* install*": deny', '    "sed -i*": deny',
+        '    "tee *": deny', '    "rm *": deny', '    "sudo *": deny',
+        '    "*--output*": deny', '    "*--ext-diff*": deny', '    "*--pre*": deny',
+        '    "*--exec*": deny', '    "fd * -x *": deny', '    "node * -e *": deny',
+        '    "* -exec *": deny', '    "*-toolexec*": deny',
+    ]
+    lines = ["permission:"]
+    if capability == "coord-ro":
+        lines += ["  edit: deny", "  webfetch: allow", "  websearch: ask", "  task:", '    "*": deny']
+        lines += [f'    "{r["role"]}": allow' for r in roles if r["role"] != "orchestrator"]
+        lines += ["  bash:", '    "*": deny', *safe, *hard_denies]
+    elif capability == "review-ro":
+        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny', *safe, *hard_denies]
+    elif capability == "gate-ro":
+        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny',
+                  '    "./ai/scripts/verify.sh*": allow', '    "npm test*": allow',
+                  '    "npm run test*": allow', '    "npm run lint*": allow',
+                  '    "npm run typecheck*": allow', '    "npm run build*": allow',
+                  '    "dotnet test*": allow', '    "go test*": allow', '    "cargo test*": allow',
+                  '    "python -m pytest*": allow',
+                  '    "*--config*": deny', '    "*--runner*": deny', '    "*-exec*": deny', *hard_denies]
+    elif capability == "release":
+        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
+                  '    "python3 ~/.config/opencode/hooks/release_action.py*": allow',
+                  '    "git switch*": deny', '    "git add*": deny', '    "git commit*": deny', '    "git push*": deny',
+                  '    "gh pr create*": deny', '    "gh pr edit*": deny', '    "gh pr merge*": deny',
+                  '    "git push --force*": deny', '    "git push -f*": deny', '    "gh repo edit*": deny',
+                  '    "gh repo delete*": deny']
+    elif capability == "run-ro":
+        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
+                  '    "./ai/scripts/run.sh*": allow', '    "./ai/scripts/verify.sh*": allow',
+                  '    "curl http://localhost*": allow', '    "curl http://127.0.0.1*": allow',
+                  '    "curl localhost*": allow', '    "curl 127.0.0.1*": allow', *hard_denies]
+    else:
+        lines += ["  edit: allow", "  task: deny", "  bash:", '    "*": ask', *safe,
+                  '    "git push*": deny', '    "sudo *": deny']
+    return "\n".join(lines)
+
+
+def claude_tools(capability, roles):
+    if capability == "coord-ro":
+        names = ", ".join(r["role"] for r in roles if r["role"] != "orchestrator")
+        return f"Read, Grep, Glob, Bash, Agent({names})"
+    if capability in READ_ONLY or capability in {"gate-ro", "release", "run-ro"}:
+        return "Read, Grep, Glob, Bash"
+    return "Read, Grep, Glob, Edit, Write, Bash"
+
+
+def frontmatter_hook(capability):
+    if capability not in {"coord-ro", "review-ro", "gate-ro", "release", "run-ro"}:
+        return ""
+    script = {"gate-ro": "claude_gate_guard.py", "release": "claude_release_guard.py", "run-ro": "claude_run_guard.py"}.get(capability, "claude_bash_guard.py")
+    return """hooks:
+  PreToolUse:
+    - matcher: \"Bash\"
+      hooks:
+        - type: command
+          command: \"python3 ~/.claude/hooks/%s\"
+""" % script
+
+
+def copy_tree(source, target):
+    if source.exists():
+        shutil.copytree(source, target, dirs_exist_ok=True)
+
+
+def write_indexes(out):
+    for harness in ("opencode", "claude-code", "codex"):
+        base = out / harness
+        files = sorted(str(p.relative_to(base)) for p in base.rglob("*") if p.is_file() and p.name != "managed-files.txt")
+        (base / "managed-files.txt").write_text("\n".join(files) + "\n")
+
+
+def generate(out, profile, roles_path=None):
+    roles = load_roles(profile, roles_path)
+    if out.exists():
+        shutil.rmtree(out)
+    for harness in ("opencode", "claude-code", "codex"):
+        (out / harness).mkdir(parents=True)
+
+    for row in roles:
+        body = (CANON / "agents" / f"{row['role']}.md").read_text()
+        desc = description(body)
+        oc = "\n".join([
+            "---", f"description: {json.dumps(desc)}", f"mode: {row['mode']}",
+            f"model: {row['opencode_model']}", f"temperature: {row['temperature']}",
+            oc_permissions(row["capability"], roles), "---", "", body,
+        ])
+        path = out / "opencode/agents" / f"{row['role']}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(oc)
+
+        claude = "\n".join([
+            "---", f"name: {row['role']}", f"description: {json.dumps(desc)}",
+            f"tools: {claude_tools(row['capability'], roles)}", f"model: {row['claude_model']}",
+            frontmatter_hook(row["capability"]).rstrip(), "---", "", body,
+        ])
+        path = out / "claude-code/agents" / f"{row['role']}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(claude)
+
+        sandbox = "read-only" if row["capability"] in READ_ONLY or row["capability"] == "release" else "workspace-write"
+        escaped = body.replace('"""', '\\\"\\\"\\\"')
+        if row["capability"] == "release":
+            escaped += "\n\nCodex release-manager is read-only in this harness. Prepare the exact gated commands and report readiness; do not execute mutations here."
+        codex = "\n".join([
+            f"name = {json.dumps(row['role'])}", f"description = {json.dumps(desc)}",
+            f"model = {json.dumps(row['codex_model'])}",
+            f"model_reasoning_effort = {json.dumps(row['codex_effort'])}",
+            f"sandbox_mode = {json.dumps(sandbox)}", 'developer_instructions = """', escaped.rstrip(), '"""', "",
+        ])
+        path = out / "codex/agents" / f"{row['role']}.toml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(codex)
+
+    for harness in ("opencode", "claude-code"):
+        copy_tree(CANON / "commands", out / harness / "commands")
+    for harness in ("opencode", "claude-code", "codex"):
+        copy_tree(CANON / "skills", out / harness / "skills")
+
+    shutil.copy2(SHARED / "AGENTS.opencode.md", out / "opencode/AGENTS.md")
+    shutil.copy2(SHARED / "CLAUDE.md", out / "claude-code/CLAUDE.md")
+    shutil.copy2(SHARED / "AGENTS.codex.md", out / "codex/AGENTS.md")
+    shutil.copy2(SHARED / "config.codex.snippet.toml", out / "codex/config.snippet.toml")
+
+    oc_config = json.loads((SHARED / "opencode.json").read_text())
+    oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
+    for item in oc_config.get("mcp", {}).values():
+        item["enabled"] = False
+    (out / "opencode/opencode.json").write_text(json.dumps(oc_config, indent=2) + "\n")
+
+    overlay = {"enabledPlugins": {"engram@engram": False}, "disabledMcpjsonServers": ["engram", "context7", "playwright", "brave-cdp"]}
+    (out / "claude-code/settings.overlay.json").write_text(json.dumps(overlay, indent=2) + "\n")
+    hooks = out / "claude-code/hooks"
+    hooks.mkdir()
+    shutil.copy2(ROOT / "ai/scripts/coord_policy.py", hooks / "coord_policy.py")
+    shutil.copy2(ROOT / "ai/scripts/claude_bash_guard.py", hooks / "claude_bash_guard.py")
+    shutil.copy2(ROOT / "ai/scripts/claude_gate_guard.py", hooks / "claude_gate_guard.py")
+    shutil.copy2(ROOT / "ai/scripts/claude_run_guard.py", hooks / "claude_run_guard.py")
+    shutil.copy2(ROOT / "ai/scripts/claude_release_guard.py", hooks / "claude_release_guard.py")
+    shutil.copy2(ROOT / "ai/scripts/release_action.py", hooks / "release_action.py")
+    for harness in ("opencode", "codex"):
+        hooks = out / harness / "hooks"
+        hooks.mkdir()
+        shutil.copy2(ROOT / "ai/scripts/release_action.py", hooks / "release_action.py")
+        shutil.copy2(ROOT / "ai/scripts/release_gate.py", hooks / "release_gate.py")
+    shutil.copy2(ROOT / "ai/scripts/release_gate.py", out / "claude-code/hooks/release_gate.py")
+    write_indexes(out)
+    validate(out, roles)
+
+
+def validate(out, roles=None):
+    roles = roles or load_roles((ROOT / "active-profile").read_text().strip())
+    json.loads((out / "opencode/opencode.json").read_text())
+    json.loads((out / "claude-code/settings.overlay.json").read_text())
+    for path in (out / "codex/agents").glob("*.toml"):
+        data = tomllib.loads(path.read_text())
+        for key in ("name", "description", "developer_instructions", "model", "sandbox_mode"):
+            if not data.get(key):
+                die(f"{path}: missing {key}")
+    for harness in ("opencode", "claude-code"):
+        for path in (out / harness / "agents").glob("*.md"):
+            text = path.read_text()
+            if not text.startswith("---\n") or "\n---\n" not in text[4:]:
+                die(f"{path}: invalid frontmatter")
+    expected = {r["role"] for r in roles}
+    for harness, suffix in (("opencode", ".md"), ("claude-code", ".md"), ("codex", ".toml")):
+        actual = {p.stem for p in (out / harness / "agents").glob(f"*{suffix}")}
+        if actual != expected:
+            die(f"{harness}: generated role set mismatch")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--profile")
+    parser.add_argument("--roles")
+    args = parser.parse_args()
+    profile = args.profile or (ROOT / "active-profile").read_text().strip()
+    try:
+        generate(Path(args.output), profile, args.roles)
+    except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
+        print(f"CHECK_FAILED: {exc}", file=sys.stderr)
+        return 2
+    print(f"CHECK_PASS: generated and validated profile {profile}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,8 +1,9 @@
 ---
 name: debugger
-description: Debugger — root-cause a failing gate and apply the minimal fix
+description: "Debugger \u2014 root-cause a failing gate and apply the minimal fix"
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: sonnet
+
 ---
 
 # Debugger — root-cause a failing gate and apply the minimal fix

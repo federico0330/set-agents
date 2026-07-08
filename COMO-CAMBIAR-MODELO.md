@@ -1,69 +1,44 @@
-# Cómo cambiar el modelo de un agente
+# Changing an agent model
 
-Los modelos NO se editan en los archivos instalados (`~/.config/opencode/agents/*.md`) — esos los **genera**
-`build.sh`. La fuente es **`manifest.tsv`**. Editás ahí, corrés `build.sh --install`, y se propaga a los 3 harnesses.
+`roles.tsv` is the only role/model roster. Each role has one row with separate `opencode_go`,
+`opencode_zen`, and `opencode_local` columns; `active-profile` selects one without rewriting the roster.
 
----
+1. List valid provider models with `opencode models`.
+2. Edit the relevant model cell in `roles.tsv`.
+3. Run `./build.sh --check` and `./build.sh --diff`.
+4. Run `./build.sh --install`; inspect the managed live diff and confirm once.
 
-## Pasos (ejemplo: cambiar el modelo del `orchestrator` en OpenCode)
+Use `./use-go-zen.sh`, `./use-zen.sh`, or `./use-local.sh` to switch `active-profile` and enter the same
+reviewed installation flow. Generated files under `Global/{opencode,claude-code,codex}` and live harness
+directories must not be edited directly.
 
-### 1. Mirá qué modelos válidos tenés
-```bash
-opencode models            # OpenCode (Zen = opencode/* · Go = opencode-go/* · GPT Plus = openai/*)
-```
-Copiá el ID exacto que querés (ej: `opencode/claude-sonnet-4-6`). Si ponés un ID que no existe, ese agente falla.
+## Cheap-but-capable hosted models for the leaf roles (Ollama was pulled)
+Ollama local was tried for the repetitive leaf/mechanical roles and **removed from the default path**: a 7B on
+this CPU-only machine was too slow *and* not reliable enough — without repo grounding it hallucinated files and
+classes that don't exist (`PrizeObligationRepository.cs`), so it burned audit round-trips instead of saving
+money. It survives only as a **manual opt-in fallback** (edit a cell in `roles.tsv` to `ollama/...`); the
+provider stays defined in `Global/_shared/opencode.json` and `ollama serve` on `:11434` for that case.
 
-### 2. Editá `manifest.tsv`
-```bash
-cd ~/SET-AGENTES && $EDITOR manifest.tsv
-```
-Es una tabla separada por TABS. Columnas:
-```
-role  mode  temp  perm  opencode_model  claude_model  codex_model
-```
-Buscá la fila `orchestrator` y cambiá la columna del harness que quieras:
-- `opencode_model` → para OpenCode
-- `claude_model`   → para Claude Code (`opus` / `sonnet` / `haiku`)
-- `codex_model`    → para Codex (`gpt-5.5`, `gpt-5.4-mini`, etc.)
+The leaf roles now run on cheap **hosted** models, in two tiers, in every profile:
+- **Code-writers** (`implementer`, `frontend-engineer`, `refactor-specialist`) → a cheap but code-specialized
+  model, `kimi-k2.7-code` (`opencode-go/` in go-zen, `opencode/` in zen, `openai/gpt-5.4-mini` in local). The
+  bet is still "build cheap, review strong": the `frontend-engineer` output gets a mandatory strong
+  `ux-ui-designer` aesthetic review.
+- **Mechanical/script-gated** (`gate-runner`, `github-release-manager`, `memory-scribe`, `app-runner`) → the
+  cheapest tier, `deepseek-v4-flash` (`-free` in zen), since they don't write feature code.
 
-Ejemplo — orquestador de OpenCode a Sonnet de Zen:
-```
-orchestrator  primary  0.1  coord  opencode/claude-sonnet-4-6  sonnet  gpt-5.5
-```
-> Respetá los TABS (no espacios) entre columnas, y no toques `role` (es la clave que matchea el archivo del agente).
+Two roles NEVER run on a cut-rate model: `test-writer` (the end-stage regression net must stay strong) and every auditor/judge.
 
-### 3. Aplicá el cambio
-```bash
-./build.sh --install
-```
-Regenera e instala los 16 agentes en los 3 harnesses de una.
+The three profiles differ only in the **hosted judgment roles**: `go-zen` uses `opencode-go/*` routers,
+`zen` uses `opencode/*` routers, `local` uses `openai/*` only. Only OpenCode has a local-model column;
+`claude_model`/`codex_model` are profile-independent (hosted).
 
-### 4. Verificá
-```bash
-rg '^model:' ~/.config/opencode/agents/orchestrator.md     # debe mostrar el nuevo ID
-opencode run --agent orchestrator "Responde solo: OK"      # debe responder (confirma que el modelo anda)
-```
+## Codex reasoning effort (`codex_effort` column)
+Only Codex has a per-agent reasoning-effort knob (`codex_effort` → `model_reasoning_effort`). It is tuned by
+activity: **xhigh** for auditors and the judge (best of the best), **high** for coordination/root-cause/spec
+and the frontend aesthetic gate, **medium** for implementation (which is audited afterward), **low** for
+mechanical/script-gated roles. OpenCode and Claude Code have no effort field — there, the "effort" is expressed
+by which model the role gets (Ollama for leaf, gpt-5.5 for auditors).
 
----
-
-## ⚠️ Importante: los perfiles pisan `manifest.tsv`
-
-Los scripts `use-go-zen.sh` / `use-zen.sh` **sobrescriben `manifest.tsv`** con su versión de
-`profiles/`. Entonces:
-
-- Si editás `manifest.tsv` y NO vas a cambiar de perfil → con el Paso 3 alcanza (cambio temporal).
-- Si querés que el cambio **sobreviva** a un `use-zen.sh` / `use-go-zen.sh` → editá también el/los archivos de
-  perfil correspondientes y reaplicá:
-  ```bash
-  $EDITOR profiles/manifest.zen.tsv       # y/o profiles/manifest.go-zen.tsv
-  ./use-zen.sh                            # (o ./use-go-zen.sh) para reinstalar desde el perfil
-  ```
-
-## Nota: modelo por defecto
-El `model` de `~/.config/opencode/opencode.json` (y su fuente `Global/_shared/opencode.json`) es el modelo
-**por defecto** que usa OpenCode cuando un agente no especifica uno. Como todos nuestros agentes especifican el
-suyo, casi nunca importa — pero si lo querés cambiar, editá `Global/_shared/opencode.json` y `./build.sh --install`.
-
-## Resumen en una línea
-**Editá `manifest.tsv` (o el perfil en `profiles/`) → `./build.sh --install` → verificá con `rg '^model:'`.**
-Nunca edites los `*.md` instalados a mano: el próximo build los pisa.
+Validation rejects duplicate roles, unknown capabilities, missing canonical prompts, invalid native formats,
+and implementation-model reuse by an auditor or judge.

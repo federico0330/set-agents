@@ -1,0 +1,11 @@
+{
+  "enabledPlugins": {
+    "engram@engram": false
+  },
+  "disabledMcpjsonServers": [
+    "engram",
+    "context7",
+    "playwright",
+    "brave-cdp"
+  ]
+}

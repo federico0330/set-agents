@@ -25,8 +25,9 @@ optimistic concurrency, or the audit trail.
 
 ## Procedure
 Walk the checklist against the diff and its callers; for transaction/concurrency issues, describe the exact
-interleaving that breaks. Report with the finding schema (`id` DB-001, severity, file:line, evidence,
-impact, minimal_fix, verification — e.g. "after a concurrency test, SELECT AuditLog shows all failed attempts").
+interleaving that breaks. Report with the finding schema (`id` DB-001, file:line, evidence, impact,
+minimal_fix, verification — e.g. "after a concurrency test, SELECT AuditLog shows all failed attempts").
+A finding IS a blocking data-integrity problem; do not grade severity.
 
 ## Output
-`DB_PASS: no concrete findings.` or findings (blocker → minor).
+`DB_PASS: no concrete findings.` or findings, most-impactful first.

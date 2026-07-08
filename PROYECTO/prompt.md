@@ -17,9 +17,11 @@ Regla rápida para elegir:
 > 1. Leé `AGENTS.md`, `docs/specs/**`, `docs/adr/**` y `ai/state/**` para tomar contexto. No me pidas que te
 >    explique lo que ya está en los archivos.
 > 2. Trabajá file-first y con gates: SDD (spec→plan→tasks→acceptance) → diseño+ADR si toca
->    arquitectura/datos/seguridad/plata → TDD (tests rojos) → implementación mínima → `./ai/scripts/verify.sh`
->    → auditoría read-only por dominio (`@auditor`, `@db-auditor`, `@security-auditor`, `@performance-auditor`,
->    `@red-team`/`@blue-team` según corresponda) → repair-loop solo de findings concretos → memoria.
+>    arquitectura/datos/seguridad/plata → implementación mínima → auditoría read-only contra el spec/diseño
+>    (`@auditor`, `@db-auditor`, `@security-auditor`, `@performance-auditor`, `@red-team`/`@blue-team` según
+>    corresponda) → repair-loop solo de findings concretos → repetí implementar⇄auditar hasta AUDIT_PASS →
+>    recién ahí `@test-writer` escribe tests de REGRESIÓN → `./ai/scripts/verify.sh` → memoria. Los tests NO son
+>    guardarraíl: un test verde no prueba correctitud; el guardarraíl es el auditor. Los tests van al final.
 > 3. Delegá a los subagentes; vos NO escribís código de feature. El que implementa no aprueba: el que audita es
 >    una corrida distinta.
 > 4. Avanzá solo entre fases SIN pedirme permiso, EXCEPTO en estos cortes duros, donde PARÁS y me preguntás:
@@ -49,8 +51,10 @@ Regla rápida para elegir:
 >    (problema, reglas de negocio, invariantes, no-goals, primer slice, criterios testeables). Mostrame el
 >    resumen y **esperá mi OK** antes de implementar.
 > 4. Si toca arquitectura/datos/seguridad/plata, `@architect` hace diseño + ADR antes de codear.
-> 5. Recién ahí corré el loop por cada tarea: `@test-writer` (rojo) → `@implementer` (diff mínimo) →
->    `./ai/scripts/verify.sh` → auditorías por dominio → repair-loop → `@memory-scribe`.
+> 5. Recién ahí corré el loop por cada tarea: `@implementer` (diff mínimo, guiado por spec/diseño) →
+>    auditoría read-only contra el spec → repair-loop → repetí implementar⇄auditar hasta AUDIT_PASS → recién ahí
+>    `@test-writer` escribe tests de regresión → `./ai/scripts/verify.sh` → `@memory-scribe`. El guardarraíl es
+>    el auditor, no un test verde; los tests van al final.
 > 6. Cortes duros y MCPs: igual que siempre — pará y preguntame (criterios en conflicto, riesgo de
 >    plata/identidad/auditoría, mismo error 2 veces, o para encender un MCP).
 >

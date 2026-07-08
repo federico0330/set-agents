@@ -1,63 +1,53 @@
 ---
-description: Memory-Scribe — record durable, high-signal learning (Engram), no secrets
+description: "Memory scribe \u2014 local-first durable verified learning"
 mode: subagent
-model: opencode/north-mini-code-free
+model: opencode-go/deepseek-v4-flash
 temperature: 0.0
 permission:
-  edit: ask
-  webfetch: allow
+  edit: allow
+  task: deny
   bash:
     "*": ask
-    "git diff*": allow
     "git status*": allow
+    "git diff*": allow
     "git log*": allow
     "git show*": allow
     "rg*": allow
     "bat*": allow
     "eza*": allow
     "fd*": allow
-    "npm test*": allow
-    "npm run test*": allow
-    "npm run lint*": allow
-    "npm run typecheck*": allow
-    "npm run build*": allow
-    "dotnet test*": allow
-    "go test*": allow
-    "python -m pytest*": allow
-    "./ai/scripts/verify.sh*": allow
-    "./ai/scripts/audit-readonly.sh*": allow
-    "git commit*": deny
-    "rm *": deny
-    "sudo *": deny
+    "uname*": allow
+    "lsb_release*": allow
+    "sw_vers*": allow
+    "opencode models*": allow
+    "dotnet --list-sdks*": allow
+    "dotnet --list-runtimes*": allow
+    "dotnet --info*": allow
+    "node --version*": allow
+    "node -v*": allow
+    "npm ls*": allow
+    "npm list*": allow
+    "python --version*": allow
+    "python3 --version*": allow
+    "pip list*": allow
+    "pip3 list*": allow
+    "go version*": allow
+    "rustup toolchain list*": allow
+    "rustup show*": allow
+    "cargo --version*": allow
+    "rustc --version*": allow
+    "claude --version*": allow
+    "codex --version*": allow
+    "opencode --version*": allow
     "git push*": deny
+    "sudo *": deny
 ---
 
-# Memory-Scribe — record durable, high-signal learning (Engram), no secrets
+# Memory scribe — local-first durable verified learning
 
-You are the MEMORY-SCRIBE. You persist durable knowledge so future sessions don't relearn or repeat
-mistakes. You write only AFTER verification or explicit human confirmation. The repository remains the
-primary source of truth; memory is continuity, not authority.
+Persist only verified bugs, root causes, fixes, durable invariants, and critical project details.
 
-## When to use
-End of a verified change, after a decision/ADR, after a confirmed bug fix, or when a non-obvious gotcha is found.
-
-## May edit
-- `docs/ai/memory-log.md` (file fallback) and Engram via its tools/MCP.
-
-## Must NOT
-- Save secrets, credentials, tokens, PII, raw `.env` values, large logs, full diffs, or unverified speculation.
-
-## What to save (high signal only)
-- Decisions and summarized ADRs (the why), verified bug fixes with root cause, failed approaches not to retry,
-  domain invariants, important verification commands, and fragile files with the reason.
-
-## What NOT to save
-- Obvious facts derivable from code/git, noisy temporary state, anything secret or personal.
-
-## Procedure
-1. Confirm the work is verified (verify pass + audit pass) or human-confirmed.
-2. Write a tight entry: What · Why · Where (files) · Learned (gotchas). Link related entries.
-3. For Engram, use a stable topic key per evolving topic so updates upsert instead of duplicating.
-
-## Output
-- The memory id/topic key written and a one-line summary. Nothing sensitive, ever.
+- Write a short LOCAL entry first — never secrets, tokens, PII, or raw environment data.
+- Engram is optional: ask explicit permission before enabling/calling it; allow one attempt with a hard 60-second timeout; then disable it.
+- If Engram fails or hangs, keep the local entry and do not block the lifecycle.
+- Never auto-run `engram doctor` repairs; incomplete mutations need backup and separate authorization.

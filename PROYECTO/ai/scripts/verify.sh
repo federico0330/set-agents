@@ -34,14 +34,25 @@ fi
 # ── Python ─────────────────────────────────────────────────
 { [ -f pyproject.toml ] || [ -f pytest.ini ]; } && { run python -m pytest -q || FAIL=1; }
 
-# ── Guardarraíl anti-tests-debilitados ─────────────────────
-if command -v rg >/dev/null 2>&1; then
-  echo "+ rg guardrail (tests debilitados)" | tee -a "$LOG"
-  if rg -n '\.skip\(|\.only\(|it\.only|test\.only|describe\.only|xit\(|xdescribe\(|\[Skip|\[Ignore|@pytest\.mark\.skip|TODO_WEAKEN_TEST' \
-        --glob '!node_modules' --glob '!**/bin/**' --glob '!**/obj/**' . 2>/dev/null | tee -a "$LOG" | grep -q .; then
-    echo "VERIFY_FAIL: marcador de test debilitado/omitido encontrado" | tee -a "$LOG"
-    FAIL=1
+# ── Guardarraíl anti-tests-debilitados (sobre el DIFF, no todo el repo) ─────
+# Un marcador preexistente en OTRO archivo ya no bloquea toda tarea (falso-positivo DoS), y detectamos
+# debilitamiento por BORRADO de asserts (no solo .skip/.only), que el grep global no veía.
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "+ guardrail (tests debilitados, sobre el diff)" | tee -a "$LOG"
+  DIFF="$(git diff HEAD -- . 2>/dev/null || git diff -- . 2>/dev/null)"
+  # (a) marcador de skip/only AGREGADO en el diff (línea que empieza con '+')
+  if printf '%s\n' "$DIFF" | grep -nE '^\+.*(\.skip\(|\.only\(|it\.only|test\.only|describe\.only|xit\(|xdescribe\(|\[Skip|\[Ignore|@pytest\.mark\.skip|TODO_WEAKEN_TEST)' | tee -a "$LOG" | grep -q .; then
+    echo "VERIFY_FAIL: el diff AGREGA un marcador de test omitido/debilitado" | tee -a "$LOG"; FAIL=1
   fi
+  # (b) el diff elimina más asserts de los que agrega (debilitamiento por borrado/cambio de valor esperado)
+  ASSERT_RE='(assert|expect\(|Assert\.|\.Should\(|toBe|toEqual|toThrow|assertEqual|assertTrue|assertThat|EXPECT_|ASSERT_)'
+  ADDED=$(printf '%s\n' "$DIFF" | grep -cE "^\+.*${ASSERT_RE}")
+  REMOVED=$(printf '%s\n' "$DIFF" | grep -cE "^-.*${ASSERT_RE}")
+  if [ "${REMOVED:-0}" -gt "${ADDED:-0}" ]; then
+    echo "VERIFY_FAIL: el diff elimina más asserts (${REMOVED}) de los que agrega (${ADDED}) — posible debilitamiento" | tee -a "$LOG"; FAIL=1
+  fi
+else
+  echo "+ (guardarraíl de tests salteado: no es repo git)" | tee -a "$LOG"
 fi
 
 if [ "$FAIL" -eq 0 ]; then echo "VERIFY_PASS" | tee -a "$LOG"; exit 0

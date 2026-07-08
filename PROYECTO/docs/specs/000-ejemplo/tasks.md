@@ -4,7 +4,7 @@
 
 ## T-001 — Tipos de dominio (Money)
 - [ ] Money con unidades mínimas enteras o decimal exacto; tests de suma/resta/moneda distinta.
-- AC: invariante de plata · Gate: TDD + verify.
+- AC: invariante de plata · Gate: audit (contra spec) + regression tests + verify.
 
 ## T-002 — Modelo de datos + migración
 - [ ] Tablas/constraints/índices para asientos, reservas, AuditLog, candidatos de duplicado.

@@ -19,6 +19,7 @@ Ejemplo: control de cobros futuros, pagos pendientes, comprobantes, detección d
 
 ## Verificación
 Correr `./ai/scripts/verify.sh` antes de auditar o dar por terminada una tarea.
+Después de las auditorías y cualquier reparación, `adversarial-judge` debe devolver `JUDGE_PASS`.
 
 ## Alcance de implementación
 Implementar SOLO la tarea activa de `docs/specs/<id>/tasks.md`. No agregar integraciones, sync bancario,
@@ -35,9 +36,9 @@ exportes contables, OCR ni pasarelas de pago si no están pedidos.
 - Stack: <node | .NET | go | python | ...>
 - Test: `<comando de test>`  · Lint: `<...>`  · Build: `<...>` (reflejarlos en verify.sh).
 
-## Modelos (override local opcional)
-Por defecto se usan los modelos globales. Para forzar otros en los loops, exportá `IMPL_MODEL`,
-`AUDIT_MODEL`, etc. antes de correr `ai/scripts/loop.sh`.
+## Separación de deberes
+El orquestador sólo inspecciona y delega. `gate-runner` ejecuta la verificación. Ningún agente que modifica
+código audita o juzga ese mismo cambio.
 
 ## MCP
 - Context7 para docs actuales del framework/ORM/librerías de test cuando haya incertidumbre de versión.
