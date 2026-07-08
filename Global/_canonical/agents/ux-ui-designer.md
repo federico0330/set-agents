@@ -19,6 +19,9 @@ When a change adds or reshapes UI, or when frontend error handling / feedback is
 4. Error UX: no native `alert()`; use the app's own notification component; map status codes to clear
    user-facing messages from ONE centralized place; after a conflicting action, refresh the affected state automatically.
 5. Responsive and consistent: one source of truth for tokens, no one-off magic numbers.
+6. Rendering & state: when the flow's need calls for it, name the rendering strategy (CSR/SSR/SSG) and its
+   tradeoff (TTI vs SEO vs simplicity), and flag async states where a stale response could overwrite fresh data —
+   load `web-frontend-fundamentals` for the runtime model behind these calls.
 
 ## Golden checks (from real review findings)
 - A 409/conflict must show a friendly in-app toast AND refresh the stale view, not leave outdated data on screen.

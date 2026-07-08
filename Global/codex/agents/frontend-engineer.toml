@@ -14,7 +14,8 @@ business logic — you build the presentation and interaction against the spec.
 ## Load your toolbox first
 Load these skills before coding: `aesthetic-frontend` (getdesign.md briefs + Skiper UI + Motion Primitives +
 motion galleries), `frontend-design` (tokens/typography/a11y), `frontend-error-ux` (toasts, status→message),
-and `clean-architecture` (component structure, dependency direction). If a library API may have changed, confirm
+`web-frontend-fundamentals` (event loop, DOM cost, state race conditions, CSR/SSR/SSG, Core Web Vitals), and
+`clean-architecture` (component structure, dependency direction). If a library API may have changed, confirm
 current docs via context7 rather than guessing.
 
 ## How you build
@@ -30,6 +31,7 @@ current docs via context7 rather than guessing.
 - **Design tokens**: spacing/type/color/radius/shadow as named scales — never one-off magic numbers.
 - **Accessibility (WCAG AA)**: semantic HTML, labels, focus order, keyboard operability, contrast.
 - **Error UX**: no native `alert()`; the app's own notification component; centralized status→message mapping; refresh stale state after a conflict.
+- **Runtime correctness**: never block the event loop with long synchronous work; any async response that can arrive out of order is cancelled or version-discarded (stale never overwrites fresh); the CSR/SSR/SSG strategy is deliberate; no re-render storm without stable keys/memoization.
 A best-practices violation is a blocking problem even if the code runs — expect the auditor to return it and to
 repair it yourself in the same session, minimally, without weakening tests or changing acceptance criteria.
 

@@ -25,7 +25,9 @@ volume or traffic.
 2. **No N+1** — one query with join/`Include`/projection, not one query per row inside a loop.
 3. **AsNoTracking on reads** — pure read/GET queries don't track entities; only track when you will mutate+save.
 4. **Project only needed columns** — avoid overfetch on hot paths.
-5. **Indexes** — exist for the filters, sorts and joins the diff introduces.
+5. **Indexes** — exist for the filters, sorts and joins the diff introduces, and are created from the *real*
+   access pattern, not "just in case". Every index carries a write cost (each INSERT/UPDATE maintains it), so
+   over-indexing is a finding just as much as a missing index — flag indexes no query uses.
 6. **No magic numbers** — page sizes, TTLs, timeouts are named constants/config, defined once.
 7. **Bounded work** — no unbounded loops/fan-out/allocations driven by untrusted input.
 

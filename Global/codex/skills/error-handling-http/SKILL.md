@@ -1,6 +1,6 @@
 ---
 name: error-handling-http
-description: HTTP error-handling checklist — correct status codes (409 conflict, 404 not found), one global exception middleware mapping typed domain exceptions, never leak stack traces to clients. Load when touching API error handling or HTTP responses.
+description: HTTP error-handling & contract checklist — correct status codes (409 conflict, 404 not found), one global exception middleware mapping typed domain exceptions, never leak stack traces, verb/cache semantics (GET cacheable, POST not), and idempotency keys for retried mutations. Load when touching API error handling, HTTP responses, or retryable actions.
 license: MIT
 compatibility: opencode
 metadata:
@@ -26,7 +26,14 @@ Any API/controller/middleware change, or when mapping domain errors to HTTP resp
 4. **Never leak internals** — no stack trace / framework detail to the client in production; return a generic
    message + correlation id; log the detail server-side only.
 5. **Consistent error body** — same shape across endpoints (`{ code, message, correlationId }`).
+6. **Verb & cache semantics** — GET is safe/idempotent/cacheable; PUT/DELETE are idempotent; POST is neither.
+   Never hide a mutation behind a GET. Set `Cache-Control` to match, and never cache authenticated/private
+   responses in a shared cache.
+7. **Idempotency keys** — any mutation that can be retried (network retry, at-least-once queue, and **especially
+   an agent-triggered action**) carries a unique idempotency key so a replay is a no-op, not a double-charge or
+   duplicated side effect. Name where the key is persisted and its dedup window.
 
 ## Verification ideas
 Force a conflict → response is 409 with a clean body (no stack). Force an unhandled error in prod config →
-client sees generic message + id; full detail only in server logs. One middleware owns the mapping.
+client sees generic message + id; full detail only in server logs. One middleware owns the mapping. Replay the
+same mutation with the same idempotency key → the side effect happens once, not twice.

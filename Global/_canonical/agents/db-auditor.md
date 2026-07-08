@@ -22,6 +22,10 @@ optimistic concurrency, or the audit trail.
 5. **Money**: integer minor units or exact decimal, never binary floating point.
 6. **Migrations**: reversible, no silent data loss/reinterpretation; constraints/indexes for tenancy,
    references, statuses, and duplicate uniqueness; duplicates proposed for human review, never auto-merged.
+7. **Idempotency of retryable mutations**: any mutating operation that can be retried or delivered more than once
+   (client retry, at-least-once queue, **agent-triggered action**) must carry a unique idempotency key (or a
+   uniqueness constraint) so a replay is a no-op. A mutation that can double-apply — double-charge, duplicate
+   ledger entry — with no key or constraint guarding it is a blocking finding.
 
 ## Procedure
 Walk the checklist against the diff and its callers; for transaction/concurrency issues, describe the exact

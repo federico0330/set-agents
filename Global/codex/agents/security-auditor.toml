@@ -14,7 +14,8 @@ When the diff touches auth, authorization, secrets, input handling, file upload,
 serialization, external services, or anything that moves money or exposes data.
 
 ## Threat checklist (OWASP-aligned)
-- AuthN/AuthZ: every protected route checks identity AND object-level authorization (no IDOR); tenant scoping enforced server-side.
+- AuthN vs AuthZ (distinct pillars): authentication proves WHO the caller is; authorization decides WHAT they may do. Every protected route checks identity AND object-level authorization (no IDOR); tenant scoping enforced server-side. Checking one but not the other is the defect.
+- Response caching: authenticated/private responses are never stored in a shared cache; `Cache-Control` (no-store/private) matches the sensitivity, so one user's data can't be served to another.
 - Input: validate/normalize untrusted input; parameterized queries only (no string-built SQL); output encoding to stop XSS.
 - Secrets: NO credentials/connection strings/tokens committed or logged; config via env/secret store; `.env*` never read or shipped.
 - Errors: never leak stack traces or internal details to clients in production; generic message + correlation id.

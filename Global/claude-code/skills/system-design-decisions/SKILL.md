@@ -39,6 +39,17 @@ DB, synchronous request/response. Reach for each component ONLY on its trigger:
 | Read replica | Read-heavy load starves the primary | Writes are the bottleneck (replicas don't help writes) | Introduces replication lag → eventual consistency on reads |
 | Sharding | A single DB genuinely can't hold the data/throughput | Before replicas + caching + vertical are exhausted | Highest-cost, hardest-to-reverse move; pick the shard key deliberately |
 
+**Load balancer vs reverse proxy — they are different roles even when one box (e.g. Nginx) does both.** A
+**load balancer** distributes incoming traffic across interchangeable nodes by their availability/health (scale
+and HA). A **reverse proxy** routes by the *kind* of request — path, host, or service — to the right backend
+(the front door of a microservice split, TLS termination, caching). Name which job you are actually adding; "put
+Nginx in front" is not a decision until you say whether it is balancing load, routing services, or both.
+
+**The API is a contract, not just code.** A public interface is a map others build against: its shape, verbs,
+status codes, and cache semantics (see `error-handling-http`) are promises. Design it for the caller's ergonomics,
+and treat versioning and backward compatibility as a deliberate decision — a breaking change to a shipped contract
+is an ADR-worthy event, not an edit.
+
 **Observability is the standing exception to "defer".** You cannot operate a distributed system blind, so
 design the three pillars in from the start, cheaply: structured/canonical logs with metadata (user id,
 server, request id); a few health metrics (latency, availability, error rate); and a trace id that travels
@@ -73,6 +84,10 @@ Cross-cutting decisions to record:
 
 ## 3. Security by design — day one, NOT deferred
 This section overrides the golden rule's "defer until measurable". Decide these up front:
+- **Authentication vs authorization** — two distinct pillars, both day-one. **Authentication** proves *who you
+  are* (login/identity); **authorization** decides *what you may do* once identified (roles, scopes,
+  object-level access). Conflating them — or checking one and not the other — is how IDOR and privilege
+  escalation happen. Decide the model for both; hand the enforcement proof to the audit skills below.
 - **Least privilege** — every component, credential, and token gets the minimum scope it needs, nothing more.
   (This harness already lives it: MCP servers off by default, read-only agents, capability gates.)
 - **Isolation / blast-radius containment** — separate concerns and environments so one compromised vector

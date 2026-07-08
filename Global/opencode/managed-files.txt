@@ -68,3 +68,4 @@ skills/sdd/SKILL.md
 skills/secrets-hygiene/SKILL.md
 skills/security-review/SKILL.md
 skills/system-design-decisions/SKILL.md
+skills/web-frontend-fundamentals/SKILL.md
