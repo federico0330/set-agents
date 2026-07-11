@@ -69,7 +69,7 @@ class HarnessTests(unittest.TestCase):
 
     def test_invalid_separation_graph_is_rejected(self):
         roster = (ROOT / "roles.tsv").read_text().replace(
-            "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topenai/gpt-5.5",
+            "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topenai/gpt-5.6-sol",
             "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topencode-go/kimi-k2.7-code",
         )
         with tempfile.TemporaryDirectory() as td:
@@ -87,13 +87,13 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("mutating capability", result.stderr)
 
-        family_overlap = (ROOT / "roles.tsv").read_text().replace("auditor\tsubagent\t0.0\treview-ro\taudit\topencode-go/glm-5.1\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.5", "auditor\tsubagent\t0.0\treview-ro\taudit\topencode-go/glm-5.1\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.4")
+        family_overlap = (ROOT / "roles.tsv").read_text().replace("auditor\tsubagent\t0.0\treview-ro\taudit\topencode-go/minimax-m3\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-sol", "auditor\tsubagent\t0.0\treview-ro\taudit\topencode-go/minimax-m3\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-terra")
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"
             roles.write_text(family_overlap)
             result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("gpt-5.4", result.stderr)
+        self.assertIn("gpt-5.6-terra", result.stderr)
 
     def test_generated_mcp_is_off(self):
         run("./build.sh")

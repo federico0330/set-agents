@@ -13,8 +13,10 @@ These rules apply to every Codex session unless a project `AGENTS.md` is more sp
 `adversarial-judge`; `github-release-manager` and `memory-scribe` handle gated release and durable learning.
 
 ## Model tiers (cost discipline)
-Strong models (`gpt-5.5`) for planning and auditing (architect, auditors, security/red/blue/db). Mid
-(`gpt-5.4`) for orchestration/UX/brainstorm. Cheap (`gpt-5.4-mini`) for implementation and leftover work.
+Strong models (`gpt-5.6-sol`) for architecture, UX review, auditing, security/red/blue/db, and final judgment.
+Balanced models (`gpt-5.6-terra`) for orchestration, product analysis, brainstorming, debugging, tests, frontend
+implementation, and runtime verification. Efficient models (`gpt-5.6-luna`) for bounded implementation,
+mechanical gates, release preparation, memory, image description, app running, and leftover work.
 Codex loads each role's model, reasoning effort, and sandbox from its native agent TOML. Reasoning effort is
 tuned by activity: **xhigh** for auditors and the judge (best of the best), **high** for coordination/root-cause
 and the frontend aesthetic gate, **medium** for implementation (audited afterward), **low** for mechanical/

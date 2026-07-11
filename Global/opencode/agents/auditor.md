@@ -1,7 +1,7 @@
 ---
 description: "Auditor \u2014 read-only supervisor of the implementer, catches the cheap mistakes that compound"
 mode: subagent
-model: opencode-go/glm-5.1
+model: opencode-go/minimax-m3
 temperature: 0.0
 permission:
   edit: deny

@@ -1,6 +1,6 @@
 name = "test-writer"
 description = "Test-Writer \u2014 end-stage regression tests, behavior-first, never weakens assertions"
-model = "gpt-5.4-mini"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """

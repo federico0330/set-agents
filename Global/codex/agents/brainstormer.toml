@@ -1,6 +1,6 @@
 name = "brainstormer"
 description = "Brainstormer \u2014 divergent idea generation with explicit tradeoffs"
-model = "gpt-5.4"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 developer_instructions = """

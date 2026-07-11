@@ -1,7 +1,7 @@
 ---
 description: "Test-Writer \u2014 end-stage regression tests, behavior-first, never weakens assertions"
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/deepseek-v4-pro
 temperature: 0.1
 permission:
   edit: allow

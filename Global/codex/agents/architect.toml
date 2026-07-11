@@ -1,6 +1,6 @@
 name = "architect"
 description = "Architect \u2014 design, ADRs, Clean/Hexagonal/SOLID before implementation"
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = """

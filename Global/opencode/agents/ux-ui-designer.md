@@ -1,7 +1,7 @@
 ---
 description: "UX-UI-Designer \u2014 frontend design, design tokens, accessibility, error UX"
 mode: subagent
-model: opencode-go/glm-5.1
+model: openai/gpt-5.6-terra
 temperature: 0.3
 permission:
   edit: allow

@@ -1,7 +1,7 @@
 ---
 description: "Security-Auditor \u2014 read-only application security review (defensive)"
 mode: subagent
-model: openai/gpt-5.5
+model: openai/gpt-5.6-sol
 temperature: 0.0
 permission:
   edit: deny

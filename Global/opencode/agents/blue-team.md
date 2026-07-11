@@ -1,7 +1,7 @@
 ---
 description: "Blue-Team \u2014 defensive hardening, detection, and mitigation design (read-only)"
 mode: subagent
-model: opencode-go/glm-5.1
+model: opencode-go/minimax-m3
 temperature: 0.0
 permission:
   edit: deny

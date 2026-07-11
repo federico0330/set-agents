@@ -1,7 +1,7 @@
 ---
 description: "Red-Team \u2014 offensive review: try to break it (authorized, read-only)"
 mode: subagent
-model: opencode-go/glm-5.1
+model: openai/gpt-5.6-sol
 temperature: 0.0
 permission:
   edit: deny

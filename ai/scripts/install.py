@@ -16,16 +16,19 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument("--staging", required=True)
 parser.add_argument("--home", required=True)
+parser.add_argument("--target", action="append", choices=("opencode", "claude-code", "codex"))
 parser.add_argument("--preview", action="store_true")
 args = parser.parse_args()
 
 staging = Path(args.staging)
 home = Path(args.home)
-targets = {
+all_targets = {
     "opencode": home / ".config/opencode",
     "claude-code": home / ".claude",
     "codex": home / ".codex",
 }
+selected = set(args.target or all_targets)
+targets = {name: path for name, path in all_targets.items() if name in selected}
 SPECIAL = {
     ("opencode", "opencode.json"),
     ("claude-code", "settings.overlay.json"),
@@ -70,14 +73,17 @@ def managed_files():
 
 
 def effective_specials():
-    oc = targets["opencode"] / "opencode.json"
-    cc = targets["claude-code"] / "settings.json"
-    cx = targets["codex"] / "config.toml"
-    return [
-        (merged_json(oc, staging / "opencode/opencode.json"), oc),
-        (merged_json(cc, staging / "claude-code/settings.overlay.json", union_lists=True), cc),
-        (merge_codex(cx), cx),
-    ]
+    result = []
+    if "opencode" in targets:
+        oc = targets["opencode"] / "opencode.json"
+        result.append((merged_json(oc, staging / "opencode/opencode.json"), oc))
+    if "claude-code" in targets:
+        cc = targets["claude-code"] / "settings.json"
+        result.append((merged_json(cc, staging / "claude-code/settings.overlay.json", union_lists=True), cc))
+    if "codex" in targets:
+        cx = targets["codex"] / "config.toml"
+        result.append((merge_codex(cx), cx))
+    return result
 
 
 def legacy_prompt_bytes(relative):
@@ -165,12 +171,13 @@ def previous_targets():
         stored = json.loads(MANIFEST.read_text())
     except (OSError, json.JSONDecodeError):
         return []
-    roots = set(targets.values())
+    roots = set(all_targets.values())
+    selected_roots = set(targets.values())
     result = []
     for relative in stored:
         candidate = home / relative
         # Hard safety fence: never prune anything outside a managed harness root.
-        if any(root in candidate.parents for root in roots):
+        if any(root in candidate.parents for root in roots) and any(root in candidate.parents for root in selected_roots):
             result.append(candidate)
     return result
 
@@ -196,15 +203,16 @@ files = managed_files()
 specials = effective_specials()
 legacy = []
 legacy_conflicts = []
-for prompt in (staging / "codex/agents").glob("*.toml"):
-    target = targets["codex"] / "prompts" / f"{prompt.stem}.md"
-    expected = legacy_prompt_bytes(Path("Global/codex/prompts") / f"{prompt.stem}.md")
-    if expected is None:
-        continue
-    if target.exists() and target.read_bytes() == expected:
-        legacy.append(target)
-    elif target.exists():
-        legacy_conflicts.append(str(target.relative_to(home)))
+if "codex" in targets:
+    for prompt in (staging / "codex/agents").glob("*.toml"):
+        target = targets["codex"] / "prompts" / f"{prompt.stem}.md"
+        expected = legacy_prompt_bytes(Path("Global/codex/prompts") / f"{prompt.stem}.md")
+        if expected is None:
+            continue
+        if target.exists() and target.read_bytes() == expected:
+            legacy.append(target)
+        elif target.exists():
+            legacy_conflicts.append(str(target.relative_to(home)))
 
 new_targets = {target for _, target in files}
 special_targets = {target for _, target in specials}
@@ -286,26 +294,40 @@ try:
     if legacy_conflicts:
         print("LEGACY_CONFLICTS=" + ",".join(sorted(legacy_conflicts)))
 
-    oc = json.loads((targets["opencode"] / "opencode.json").read_text())
-    if any(item.get("enabled") for item in oc.get("mcp", {}).values()):
-        raise RuntimeError("OpenCode MCP smoke check failed")
-    cc = json.loads((targets["claude-code"] / "settings.json").read_text())
-    if cc.get("enabledPlugins", {}).get("engram@engram") is not False:
-        raise RuntimeError("Claude Engram smoke check failed")
-    for path in (targets["codex"] / "agents").glob("*.toml"):
-        tomllib.loads(path.read_text())
-    codex_config = tomllib.loads((targets["codex"] / "config.toml").read_text())
-    if codex_config.get("features", {}).get("multi_agent") is not True or codex_config.get("agents", {}).get("max_depth") != 1:
-        raise RuntimeError("Codex multi-agent smoke check failed")
-    for name in ("engram", "context7", "playwright", "brave-cdp"):
-        if codex_config.get("mcp_servers", {}).get(name, {}).get("enabled", False) is not False:
-            raise RuntimeError(f"Codex {name} MCP smoke check failed")
+    if "opencode" in targets:
+        oc = json.loads((targets["opencode"] / "opencode.json").read_text())
+        if any(item.get("enabled") for item in oc.get("mcp", {}).values()):
+            raise RuntimeError("OpenCode MCP smoke check failed")
+    if "claude-code" in targets:
+        cc = json.loads((targets["claude-code"] / "settings.json").read_text())
+        if cc.get("enabledPlugins", {}).get("engram@engram") is not False:
+            raise RuntimeError("Claude Engram smoke check failed")
+    if "codex" in targets:
+        for path in (targets["codex"] / "agents").glob("*.toml"):
+            tomllib.loads(path.read_text())
+        codex_config = tomllib.loads((targets["codex"] / "config.toml").read_text())
+        if codex_config.get("features", {}).get("multi_agent") is not True or codex_config.get("agents", {}).get("max_depth") != 1:
+            raise RuntimeError("Codex multi-agent smoke check failed")
+        for name in ("engram", "context7", "playwright", "brave-cdp"):
+            if codex_config.get("mcp_servers", {}).get(name, {}).get("enabled", False) is not False:
+                raise RuntimeError(f"Codex {name} MCP smoke check failed")
     if os.environ.get("SET_AGENTS_FORCE_SMOKE_FAIL") == "1":
         raise RuntimeError("forced smoke failure")
     # Only after every smoke check passes: record what we manage now, so the next run can
     # prune whatever we stop producing. A rolled-back install never reaches here.
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    atomic_write(MANIFEST, json.dumps(sorted(str(t.relative_to(home)) for t in new_targets), indent=2) + "\n")
+    preserved = []
+    selected_roots = set(targets.values())
+    if MANIFEST.exists():
+        try:
+            for relative in json.loads(MANIFEST.read_text()):
+                candidate = home / relative
+                if not any(root in candidate.parents for root in selected_roots):
+                    preserved.append(relative)
+        except (OSError, json.JSONDecodeError):
+            preserved = []
+    managed = set(preserved) | {str(t.relative_to(home)) for t in new_targets}
+    atomic_write(MANIFEST, json.dumps(sorted(managed), indent=2) + "\n")
 except Exception:
     rollback()
     print(f"INSTALL_ROLLED_BACK backup={backup}")

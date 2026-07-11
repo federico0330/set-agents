@@ -1,7 +1,7 @@
 ---
 description: "Orchestrator \u2014 read-only coordinator of the complete delivery lifecycle"
 mode: primary
-model: openai/gpt-5.4
+model: openai/gpt-5.6-terra
 temperature: 0.1
 permission:
   edit: deny

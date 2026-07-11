@@ -1,6 +1,6 @@
 name = "product-analyst"
 description = "Product-Analyst \u2014 turns intent into specs and acceptance criteria"
-model = "gpt-5.4"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = """

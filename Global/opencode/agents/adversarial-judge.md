@@ -1,7 +1,7 @@
 ---
 description: "Adversarial judge \u2014 mandatory final read-only gate"
 mode: subagent
-model: openai/gpt-5.5
+model: openai/gpt-5.6-sol
 temperature: 0.0
 permission:
   edit: deny

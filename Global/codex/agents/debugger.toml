@@ -1,6 +1,6 @@
 name = "debugger"
 description = "Debugger \u2014 root-cause a failing gate and apply the minimal fix"
-model = "gpt-5.4-mini"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = """

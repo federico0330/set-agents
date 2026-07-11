@@ -1,7 +1,7 @@
 ---
 description: "Debugger \u2014 root-cause a failing gate and apply the minimal fix"
 mode: subagent
-model: openai/gpt-5.4
+model: openai/gpt-5.6-terra
 temperature: 0.1
 permission:
   edit: allow

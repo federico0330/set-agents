@@ -1,7 +1,7 @@
 ---
 description: "Runtime-verifier \u2014 read-only end-to-end proof that the running app actually behaves"
 mode: subagent
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-terra
 temperature: 0.1
 permission:
   edit: deny

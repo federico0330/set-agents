@@ -50,7 +50,7 @@ def load_roles(profile, roles_path=None):
             die(f"{row['role']}: invalid OpenCode model id")
         if row["claude_model"] not in {"opus", "sonnet", "haiku", "fable"}:
             die(f"{row['role']}: invalid Claude model alias")
-        if not re.fullmatch(r"gpt-5\.(?:4(?:-mini)?|5)", row["codex_model"]):
+        if not re.fullmatch(r"gpt-5\.(?:4(?:-mini)?|5|6-(?:sol|terra|luna))", row["codex_model"]):
             die(f"{row['role']}: invalid Codex model id")
         if not (CANON / "agents" / f"{row['role']}.md").is_file():
             die(f"{row['role']}: missing canonical prompt")

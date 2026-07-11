@@ -6,9 +6,10 @@ MODE="generate"
 PROFILE=""
 OUTPUT=""
 YES=0
+TARGETS=()
 
 usage() {
-  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|local] [--output DIR] [--yes]"
+  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|local] [--output DIR] [--target opencode|claude-code|codex] [--yes]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -18,6 +19,7 @@ while [ "$#" -gt 0 ]; do
     --install) MODE="install" ;;
     --profile) shift; PROFILE="${1:-}" ;;
     --output) shift; OUTPUT="${1:-}" ;;
+    --target) shift; TARGETS+=("${1:-}") ;;
     --yes) YES=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
@@ -54,11 +56,15 @@ case "$MODE" in
     echo "Generated tracked artifacts for ${PROFILE:-$(<"$ROOT/active-profile")}."
     ;;
   install)
-    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" --preview
+    target_args=()
+    for target in "${TARGETS[@]}"; do
+      target_args+=(--target "$target")
+    done
+    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" "${target_args[@]}" --preview
     if [ "$YES" -ne 1 ]; then
       read -r -p "Install this managed diff globally? [y/N] " answer
       case "$answer" in y|Y|yes|YES) ;; *) echo "Installation cancelled."; exit 1;; esac
     fi
-    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME"
+    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" "${target_args[@]}"
     ;;
 esac

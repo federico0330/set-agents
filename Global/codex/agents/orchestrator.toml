@@ -1,6 +1,6 @@
 name = "orchestrator"
 description = "Orchestrator \u2014 read-only coordinator of the complete delivery lifecycle"
-model = "gpt-5.4"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """

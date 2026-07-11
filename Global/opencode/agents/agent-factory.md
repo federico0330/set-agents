@@ -1,7 +1,7 @@
 ---
 description: "Agent factory \u2014 canonical role and capability authoring"
 mode: subagent
-model: opencode-go/glm-5.1
+model: openai/gpt-5.6-terra
 temperature: 0.1
 permission:
   edit: allow
