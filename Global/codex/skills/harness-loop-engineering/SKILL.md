@@ -1,45 +1,46 @@
 ---
 name: harness-loop-engineering
-description: The meta-skill — how this whole system works. Harness = the verifiable process around the model (agents, permissions, gates, memory). Loop = a controlled cycle implement→verify→audit→repair with hard stops. Load to understand or orchestrate the workflow.
+description: Package-based harness workflow: approved spec, coherent packages, local validations, deterministic gates, independent package review, consolidated repair, delta review, and hard stops.
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: orchestrator, architect, debugger
+  enabled_for: orchestrator, architect, debugger, package-planner, integrator
 ---
 
 # Harness & Loop Engineering
 
 ## Idea
-**Harness engineering** = designing the verifiable scaffolding around the model (roles, prompts, permissions,
-skills, commands, deterministic scripts, audits, gates). The goal is not "ask the model nicer" but to box it
-into a process that proves its own output. **Loop engineering** = controlled cycles with hard stop conditions.
+Harness engineering designs the verifiable scaffolding around the model: roles, prompts, permissions, skills,
+commands, deterministic scripts, audits, gates, and state. Loop engineering defines controlled cycles with hard
+stop conditions.
 
-## The canonical loop
+## Canonical package workflow
 ```
-task → implement → audit(read-only, vs spec/design/acceptance) → repair(findings) → audit → … until no findings
-     → regression tests(test-writer) → verify(gate) → memory → stop
+REQUIREMENTS -> SPEC_DRAFT -> SPEC_CHALLENGE -> USER_APPROVAL -> PACKAGE_PLANNING
+-> PACKAGE_IMPLEMENTATION -> PACKAGE_GATES -> PACKAGE_REVIEW -> PACKAGE_REPAIR
+-> DELTA_REVIEW -> PACKAGE_ACCEPTED -> INTEGRATION -> DONE | BLOCKED
 ```
-The **read-only audit against the spec/design is the primary gate**, not tests: a passing test does not prove the
-code returns what the spec expects. Regression tests are written only after the audit loop converges, as proof of
-the already-correct behavior — never as a guardrail to implement, and never weakened to pass.
-Rules that make it safe:
-- `MAX_ITER` cap (default 4).
-- Deterministic verification (`ai/scripts/verify.sh`) runs build/lint each iteration and, once regression tests
-  exist, runs them too — but the auditor, not a green suite, decides convergence.
-- The auditor is a DIFFERENT agent/run than the implementer (separation of duties).
-- Findings must be actionable (`id, severity, file:line, evidence, impact, minimal_fix, verification`).
-- Stop if the same failure/audit state repeats (hash the state and compare).
-- Stop and emit `HUMAN_DECISION_REQUIRED` when a human must decide.
-- Save durable memory at the end of a verified iteration.
+
+The independent package review against the approved spec/package contract is the primary review gate. Local tests
+keep workers from accumulating broken code; they do not approve the package. Regression tests are written after
+package behavior converges and must never be weakened.
+
+## Rules
+- Each ordinary task gets local validation.
+- Deep review happens on the integrated package, not after every task.
+- Maximum two deep review cycles per package.
+- Findings are consolidated; repairs are consolidated; re-review is delta-focused.
+- Reviewers are read-only and independent from implementers.
+- Stop when retry budget is consumed, the same state repeats, or a real human decision is required.
+- Durable state lives in `ai/state/features/<feature_id>.json`, not in chat.
 
 ## Roles vs pieces
-- **Agent/subagent**: a role with prompt, permissions, model. **Skill**: a reusable procedure loaded on demand.
-- **Command**: an invocable prompt (`/audit`). **MCP**: external tool (docs, memory). **Memory**: durable
-  continuity (not primary truth). **Gate**: an objective pass/fail condition.
+- **Agent/subagent**: role with prompt, permissions, model.
+- **Skill**: reusable procedure loaded on demand.
+- **Command**: invocable prompt such as `/feature-batch`.
+- **Gate**: objective pass/fail condition.
+- **State**: compact JSON/YAML evidence, not a transcript.
 
 ## Golden rule
-Whoever implements does not approve. Cheap models implement; capable models design and audit. State lives in
-files, so any session (or harness) can resume from the repository, not from chat.
-
-## When to use
-At the start of any non-trivial change, when designing a new loop, or when a process keeps producing churn.
+Whoever implements does not approve. Efficient models may implement bounded package work; capable independent
+models challenge specs, review packages, and judge final evidence.

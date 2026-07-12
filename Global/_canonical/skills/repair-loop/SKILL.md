@@ -1,32 +1,32 @@
 ---
 name: repair-loop
-description: Turn concrete audit findings into minimal fixes, re-verify, and re-audit — without expanding scope or weakening tests. Load when an audit produced actionable findings.
+description: Turn consolidated package/delta review findings into minimal fixes, re-verify, and route to focused delta review without expanding scope or weakening tests.
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: orchestrator, implementer, debugger, auditor
+  enabled_for: orchestrator, repair-agent, implementer, debugger
 ---
 
 # Repair Loop
 
 ## When to use
-After an audit produced concrete findings (blocker/major/minor).
+After package review or delta review produced concrete findings.
 
 ## Inputs
-Findings file/output, active task/spec, current diff.
+Findings set, approved spec, package plan, current diff, gate output, retry budget.
 
 ## Outputs
-Minimal repair diff · full verification result · re-audit result.
+Minimal repair diff, finding-specific verification, package gate result, and delta-review handoff.
 
 ## Procedure
-1. Parse findings; reject vague ones (send back for evidence).
-2. Sort blocker → major → minor.
-3. For each finding, make ONLY the minimal fix. Do not batch unrelated repairs.
-4. Run the finding-specific verification, then full `ai/scripts/verify.sh`.
-5. Re-run the SAME auditor (read-only, fresh context) to confirm closure.
-6. Stop after `MAX_ITER` or if the same finding/state repeats → `HUMAN_DECISION_REQUIRED`.
+1. Parse findings; reject vague ones lacking evidence.
+2. Group findings by root cause and files.
+3. Make only minimal fixes. Batch related repairs; avoid unrelated cleanup.
+4. Run finding-specific checks, then the package/full gate available in the project.
+5. Route to `delta-reviewer` in a fresh read-only context.
+6. Stop after retry budget or repeated state -> `BLOCKED`.
 
 ## Rules
-- Never modify acceptance criteria or weaken tests to close a finding.
-- The implementer cannot mark a finding resolved without a re-audit.
-- A finding that reappears twice is a stop condition, not a third attempt.
+- Never modify acceptance criteria or weaken tests.
+- The repair agent cannot mark a finding resolved without delta review.
+- A finding that reappears after budget is a terminal blocker, not an invitation to loop.

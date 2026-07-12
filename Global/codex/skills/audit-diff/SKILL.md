@@ -1,6 +1,6 @@
 ---
 name: audit-diff
-description: Read-only diff audit against spec/tasks/acceptance — scope control, test integrity, edge cases, and a golden catalog of the cheap-but-compounding mistakes a fast implementer makes (pagination, N+1, AsNoTracking, atomicity, concurrency, status codes, secrets). Actionable binary findings. Load after implementation, before declaring a task done.
+description: Read-only diff audit against spec/package/acceptance — scope control, test integrity, edge cases, and a golden catalog of cheap-but-compounding mistakes. Load for focused audits or package review support.
 license: MIT
 compatibility: opencode
 metadata:
@@ -15,19 +15,19 @@ whole catalog every time, even when the code compiles and the tests pass — "it
 job is to catch the small, cheap-to-fix failures that quietly become debt and vulnerabilities.
 
 ## When to use
-After implementation and verify, before a task is marked complete.
+After package implementation and gates, before a package is accepted; also for focused checkpoints.
 
 ## Inputs
-`git diff`, active spec/task/acceptance, verification output, project rules (AGENTS.md).
+`git diff`, approved spec, package/task scope, acceptance criteria, verification output, project rules.
 
 ## Procedure
 1. Read the task and acceptance criteria FIRST — you audit the implementation against the spec/design/acceptance,
    NOT against a passing test suite. This is the guardrail: does the code actually return what the spec expects?
 2. Inspect the diff in context, not files in isolation.
 3. Scope control: no opportunistic refactors, no unrelated churn.
-4. Test integrity — only once the end-stage regression tests exist (they are written after the implement⇄audit
-   loop converges): they prove the behavior and were not weakened/skipped. During the loop, before tests exist,
-   this check is N/A; judge correctness against the spec, not a green suite.
+4. Test integrity — local validations are expected during package implementation; end-stage regression tests are
+   checked once they exist after package convergence. Judge correctness against the spec/package contract, not a
+   green suite alone.
 5. Failure paths and edge cases covered.
 6. **Walk the golden failure catalog below** — for anything the diff touches.
 7. Produce ONLY actionable findings.

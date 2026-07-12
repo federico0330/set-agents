@@ -3,8 +3,11 @@ description: "Project bootstrapper \u2014 conservative project discovery and set
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.2
+steps: 10
 permission:
   edit: allow
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": ask

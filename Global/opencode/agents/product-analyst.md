@@ -3,8 +3,11 @@ description: "Product-Analyst \u2014 turns intent into specs and acceptance crit
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.2
+steps: 10
 permission:
   edit: allow
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": ask
@@ -61,12 +64,12 @@ After the idea is clear (directly or via brainstormer), before architecture and 
 1. Write `spec.md`: problem, target users, business rules, invariants, in-scope, explicit non-goals.
 2. Write `acceptance.md`: each criterion as a testable Given/When/Then with the expected status/result. These
    are the **BDD** behavioral scenarios (business language, whole-system, product↔tech bridge) — load the
-   `bdd` skill; they drive the implement⇄audit loop, the end-stage regression tests, and the runtime-verifier's
+   `bdd` skill; they drive package planning/review, the end-stage regression tests, and the runtime-verifier's
    end-to-end check. Include a portable ASCII/Unicode flow diagram of the scenarios (actor → action → observable
    outcome) in `acceptance.md` so the orchestrator can walk the user through the flow as the connection point
    before implementation.
-3. Write `tasks.md`: ordered, small tasks (`T-001…`), each with its acceptance link and review gate
-   (architect / db-auditor / security-auditor / performance-auditor).
+3. Write `tasks.md`: ordered work items (`T-001…`), each with its acceptance link, likely package, local
+   validations, ownership hints, and risk-specific checkpoint needs.
 4. Write `plan.md`: sequence, dependencies, risks, and what triggers a human decision.
 5. Self-review before handing off — a short "spec audit" section at the end of `spec.md`:
    - For each detection/absence requirement: universe named? absence-of-record behavior defined? data

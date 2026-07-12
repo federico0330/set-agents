@@ -3,8 +3,11 @@ description: "Runtime-verifier \u2014 read-only end-to-end proof that the runnin
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
+steps: 8
 permission:
   edit: deny
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": deny

@@ -1,10 +1,9 @@
 ---
-description: Pick and route the next task through the loop
+description: Legacy task runner; prefer /feature-batch for package workflow
 agent: orchestrator
 ---
 Advance the active change. Argument (optional task id): $ARGUMENTS
 
-Read specs/tasks, pick the next task, delegate the smallest implementation (driven by the spec/design, NOT by
-tests), then run the implement⇄audit loop until the auditor returns no findings; write regression tests once it
-converges and route the right gates (verify + domain audits). Report phase, gate results, and the next step or
-human decision.
+Compatibility path only. If an approved feature can be packaged, switch to `/feature-batch` and package planning.
+Do not start deep audits after ordinary individual tasks. For legacy quick-fix scope, delegate implementation,
+local validation, deterministic gates, and a focused audit only when package workflow is not applicable.

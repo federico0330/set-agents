@@ -1,7 +1,10 @@
 ---
-description: Fix concrete audit findings minimally
-agent: implementer
+description: Consolidated package repair for concrete findings
+agent: repair-agent
 ---
-Repair ONLY the concrete findings in ai/state/audit-findings.md (or: $ARGUMENTS).
-Sort blocker>major>minor, make the minimal fix per finding, do not change acceptance criteria or weaken
-tests, run focused verification then ai/scripts/verify.sh, and hand back to the auditor for re-audit.
+Repair ONLY the concrete findings for the active package in ai/state/features/<feature_id>.json,
+ai/state/audit-findings.md, or: $ARGUMENTS.
+
+Make a consolidated minimal repair pass, preserve finding -> change -> verification traceability, do not change
+acceptance criteria or weaken tests, run focused verification then package gates, and hand back to
+`delta-reviewer`.

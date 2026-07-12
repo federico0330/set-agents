@@ -3,8 +3,11 @@ description: "DB-Auditor \u2014 read-only data integrity, transactions, concurre
 mode: subagent
 model: openai/gpt-5.6-sol
 temperature: 0.0
+steps: 8
 permission:
   edit: deny
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": deny

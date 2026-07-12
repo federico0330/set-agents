@@ -3,8 +3,11 @@ description: "Agent factory \u2014 canonical role and capability authoring"
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
+steps: 10
 permission:
   edit: allow
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": ask

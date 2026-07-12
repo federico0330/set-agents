@@ -3,8 +3,11 @@ description: "GitHub release manager \u2014 gated local preparation and two huma
 mode: subagent
 model: openai/gpt-5.4-mini
 temperature: 0.0
+steps: 6
 permission:
   edit: deny
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": deny

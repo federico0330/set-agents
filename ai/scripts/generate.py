@@ -81,6 +81,46 @@ def description(body):
     return match.group(1) if match else "Specialized harness agent"
 
 
+def oc_steps(role, capability, duty):
+    role_steps = {
+        "orchestrator": 18,
+        "spec-challenger": 8,
+        "package-planner": 10,
+        "package-reviewer": 10,
+        "delta-reviewer": 8,
+        "repair-agent": 12,
+        "integrator": 12,
+        "implementer": 14,
+        "frontend-engineer": 14,
+        "refactor-specialist": 10,
+        "debugger": 10,
+        "test-writer": 10,
+        "gate-runner": 4,
+        "runtime-verifier": 8,
+        "app-runner": 6,
+    }
+    if role in role_steps:
+        return role_steps[role]
+    if duty in {"audit", "judge"}:
+        return 8
+    if capability in {"docs-rw", "factory-rw"}:
+        return 10
+    if capability == "review-ro":
+        return 8
+    return 6
+
+
+def oc_hidden(role):
+    return role in {
+        "spec-challenger",
+        "package-planner",
+        "package-reviewer",
+        "repair-agent",
+        "delta-reviewer",
+        "integrator",
+    }
+
+
 def oc_permissions(capability, roles):
     safe = [
         '    "git status*": allow', '    "git diff*": allow', '    "git log*": allow',
@@ -109,13 +149,13 @@ def oc_permissions(capability, roles):
     ]
     lines = ["permission:"]
     if capability == "coord-ro":
-        lines += ["  edit: deny", "  webfetch: allow", "  websearch: ask", "  task:", '    "*": deny']
+        lines += ["  edit: deny", "  question: ask", "  doom_loop: deny", "  webfetch: allow", "  websearch: ask", "  task:", '    "*": deny']
         lines += [f'    "{r["role"]}": allow' for r in roles if r["role"] != "orchestrator"]
         lines += ["  bash:", '    "*": deny', *safe, *hard_denies]
     elif capability == "review-ro":
-        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny', *safe, *hard_denies]
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": deny', *safe, *hard_denies]
     elif capability == "gate-ro":
-        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny',
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": deny',
                   '    "./ai/scripts/verify.sh*": allow', '    "npm test*": allow',
                   '    "npm run test*": allow', '    "npm run lint*": allow',
                   '    "npm run typecheck*": allow', '    "npm run build*": allow',
@@ -123,19 +163,19 @@ def oc_permissions(capability, roles):
                   '    "python -m pytest*": allow',
                   '    "*--config*": deny', '    "*--runner*": deny', '    "*-exec*": deny', *hard_denies]
     elif capability == "release":
-        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
                   '    "python3 ~/.config/opencode/hooks/release_action.py*": allow',
                   '    "git switch*": deny', '    "git add*": deny', '    "git commit*": deny', '    "git push*": deny',
                   '    "gh pr create*": deny', '    "gh pr edit*": deny', '    "gh pr merge*": deny',
                   '    "git push --force*": deny', '    "git push -f*": deny', '    "gh repo edit*": deny',
                   '    "gh repo delete*": deny']
     elif capability == "run-ro":
-        lines += ["  edit: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
                   '    "./ai/scripts/run.sh*": allow', '    "./ai/scripts/verify.sh*": allow',
                   '    "curl http://localhost*": allow', '    "curl http://127.0.0.1*": allow',
                   '    "curl localhost*": allow', '    "curl 127.0.0.1*": allow', *hard_denies]
     else:
-        lines += ["  edit: allow", "  task: deny", "  bash:", '    "*": ask', *safe,
+        lines += ["  edit: allow", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe,
                   '    "git push*": deny', '    "sudo *": deny']
     return "\n".join(lines)
 
@@ -187,8 +227,11 @@ def generate(out, profile, roles_path=None):
         oc = "\n".join([
             "---", f"description: {json.dumps(desc)}", f"mode: {row['mode']}",
             f"model: {row['opencode_model']}", f"temperature: {row['temperature']}",
+            f"steps: {oc_steps(row['role'], row['capability'], row['duty'])}",
+            ("hidden: true" if oc_hidden(row["role"]) else ""),
             oc_permissions(row["capability"], roles), "---", "", body,
         ])
+        oc = oc.replace("\n\npermission:", "\npermission:")
         path = out / "opencode/agents" / f"{row['role']}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(oc)

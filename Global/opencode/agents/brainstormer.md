@@ -3,8 +3,11 @@ description: "Brainstormer \u2014 divergent idea generation with explicit tradeo
 mode: subagent
 model: opencode/nemotron-3-ultra-free
 temperature: 0.4
+steps: 8
 permission:
   edit: deny
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": deny

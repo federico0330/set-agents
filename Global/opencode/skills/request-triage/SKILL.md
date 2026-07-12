@@ -26,10 +26,11 @@ failure this skill exists to prevent (applying the heavy flow to a problem that 
 Triggers: "build an app", "add a feature", anything net-new or non-trivial touching architecture/data/security.
 Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
 expect? what data model? where centralized vs decentralized? what must be secure day one? Then the rigorous
-**SDD → BDD → implement⇄audit loop → regression tests** flow: spec → design+ADR (SDD) → acceptance
-Given-When-Then (BDD) → **implement → read-only audit against the spec/design → repair → audit → … until no
-findings** → regression tests (written now) → verify → audit panel → judge → release → memory. Tests do NOT gate
-implementation; the auditor does. This order is mandatory in feature mode; the three lanes below are the only
+**SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
+Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
+validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
+integration → judge → release → memory. Tests do NOT approve implementation; the independent package reviewer
+does. This order is mandatory in feature mode; the three lanes below are the only
 exceptions (scoped-feature / quick-fix / incident).
 
 ### 2. Scoped-feature — bounded but security-sensitive (the middle lane)
@@ -38,12 +39,12 @@ Triggers: a net-new but **well-bounded** feature with a clear blast radius that 
 recovery on Supabase". It is too sensitive for quick-fix, but running the full panel after every task and every
 repair is waste (that is what turned a login into a 4-5h grind).
 Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
-decision) → BDD connection point with the user → implement⇄audit loop → **ONE consolidated `auditor` pass over
-the complete diff** → `security-auditor` + `red-team` **once at the end** (not per cycle) → regression tests →
-`adversarial-judge` → release → memory.
-What is cut: the heavy panel does NOT re-run after each task or each trivial repair — it runs once on the full
-diff before the judge. The security guarantee is preserved (auth ALWAYS passes security + red-team once), but the
-task×cycle multiplier is eliminated. Ambiguous between scoped and full feature → **go up to feature mode**.
+decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
+consolidated package review over the complete package diff** → `security-auditor` + `red-team` when the package
+touches that surface → regression tests → `adversarial-judge` → release → memory.
+What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
+reviewing the complete relevant package/diff once, then delta-reviewing repairs. Ambiguous between scoped and
+full feature → **go up to feature mode**.
 
 ### 3. Quick-fix — bounded and low-risk
 Triggers: a small, well-understood change with an obvious blast radius (copy tweak, one-function bug, config
@@ -69,17 +70,15 @@ These agents are permitted but easy to forget — pull them in on these triggers
 - **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
 - **queries / lists / transactions / migrations** → `db-auditor` + `performance-auditor` (already mandatory).
 
-**Cadence by mode:** in **feature** mode these run per the orchestrator's cadence (heavy panel on first touch of
-the surface and again only when a repair changes that surface, plus one full panel pass before the judge). In
-**scoped-feature** mode they run **once at the end** on the complete diff, not per task or per repair. Either
-way, a full panel pass before `adversarial-judge` is mandatory — never skip the pre-judge panel.
+**Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
+when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before
+`adversarial-judge` is mandatory.
 
 ## Hard logic → hosted implementer (never the local leaf)
 Concurrency, atomic transactions, money/financial rules, and security-critical logic must NOT be implemented by
 the local leaf model (the cheap 8B) — a weak first draft on exactly this logic triggers more strong-auditor
 rework than it saves. When a task touches these, pin implementation to a **hosted** model (e.g. `openai/gpt-5.4`)
-rather than the local `implementer`. The autonomous `loop.sh` does this automatically when the spec flags a
-sensitive/data surface; in the interactive path, route such implementation to a hosted model deliberately. The
+rather than the local `implementer`. Route such implementation deliberately from the package plan. The
 local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then reviews.
 
 ## Output of triage

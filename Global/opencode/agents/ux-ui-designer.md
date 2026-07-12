@@ -3,8 +3,11 @@ description: "UX-UI-Designer \u2014 frontend design, design tokens, accessibilit
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.3
+steps: 10
 permission:
   edit: allow
+  question: deny
+  doom_loop: deny
   task: deny
   bash:
     "*": ask
