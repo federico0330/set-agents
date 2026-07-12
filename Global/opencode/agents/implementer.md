@@ -1,7 +1,7 @@
 ---
 description: "Implementer \u2014 smallest safe diff for one task, no opportunistic refactors"
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: openai/gpt-5.3-codex-spark
 temperature: 0.1
 permission:
   edit: allow

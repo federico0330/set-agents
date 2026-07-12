@@ -1,7 +1,7 @@
 ---
 description: "Gate runner \u2014 deterministic verification without repair"
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4-mini
 temperature: 0.0
 permission:
   edit: deny

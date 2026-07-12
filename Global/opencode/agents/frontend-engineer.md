@@ -1,7 +1,7 @@
 ---
 description: "Frontend-engineer \u2014 build brand-grade, accessible UI that never looks generic"
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: openai/gpt-5.3-codex-spark
 temperature: 0.2
 permission:
   edit: allow

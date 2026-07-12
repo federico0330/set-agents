@@ -1,7 +1,7 @@
 ---
 description: "Project bootstrapper \u2014 conservative project discovery and setup"
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.6-terra
 temperature: 0.2
 permission:
   edit: allow

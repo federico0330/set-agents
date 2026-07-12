@@ -1,7 +1,7 @@
 ---
 description: "Refactor-Specialist \u2014 behavior-preserving refactors under a test net"
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: openai/gpt-5.3-codex-spark
 temperature: 0.1
 permission:
   edit: allow

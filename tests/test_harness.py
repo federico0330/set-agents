@@ -70,7 +70,7 @@ class HarnessTests(unittest.TestCase):
     def test_invalid_separation_graph_is_rejected(self):
         roster = (ROOT / "roles.tsv").read_text().replace(
             "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topenai/gpt-5.6-sol",
-            "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topencode-go/kimi-k2.7-code",
+            "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topenai/gpt-5.3-codex-spark",
         )
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"

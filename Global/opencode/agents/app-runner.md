@@ -1,7 +1,7 @@
 ---
 description: "App runner \u2014 launch, health-check, and report the running application"
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4-mini
 temperature: 0.1
 permission:
   edit: deny

@@ -1,7 +1,7 @@
 ---
 description: "Memory scribe \u2014 local-first durable verified learning"
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4-mini
 temperature: 0.0
 permission:
   edit: allow

@@ -1,7 +1,7 @@
 ---
 description: "Performance-Auditor \u2014 read-only scalability and query-efficiency review"
 mode: subagent
-model: opencode-go/minimax-m3
+model: openai/gpt-5.6-sol
 temperature: 0.0
 permission:
   edit: deny

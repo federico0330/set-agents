@@ -1,7 +1,7 @@
 ---
 description: "GitHub release manager \u2014 gated local preparation and two human cuts"
 mode: subagent
-model: opencode-go/deepseek-v4-flash
+model: openai/gpt-5.4-mini
 temperature: 0.0
 permission:
   edit: deny

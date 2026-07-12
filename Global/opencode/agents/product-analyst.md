@@ -1,7 +1,7 @@
 ---
 description: "Product-Analyst \u2014 turns intent into specs and acceptance criteria"
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: openai/gpt-5.6-terra
 temperature: 0.2
 permission:
   edit: allow
