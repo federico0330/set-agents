@@ -34,6 +34,8 @@ REQUIREMENTS
 -> PACKAGE_REVIEW
 -> PACKAGE_REPAIR
 -> DELTA_REVIEW
+-> PACKAGE_TESTING
+-> PACKAGE_RUNTIME_QA
 -> PACKAGE_ACCEPTED
 -> INTEGRATION
 -> DONE | BLOCKED
@@ -41,18 +43,36 @@ REQUIREMENTS
 
 Preserve the current strong front half: requirements, Feature Contract, spec challenge, revisions, and human
 approval. The change is after approval: implement related work as packages, run local validations per task, then
-run one deep review over the complete package.
+run a bounded review panel over the complete package, repair in batches, test with deterministic commands, and
+verify the running application when relevant.
 
 ## Durable state
 
 For package-based features, maintain a compact structured state file at `ai/state/features/<feature_id>.json`
-when the project allows writes through the appropriate delegated agent. It must store at least:
+using `python3 ai/scripts/feature-state.py`. It must store at least:
 
 - `feature_id`, approved spec path, spec hash/version, acceptance criteria
 - packages, tasks, dependencies, ownership paths, status per task/package
 - gate results, attempts consumed, findings, repairs, final state
 
 Do not turn state into a chat transcript. Store decisions and evidence only.
+
+Every transition after USER_APPROVAL must be backed by the state CLI:
+
+- `init` after approved spec.
+- `create-package` after package planning.
+- `transition` only when the CLI allows the target phase.
+- `complete-task` for local task validation evidence.
+- `record-gate`, including `check-owned-paths.py`, before package review.
+- `record-review`, `record-repair`, `record-delta-review`, and `accept-package` after the corresponding agent.
+- `start-review-panel`, `record-subreview`, and `finalize-review-panel` when multiple specialist reviewers are
+  useful. A panel consumes one deep review cycle no matter how many subreviewers contribute.
+- `record-testing` after regression/integration tests.
+- `record-runtime-qa` after app/browser QA with observable evidence.
+- `resume`/`next` before continuing an interrupted feature.
+
+If the state machine rejects a transition, do not work around it in chat. Fix the missing precondition or mark
+`BLOCKED`.
 
 ## Delegation flow
 
@@ -64,21 +84,32 @@ Do not turn state into a chat transcript. Store decisions and evidence only.
 4. Stop for USER_APPROVAL of the spec. Do not implement before approval.
 5. `package-planner` decomposes the approved spec into coherent packages. Packages should be vertical slices,
    related AC groups, stable subsystems, API+integration paths, or UI+API flows. Prefer 3-7 work items when
-   cohesive; cohesion wins over count.
+   cohesive; cohesion wins over count. It must classify complexity and record `selected_role`, `selected_model`,
+   and `routing_reason` in state:
+   - `small`: mechanical, few files, closed scope -> efficient role/model.
+   - `medium`: several related tasks, layers, or integration -> Terra-class implementer/repair agent.
+   - `high`: architecture/security/concurrency/contracts/migrations -> strongest available planning/review and
+     explicit risk checkpoint before broad mutation.
 6. For each package, delegate implementation to `implementer`, `frontend-engineer`, `refactor-specialist`, or
    `integrator` as appropriate. Workers run local validation per task but never deep-audit or approve themselves.
 7. `gate-runner` runs deterministic package gates after the package is integrated enough to review.
-8. `package-reviewer` runs the single deep package review. Trigger early focused checkpoints only for auth,
-   authorization, tenant isolation, payments, secrets, crypto, destructive migrations/deletes, incompatible public
-   contracts, system permissions, or untrusted code execution.
+   Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
+8. `package-reviewer` leads the bounded package review panel. Use as many specialist subagents as make sense for
+   the package surface: `auditor`, `security-auditor`, `red-team`, `blue-team`, `db-auditor`,
+   `performance-auditor`, `ux-ui-designer`, or other relevant reviewers. Their outputs are subreviews inside one
+   panel and must be consolidated before repair. Trigger early focused checkpoints only for auth, authorization,
+   tenant isolation, payments, secrets, crypto, destructive migrations/deletes, incompatible public contracts,
+   system permissions, or untrusted code execution.
 9. If findings exist, `repair-agent` repairs them in a consolidated pass.
 10. `delta-reviewer` reviews the repair delta and previous findings. It performs a full re-review only if the
     repair substantially changed architecture, public contracts, or risk surface.
-11. Mark `PACKAGE_ACCEPTED` only after package gates and review/delta review pass.
-12. `integrator` integrates accepted packages and runs global consistency checks.
-13. `test-writer` writes end-stage regression tests after package behavior has converged, then `gate-runner` runs
-    verification.
-14. `runtime-verifier` checks running UI/runtime behavior when relevant.
+11. `test-writer` writes end-stage regression tests after package behavior has converged, then `gate-runner` runs
+    verification and `record-testing`.
+12. `app-runner` starts the application and `runtime-verifier` performs browser/runtime QA when the package has UI,
+    API, persistence, workflow, or customer-visible behavior. QA means exercising the running app, not rereading
+    code. Record URL, screenshots/logs, checks performed, and result with `record-runtime-qa`.
+13. Mark `PACKAGE_ACCEPTED` only after package gates, review/delta review, testing, and runtime QA pass.
+14. `integrator` integrates accepted packages and runs global consistency checks.
 15. `adversarial-judge` receives the final evidence bundle before release.
 16. `github-release-manager` prepares release only after judge pass and required human cuts.
 17. `memory-scribe` records durable verified learning when useful.
@@ -89,10 +120,11 @@ Do not turn state into a chat transcript. Store decisions and evidence only.
 - Every task gets local validation: compile/typecheck/lint/focused tests/contract checks/smoke checks as relevant.
 - Deep review starts only when the package is integrated, minimum gates ran, or a declared high-risk checkpoint is
   reached.
-- Maximum two deep review cycles per package. After that: diagnose once and mark `BLOCKED` with evidence.
+- A review panel may include many subagents, but the panel is one review cycle. Maximum two deep review cycles per
+  package. After that: diagnose once and mark `BLOCKED` with evidence.
 - Findings are consolidated; repairs are consolidated; the second review is focused on the delta.
 - Do not re-spawn security/db/perf panels after every repair. Run specialized reviewers when their surface is in
-  the package or the repair changes that surface.
+  the package or the repair changes that surface, and record them as subreviews of the same bounded panel.
 
 ## Question policy
 

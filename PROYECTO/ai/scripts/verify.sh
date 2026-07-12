@@ -34,6 +34,14 @@ fi
 # ── Python ─────────────────────────────────────────────────
 { [ -f pyproject.toml ] || [ -f pytest.ini ]; } && { run python -m pytest -q || FAIL=1; }
 
+# ── Package ownership gate ─────────────────────────────────
+# When FEATURE_STATE and PACKAGE_ID are provided by the orchestrator, enforce package-owned paths before
+# the deep package review. Without those variables, keep verify.sh usable as a generic project gate.
+if [ -n "${FEATURE_STATE:-}" ] && [ -n "${PACKAGE_ID:-}" ]; then
+  BASELINE="${BASELINE:-HEAD}"
+  run python3 ai/scripts/check-owned-paths.py --state-file "$FEATURE_STATE" --package-id "$PACKAGE_ID" --baseline "$BASELINE" || FAIL=1
+fi
+
 # ── Guardarraíl anti-tests-debilitados (sobre el DIFF, no todo el repo) ─────
 # Un marcador preexistente en OTRO archivo ya no bloquea toda tarea (falso-positivo DoS), y detectamos
 # debilitamiento por BORRADO de asserts (no solo .skip/.only), que el grep global no veía.

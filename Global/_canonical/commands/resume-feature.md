@@ -6,5 +6,14 @@ Resume feature:
 $ARGUMENTS
 
 Read `ai/state/features/<feature_id>.json`, approved spec, package plan, latest gates, findings, and repairs.
-Continue from the next deterministic state transition. Do not restart from requirements unless state/spec is
-missing or invalid. Consolidate any questions into one orchestrator question only if a real blocker exists.
+First run:
+
+```bash
+python3 ai/scripts/feature-state.py resume <feature_id>
+python3 ai/scripts/feature-state.py validate <feature_id>
+```
+
+Continue only from the next transition returned by the state machine. Do not restart from requirements unless
+state/spec is missing or invalid. Do not repeat completed tasks, prior package reviews, or the approved spec.
+After each delegated agent returns, register its result before continuing. Consolidate questions into one
+orchestrator question only if a real blocker exists.

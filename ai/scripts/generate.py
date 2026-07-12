@@ -23,6 +23,38 @@ READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
 MUTATING_CAPABILITIES = {"docs-rw", "factory-rw", "code-rw", "release", "memory-rw"}
+ORCHESTRATOR_TASK_ALLOW = {
+    "brainstormer",
+    "product-analyst",
+    "project-bootstrapper",
+    "architect",
+    "agent-factory",
+    "ux-ui-designer",
+    "spec-challenger",
+    "package-planner",
+    "implementer",
+    "frontend-engineer",
+    "refactor-specialist",
+    "debugger",
+    "gate-runner",
+    "auditor",
+    "package-reviewer",
+    "repair-agent",
+    "delta-reviewer",
+    "security-auditor",
+    "red-team",
+    "blue-team",
+    "db-auditor",
+    "performance-auditor",
+    "integrator",
+    "test-writer",
+    "runtime-verifier",
+    "adversarial-judge",
+    "github-release-manager",
+    "memory-scribe",
+    "image-describer",
+    "app-runner",
+}
 
 
 def die(message):
@@ -150,7 +182,7 @@ def oc_permissions(capability, roles):
     lines = ["permission:"]
     if capability == "coord-ro":
         lines += ["  edit: deny", "  question: ask", "  doom_loop: deny", "  webfetch: allow", "  websearch: ask", "  task:", '    "*": deny']
-        lines += [f'    "{r["role"]}": allow' for r in roles if r["role"] != "orchestrator"]
+        lines += [f'    "{r["role"]}": allow' for r in roles if r["role"] in ORCHESTRATOR_TASK_ALLOW]
         lines += ["  bash:", '    "*": deny', *safe, *hard_denies]
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": deny', *safe, *hard_denies]
@@ -182,7 +214,7 @@ def oc_permissions(capability, roles):
 
 def claude_tools(capability, roles):
     if capability == "coord-ro":
-        names = ", ".join(r["role"] for r in roles if r["role"] != "orchestrator")
+        names = ", ".join(r["role"] for r in roles if r["role"] in ORCHESTRATOR_TASK_ALLOW)
         return f"Read, Grep, Glob, Bash, Agent({names})"
     if capability in READ_ONLY or capability in {"gate-ro", "release", "run-ro"}:
         return "Read, Grep, Glob, Bash"
@@ -314,6 +346,10 @@ def validate(out, roles=None):
         actual = {p.stem for p in (out / harness / "agents").glob(f"*{suffix}")}
         if actual != expected:
             die(f"{harness}: generated role set mismatch")
+    orchestrator = (out / "opencode/agents/orchestrator.md").read_text()
+    for role in ORCHESTRATOR_TASK_ALLOW:
+        if f'    "{role}": allow' not in orchestrator:
+            die(f"orchestrator cannot delegate required role: {role}")
 
 
 def main():

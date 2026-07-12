@@ -9,12 +9,12 @@ ux-ui-designer	subagent	0.3	docs-rw	docs	openai/gpt-5.6-terra	opencode/glm-5.2	o
 spec-challenger	subagent	0.0	review-ro	audit	openai/gpt-5.6-sol	openai/gpt-5.5	openai/gpt-5.5	opus	gpt-5.6-sol	xhigh
 package-planner	subagent	0.1	docs-rw	docs	openai/gpt-5.6-terra	opencode/glm-5.2	openai/gpt-5.5	sonnet	gpt-5.6-terra	high
 test-writer	subagent	0.1	code-rw	implement	openai/gpt-5.6-terra	opencode/deepseek-v4-flash-free	openai/gpt-5.4-mini	sonnet	gpt-5.6-terra	medium
-implementer	subagent	0.1	code-rw	implement	openai/gpt-5.3-codex-spark	opencode/kimi-k2.7-code	openai/gpt-5.4-mini	sonnet	gpt-5.6-luna	medium
+implementer	subagent	0.1	code-rw	implement	openai/gpt-5.6-terra	opencode/kimi-k2.7-code	openai/gpt-5.4	sonnet	gpt-5.6-terra	medium
 frontend-engineer	subagent	0.2	code-rw	implement	openai/gpt-5.3-codex-spark	opencode/kimi-k2.7-code	openai/gpt-5.4-mini	sonnet	gpt-5.6-terra	medium
 refactor-specialist	subagent	0.1	code-rw	implement	openai/gpt-5.3-codex-spark	opencode/kimi-k2.7-code	openai/gpt-5.4-mini	sonnet	gpt-5.6-luna	medium
 debugger	subagent	0.1	code-rw	implement	openai/gpt-5.6-terra	openai/gpt-5.4	openai/gpt-5.4	sonnet	gpt-5.6-terra	high
-repair-agent	subagent	0.1	code-rw	implement	openai/gpt-5.3-codex-spark	opencode/kimi-k2.7-code	openai/gpt-5.4-mini	sonnet	gpt-5.6-luna	medium
-integrator	subagent	0.1	code-rw	implement	openai/gpt-5.3-codex-spark	opencode/kimi-k2.7-code	openai/gpt-5.4-mini	sonnet	gpt-5.6-terra	medium
+repair-agent	subagent	0.1	code-rw	implement	openai/gpt-5.6-terra	opencode/kimi-k2.7-code	openai/gpt-5.4	sonnet	gpt-5.6-terra	medium
+integrator	subagent	0.1	code-rw	implement	openai/gpt-5.6-terra	opencode/kimi-k2.7-code	openai/gpt-5.4	sonnet	gpt-5.6-terra	medium
 gate-runner	subagent	0.0	gate-ro	gate	openai/gpt-5.4-mini	opencode/deepseek-v4-flash-free	openai/gpt-5.4-mini	haiku	gpt-5.6-luna	medium
 auditor	subagent	0.0	review-ro	audit	opencode-go/minimax-m3	openai/gpt-5.5	openai/gpt-5.5	opus	gpt-5.6-sol	xhigh
 package-reviewer	subagent	0.0	review-ro	audit	openai/gpt-5.6-sol	openai/gpt-5.5	openai/gpt-5.5	opus	gpt-5.6-sol	xhigh

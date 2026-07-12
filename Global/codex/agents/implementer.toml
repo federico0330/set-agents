@@ -1,6 +1,6 @@
 name = "implementer"
 description = "Implementer \u2014 bounded package work with local validation, no self-approval"
-model = "gpt-5.6-luna"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """

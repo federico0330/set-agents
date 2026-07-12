@@ -9,6 +9,8 @@ import filecmp
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+FEATURE_STATE = ROOT / "PROYECTO/ai/scripts/feature-state.py"
+CHECK_OWNED = ROOT / "PROYECTO/ai/scripts/check-owned-paths.py"
 
 
 def run(*args, env=None, check=True):
@@ -23,6 +25,40 @@ def run(*args, env=None, check=True):
 
 
 class HarnessTests(unittest.TestCase):
+    def run_state(self, state, *args, check=True):
+        return run("python3", str(FEATURE_STATE), *args, "--state-file", str(state), check=check)
+
+    def create_ready_package(self, td, *, max_cycles=2, review=True):
+        state = Path(td) / "feature.json"
+        run("python3", str(FEATURE_STATE), "init", "feat", "docs/specs/feat/spec.md", "hash",
+            "--state-file", str(state), "--ac", "AC-1", "--ac", "AC-2",
+            "--max-deep-review-cycles", str(max_cycles))
+        self.run_state(
+            state, "create-package", "PKG-01", "Observable slice",
+            "--ac", "AC-1", "--ac", "AC-2",
+            "--task", "T-001", "--task", "T-002", "--task", "T-003",
+            "--owned-path", "src/**", "--owned-path", "tests/**",
+            "--complexity", "medium",
+            "--selected-role", "implementer",
+            "--selected-model", "openai/gpt-5.6-terra",
+            "--routing-reason", "three related tasks across code and tests",
+        )
+        self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+        for task_id in ("T-001", "T-002", "T-003"):
+            self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "focused-test")
+        self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+        self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
+        self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "HEAD..work")
+        self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
+        if review:
+            finding_a = json.dumps({"id": "F-001", "severity": "high", "category": "correctness"})
+            finding_b = json.dumps({"id": "F-002", "severity": "medium", "category": "testing"})
+            self.run_state(
+                state, "record-review", "PKG-01", "repair_required",
+                "--actor", "package-reviewer", "--finding", finding_a, "--finding", finding_b,
+            )
+        return state
+
     def test_check_and_native_codex_agents(self):
         run("./build.sh", "--check")
         run("./build.sh")
@@ -102,6 +138,21 @@ class HarnessTests(unittest.TestCase):
         self.assertTrue(all(not item["enabled"] for item in data["mcp"].values()))
         overlay = json.loads((ROOT / "Global/claude-code/settings.overlay.json").read_text())
         self.assertFalse(overlay["enabledPlugins"]["engram@engram"])
+
+    def test_orchestrator_delegation_graph_is_broad_but_state_governed(self):
+        run("./build.sh")
+        oc = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
+        claude = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        allowed = ["spec-challenger", "package-planner", "implementer", "package-reviewer", "repair-agent", "delta-reviewer", "integrator"]
+        specialists = ["auditor", "security-auditor", "red-team", "blue-team", "db-auditor", "performance-auditor"]
+        for role in allowed:
+            self.assertIn(f'"{role}": allow', oc)
+            self.assertIn(role, claude)
+        for role in specialists:
+            self.assertIn(f'"{role}": allow', oc)
+            self.assertIn(role, claude)
+        self.assertIn("start-review-panel", oc)
+        self.assertIn("record-subreview", oc)
 
     def test_release_gate_requires_two_confirmations(self):
         base = {"verify": "pass", "audits": "pass", "judge": "JUDGE_PASS", "surfaces": [], "audits_ran": ["auditor"]}
@@ -301,6 +352,194 @@ class HarnessTests(unittest.TestCase):
         self.assertIn('"*-exec*": deny', gate)
         self.assertIn('"*>*": deny', gate)
         self.assertIn('"*|*": deny', gate)
+
+    def test_package_workflow_happy_path_executes_real_transitions(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-001", "--finding-id", "F-002",
+                "--changed-file", "src/example.py", "--verification", "focused-test",
+            )
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "pass", "--actor", "delta-reviewer",
+                "--closed-finding", "F-001", "--closed-finding", "F-002",
+            )
+            self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+            self.run_state(
+                state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier",
+                "--url", "http://localhost:3000", "--browser", "playwright", "--check", "customer-visible flow works",
+            )
+            self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator")
+            self.run_state(state, "transition", "INTEGRATION")
+            self.run_state(state, "record-gate", "global verify", "pass", "--global-gate", "--evidence", "ok")
+            self.run_state(state, "transition", "DONE")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["phase"], "DONE")
+        self.assertEqual(data["metrics"]["task_deep_reviews"], 0)
+        self.assertEqual(data["metrics"]["package_reviews"], 1)
+        self.assertEqual(data["metrics"]["repair_batches"], 1)
+        self.assertEqual(data["metrics"]["delta_reviews"], 1)
+        self.assertEqual(len(data["packages"][0]["tasks"]), 3)
+        self.assertEqual(data["packages"][0]["testing"][-1]["status"], "pass")
+        self.assertEqual(data["packages"][0]["runtime_qa"][-1]["status"], "pass")
+
+    def test_review_panel_allows_many_subagents_as_one_cycle(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            self.run_state(
+                state, "start-review-panel", "PKG-01",
+                "--role", "package-reviewer", "--role", "security-auditor", "--role", "db-auditor", "--role", "performance-auditor",
+            )
+            self.run_state(state, "record-subreview", "PKG-01", "package-reviewer", "pass", "--actor", "package-reviewer")
+            finding = json.dumps({"id": "F-SEC-001", "severity": "high", "category": "security"})
+            self.run_state(state, "record-subreview", "PKG-01", "security-auditor", "repair_required", "--actor", "security-auditor", "--finding", finding)
+            self.run_state(state, "record-subreview", "PKG-01", "db-auditor", "pass", "--actor", "db-auditor")
+            self.run_state(state, "record-subreview", "PKG-01", "performance-auditor", "pass", "--actor", "performance-auditor")
+            self.run_state(state, "finalize-review-panel", "PKG-01", "repair_required", "--actor", "package-reviewer")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["metrics"]["package_reviews"], 1)
+        self.assertEqual(data["packages"][0]["attempts"]["deep_review_cycles"], 1)
+        self.assertEqual(len(data["packages"][0]["review_panels"][0]["subreviews"]), 4)
+        self.assertEqual(data["phase"], "PACKAGE_REPAIR")
+
+    def test_package_review_requires_completed_tasks(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            self.run_state(state, "complete-task", "PKG-01", "T-001", "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01")
+            self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "diff")
+            result = self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01", check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("tasks are not all completed", result.stdout)
+
+    def test_failed_gate_blocks_package_review_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            self.run_state(state, "complete-task", "PKG-01", "T-001", "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "complete-task", "PKG-01", "T-002", "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "diff")
+            self.run_state(state, "record-gate", "package verify", "fail", "--package-id", "PKG-01")
+            nxt = self.run_state(state, "next")
+            self.assertIn("PACKAGE_IMPLEMENTATION", nxt.stdout)
+            result = self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01", check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("required gates", result.stdout)
+
+    def test_consolidated_findings_and_delta_review_do_not_increment_full_review(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent", "--finding-id", "F-001", "--finding-id", "F-002")
+            self.run_state(state, "record-delta-review", "PKG-01", "pass", "--actor", "delta-reviewer", "--closed-finding", "F-001", "--closed-finding", "F-002")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["packages"][0]["reviews"][0]["findings"], ["F-001", "F-002"])
+        self.assertEqual(data["packages"][0]["repairs"][0]["finding_ids"], ["F-001", "F-002"])
+        self.assertEqual(data["metrics"]["package_reviews"], 1)
+        self.assertEqual(data["metrics"]["delta_reviews"], 1)
+
+    def test_retry_budget_blocks_third_review_cycle(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, max_cycles=1)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent", "--finding-id", "F-001")
+            result = self.run_state(
+                state, "record-delta-review", "PKG-01", "repair_required",
+                "--actor", "delta-reviewer", "--requires-full-review", "--reason", "contract changed", check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("deep review budget exhausted", json.dumps(data["blockers"]))
+
+    def test_accept_package_rejects_open_findings_and_bad_actors(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            finding = json.dumps({"id": "F-001", "severity": "high", "category": "correctness"})
+            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer", "--finding", finding)
+            self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+            self.run_state(state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier", "--url", "http://localhost:3000")
+            result = self.run_state(state, "accept-package", "PKG-01", "--actor", "repair-agent", check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("repair-agent cannot accept packages", result.stdout)
+        self.assertIn("critical/high findings", result.stdout)
+
+    def test_resume_and_invalid_transition_are_deterministic(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            resume = self.run_state(state, "resume")
+            invalid = self.run_state(state, "transition", "PACKAGE_ACCEPTED", "--package-id", "PKG-01", check=False)
+        self.assertIn("continue local implementation", resume.stdout)
+        self.assertEqual(invalid.returncode, 2)
+        self.assertIn("illegal transition", invalid.stdout)
+
+    def test_stale_revision_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            result = self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01", "--expect-revision", "0", check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("stale revision", result.stdout)
+
+    def test_owned_paths_gate(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            data = {
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": ["src/**"],
+                    "shared_paths": ["config/*.json"],
+                    "read_only_paths": ["README.md"],
+                    "approved_exceptions": [{"path": "generated/**", "status": "approved"}],
+                }]
+            }
+            state.write_text(json.dumps(data))
+            allowed = run("python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01", "--changed-file", "src/app.py", "--changed-file", "config/app.json")
+            exception = run("python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01", "--changed-file", "generated/out.txt")
+            out_of_scope = run("python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01", "--changed-file", "docs/spec.md", check=False)
+            read_only = run("python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01", "--changed-file", "README.md", check=False)
+        self.assertIn("OWNERSHIP_PASS", allowed.stdout)
+        self.assertIn("OWNERSHIP_PASS", exception.stdout)
+        self.assertEqual(out_of_scope.returncode, 2)
+        self.assertEqual(read_only.returncode, 2)
+        self.assertIn("OWNERSHIP_FAIL", out_of_scope.stdout)
+        self.assertIn("read_only_violations", read_only.stdout)
+
+    def test_active_docs_do_not_teach_task_by_task_deep_audit(self):
+        active = "\n".join([
+            (ROOT / "PROYECTO/prompt.md").read_text(),
+            (ROOT / "PROYECTO/README.md").read_text(),
+            (ROOT / "PROYECTO/docs/specs/000-ejemplo/tasks.md").read_text(),
+        ])
+        banned = ["/next-task T-001", "hasta AUDIT_PASS", "repetí implementar", "auditar cada tarea"]
+        for pattern in banned:
+            self.assertNotIn(pattern, active)
 
 
 if __name__ == "__main__":

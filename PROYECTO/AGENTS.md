@@ -28,9 +28,9 @@ No agregar integraciones, sync bancario, exportes contables, OCR ni pasarelas de
 
 ## Gates de revisión (cuándo son obligatorios)
 - Revisión profunda normal: una vez por paquete integrado, no después de cada tarea individual.
-- **DB** (`@db-auditor`): schema, migraciones, plata, duplicados, conciliación, concurrencia, audit trail.
-- **Seguridad** (`@security-auditor` + `@red-team`): auth, roles, upload/comprobantes, aislamiento por tenant, secrets, servicios externos.
-- **Performance** (`@performance-auditor`): endpoints de listado, queries, loops sobre datos, paginación.
+- **DB**: el `package-reviewer` carga `db-integrity` cuando toca schema, migraciones, plata, duplicados, conciliación, concurrencia o audit trail.
+- **Seguridad**: el `package-reviewer` carga `security-review` y, si hay checkpoint de riesgo explícito, documenta la razón en el estado.
+- **Performance**: el `package-reviewer` carga `performance-scalability` para listados, queries, loops sobre datos, paginación, colas o caché.
 - **Diseño** (`@architect`): nuevos módulos, cambios de modelo de datos, máquinas de estado.
 - **UI/UX** (`@ux-ui-designer`): cualquier cambio de interfaz o manejo de errores en el cliente.
 

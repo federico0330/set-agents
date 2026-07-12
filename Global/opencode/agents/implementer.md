@@ -1,7 +1,7 @@
 ---
 description: "Implementer \u2014 bounded package work with local validation, no self-approval"
 mode: subagent
-model: openai/gpt-5.3-codex-spark
+model: openai/gpt-5.6-terra
 temperature: 0.1
 steps: 14
 permission:
