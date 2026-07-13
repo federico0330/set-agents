@@ -52,5 +52,7 @@ questions.
 
 ## MCP discipline
 All MCP servers start disabled. Ask the user before enabling any MCP, use it only for the task, then turn it off.
-The only automatic exception is `ai/scripts/e2e.sh`, which may enable Playwright for a runtime gate and disables
-it on exit.
+The automatic exception is the runtime/E2E gate: the harness may enable `playwright` or `brave-cdp` through
+`ai/scripts/mcp.sh` or `ai/scripts/e2e.sh`, use it only for observable runtime QA, and disable it on exit. Do not
+ask the user to toggle browser MCP when the harness script can do it; ask only for credentials/login or if the
+connector is absent from the session.

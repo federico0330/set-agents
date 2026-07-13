@@ -33,8 +33,10 @@ operations, missing credentials/access, or blockers after retry budget. Do not a
 gate reruns, required repairs, or continuing approved package work.
 
 ## MCP discipline
-MCP servers start disabled. Ask before enabling, use only for the task, then disable. The E2E wrapper may enable
-Playwright for a runtime gate and disables it on exit.
+MCP servers start disabled. Ask before enabling, use only for the task, then disable. The runtime/E2E gate may
+enable `playwright` or `brave-cdp` through `ai/scripts/mcp.sh` or `ai/scripts/e2e.sh`, use it only for observable
+runtime QA, and disable it on exit. Do not ask the user to toggle browser MCP when the harness script can do it;
+ask only for credentials/login or if the connector is absent from the session.
 
 ## Human decision required
 Stop with `HUMAN_DECISION_REQUIRED` when acceptance criteria conflict, a finding changes intended behavior, a

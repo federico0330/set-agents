@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Claude PreToolUse hook for app-runner. Exit 2 blocks a Bash command.
 
-Allows read-only inspection (coord policy) plus launching the project via its
-own scripts and probing local health endpoints. Never permits edits, installs,
-commits, or arbitrary mutation.
+Allows read-only inspection (coord policy), launching the project via its own
+scripts, managing browser MCP only for runtime QA, and probing local health
+endpoints. Never permits edits, installs, commits, or arbitrary mutation.
 """
 
 import json
@@ -18,6 +18,9 @@ from coord_policy import FORBIDDEN_OPTIONS, FORBIDDEN_SYNTAX, allowed as coord_a
 RUN = [
     re.compile(r"\./ai/scripts/run\.sh(\s|$)"),
     re.compile(r"\./ai/scripts/verify\.sh(\s|$)"),
+    re.compile(r"\./ai/scripts/e2e\.sh(\s|$)"),
+    re.compile(r"\./ai/scripts/mcp\.sh\s+(?:browser-gate|ensure-brave-cdp|status)(?:\s|$)"),
+    re.compile(r"\./ai/scripts/mcp\.sh\s+(?:on|off)\s+(?:playwright|brave-cdp)(?:\s|$)"),
     re.compile(r"curl\s+(?:-[A-Za-z]+\s+)*(?:http://)?(?:localhost|127\.0\.0\.1)(?::\d+)?(?:/|\s|$)"),
 ]
 
@@ -44,5 +47,5 @@ if __name__ == "__main__":
     except (json.JSONDecodeError, AttributeError):
         command = ""
     if not allowed(command):
-        print("Blocked: app-runner may only inspect or run ./ai/scripts/{run,verify}.sh and probe localhost", file=sys.stderr)
+        print("Blocked: run-ro may only inspect, run ./ai/scripts/{run,verify,e2e}.sh, manage browser MCP for runtime QA, and probe localhost", file=sys.stderr)
         raise SystemExit(2)

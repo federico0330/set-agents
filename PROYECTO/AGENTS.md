@@ -45,3 +45,6 @@ El orquestador sólo inspecciona y delega. `gate-runner` ejecuta la verificació
 ## MCP
 - Context7 para docs actuales del framework/ORM/librerías de test cuando haya incertidumbre de versión.
 - Engram solo para decisiones de alto valor y lecciones verificadas del proyecto.
+- Runtime QA/E2E puede encender `playwright` o `brave-cdp` mediante `ai/scripts/mcp.sh` o `ai/scripts/e2e.sh`,
+  usarlo sólo para la prueba observable y apagarlo al salir. No pedir al usuario que manipule toggles cuando el
+  script puede hacerlo; pedir sólo login/credenciales si el servicio remoto lo exige.

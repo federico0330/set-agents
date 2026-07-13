@@ -44,6 +44,14 @@ permission:
     "opencode --version*": allow
     "./ai/scripts/run.sh*": allow
     "./ai/scripts/verify.sh*": allow
+    "./ai/scripts/e2e.sh*": allow
+    "./ai/scripts/mcp.sh browser-gate*": allow
+    "./ai/scripts/mcp.sh ensure-brave-cdp*": allow
+    "./ai/scripts/mcp.sh on playwright*": allow
+    "./ai/scripts/mcp.sh on brave-cdp*": allow
+    "./ai/scripts/mcp.sh off playwright*": allow
+    "./ai/scripts/mcp.sh off brave-cdp*": allow
+    "./ai/scripts/mcp.sh status*": allow
     "curl http://localhost*": allow
     "curl http://127.0.0.1*": allow
     "curl localhost*": allow
@@ -64,7 +72,6 @@ permission:
     "*;*": deny
     "*`*": deny
     "*$(*": deny
-    "*mcp.sh*": deny
     "*loop.sh*": deny
     "git add*": deny
     "git commit*": deny

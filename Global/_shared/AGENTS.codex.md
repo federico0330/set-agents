@@ -36,8 +36,11 @@ missing credentials/access, or blockers after retry budget. Routine failures are
 budget, not by asking the user.
 
 ## MCP discipline
-MCP servers start disabled. Ask before enabling, use for the task, then disable. The only automatic exception is
-the E2E wrapper enabling Playwright for a runtime gate and disabling it on exit.
+MCP servers start disabled. Ask before enabling, use for the task, then disable. The automatic exception is the
+runtime/E2E gate: the harness may enable `playwright` or `brave-cdp` through `ai/scripts/mcp.sh` or
+`ai/scripts/e2e.sh`, use it only for observable runtime QA, and disable it on exit. Do not ask the user to toggle
+browser MCP when the harness script can do it; ask only for credentials/login or if the connector is absent from
+the session.
 
 ## Human decision
 Stop with `HUMAN_DECISION_REQUIRED` when acceptance conflicts, a finding changes intended behavior, a migration

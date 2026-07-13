@@ -154,6 +154,49 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("start-review-panel", oc)
         self.assertIn("record-subreview", oc)
 
+    def test_runtime_verifier_can_manage_browser_mcp_gate(self):
+        run("./build.sh")
+        oc = (ROOT / "Global/opencode/agents/runtime-verifier.md").read_text()
+        claude = (ROOT / "Global/claude-code/agents/runtime-verifier.md").read_text()
+        codex = tomllib.loads((ROOT / "Global/codex/agents/runtime-verifier.toml").read_text())["developer_instructions"]
+        for text in (oc, claude, codex):
+            self.assertIn("mcp.sh browser-gate auto", text)
+            self.assertIn("Do not ask the user to toggle MCP", text)
+            self.assertNotIn("do not try to enable MCP yourself", text)
+        self.assertIn('"./ai/scripts/mcp.sh browser-gate*": allow', oc)
+        self.assertIn('"./ai/scripts/e2e.sh*": allow', oc)
+        self.assertNotIn('"*mcp.sh*": deny', oc)
+
+    def test_mcp_browser_gate_toggles_playwright_without_manual_steps(self):
+        with tempfile.TemporaryDirectory() as td:
+            cfg = Path(td) / "opencode.json"
+            cfg.write_text(json.dumps({
+                "mcp": {
+                    "playwright": {"enabled": False},
+                    "brave-cdp": {"enabled": False},
+                }
+            }))
+            enabled = run(
+                str(ROOT / "PROYECTO/ai/scripts/mcp.sh"), "browser-gate", "playwright",
+                env={"OPENCODE_CONFIG": str(cfg)},
+            )
+            self.assertIn("BROWSER_GATE_READY mode=playwright", enabled.stdout)
+            self.assertTrue(json.loads(cfg.read_text())["mcp"]["playwright"]["enabled"])
+            disabled = run(
+                str(ROOT / "PROYECTO/ai/scripts/mcp.sh"), "off", "playwright",
+                env={"OPENCODE_CONFIG": str(cfg)},
+            )
+            self.assertIn("MCP_SET server=playwright enabled=false", disabled.stdout)
+            self.assertFalse(json.loads(cfg.read_text())["mcp"]["playwright"]["enabled"])
+
+    def test_claude_run_guard_allows_runtime_mcp_only(self):
+        allowed_payload = json.dumps({"tool_input": {"command": "./ai/scripts/mcp.sh browser-gate auto"}})
+        allowed = subprocess.run(["python3", "ai/scripts/claude_run_guard.py"], input=allowed_payload, text=True, capture_output=True)
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        blocked_payload = json.dumps({"tool_input": {"command": "./ai/scripts/mcp.sh on context7"}})
+        blocked = subprocess.run(["python3", "ai/scripts/claude_run_guard.py"], input=blocked_payload, text=True, capture_output=True)
+        self.assertEqual(blocked.returncode, 2)
+
     def test_release_gate_requires_two_confirmations(self):
         base = {"verify": "pass", "audits": "pass", "judge": "JUDGE_PASS", "surfaces": [], "audits_ran": ["auditor"]}
         with tempfile.TemporaryDirectory() as td:

@@ -202,10 +202,19 @@ def oc_permissions(capability, roles):
                   '    "git push --force*": deny', '    "git push -f*": deny', '    "gh repo edit*": deny',
                   '    "gh repo delete*": deny']
     elif capability == "run-ro":
+        run_hard_denies = [item for item in hard_denies if "mcp.sh" not in item]
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": deny', *safe,
                   '    "./ai/scripts/run.sh*": allow', '    "./ai/scripts/verify.sh*": allow',
+                  '    "./ai/scripts/e2e.sh*": allow',
+                  '    "./ai/scripts/mcp.sh browser-gate*": allow',
+                  '    "./ai/scripts/mcp.sh ensure-brave-cdp*": allow',
+                  '    "./ai/scripts/mcp.sh on playwright*": allow',
+                  '    "./ai/scripts/mcp.sh on brave-cdp*": allow',
+                  '    "./ai/scripts/mcp.sh off playwright*": allow',
+                  '    "./ai/scripts/mcp.sh off brave-cdp*": allow',
+                  '    "./ai/scripts/mcp.sh status*": allow',
                   '    "curl http://localhost*": allow', '    "curl http://127.0.0.1*": allow',
-                  '    "curl localhost*": allow', '    "curl 127.0.0.1*": allow', *hard_denies]
+                  '    "curl localhost*": allow', '    "curl 127.0.0.1*": allow', *run_hard_denies]
     else:
         lines += ["  edit: allow", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe,
                   '    "git push*": deny', '    "sudo *": deny']
