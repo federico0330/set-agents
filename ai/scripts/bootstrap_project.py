@@ -25,6 +25,27 @@ FILES = {
     "docs/project/domain.md": "# Domain\n\nTODO: entities, invariants, and terminology.\n",
     "docs/project/architecture.md": "# Architecture\n\nTODO: boundaries, dependencies, and deployment.\n",
     "docs/project/development.md": "# Development\n\nTODO: setup, commands, and conventions.\n",
+    "docs/architecture/overview.md": (
+        "# Arquitectura — mapa vivo del sistema\n\n"
+        "> Documento único y vivo: cada sección se REEMPLAZA cuando cambia, nunca se apila. "
+        "El \"por qué\" de cada decisión vive en `docs/adr/README.md`.\n\n"
+        "## Flujo de datos\nTODO: diagrama Mermaid del flujo de datos de punta a punta.\n\n"
+        "## Workflows clave\nTODO: un `sequenceDiagram` corto por workflow importante.\n\n"
+        "## Casos de uso\nTODO: lista corta de los casos de uso principales.\n\n"
+        "## Mapa de componentes\nTODO: diagrama Mermaid de módulos/servicios y cómo se hablan.\n\n"
+        "## Decisiones\nTODO: tabla que linkea a `docs/adr/README.md`.\n"
+    ),
+    "docs/adr/README.md": (
+        "# Índice de ADRs\n\n"
+        "> Una fila por ADR, sin excepciones. `architect` la actualiza al escribir cada ADR nuevo.\n\n"
+        "| ADR | Título | Estado | Fecha |\n|---|---|---|---|\n"
+    ),
+    "docs/specs/README.md": (
+        "# Índice de specs\n\n"
+        "> Una fila por feature, sin excepciones. `product-analyst` la actualiza al escribir "
+        "(`Draft`), aprobar (`Aprobado`), integrar (`Shippeado`), o superar (`Superado por <id>`) un spec.\n\n"
+        "| ID | Título | Estado | Fecha |\n|---|---|---|---|\n"
+    ),
     ".opencode/AGENTS.md": "# Local OpenCode rules\n\nFollow ../../AGENTS.md and delegate deterministic gates.\n",
     ".claude/CLAUDE.md": "# Local Claude rules\n\nFollow ../AGENTS.md and preserve separation of duties.\n",
     ".codex/config.toml": "[agents]\nmax_depth = 1\nmax_threads = 4\n",

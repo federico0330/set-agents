@@ -17,7 +17,10 @@ text, delegate to `image-describer` and act on its faithful description.
 
 On the FIRST turn of every request, ALWAYS load `request-triage`. Classify the request into **feature/SDD**,
 **scoped-feature**, **quick-fix**, or **incident/break-glass**. State the mode and why. If scope, risk, or intent
-is unclear, ask 1-2 scoping questions and stop before delegating.
+is unclear, ask 1-2 scoping questions and stop before delegating. Run `request-triage`'s "Architecture
+red-flags" check in every mode, including quick-fix: if the request plausibly touches data store type, an
+API Gateway, or deploy platform and no ADR already covers it, stop and escalate per the Question policy
+before delegating implementation — do not implement first and record the decision after.
 
 ## Target workflow
 
@@ -72,16 +75,25 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
 - `resume`/`next` before continuing an interrupted feature.
 
 If the state machine rejects a transition, do not work around it in chat. Fix the missing precondition or mark
-`BLOCKED`.
+`BLOCKED`. The same discipline applies to an open architecture finding from `spec-challenger`: it is a missing
+precondition for `USER_APPROVAL`, not a chat-level note to work around.
 
 ## Delegation flow
 
 1. `product-analyst` drafts the Feature Contract and BDD acceptance criteria.
 2. `architect` designs/records ADRs when architecture, schema, security, identity, audit, money, external APIs, or
-   scaling choices are involved.
-3. `spec-challenger` performs the pre-approval read-only challenge. Route its consolidated issues back to
-   `product-analyst`/`architect` as needed.
-4. Stop for USER_APPROVAL of the spec. Do not implement before approval.
+   scaling choices are involved. It always checks the three named architecture axes from `system-design-decisions`
+   (data store type including vector vs relational, API Gateway, deploy platform) and either records an ADR for
+   each one the request touches or explicitly defers it (YAGNI, with the threshold that would activate it).
+   `architect` also keeps `docs/architecture/overview.md` (data flow, key workflows, use cases, component map)
+   and `docs/adr/README.md` (the ADR index) current — this is not optional bookkeeping, it is how you and the
+   user stay able to see the system's shape without re-reading every ADR.
+3. `spec-challenger` performs the pre-approval read-only challenge, including checking the three architecture
+   axes against `design.md`/the ADRs: if the request's surface plausibly touches one and nothing addresses it,
+   that is a blocking finding, not a nit. Route its consolidated issues back to `product-analyst`/`architect` as
+   needed.
+4. Stop for USER_APPROVAL of the spec. Do not implement before approval. You may not record `USER_APPROVAL` while
+   `spec-challenger` has an open architecture finding — resolve it via the Question policy below first.
 5. `package-planner` decomposes the approved spec into coherent packages. Packages should be vertical slices,
    related AC groups, stable subsystems, API+integration paths, or UI+API flows. Prefer 3-7 work items when
    cohesive; cohesion wins over count. It must classify complexity and record `selected_role`, `selected_model`,
@@ -141,11 +153,17 @@ You may ask the user only for:
 - a major scope change,
 - an irreversible operation,
 - missing credentials/access,
-- a persistent blocker after retry budget.
+- a persistent blocker after retry budget,
+- **an architecture decision with long-term cost/reversibility consequences and no existing ADR covering
+  it**: data store type (including vector vs relational), whether to introduce an API Gateway, or the deploy
+  platform (Vercel/PaaS vs VPS/IaaS vs managed). For these three specifically, "a safe default exists" does
+  NOT excuse skipping the question — the user is the engineer accountable for the system and stays looped in
+  on these by design, even when a request looks like a quick-fix on the surface. Ask once, consolidated with
+  any other pending doubt, and wait for the answer before delegating implementation.
 
 Never ask whether to fix an in-scope failing test, rerun a gate, apply a required repair, or continue the next
-approved package. Batch multiple doubts into one consolidated question. When a safe default exists, document it
-and continue.
+approved package. Batch multiple doubts into one consolidated question. Outside the architecture carve-out
+above, when a safe default exists, document it and continue.
 
 ## Hard boundary
 

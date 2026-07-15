@@ -302,6 +302,9 @@ class HarnessTests(unittest.TestCase):
             first = run("python3", "ai/scripts/bootstrap_project.py", td)
             self.assertEqual(existing.read_text(), "custom rules\n")
             self.assertTrue((target / "docs/project/overview.md").exists())
+            self.assertTrue((target / "docs/architecture/overview.md").exists())
+            self.assertTrue((target / "docs/adr/README.md").exists())
+            self.assertTrue((target / "docs/specs/README.md").exists())
             second = run("python3", "ai/scripts/bootstrap_project.py", td)
             self.assertIn("BOOTSTRAP_CREATED=", first.stdout)
             self.assertIn("BOOTSTRAP_CONFLICTS=AGENTS.md", first.stdout)
@@ -310,6 +313,32 @@ class HarnessTests(unittest.TestCase):
             self.assertTrue((target / ".opencode/AGENTS.md").exists())
             self.assertTrue((target / ".claude/CLAUDE.md").exists())
             self.assertTrue((target / ".codex/config.toml").exists())
+
+    def test_architecture_gate_is_wired_through_the_canon(self):
+        run("./build.sh")
+        orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        architect = (ROOT / "Global/claude-code/agents/architect.md").read_text()
+        spec_challenger = (ROOT / "Global/claude-code/agents/spec-challenger.md").read_text()
+        design_skill = (ROOT / "Global/claude-code/skills/system-design-decisions/SKILL.md").read_text()
+        triage_skill = (ROOT / "Global/claude-code/skills/request-triage/SKILL.md").read_text()
+        # The orchestrator must recognize a missing architecture ADR as a question-worthy category that
+        # overrides "a safe default exists, so continue".
+        self.assertIn("vector vs relational", orchestrator)
+        self.assertIn("API Gateway", orchestrator)
+        self.assertIn("VPS/IaaS", orchestrator)
+        self.assertIn("excuse skipping the question", orchestrator)
+        # architect must own the living architecture doc and the ADR index, not just loose ADR files.
+        self.assertIn("docs/architecture/overview.md", architect)
+        self.assertIn("docs/adr/README.md", architect)
+        # spec-challenger must treat an unaddressed architecture axis as a blocking finding.
+        self.assertIn("category: architecture", spec_challenger)
+        # the design-time skill must cover the three named axes, not just the generic scale framework.
+        self.assertIn("Vector / embedding store", design_skill)
+        self.assertIn("API Gateway", design_skill)
+        self.assertIn("Deploy platform", design_skill)
+        # the transversal red-flag check must apply even outside full feature/SDD mode.
+        self.assertIn("Architecture red-flags", triage_skill)
+        self.assertIn("including quick-fix", triage_skill)
 
     def test_managed_install_preserves_unrelated_and_rolls_back(self):
         with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging_dir:

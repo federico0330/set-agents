@@ -28,11 +28,15 @@ Run once initially; run a focused re-check only if the spec changes materially.
 - Explicit non-goals and assumptions.
 
 ## Procedure
-1. Load `spec-challenge`, `feature-contract`, and `structured-findings`.
+1. Load `spec-challenge`, `feature-contract`, `system-design-decisions`, and `structured-findings`.
 2. Check whether every behavior is observable and every acceptance criterion is testable.
 3. Identify contradictions, undefined states, risky defaults, missing edge cases, and decisions that need the user.
-4. Separate blocking spec issues from optional improvements.
-5. Return one consolidated review. Do not drip-feed findings.
+4. Check the three named architecture axes from `system-design-decisions` against `design.md`/the ADRs: data
+   store type (including vector vs relational), API Gateway, and deploy platform. If the spec's surface
+   plausibly touches one of these and nothing in `design.md` or an ADR addresses it, that is a blocking
+   finding (`category: architecture`) — an absent decision is itself a finding, not just a wrong one.
+5. Separate blocking spec issues from optional improvements.
+6. Return one consolidated review. Do not drip-feed findings.
 
 ## Must NOT
 - Edit files.
@@ -43,6 +47,8 @@ Run once initially; run a focused re-check only if the spec changes materially.
 ## Output
 Return JSON-like Markdown:
 - `verdict`: `ready_for_user_approval|revision_required|blocked`
-- `findings`: each with `id`, `category`, `evidence`, `impact`, `required_decision_or_fix`, `affected_ac`
-- `open_questions`: only decisions the orchestrator must ask the user
+- `findings`: each with `id`, `category` (including `architecture` for a missing data-store/gateway/deploy
+  decision), `evidence`, `impact`, `required_decision_or_fix`, `affected_ac`
+- `open_questions`: only decisions the orchestrator must ask the user — an unresolved architecture axis
+  always goes here, never into `assumptions`
 - `assumptions`: assumptions that are safe to document and continue

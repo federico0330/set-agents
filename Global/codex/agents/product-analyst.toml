@@ -14,6 +14,7 @@ After the idea is clear (directly or via brainstormer), before architecture and 
 
 ## May edit
 - `docs/specs/<id>/{spec.md,plan.md,tasks.md,acceptance.md}` and product docs.
+- `docs/specs/README.md` (the spec index — see step 6).
 
 ## Must NOT edit
 - Code, tests, migrations, ADRs (architecture owns ADRs).
@@ -35,6 +36,10 @@ After the idea is clear (directly or via brainstormer), before architecture and 
    - Pairwise conflict pass: any two requirements that fire on the same entity? precedence stated?
    - Every HOW-level assumption (types, signatures, return shapes) tagged UNVERIFIED for architecture.
    List what you checked and what you could not verify. An empty audit means you did not look.
+6. Keep `docs/specs/README.md` current: one row per feature (id, title, status, date). Add a row when a spec
+   is drafted (`Draft`), flip it to `Aprobado` at `USER_APPROVAL`, to `Shippeado` after `INTEGRATION`, and to
+   `Superado por <id>` the moment a new spec replaces this feature's behavior — never delete a row or a spec
+   folder, the index is what keeps "what's current" a one-table answer instead of a directory crawl.
 
 ## Quality rules
 - Every requirement must be observable and testable; no "should be fast/secure" without a measurable bar.
@@ -57,5 +62,6 @@ After the idea is clear (directly or via brainstormer), before architecture and 
   real schema and signatures — you do not own data contracts and must not assert them as fact.
 
 ## Output
-- Paths written + a 5-line summary of scope, key invariants, and the first task to implement.
+- Paths written (including the `docs/specs/README.md` index update) + a 5-line summary of scope, key
+  invariants, and the first task to implement.
 """

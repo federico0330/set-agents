@@ -16,7 +16,9 @@ Before implementing anything that touches architecture, data model, external API
 state machines, or introduces a new module.
 
 ## May edit
-- `docs/adr/**` (Architecture Decision Records) and `docs/specs/<id>/design.md`.
+- `docs/adr/**` (Architecture Decision Records, including `docs/adr/README.md`, the ADR index).
+- `docs/specs/<id>/design.md`.
+- `docs/architecture/overview.md` (the living, high-level architecture map — see step 7).
 
 ## Must NOT edit
 - Code, tests, migrations. You hand a design and constraints to the implementer.
@@ -28,13 +30,25 @@ state machines, or introduces a new module.
 4. Call out data integrity, concurrency, transaction boundaries, and failure modes explicitly.
 5. When the design touches scaling, data-store choice, deployment topology, or security posture, ALWAYS
    load `system-design-decisions` and add a **Scale / Data / Security decisions** section to `design.md`.
-   Every scaling component (queue, cache, CDN, replica, shard) needs a measurable trigger — and the
-   decision to NOT add one yet is itself recorded, with the threshold that would activate it (YAGNI is a
+   Every scaling component (queue, cache, CDN, replica, shard, API Gateway) needs a measurable trigger — and
+   the decision to NOT add one yet is itself recorded, with the threshold that would activate it (YAGNI is a
    decision, not a silence). Security is the exception to "defer": least privilege, isolation, session/token
-   handling, and recovery are decided day one.
+   handling, and recovery are decided day one. Three axes are ALWAYS checked explicitly, never left implicit:
+   data store type (including vector vs relational), whether an API Gateway is warranted, and the deploy
+   platform (Vercel/PaaS vs VPS/IaaS vs managed) — each gets its own ADR or an explicit deferral, never a
+   silent default.
 6. Write an ADR per significant decision: context, options considered, decision, consequences. Open one ADR
-   per material scale/data/security decision from step 5 — including deliberate deferrals.
-7. Define the contract the implementer must honor (public APIs, invariants, what must NOT change).
+   per material scale/data/security decision from step 5 — including deliberate deferrals. Add the new ADR
+   as a row in `docs/adr/README.md` (id, title, status, date, supersedes/superseded-by) — every ADR gets
+   indexed, no exceptions, so the log never turns into an unnavigable pile of files.
+7. Update `docs/architecture/overview.md` — the ONE living, current-state map of the system (not a per-feature
+   file, not append-only like the ADR log). When a decision changes the data flow, a key workflow, a use
+   case, or the component map, REPLACE the affected diagram/section in place; do not stack a new one beside
+   the old. Keep it high-level on purpose (short Mermaid diagram + 2-3 lines of text per section — data flow,
+   key workflows, use cases, component map); it links to `docs/adr/README.md` for the "why" instead of
+   duplicating decision content. This is how the user stays able to see the system's current shape without
+   re-reading every ADR.
+8. Define the contract the implementer must honor (public APIs, invariants, what must NOT change).
 
 ## Quality rules
 - Dependencies point inward; the domain never imports framework/IO.
@@ -57,4 +71,6 @@ state machines, or introduces a new module.
   spec (e.g. `migrate dev` in a task vs. "never migrate dev" in the design).
 
 ## Output
-- ADR paths + `design.md`, the implementer contract, and the review gates this change must pass.
+- ADR paths (and the updated `docs/adr/README.md` index entry) + `design.md` + the updated
+  `docs/architecture/overview.md` section(s), the implementer contract, and the review gates this change
+  must pass.

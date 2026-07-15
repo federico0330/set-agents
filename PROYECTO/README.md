@@ -5,7 +5,10 @@ Copiá lo que necesites de esta carpeta a la raíz de tu repo. Mínimo recomenda
 ```
 AGENTS.md                      # reglas del proyecto (editá los placeholders)
 docs/specs/<id>/{spec,plan,tasks,acceptance}.md
+docs/specs/README.md           # índice de specs (vigente/superado) — lo mantiene product-analyst
 docs/adr/0001-*.md
+docs/adr/README.md             # índice de ADRs — lo mantiene architect
+docs/architecture/overview.md  # mapa vivo del sistema (data flow, workflows, casos de uso) — lo mantiene architect
 docs/ai/memory-log.md
 ai/scripts/{verify.sh,audit-readonly.sh,loop.sh}   # deterministic gates and optional worker loop
 ai/scripts/{feature-state.py,check-owned-paths.py} # package workflow state and ownership gates

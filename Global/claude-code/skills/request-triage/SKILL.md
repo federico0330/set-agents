@@ -25,7 +25,10 @@ failure this skill exists to prevent (applying the heavy flow to a problem that 
 ### 1. Feature / build — full SDD (default; ~90% of requests)
 Triggers: "build an app", "add a feature", anything net-new or non-trivial touching architecture/data/security.
 Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
-expect? what data model? where centralized vs decentralized? what must be secure day one? Then the rigorous
+expect? where centralized vs decentralized? what must be secure day one? and name these three axes
+explicitly, not generically — **does persistence need vector/semantic search or does relational cover it?
+does this need an API Gateway or is it a monolith with one client? where does it deploy and why (Vercel/PaaS
+vs VPS/IaaS vs managed)?** Then the rigorous
 **SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
 Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
 validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
@@ -61,6 +64,16 @@ Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual cha
 exception to the rigor default — not a licence to abandon it.
 
 Ambiguous which mode? Ask. When risk is unclear, bias toward the more rigorous mode.
+
+## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
+Before delegating in ANY mode, check the request against the three named axes above: **data store type
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. If
+the request plausibly touches one of these AND no existing ADR already covers it for this project, do not
+implement directly — escalate to at least `scoped-feature` with an architecture checkpoint (`architect`
+loads `system-design-decisions`, proposes options, and the orchestrator asks the user per its Question
+policy) before any code is written. This applies even to a request that looks like a quick-fix on its
+surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store decision). A safe
+default is NOT an escape hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
 
 ## Waking the dormant agents (concrete triggers, not "by risk")
 These agents are permitted but easy to forget — pull them in on these triggers:
