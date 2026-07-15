@@ -14,10 +14,10 @@ def fail(message):
 # Which auditors MUST have run for each touched surface. Ties JUDGE_PASS to real coverage
 # instead of trusting a single free-text audits="pass" attestation.
 SURFACE_AUDITORS = {
-    "auth": {"security-auditor", "red-team"},
-    "money": {"security-auditor", "red-team", "db-auditor"},
-    "pii": {"security-auditor", "red-team"},
-    "data": {"db-auditor", "performance-auditor"},
+    "auth": {"security-auditor"},
+    "money": {"security-auditor", "package-reviewer"},
+    "pii": {"security-auditor"},
+    "data": {"package-reviewer"},
     "ui": {"ux-ui-designer"},
 }
 
@@ -28,8 +28,8 @@ def check_coverage(state):
     if surfaces is None:
         fail("release blocked: audit surface coverage not declared (state.surfaces missing)")
     ran = set(state.get("audits_ran") or [])
-    if "auditor" not in ran:
-        fail("release blocked: base auditor did not run (audits_ran missing 'auditor')")
+    if "package-reviewer" not in ran:
+        fail("release blocked: base reviewer did not run (audits_ran missing 'package-reviewer')")
     for surface in surfaces:
         missing = SURFACE_AUDITORS.get(surface, set()) - ran
         if missing:

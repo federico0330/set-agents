@@ -8,7 +8,7 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "python3 ~/.claude/hooks/claude_bash_guard.py"
+          command: "python3 ~/.claude/hooks/claude_ask_guard.py"
 ---
 
 # Spec-Challenger — pre-approval read-only challenge of the Feature Contract

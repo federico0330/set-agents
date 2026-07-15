@@ -8,7 +8,7 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "python3 ~/.claude/hooks/claude_bash_guard.py"
+          command: "python3 ~/.claude/hooks/claude_ask_guard.py"
 ---
 
 # Delta-Reviewer — focused review after package repair

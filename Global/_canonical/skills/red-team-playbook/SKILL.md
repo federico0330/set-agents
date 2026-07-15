@@ -4,7 +4,7 @@ description: Authorized, read-only offensive review of the change under test —
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: red-team, security-auditor
+  enabled_for: security-auditor
 ---
 
 # Red Team Playbook

@@ -4,7 +4,7 @@ description: Defensive OWASP-aligned security checklist — authZ/object-level a
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: security-auditor, auditor, architect, implementer
+  enabled_for: security-auditor, package-reviewer, architect, implementer
 ---
 
 # Security Review

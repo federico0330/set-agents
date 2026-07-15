@@ -4,7 +4,7 @@ description: Scalability checklist — paginate in SQL not memory, kill N+1, AsN
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: performance-auditor, architect, implementer, debugger
+  enabled_for: package-reviewer, architect, implementer, debugger
 ---
 
 # Performance & Scalability

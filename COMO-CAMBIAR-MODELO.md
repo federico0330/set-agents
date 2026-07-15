@@ -27,10 +27,13 @@ almost all daily work and keeping OpenCode Go as a single external audit lane:
 - **Mechanical/script-gated** (`gate-runner`, `github-release-manager`, `memory-scribe`, `app-runner`) →
   `openai/gpt-5.4-mini` in go-zen; these roles should not spend Go quota.
 
-`test-writer` uses `openai/gpt-5.6-terra` in go-zen because end-stage regressions need real assertions. The only
-default OpenCode Go role in go-zen is the general `auditor` (`opencode-go/minimax-m3`) to keep one non-OpenAI
-second opinion per pass. Security, red-team, db audit, performance review, blue-team, and the final judge use
-GPT-5.6 through OpenAI.
+`test-writer` uses `openai/gpt-5.6-terra` in go-zen because end-stage regressions need real assertions. The
+review roster (`package-reviewer` — correctness/data-integrity/scalability in one pass, `security-auditor` —
+offensive+defensive in one pass, `delta-reviewer`, `spec-challenger`) and the final judge all use GPT-5.6 Sol
+through OpenAI. No role currently uses `opencode-go/*` in the go-zen profile — the standalone `auditor` role
+that held that OpenCode Go "non-OpenAI second opinion" lane was folded into `package-reviewer` (same criteria,
+same GPT-5.6 Sol model as the rest of the review panel). If you want that provider-diversity lane back, pick a
+review-ro role and set its `opencode_go` cell in `roles.tsv` to an `opencode-go/*` model.
 
 The three profiles differ in the hosted model column selected by `active-profile`: `go-zen` mixes OpenAI
 subscription models with `opencode-go/*`, `zen` uses `opencode/*` routers, and `local` uses `openai/*` only.

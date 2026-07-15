@@ -4,7 +4,7 @@ description: Standard finding format for package reviews, delta reviews, securit
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: auditor, package-reviewer, delta-reviewer, security-auditor, db-auditor, performance-auditor, red-team, repair-agent
+  enabled_for: package-reviewer, delta-reviewer, security-auditor, repair-agent
 ---
 
 # Structured Findings

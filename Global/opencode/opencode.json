@@ -103,11 +103,8 @@
     "brave-cdp": {
       "type": "local",
       "command": [
-        "npx",
-        "-y",
-        "@playwright/mcp@latest",
-        "--cdp-endpoint",
-        "http://localhost:9222"
+        "/home/federico/SET-AGENTES/PROYECTO/ai/scripts/brave-cdp-mcp.sh",
+        "run-mcp"
       ],
       "enabled": false
     }

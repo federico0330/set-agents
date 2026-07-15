@@ -42,8 +42,33 @@ permission:
     "claude --version*": allow
     "codex --version*": allow
     "opencode --version*": allow
-    "git push*": deny
+    "cat *": allow
+    "ls*": allow
+    "find *": allow
+    "grep *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "file *": allow
+    "stat *": allow
+    "diff *": allow
+    "du *": allow
+    "df*": allow
+    "ps*": allow
+    "pwd*": allow
+    "which *": allow
+    "curl http://localhost*": allow
+    "curl http://127.0.0.1*": allow
+    "curl localhost*": allow
+    "curl 127.0.0.1*": allow
     "sudo *": deny
+    "rm -rf*": deny
+    "rm -fr*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git push --force-with-lease*": deny
+    "gh repo delete*": deny
 ---
 
 # Implementer — bounded package work with local validation, no self-approval
@@ -77,9 +102,12 @@ inside a package.
    `performance-scalability`, or `context7` for uncertain external APIs.
 2. Implement the assigned work packet with the smallest safe diff.
 3. After each task or coherent subtask, run local validation: typecheck/compile, lint on touched files, focused
-   unit/contract tests, smoke checks, and ownership checks as available.
+   unit/contract tests, smoke checks, and ownership checks as available. When a local validation fails, fix and
+   re-run it yourself — repeat this fix-verify loop as many times as it takes to converge. This local loop is
+   cheap and expected; it is not a deep audit and does not need the orchestrator or a reviewer in between.
 4. Keep a short record of local validations and assumptions for the package state.
-5. Stop at package boundary. Hand back to the orchestrator for package gates and review.
+5. Stop at package boundary only once local validation is green, or once the same failure repeats after a
+   focused repair attempt (see Stop conditions). Hand back to the orchestrator for package gates and review.
 
 ## Deep audit boundary
 

@@ -1,6 +1,6 @@
 ---
 name: request-triage
-description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (red-team, blue-team, security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
 license: MIT
 compatibility: opencode
 metadata:
@@ -40,7 +40,7 @@ recovery on Supabase". It is too sensitive for quick-fix, but running the full p
 repair is waste (that is what turned a login into a 4-5h grind).
 Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
 decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
-consolidated package review over the complete package diff** → `security-auditor` + `red-team` when the package
+consolidated package review over the complete package diff** → `security-auditor` when the package
 touches that surface → regression tests → `adversarial-judge` → release → memory.
 What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
 reviewing the complete relevant package/diff once, then delta-reviewing repairs. Ambiguous between scoped and
@@ -64,11 +64,12 @@ Ambiguous which mode? Ask. When risk is unclear, bias toward the more rigorous m
 
 ## Waking the dormant agents (concrete triggers, not "by risk")
 These agents are permitted but easy to forget — pull them in on these triggers:
-- **auth / money / PII / any external input** → `security-auditor` AND `red-team` are MANDATORY before the judge.
-- **after red-team finds something** → `blue-team` to design the hardening + detection.
+- **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
+  covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
 - **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).
 - **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
-- **queries / lists / transactions / migrations** → `db-auditor` + `performance-auditor` (already mandatory).
+- **queries / lists / transactions / migrations** → covered by `package-reviewer`'s own data-integrity/
+  scalability checklist (already mandatory, no separate agent).
 
 **Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
 when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before

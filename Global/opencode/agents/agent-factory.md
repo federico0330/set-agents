@@ -42,8 +42,33 @@ permission:
     "claude --version*": allow
     "codex --version*": allow
     "opencode --version*": allow
-    "git push*": deny
+    "cat *": allow
+    "ls*": allow
+    "find *": allow
+    "grep *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "file *": allow
+    "stat *": allow
+    "diff *": allow
+    "du *": allow
+    "df*": allow
+    "ps*": allow
+    "pwd*": allow
+    "which *": allow
+    "curl http://localhost*": allow
+    "curl http://127.0.0.1*": allow
+    "curl localhost*": allow
+    "curl 127.0.0.1*": allow
     "sudo *": deny
+    "rm -rf*": deny
+    "rm -fr*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git push --force-with-lease*": deny
+    "gh repo delete*": deny
 ---
 
 # Agent factory — canonical role and capability authoring

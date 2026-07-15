@@ -4,7 +4,7 @@ description: Frontend error-UX checklist — no native alert(), use the app's ow
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: ux-ui-designer, auditor, implementer
+  enabled_for: ux-ui-designer, package-reviewer, implementer
 ---
 
 # Frontend Error UX

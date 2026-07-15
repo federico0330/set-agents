@@ -3,10 +3,7 @@ agents/adversarial-judge.md
 agents/agent-factory.md
 agents/app-runner.md
 agents/architect.md
-agents/auditor.md
-agents/blue-team.md
 agents/brainstormer.md
-agents/db-auditor.md
 agents/debugger.md
 agents/delta-reviewer.md
 agents/frontend-engineer.md
@@ -15,14 +12,14 @@ agents/github-release-manager.md
 agents/image-describer.md
 agents/implementer.md
 agents/integrator.md
+agents/local-gate-runner.md
 agents/memory-scribe.md
 agents/orchestrator.md
+agents/package-gate-runner.md
 agents/package-planner.md
 agents/package-reviewer.md
-agents/performance-auditor.md
 agents/product-analyst.md
 agents/project-bootstrapper.md
-agents/red-team.md
 agents/refactor-specialist.md
 agents/repair-agent.md
 agents/runtime-verifier.md

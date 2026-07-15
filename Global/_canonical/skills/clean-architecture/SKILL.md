@@ -4,7 +4,7 @@ description: SOLID principles plus Clean/Hexagonal/Screaming Architecture — de
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: architect, implementer, refactor-specialist, auditor
+  enabled_for: architect, implementer, refactor-specialist, package-reviewer
 ---
 
 # Clean Architecture

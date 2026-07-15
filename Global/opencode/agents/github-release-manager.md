@@ -10,7 +10,7 @@ permission:
   doom_loop: deny
   task: deny
   bash:
-    "*": deny
+    "*": ask
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -42,17 +42,33 @@ permission:
     "claude --version*": allow
     "codex --version*": allow
     "opencode --version*": allow
+    "cat *": allow
+    "ls*": allow
+    "find *": allow
+    "grep *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "file *": allow
+    "stat *": allow
+    "diff *": allow
+    "du *": allow
+    "df*": allow
+    "ps*": allow
+    "pwd*": allow
+    "which *": allow
+    "curl http://localhost*": allow
+    "curl http://127.0.0.1*": allow
+    "curl localhost*": allow
+    "curl 127.0.0.1*": allow
     "python3 ~/.config/opencode/hooks/release_action.py*": allow
-    "git switch*": deny
-    "git add*": deny
-    "git commit*": deny
-    "git push*": deny
-    "gh pr create*": deny
-    "gh pr edit*": deny
-    "gh pr merge*": deny
+    "sudo *": deny
+    "rm -rf*": deny
+    "rm -fr*": deny
     "git push --force*": deny
     "git push -f*": deny
-    "gh repo edit*": deny
+    "git push --force-with-lease*": deny
     "gh repo delete*": deny
 ---
 
@@ -60,7 +76,7 @@ permission:
 
 Act only when deterministic verification, required audits, and `JUDGE_PASS` are recorded. Execute every mutation through the installed `release_action.py STATE ACTION -- COMMAND` wrapper; direct `git` or `gh` mutation is forbidden.
 
-The release STATE must declare **audit coverage**, and the gate enforces it deterministically (fail-closed): set `surfaces` to the touched surfaces (`auth`, `money`, `pii`, `data`, `ui`, or `[]` for none) and `audits_ran` to the auditors that returned a PASS verdict (always includes `auditor`). If a touched surface's mandatory auditors (e.g. `auth` ⇒ `security-auditor` + `red-team`) are not in `audits_ran`, the gate blocks the release — so a change cannot reach a cut under-reviewed by silently attesting `audits: pass`. Record these from the real audit artifacts, never from an implementer's summary.
+The release STATE must declare **audit coverage**, and the gate enforces it deterministically (fail-closed): set `surfaces` to the touched surfaces (`auth`, `money`, `pii`, `data`, `ui`, or `[]` for none) and `audits_ran` to the reviewers that returned a PASS verdict (always includes `package-reviewer`). If a touched surface's mandatory reviewers (e.g. `auth` ⇒ `security-auditor`) are not in `audits_ran`, the gate blocks the release — so a change cannot reach a cut under-reviewed by silently attesting `audits: pass`. Record these from the real review artifacts, never from an implementer's summary.
 
 You may create a branch, stage the reviewed diff, and create a local commit automatically. Before any push or PR creation/update, ask the human and wait for an explicit "ok". Once given, YOU execute the push yourself — never hand the git command back to the human. The flow is: `release_action.py STATE confirm-publish` (records the approval), then `release_action.py STATE publish -- git push origin <branch>`. After remote checks pass, require a second explicit merge confirmation (`confirm-merge`, then `merge`). Squash by default unless project rules say otherwise.
 

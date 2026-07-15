@@ -10,7 +10,7 @@ permission:
   doom_loop: deny
   task: deny
   bash:
-    "*": deny
+    "*": ask
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -42,6 +42,26 @@ permission:
     "claude --version*": allow
     "codex --version*": allow
     "opencode --version*": allow
+    "cat *": allow
+    "ls*": allow
+    "find *": allow
+    "grep *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "file *": allow
+    "stat *": allow
+    "diff *": allow
+    "du *": allow
+    "df*": allow
+    "ps*": allow
+    "pwd*": allow
+    "which *": allow
+    "curl http://localhost*": allow
+    "curl http://127.0.0.1*": allow
+    "curl localhost*": allow
+    "curl 127.0.0.1*": allow
     "./ai/scripts/run.sh*": allow
     "./ai/scripts/verify.sh*": allow
     "./ai/scripts/e2e.sh*": allow
@@ -52,44 +72,13 @@ permission:
     "./ai/scripts/mcp.sh off playwright*": allow
     "./ai/scripts/mcp.sh off brave-cdp*": allow
     "./ai/scripts/mcp.sh status*": allow
-    "curl http://localhost*": allow
-    "curl http://127.0.0.1*": allow
-    "curl localhost*": allow
-    "curl 127.0.0.1*": allow
-    "* > *": deny
-    "*>*": deny
-    "* >> *": deny
-    "*>>*": deny
-    "* < *": deny
-    "*<*": deny
-    "* << *": deny
-    "*<<*": deny
-    "* | *": deny
-    "*|*": deny
-    "* && *": deny
-    "*&&*": deny
-    "* ; *": deny
-    "*;*": deny
-    "*`*": deny
-    "*$(*": deny
-    "*loop.sh*": deny
-    "git add*": deny
-    "git commit*": deny
-    "git push*": deny
-    "gh *": deny
-    "* install*": deny
-    "sed -i*": deny
-    "tee *": deny
-    "rm *": deny
     "sudo *": deny
-    "*--output*": deny
-    "*--ext-diff*": deny
-    "*--pre*": deny
-    "*--exec*": deny
-    "fd * -x *": deny
-    "node * -e *": deny
-    "* -exec *": deny
-    "*-toolexec*": deny
+    "rm -rf*": deny
+    "rm -fr*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git push --force-with-lease*": deny
+    "gh repo delete*": deny
 ---
 
 # App runner — launch, health-check, and report the running application

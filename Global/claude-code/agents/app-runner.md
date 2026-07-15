@@ -8,7 +8,7 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "python3 ~/.claude/hooks/claude_run_guard.py"
+          command: "python3 ~/.claude/hooks/claude_ask_guard.py"
 ---
 
 # App runner — launch, health-check, and report the running application

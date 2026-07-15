@@ -35,9 +35,12 @@ inside a package.
    `performance-scalability`, or `context7` for uncertain external APIs.
 2. Implement the assigned work packet with the smallest safe diff.
 3. After each task or coherent subtask, run local validation: typecheck/compile, lint on touched files, focused
-   unit/contract tests, smoke checks, and ownership checks as available.
+   unit/contract tests, smoke checks, and ownership checks as available. When a local validation fails, fix and
+   re-run it yourself — repeat this fix-verify loop as many times as it takes to converge. This local loop is
+   cheap and expected; it is not a deep audit and does not need the orchestrator or a reviewer in between.
 4. Keep a short record of local validations and assumptions for the package state.
-5. Stop at package boundary. Hand back to the orchestrator for package gates and review.
+5. Stop at package boundary only once local validation is green, or once the same failure repeats after a
+   focused repair attempt (see Stop conditions). Hand back to the orchestrator for package gates and review.
 
 ## Deep audit boundary
 

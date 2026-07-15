@@ -69,6 +69,8 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(data["name"], path.stem)
             self.assertIn(data["sandbox_mode"], {"read-only", "workspace-write"})
             self.assertTrue(data["developer_instructions"].strip())
+        gate_runner = tomllib.loads((ROOT / "Global/codex/agents/gate-runner.toml").read_text())
+        self.assertEqual(gate_runner["sandbox_mode"], "read-only")
 
     def test_coordinator_policy(self):
         allowed = [
@@ -115,15 +117,15 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("separation violation", result.stderr)
 
-        mutating_auditor = (ROOT / "roles.tsv").read_text().replace("auditor\tsubagent\t0.0\treview-ro\taudit", "auditor\tsubagent\t0.0\tcode-rw\taudit")
+        mutating_reviewer = (ROOT / "roles.tsv").read_text().replace("package-reviewer\tsubagent\t0.0\treview-ro\taudit", "package-reviewer\tsubagent\t0.0\tcode-rw\taudit")
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"
-            roles.write_text(mutating_auditor)
+            roles.write_text(mutating_reviewer)
             result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("mutating capability", result.stderr)
 
-        family_overlap = (ROOT / "roles.tsv").read_text().replace("auditor\tsubagent\t0.0\treview-ro\taudit\topencode-go/minimax-m3\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-sol", "auditor\tsubagent\t0.0\treview-ro\taudit\topencode-go/minimax-m3\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-terra")
+        family_overlap = (ROOT / "roles.tsv").read_text().replace("package-reviewer\tsubagent\t0.0\treview-ro\taudit\topenai/gpt-5.6-sol\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-sol", "package-reviewer\tsubagent\t0.0\treview-ro\taudit\topenai/gpt-5.6-sol\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-terra")
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"
             roles.write_text(family_overlap)
@@ -144,7 +146,7 @@ class HarnessTests(unittest.TestCase):
         oc = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
         claude = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
         allowed = ["spec-challenger", "package-planner", "implementer", "package-reviewer", "repair-agent", "delta-reviewer", "integrator"]
-        specialists = ["auditor", "security-auditor", "red-team", "blue-team", "db-auditor", "performance-auditor"]
+        specialists = ["security-auditor"]
         for role in allowed:
             self.assertIn(f'"{role}": allow', oc)
             self.assertIn(role, claude)
@@ -189,16 +191,21 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("MCP_SET server=playwright enabled=false", disabled.stdout)
             self.assertFalse(json.loads(cfg.read_text())["mcp"]["playwright"]["enabled"])
 
-    def test_claude_run_guard_allows_runtime_mcp_only(self):
-        allowed_payload = json.dumps({"tool_input": {"command": "./ai/scripts/mcp.sh browser-gate auto"}})
-        allowed = subprocess.run(["python3", "ai/scripts/claude_run_guard.py"], input=allowed_payload, text=True, capture_output=True)
-        self.assertEqual(allowed.returncode, 0, allowed.stderr)
-        blocked_payload = json.dumps({"tool_input": {"command": "./ai/scripts/mcp.sh on context7"}})
-        blocked = subprocess.run(["python3", "ai/scripts/claude_run_guard.py"], input=blocked_payload, text=True, capture_output=True)
-        self.assertEqual(blocked.returncode, 2)
+    def test_claude_ask_guard_fails_open_except_always_denied(self):
+        # Known-good and merely-uncommon commands both fall through (exit 0) to Claude Code's
+        # own native permission prompt instead of a silent hard block.
+        for command in ("./ai/scripts/mcp.sh browser-gate auto", "./ai/scripts/mcp.sh on context7", "docker ps", "cat some/file.py"):
+            payload = json.dumps({"tool_input": {"command": command}})
+            result = subprocess.run(["python3", "ai/scripts/claude_ask_guard.py"], input=payload, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, (command, result.stderr))
+        # The short, irreducible safety net still hard-blocks regardless of role.
+        for dangerous in ("sudo rm -rf /", "rm -rf /", "git push --force origin main", "git push -f origin main", "gh repo delete owner/repo"):
+            payload = json.dumps({"tool_input": {"command": dangerous}})
+            blocked = subprocess.run(["python3", "ai/scripts/claude_ask_guard.py"], input=payload, text=True, capture_output=True)
+            self.assertEqual(blocked.returncode, 2, dangerous)
 
     def test_release_gate_requires_two_confirmations(self):
-        base = {"verify": "pass", "audits": "pass", "judge": "JUDGE_PASS", "surfaces": [], "audits_ran": ["auditor"]}
+        base = {"verify": "pass", "audits": "pass", "judge": "JUDGE_PASS", "surfaces": [], "audits_ran": ["package-reviewer"]}
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "state.json"
             state.write_text(json.dumps(base))
@@ -217,19 +224,19 @@ class HarnessTests(unittest.TestCase):
             # green gates but no surface coverage declared → blocked
             state.write_text(json.dumps(green))
             self.assertEqual(run("python3", "ai/scripts/release_gate.py", str(state), "commit", check=False).returncode, 2)
-            # auth surface without its mandatory auditors → blocked, names the missing auditor
-            state.write_text(json.dumps({**green, "surfaces": ["auth"], "audits_ran": ["auditor"]}))
+            # auth surface without its mandatory reviewer → blocked, names the missing reviewer
+            state.write_text(json.dumps({**green, "surfaces": ["auth"], "audits_ran": ["package-reviewer"]}))
             blocked = run("python3", "ai/scripts/release_gate.py", str(state), "commit", check=False)
             self.assertEqual(blocked.returncode, 2)
             self.assertIn("security-auditor", blocked.stderr)
-            # auth surface WITH the mandatory auditors recorded → allowed
+            # auth surface WITH the mandatory reviewers recorded → allowed
             state.write_text(json.dumps({**green, "surfaces": ["auth"],
-                                         "audits_ran": ["auditor", "security-auditor", "red-team"]}))
+                                         "audits_ran": ["package-reviewer", "security-auditor"]}))
             self.assertEqual(run("python3", "ai/scripts/release_gate.py", str(state), "commit", check=False).returncode, 0)
 
     def test_release_action_blocks_destructive_publishes(self):
         base = {"verify": "pass", "audits": "pass", "judge": "JUDGE_PASS", "publish_confirmed": True,
-                "surfaces": [], "audits_ran": ["auditor"]}
+                "surfaces": [], "audits_ran": ["package-reviewer"]}
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "state.json"
             state.write_text(json.dumps(base))
@@ -258,7 +265,8 @@ class HarnessTests(unittest.TestCase):
         oc = (ROOT / "Global/opencode/agents/github-release-manager.md").read_text()
         claude = (ROOT / "Global/claude-code/agents/github-release-manager.md").read_text()
         codex = tomllib.loads((ROOT / "Global/codex/agents/github-release-manager.toml").read_text())
-        self.assertIn('"git commit*": deny', oc)
+        self.assertIn('"gh repo delete*": deny', oc)
+        self.assertIn('"python3 ~/.config/opencode/hooks/release_action.py*": allow', oc)
         self.assertIn("release_action.py", oc)
         self.assertIn("claude_release_guard.py", claude)
         self.assertEqual(codex["sandbox_mode"], "read-only")
@@ -384,17 +392,72 @@ class HarnessTests(unittest.TestCase):
             comparison = filecmp.dircmp(one, two)
             self.assertFalse(comparison.left_only or comparison.right_only or comparison.diff_files or comparison.funny_files)
 
-    def test_gate_guard_blocks_execution_flags(self):
-        for command in ("go test -exec /bin/sh ./...", "go test -exec=/tmp/evil ./...", "go test -toolexec evil ./...", "cargo test --config target.runner='evil'", "cargo test --config=target.runner='evil'"):
+    def test_gate_guard_fails_open_except_always_denied(self):
+        # A gate command with an unexpected flag (e.g. -exec) now falls through to Claude Code's
+        # native permission prompt instead of a silent hard block — only the short always-dangerous
+        # list still blocks outright.
+        for command in ("go test -exec /bin/sh ./...", "go test -exec=/tmp/evil ./...", "go test -toolexec evil ./...", "cargo test --config target.runner='evil'"):
             payload = json.dumps({"tool_input": {"command": command}})
-            result = subprocess.run(["python3", "ai/scripts/claude_gate_guard.py"], input=payload, text=True, capture_output=True)
-            self.assertEqual(result.returncode, 2, command)
+            result = subprocess.run(["python3", "ai/scripts/claude_ask_guard.py"], input=payload, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, command)
         gate = (ROOT / "Global/opencode/agents/gate-runner.md").read_text()
-        self.assertIn('"*--config*": deny', gate)
-        self.assertIn('"*--runner*": deny', gate)
-        self.assertIn('"*-exec*": deny', gate)
-        self.assertIn('"*>*": deny', gate)
-        self.assertIn('"*|*": deny', gate)
+        self.assertIn('"*": ask', gate)
+        self.assertIn('"sudo *": deny', gate)
+        self.assertIn('"rm -rf*": deny', gate)
+        self.assertIn('"git push --force*": deny', gate)
+        self.assertIn('"gh repo delete*": deny', gate)
+
+    def test_rpl_p0a_package_gate_runner_is_opencode_only_and_strictly_scoped(self):
+        run("./build.sh")
+        agent = ROOT / "Global/opencode/agents/package-gate-runner.md"
+        text = agent.read_text()
+        self.assertTrue(agent.exists())
+        self.assertFalse((ROOT / "Global/claude-code/agents/package-gate-runner.md").exists())
+        self.assertFalse((ROOT / "Global/codex/agents/package-gate-runner.toml").exists())
+
+        catch_all = text.index('    "*": deny', text.index("  bash:"))
+        ownership = text.index(
+            '    "python3 ai/scripts/check-owned-paths.py --state-file '
+            '/home/federico/iey/iey-ai/ai/state/features/replenishment-v2.json '
+            '--package-id RPL-P0A --baseline 4ef70b0ab6da": allow'
+        )
+        self.assertLess(catch_all, ownership)
+        self.assertIn('    "git *": deny', text)
+        self.assertLess(text.index('    "git *": deny'), text.index('    "git status": allow'))
+        self.assertIn('    "git log --oneline -5": allow', text)
+        self.assertIn(
+            '    "/tmp/opencode/rpl-p0a-gates-4ef70b0ab6da/**": allow', text
+        )
+        self.assertIn(
+            '    "/home/federico/iey/iey-ai/ai/state/features/replenishment-v2.json": allow', text
+        )
+        self.assertIn(
+            '    "NODE_PATH=/home/federico/iey/iey-ai/node_modules '
+            '/home/federico/iey/iey-ai/node_modules/.bin/prisma validate": allow', text
+        )
+        self.assertIn(
+            '    "NODE_PATH=/home/federico/iey/iey-ai/node_modules '
+            '/home/federico/iey/iey-ai/node_modules/.bin/vitest run '
+            'src/lib/modules/contabilium-ingestion/repositories/__tests__/'
+            'ledger-rls.integration.test.ts": allow', text
+        )
+        self.assertIn("record-gate replenishment-v2 --description *", text)
+        self.assertIn('    "*--next-id*": deny', text)
+        self.assertIn('    "*verify.sh*": deny', text)
+        self.assertNotIn('    "*verify.sh*": allow', text)
+        self.assertNotIn('    "NODE_PATH=*', text)
+
+        orchestrator = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
+        self.assertIn('    "package-gate-runner": allow', orchestrator)
+        self.assertIn("For `replenishment-v2` package `RPL-P0A` only", orchestrator)
+        self.assertNotIn(
+            "package-gate-runner",
+            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(),
+        )
+        self.assertNotIn(
+            "package-gate-runner",
+            tomllib.loads((ROOT / "Global/codex/agents/orchestrator.toml").read_text())["developer_instructions"],
+        )
 
     def test_package_workflow_happy_path_executes_real_transitions(self):
         with tempfile.TemporaryDirectory() as td:

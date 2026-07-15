@@ -4,7 +4,7 @@ description: Read-only diff audit against spec/package/acceptance — scope cont
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: orchestrator, auditor, security-auditor, db-auditor, performance-auditor, adversarial-judge
+  enabled_for: orchestrator, package-reviewer, security-auditor, adversarial-judge
 ---
 
 # Audit Diff

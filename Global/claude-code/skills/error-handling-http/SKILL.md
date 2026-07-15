@@ -4,7 +4,7 @@ description: HTTP error-handling & contract checklist — correct status codes (
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: auditor, security-auditor, architect, implementer
+  enabled_for: package-reviewer, security-auditor, architect, implementer
 ---
 
 # HTTP Error Handling

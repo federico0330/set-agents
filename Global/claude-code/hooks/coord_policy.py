@@ -19,10 +19,26 @@ SAFE = [
     r"rustup (toolchain list|show)(\s|$)",
     r"(cargo|rustc) (--version|-V)(\s|$)",
     r"(claude|codex|opencode) (--version|-V)(\s|$)",
+    r"(cat|ls|find|grep|head|tail|wc|tree|file|stat|diff|du|df|ps|pwd|which)(\s|$)",
+    r"curl (?:-[A-Za-z]+\s+)*(?:http://)?(?:localhost|127\.0\.0\.1)(?::\d+)?(?:/|\s|$)",
 ]
 
 FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")
 FORBIDDEN_OPTIONS = re.compile(r"(?:--output(?:=|\s)|--ext-diff|--pre(?:=|\s)|--exec(?:=|\s)|--exec-batch(?:=|\s)|(?:^|\s)-x(?:\s|$)|(?:^|\s)-e(?:\s|$))")
+
+# Short, irreducible safety net: hard-blocked for every role, including subagents that
+# otherwise fail open to "ask". Everything else is a matter of asking the human, never a
+# silent deny.
+ALWAYS_DENY = re.compile(
+    r"(?:^|\s)sudo(?:\s|$)|"
+    r"rm\s+-[a-zA-Z]*r[a-zA-Z]*f|rm\s+-[a-zA-Z]*f[a-zA-Z]*r|"
+    r"git\s+push\s+(?:--force(?:-with-lease)?|-f)(?:\s|$)|"
+    r"gh\s+repo\s+delete"
+)
+
+
+def always_denied(command: str) -> bool:
+    return bool(ALWAYS_DENY.search(command.strip()))
 
 
 def allowed(command: str) -> bool:

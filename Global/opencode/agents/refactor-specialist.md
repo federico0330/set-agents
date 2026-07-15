@@ -42,8 +42,33 @@ permission:
     "claude --version*": allow
     "codex --version*": allow
     "opencode --version*": allow
-    "git push*": deny
+    "cat *": allow
+    "ls*": allow
+    "find *": allow
+    "grep *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "file *": allow
+    "stat *": allow
+    "diff *": allow
+    "du *": allow
+    "df*": allow
+    "ps*": allow
+    "pwd*": allow
+    "which *": allow
+    "curl http://localhost*": allow
+    "curl http://127.0.0.1*": allow
+    "curl localhost*": allow
+    "curl 127.0.0.1*": allow
     "sudo *": deny
+    "rm -rf*": deny
+    "rm -fr*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git push --force-with-lease*": deny
+    "gh repo delete*": deny
 ---
 
 # Refactor-Specialist — behavior-preserving refactors under a test net
@@ -66,7 +91,7 @@ When an explicit task asks to reduce duplication, clarify naming, extract seams,
 2. Make one small, behavior-preserving transformation at a time (extract, rename, inline, move).
 3. Run tests after each step; revert immediately if behavior changes.
 4. Keep the diff reviewable; separate pure refactor commits from any (separately approved) behavior change.
-5. Re-run `ai/scripts/verify.sh`; hand to `@auditor` to confirm no behavior drift.
+5. Re-run `ai/scripts/verify.sh`; hand to `@package-reviewer` to confirm no behavior drift.
 
 ## Rules
 - Apply SOLID and clean-architecture only where it removes real pain, not as decoration.

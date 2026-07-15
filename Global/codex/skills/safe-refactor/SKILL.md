@@ -4,7 +4,7 @@ description: Behavior-preserving refactoring only — establish a green baseline
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: refactor-specialist, implementer, auditor
+  enabled_for: refactor-specialist, implementer, package-reviewer
 ---
 
 # Safe Refactor

@@ -43,8 +43,33 @@ permission:
     "claude --version*": allow
     "codex --version*": allow
     "opencode --version*": allow
-    "git push*": deny
+    "cat *": allow
+    "ls*": allow
+    "find *": allow
+    "grep *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "file *": allow
+    "stat *": allow
+    "diff *": allow
+    "du *": allow
+    "df*": allow
+    "ps*": allow
+    "pwd*": allow
+    "which *": allow
+    "curl http://localhost*": allow
+    "curl http://127.0.0.1*": allow
+    "curl localhost*": allow
+    "curl 127.0.0.1*": allow
     "sudo *": deny
+    "rm -rf*": deny
+    "rm -fr*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git push --force-with-lease*": deny
+    "gh repo delete*": deny
 ---
 
 # Package-Planner — coherent package decomposition after spec approval
@@ -72,7 +97,16 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
    - `medium`: several related tasks, multiple layers, or integration work.
    - `high`: architecture-critical, auth/authz, concurrency, destructive migration, public contract, secrets, money,
      or high-risk data changes.
-6. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
+6. Decide `required_reviewers` explicitly, for the orchestrator to use as a ceiling on the review panel — it may
+   not invoke a reviewer you did not declare here:
+   - `small`/`medium` (default): `["package-reviewer"]` only — it already covers correctness, data-integrity, and
+     scalability itself.
+   - add `security-auditor` only when the package touches auth, authorization, payments, secrets, tenant
+     isolation, or PII.
+   - add `ux-ui-designer` only when the package introduces or changes user-facing UI.
+   This is the single biggest lever on review wall-clock: do not over-declare reviewers a package's surface does
+   not need, and do not under-declare on a real risk surface either.
+7. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
    `--selected-role`, `--selected-model`, and `--routing-reason`.
 
 ## Package fields
@@ -80,7 +114,7 @@ Each package must include:
 - `package_id`, `objective`, `acceptance_criteria`, `tasks`, `dependencies`
 - `owned_paths`, `read_only_paths`, `shared_paths`, `risks`, `local_validations`, `package_gates`
 - `early_checkpoints`, `done_conditions`
-- `complexity`, `selected_role`, `selected_model`, `routing_reason`
+- `complexity`, `selected_role`, `selected_model`, `routing_reason`, `required_reviewers`
 
 ## Must NOT
 - Create one package per function/file.

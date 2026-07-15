@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: "Orchestrator \u2014 read-only coordinator of the package-based delivery lifecycle"
-tools: Read, Grep, Glob, Bash, Agent(brainstormer, product-analyst, project-bootstrapper, architect, agent-factory, ux-ui-designer, spec-challenger, package-planner, test-writer, implementer, frontend-engineer, refactor-specialist, debugger, repair-agent, integrator, gate-runner, auditor, package-reviewer, delta-reviewer, security-auditor, red-team, blue-team, db-auditor, performance-auditor, adversarial-judge, github-release-manager, memory-scribe, image-describer, app-runner, runtime-verifier)
+tools: Read, Grep, Glob, Bash, Agent(brainstormer, product-analyst, project-bootstrapper, architect, agent-factory, ux-ui-designer, spec-challenger, package-planner, test-writer, implementer, frontend-engineer, refactor-specialist, debugger, repair-agent, integrator, gate-runner, local-gate-runner, package-reviewer, delta-reviewer, security-auditor, adversarial-judge, github-release-manager, memory-scribe, image-describer, app-runner, runtime-verifier)
 model: fable
 hooks:
   PreToolUse:
@@ -92,21 +92,28 @@ If the state machine rejects a transition, do not work around it in chat. Fix th
 5. `package-planner` decomposes the approved spec into coherent packages. Packages should be vertical slices,
    related AC groups, stable subsystems, API+integration paths, or UI+API flows. Prefer 3-7 work items when
    cohesive; cohesion wins over count. It must classify complexity and record `selected_role`, `selected_model`,
-   and `routing_reason` in state:
-   - `small`: mechanical, few files, closed scope -> efficient role/model.
-   - `medium`: several related tasks, layers, or integration -> Terra-class implementer/repair agent.
+   `routing_reason`, and `required_reviewers` in state:
+   - `small`: mechanical, few files, closed scope -> efficient role/model, `package-reviewer` only.
+   - `medium`: several related tasks, layers, or integration -> Terra-class implementer/repair agent,
+     `package-reviewer` only unless a specific risk surface is present.
    - `high`: architecture/security/concurrency/contracts/migrations -> strongest available planning/review and
-     explicit risk checkpoint before broad mutation.
+     explicit risk checkpoint before broad mutation, `package-reviewer` plus `security-auditor` when auth,
+     payments, PII, or tenant isolation is in scope.
+   You may only invoke the reviewers `package-planner` declared in `required_reviewers` for that package — not
+   whichever ones seem relevant in the moment. If a repair changes the risk surface enough to need a reviewer
+   that wasn't declared, that is itself a finding to record, not a silent addition to the panel.
 6. For each package, delegate implementation to `implementer`, `frontend-engineer`, `refactor-specialist`, or
    `integrator` as appropriate. Workers run local validation per task but never deep-audit or approve themselves.
 7. `gate-runner` runs deterministic package gates after the package is integrated enough to review.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
-8. `package-reviewer` leads the bounded package review panel. Use as many specialist subagents as make sense for
-   the package surface: `auditor`, `security-auditor`, `red-team`, `blue-team`, `db-auditor`,
-   `performance-auditor`, `ux-ui-designer`, or other relevant reviewers. Their outputs are subreviews inside one
-   panel and must be consolidated before repair. Trigger early focused checkpoints only for auth, authorization,
-   tenant isolation, payments, secrets, crypto, destructive migrations/deletes, incompatible public contracts,
-   system permissions, or untrusted code execution.
+8. `package-reviewer` leads the bounded package review panel — it covers correctness, architecture, test gaps,
+   data-integrity, and scalability itself in one pass (no separate DB/performance/legacy-audit agent to
+   delegate those to). Add only the reviewers `package-planner` declared in `required_reviewers`: typically
+   `security-auditor` (offensive+defensive, one pass) when auth/payments/PII/tenant-isolation is in scope, or
+   `ux-ui-designer` for UI/UX risk. Their outputs are subreviews inside one panel and must be consolidated
+   before repair. Trigger early focused checkpoints only for auth, authorization, tenant isolation, payments,
+   secrets, crypto, destructive migrations/deletes, incompatible public contracts, system permissions, or
+   untrusted code execution.
 9. If findings exist, `repair-agent` repairs them in a consolidated pass.
 10. `delta-reviewer` reviews the repair delta and previous findings. It performs a full re-review only if the
     repair substantially changed architecture, public contracts, or risk surface.
@@ -127,11 +134,12 @@ If the state machine rejects a transition, do not work around it in chat. Fix th
 - Every task gets local validation: compile/typecheck/lint/focused tests/contract checks/smoke checks as relevant.
 - Deep review starts only when the package is integrated, minimum gates ran, or a declared high-risk checkpoint is
   reached.
-- A review panel may include many subagents, but the panel is one review cycle. Maximum two deep review cycles per
-  package. After that: diagnose once and mark `BLOCKED` with evidence.
+- A review panel may include `package-reviewer` plus the reviewers `package-planner` declared, but the panel is
+  one review cycle. Maximum two deep review cycles per package. After that: diagnose once and mark `BLOCKED`
+  with evidence.
 - Findings are consolidated; repairs are consolidated; the second review is focused on the delta.
-- Do not re-spawn security/db/perf panels after every repair. Run specialized reviewers when their surface is in
-  the package or the repair changes that surface, and record them as subreviews of the same bounded panel.
+- Do not re-spawn `security-auditor` after every repair. Run it again only when the repair changed the surface
+  that made it required in the first place, and record it as a subreview of the same bounded panel.
 
 ## Question policy
 

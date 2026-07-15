@@ -4,7 +4,7 @@ description: Convert red-team and security findings into layered defenses — se
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: blue-team, security-auditor, implementer
+  enabled_for: security-auditor, implementer
 ---
 
 # Blue Team Hardening

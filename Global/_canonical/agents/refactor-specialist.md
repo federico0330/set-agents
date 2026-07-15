@@ -18,7 +18,7 @@ When an explicit task asks to reduce duplication, clarify naming, extract seams,
 2. Make one small, behavior-preserving transformation at a time (extract, rename, inline, move).
 3. Run tests after each step; revert immediately if behavior changes.
 4. Keep the diff reviewable; separate pure refactor commits from any (separately approved) behavior change.
-5. Re-run `ai/scripts/verify.sh`; hand to `@auditor` to confirm no behavior drift.
+5. Re-run `ai/scripts/verify.sh`; hand to `@package-reviewer` to confirm no behavior drift.
 
 ## Rules
 - Apply SOLID and clean-architecture only where it removes real pain, not as decoration.

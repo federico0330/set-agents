@@ -4,7 +4,7 @@ description: Data integrity checklist — atomic transactions, working optimisti
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: db-auditor, architect, implementer, debugger
+  enabled_for: package-reviewer, architect, implementer, debugger
 ---
 
 # DB Integrity

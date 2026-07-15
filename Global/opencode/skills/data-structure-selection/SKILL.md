@@ -3,7 +3,7 @@ name: data-structure-selection
 description: Pick the right data structure by access pattern BEFORE writing code — the 8 fundamentals (array, linked list, stack, queue, hash table, BST, heap, graph) mapped to the operation that dominates (read, insert/delete, priority, relationships) with their time-complexity tradeoffs. Load when implementing logic that stores, looks up, orders, or traverses data, or when reviewing such code.
 license: MIT
 metadata:
-  enabled_for: implementer, architect, performance-auditor
+  enabled_for: implementer, architect, package-reviewer
 ---
 
 # Data-structure selection

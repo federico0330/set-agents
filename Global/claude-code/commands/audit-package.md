@@ -25,7 +25,7 @@ python3 ai/scripts/feature-state.py record-review <PKG> <pass|repair_required|bl
 When the package surface warrants specialist review, the orchestrator should run a bounded panel instead:
 
 ```bash
-python3 ai/scripts/feature-state.py start-review-panel <PKG> --role package-reviewer --role security-auditor --role db-auditor
+python3 ai/scripts/feature-state.py start-review-panel <PKG> --role package-reviewer --role security-auditor
 python3 ai/scripts/feature-state.py record-subreview <PKG> security-auditor <pass|repair_required|blocked> --finding '<json>' ...
 python3 ai/scripts/feature-state.py finalize-review-panel <PKG> <pass|repair_required|blocked>
 ```

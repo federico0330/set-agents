@@ -4,7 +4,7 @@ description: Runtime fundamentals a frontend build/review must respect — the b
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: frontend-engineer, ux-ui-designer, implementer, performance-auditor
+  enabled_for: frontend-engineer, ux-ui-designer, implementer, package-reviewer
 ---
 
 # Web Frontend Fundamentals

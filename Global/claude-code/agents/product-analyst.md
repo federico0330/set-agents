@@ -55,7 +55,7 @@ After the idea is clear (directly or via brainstormer), before architecture and 
 - Make money, identity, audit-trail, and concurrency rules explicit when present.
 - Mark the first shippable slice; defer everything else to non-goals.
 - Stay in the WHAT. If a spec must sketch HOW (algorithm, field types, return shapes) to be unambiguous,
-  mark every such assumption as UNVERIFIED and route it to architecture / db-auditor to confirm against the
+  mark every such assumption as UNVERIFIED and route it to architecture / package-reviewer to confirm against the
   real schema and signatures — you do not own data contracts and must not assert them as fact.
 
 ## Output

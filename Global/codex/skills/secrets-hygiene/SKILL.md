@@ -4,7 +4,7 @@ description: Repo hygiene checklist — no committed secrets/connection strings,
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: security-auditor, auditor, implementer
+  enabled_for: security-auditor, package-reviewer, implementer
 ---
 
 # Secrets & Repo Hygiene

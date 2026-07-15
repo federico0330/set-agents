@@ -3,10 +3,7 @@ agents/adversarial-judge.toml
 agents/agent-factory.toml
 agents/app-runner.toml
 agents/architect.toml
-agents/auditor.toml
-agents/blue-team.toml
 agents/brainstormer.toml
-agents/db-auditor.toml
 agents/debugger.toml
 agents/delta-reviewer.toml
 agents/frontend-engineer.toml
@@ -15,14 +12,13 @@ agents/github-release-manager.toml
 agents/image-describer.toml
 agents/implementer.toml
 agents/integrator.toml
+agents/local-gate-runner.toml
 agents/memory-scribe.toml
 agents/orchestrator.toml
 agents/package-planner.toml
 agents/package-reviewer.toml
-agents/performance-auditor.toml
 agents/product-analyst.toml
 agents/project-bootstrapper.toml
-agents/red-team.toml
 agents/refactor-specialist.toml
 agents/repair-agent.toml
 agents/runtime-verifier.toml
