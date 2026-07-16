@@ -2,6 +2,21 @@
 
 This independent repository is the versioned source for OpenCode, Claude Code, and Codex.
 
+## Control plane
+
+**OpenCode is the orchestration control plane.** Feature work always starts there with `/feature-batch`
+(its main session IS the orchestrator, with the model, permissions, and step budgets the harness actually
+enforces). The other two harnesses are single-task lanes, not orchestrators:
+
+- **Claude Code**: review/debug lane (`/audit`, `/review-*`, focused debugging sessions).
+- **Codex**: second-opinion lane, one bounded task per session. Never orchestrate long features in Codex:
+  its native `spawn_agent` inherits the session model (ignoring the per-agent TOML routing) and can fork
+  the whole transcript into every subagent — the exact combination that burned a week of quota in two days.
+
+`ai/scripts/check-drift.sh` compares the live install against the repo; a post-commit hook (installed by
+`build.sh`) warns when the installation lags. Never leave a `DRIFT_DETECTED` unresolved — the July 2026
+incident (orphaned expensive reviewers + an MCP left enabled) was exactly a one-generation-stale install.
+
 ## Source layout
 
 - `roles.tsv`: one row per role, capabilities, duties, and quota-first models.

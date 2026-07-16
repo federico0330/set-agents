@@ -371,6 +371,22 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(claude_settings.read_bytes(), before)
             self.assertEqual(unrelated.read_text(), "keep\n")
 
+    def test_check_drift_detects_stale_and_clean_install(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td)
+            for sub in (".claude", ".config/opencode", ".codex"):
+                (home / sub).mkdir(parents=True)
+            # empty fake home = everything differs
+            stale = run("ai/scripts/check-drift.sh", env={"DRIFT_HOME": td}, check=False)
+            self.assertEqual(stale.returncode, 1)
+            self.assertIn("DRIFT_DETECTED", stale.stdout)
+            # install into the fake home, then drift must be clean
+            with tempfile.TemporaryDirectory() as staging_dir:
+                run("./build.sh", "--output", staging_dir)
+                run("python3", "ai/scripts/install.py", "--staging", staging_dir, "--home", td)
+            clean = run("ai/scripts/check-drift.sh", env={"DRIFT_HOME": td})
+            self.assertIn("DRIFT_OK", clean.stdout)
+
     def test_install_prunes_orphaned_managed_files_but_keeps_user_files(self):
         with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging_dir:
             home = Path(td)

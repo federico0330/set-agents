@@ -34,6 +34,20 @@ if [ -n "$OUTPUT" ]; then
   exit
 fi
 
+ensure_drift_hook() {
+  local hook="$ROOT/.git/hooks/post-commit"
+  [ -d "$ROOT/.git/hooks" ] || return 0
+  if [ ! -e "$hook" ] || grep -q "set-agentes drift check" "$hook" 2>/dev/null; then
+    cat > "$hook" <<'HOOK'
+#!/usr/bin/env bash
+# set-agentes drift check (managed by build.sh) — warns when the live install lags the repo.
+ROOT="$(git rev-parse --show-toplevel)"
+"$ROOT/ai/scripts/check-drift.sh" || true
+HOOK
+    chmod +x "$hook"
+  fi
+}
+
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 args=(python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING")
@@ -54,6 +68,7 @@ case "$MODE" in
       cp -a "$STAGING/$harness" "$ROOT/Global/$harness"
     done
     echo "Generated tracked artifacts for ${PROFILE:-$(<"$ROOT/active-profile")}."
+    ensure_drift_hook
     ;;
   install)
     target_args=()
@@ -66,5 +81,6 @@ case "$MODE" in
       case "$answer" in y|Y|yes|YES) ;; *) echo "Installation cancelled."; exit 1;; esac
     fi
     python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" "${target_args[@]}"
+    ensure_drift_hook
     ;;
 esac

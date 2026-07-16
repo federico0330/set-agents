@@ -1,7 +1,12 @@
 # prompt.md — Package workflow starters
 
-Pegá una de estas plantillas como primer mensaje en OpenCode / Claude Code / Codex, parado en la raíz del repo.
-Convierten a la IA en orquestador, pero el estado ejecutable vive en `ai/state/features/<feature_id>.json`.
+Pegá una de estas plantillas como primer mensaje, parado en la raíz del repo. Convierten a la IA en
+orquestador, pero el estado ejecutable vive en `ai/state/features/<feature_id>.json`.
+
+**Dónde orquestar: SIEMPRE en OpenCode** (`/feature-batch`), que es el plano de control del harness.
+Claude Code queda para review/debug puntual y Codex para una segunda opinión de UNA tarea acotada —
+nunca orquestes una feature larga en Codex: sus subagentes heredan el modelo de la sesión e ignoran el
+ruteo por rol, y pueden clonar el historial completo (eso quemó una semana de cuota en dos días).
 
 Regla rápida para elegir:
 - **Cambio chico y claro** → usá la variante corta o pedilo directo.
