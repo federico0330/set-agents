@@ -127,7 +127,9 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
     verification and `record-testing`.
 12. `app-runner` starts the application and `runtime-verifier` performs browser/runtime QA when the package has UI,
     API, persistence, workflow, or customer-visible behavior. QA means exercising the running app, not rereading
-    code. Record URL, screenshots/logs, checks performed, and result with `record-runtime-qa`.
+    code. Record URL, screenshots/logs, checks performed, and result with `record-runtime-qa`; the
+    `--evidence` value must point at files under `docs/specs/<feature_id>/evidence/` (the delivery
+    evidence folder), not at chat prose.
 13. Mark `PACKAGE_ACCEPTED` only after package gates, review/delta review, testing, and runtime QA pass.
 14. `integrator` integrates accepted packages and runs global consistency checks.
 15. `adversarial-judge` receives the final evidence bundle before release.

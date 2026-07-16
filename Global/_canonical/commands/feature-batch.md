@@ -39,3 +39,7 @@ Executable state requirements:
 - Record tests with `record-testing` and runtime/browser QA with `record-runtime-qa` before package acceptance.
 
 Report current phase, package status, gates, findings, retry budget, and next transition from the state file.
+
+After DONE, close the delivery: the evidence bundle lives at `docs/specs/<feature_id>/evidence/`, and the
+consumption summary can be added with `cost-report.py --project . --md > docs/specs/<feature_id>/evidence/cost.md`
+(script lives in the SET-AGENTES repo, `ai/scripts/cost-report.py`).

@@ -30,10 +30,22 @@ else
 fi
 
 # 3. Probar la app corriendo con el runtime-verifier (usa su modelo de perfil; timeout duro anti-cuelgue).
+# La salida queda como evidencia de entrega en docs/specs/<TASK>/evidence/.
+EVIDENCE_DIR="docs/specs/${TASK_ID}/evidence"
+mkdir -p "$EVIDENCE_DIR"
+EVIDENCE_FILE="$EVIDENCE_DIR/e2e-$(date +%Y%m%d-%H%M%S).md"
+{
+  echo "# E2E runtime QA — ${TASK_ID}"
+  echo "- date: $(date -Is)"
+  echo "- browser mode: ${BROWSER_MODE}"
+  echo ""
+} > "$EVIDENCE_FILE"
 timeout "$E2E_TIMEOUT" opencode run --agent runtime-verifier \
   "Verify task ${TASK_ID} in the RUNNING app. Read docs/specs/${TASK_ID}/acceptance.md. Drive the UI via the
 available browser MCP (${BROWSER_MODE}), read screenshots, and check endpoint status codes (e.g. 200 vs 409). Exercise only the flows the
-task names. Return RUNTIME_PASS or concrete problems (where / expected vs actual / evidence)."
-rc=$?
+task names. Save any screenshots/log excerpts under docs/specs/${TASK_ID}/evidence/. Return RUNTIME_PASS or concrete problems (where / expected vs actual / evidence)." \
+  | tee -a "$EVIDENCE_FILE"
+rc=${PIPESTATUS[0]}
+echo "E2E_EVIDENCE=$EVIDENCE_FILE"
 [ "$rc" -eq 124 ] && echo "⏱️  runtime-verifier excedió ${E2E_TIMEOUT}s — E2E cortado por timeout."
 exit $rc

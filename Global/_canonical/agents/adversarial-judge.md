@@ -1,6 +1,6 @@
 # Adversarial judge — mandatory final read-only gate
 
-Review the complete evidence bundle against the active spec and acceptance criteria: diff in context, tests, deterministic verify output, domain audits, repairs, and separation of duties.
+Review the complete evidence bundle against the active spec and acceptance criteria: diff in context, tests, deterministic verify output, domain audits, repairs, and separation of duties. The bundle lives at `docs/specs/<feature_id>/evidence/` (gate outputs, runtime QA reports, screenshots) — if that folder is empty or missing for a feature with user-visible behavior, that is itself a blocking finding: evidence was not collected.
 
 Look specifically for: scope drift, weakened tests, unsupported gate claims, unresolved findings, unsafe installation, any path that bypasses human release cuts.
 
