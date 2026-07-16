@@ -371,6 +371,29 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(claude_settings.read_bytes(), before)
             self.assertEqual(unrelated.read_text(), "keep\n")
 
+    def test_sync_project_copies_generic_scripts_and_guards_active_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td)
+            (project / "ai/scripts").mkdir(parents=True)
+            (project / "ai/scripts/run.sh").write_text("#!/bin/sh\necho project-specific\n")
+            (project / "ai/scripts/feature-state.py").write_text("# old divergent copy\n")
+            # incompatible ACTIVE state → abort
+            states = project / "ai/state/features"
+            states.mkdir(parents=True)
+            (states / "f.json").write_text(json.dumps({"phase": "PACKAGE_PLANNING", "foo": 1}))
+            aborted = run("ai/scripts/sync-project.sh", str(project), check=False)
+            self.assertEqual(aborted.returncode, 1)
+            self.assertIn("SYNC_ABORTED", aborted.stdout + aborted.stderr)
+            self.assertIn("old divergent", (project / "ai/scripts/feature-state.py").read_text())
+            # terminal state → syncs, backs up the old copy, leaves run.sh alone
+            (states / "f.json").write_text(json.dumps({"phase": "BLOCKED", "foo": 1}))
+            ok = run("ai/scripts/sync-project.sh", str(project))
+            self.assertIn("SYNC_OK", ok.stdout)
+            self.assertIn("state machine", (project / "ai/scripts/feature-state.py").read_text())
+            self.assertIn("project-specific", (project / "ai/scripts/run.sh").read_text())
+            backups = list((project / "ai/state").glob("sync-backup-*/feature-state.py"))
+            self.assertTrue(backups and "old divergent" in backups[0].read_text())
+
     def test_check_drift_detects_stale_and_clean_install(self):
         with tempfile.TemporaryDirectory() as td:
             home = Path(td)

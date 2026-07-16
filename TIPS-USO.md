@@ -17,6 +17,11 @@ enforces). The other two harnesses are single-task lanes, not orchestrators:
 `build.sh`) warns when the installation lags. Never leave a `DRIFT_DETECTED` unresolved — the July 2026
 incident (orphaned expensive reviewers + an MCP left enabled) was exactly a one-generation-stale install.
 
+Project-level scripts drift too: `ai/scripts/sync-project.sh <project-dir>` copies the generic template
+scripts (feature-state.py, mcp.sh, e2e.sh, …) into a project, backing up what it replaces and leaving the
+project-specific `run.sh`/`verify.sh` untouched. It ABORTS if the project has an active (non-terminal)
+feature whose state does not validate against the new schema — close the feature first, or `--force`.
+
 ## Source layout
 
 - `roles.tsv`: one row per role, capabilities, duties, and quota-first models.
