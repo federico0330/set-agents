@@ -56,7 +56,8 @@ Do not turn state into a chat transcript. Store decisions and evidence only.
 
 Every transition after USER_APPROVAL must be backed by the state CLI:
 
-- `init` after approved spec.
+- `init` after approved spec, always with `--mode <feature|scoped|quick-fix|incident>` carrying the mode
+  chosen at triage — it sets the physical spawn/review budgets for the whole feature.
 - `create-package` after package planning.
 - `transition` only when the CLI allows the target phase.
 - `complete-task` for local task validation evidence.

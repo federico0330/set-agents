@@ -75,6 +75,13 @@ MUTATING_COMMANDS = {
     "block",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
+# Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
+MODE_BUDGETS = {
+    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2},
+    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2},
+    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1},
+    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1},
+}
 
 
 class StateError(RuntimeError):
@@ -208,6 +215,8 @@ def validate_state(data: dict[str, Any]) -> list[str]:
         errors.append("missing feature_id")
     if data.get("phase") not in PHASES:
         errors.append(f"invalid phase: {data.get('phase')}")
+    if data.get("mode") is not None and data.get("mode") not in MODE_BUDGETS:
+        errors.append(f"invalid mode: {data.get('mode')}")
     spec = data.get("approved_spec") or {}
     if not spec.get("path") or not spec.get("hash"):
         errors.append("approved_spec.path and approved_spec.hash are required")
@@ -502,6 +511,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         raise StateError(f"state exists: {path}")
     data = base_state(args.feature_id, args.spec_path, args.spec_hash)
     data["acceptance_criteria"] = args.ac or []
+    data["mode"] = args.mode
+    data["budgets"].update(MODE_BUDGETS[args.mode])
     for key in ("max_deep_review_cycles", "max_repairs_per_finding", "max_package_subdivisions", "max_spawns_per_package"):
         value = getattr(args, key)
         if value is not None:
@@ -1209,6 +1220,7 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--max-repairs-per-finding", type=int)
     init.add_argument("--max-package-subdivisions", type=int)
     init.add_argument("--max-spawns-per-package", type=int)
+    init.add_argument("--mode", choices=sorted(MODE_BUDGETS), default="feature")
     init.set_defaults(func=cmd_init)
 
     for name, func in (("status", cmd_status), ("next", cmd_next), ("resume", cmd_resume), ("validate", cmd_validate)):

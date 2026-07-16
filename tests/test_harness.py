@@ -601,6 +601,35 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(data["phase"], "BLOCKED")
         self.assertIn("deep review budget exhausted", json.dumps(data["blockers"]))
 
+    def test_init_mode_sets_physical_budgets(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash",
+                "--state-file", str(state), "--ac", "AC-1", "--mode", "quick-fix")
+            self.run_state(
+                state, "create-package", "PKG-01", "Fix",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            data = json.loads(state.read_text())
+            self.assertEqual(data["mode"], "quick-fix")
+            self.assertEqual(data["budgets"]["max_spawns_per_package"], 4)
+            self.assertEqual(data["budgets"]["max_deep_review_cycles"], 1)
+            for role in ("implementer", "gate-runner", "gate-runner", "debugger"):
+                self.run_state(state, "record-spawn", "PKG-01", role)
+            result = self.run_state(state, "record-spawn", "PKG-01", "package-reviewer", check=False)
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(data["phase"], "BLOCKED")
+        # explicit flag still wins over the mode default
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash",
+                "--state-file", str(state), "--ac", "AC-1", "--mode", "quick-fix",
+                "--max-spawns-per-package", "9")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["budgets"]["max_spawns_per_package"], 9)
+
     def test_spawn_budget_blocks_after_limit(self):
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "feature.json"
