@@ -32,15 +32,24 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
    - add `ux-ui-designer` only when the package introduces or changes user-facing UI.
    This is the single biggest lever on review wall-clock: do not over-declare reviewers a package's surface does
    not need, and do not under-declare on a real risk surface either.
-7. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
-   `--selected-role`, `--selected-model`, and `--routing-reason`.
+7. Write one **context pack** per package at `docs/specs/<feature_id>/context/<PACKAGE_ID>.md`, max ~120
+   lines. It is the ONLY context a spawned worker gets besides its task, so it must be self-contained:
+   - objective of the package in 2-3 lines and the acceptance criteria it covers,
+   - the relevant files/paths with a one-line why for each (entry points, contracts, tests to extend),
+   - the ADRs/contracts/invariants that constrain this package (link, plus the one-line rule),
+   - the exact local validation commands for this package,
+   - explicit out-of-scope: what a worker must NOT touch even if tempted.
+   Curate, do not dump: a worker reading this should not need to re-explore the repository. Keep it current
+   if repairs change the package surface.
+8. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
+   `--selected-role`, `--selected-model`, `--routing-reason`, and `--context-pack docs/specs/<feature_id>/context/<PACKAGE_ID>.md`.
 
 ## Package fields
 Each package must include:
 - `package_id`, `objective`, `acceptance_criteria`, `tasks`, `dependencies`
 - `owned_paths`, `read_only_paths`, `shared_paths`, `risks`, `local_validations`, `package_gates`
 - `early_checkpoints`, `done_conditions`
-- `complexity`, `selected_role`, `selected_model`, `routing_reason`, `required_reviewers`
+- `complexity`, `selected_role`, `selected_model`, `routing_reason`, `required_reviewers`, `context_pack`
 
 ## Must NOT
 - Create one package per function/file.

@@ -138,9 +138,11 @@ session has burned a week of quota in two days; treat them as invariants, not st
 
 - **Never fork conversation history into a subagent.** If the platform's spawn call supports inheriting the
   parent transcript (e.g. Codex `spawn_agent` with `fork_turns`), always pass `fork_turns: "none"`. The spawn
-  message must be self-contained instead: feature id, package id, spec/plan file paths, ownership paths,
-  acceptance criteria covered, and the exact expected output. Subagents read state from files, not from your
-  chat history — that is the whole point of file-first state.
+  message must be self-contained instead: feature id, package id, the package's **context pack** path
+  (`docs/specs/<feature_id>/context/<PKG>.md`, written by `package-planner`), the concrete task, and the
+  exact expected output. Never tell a worker to "explore the repo" — if the context pack is missing or
+  stale for what you are delegating, route that back to `package-planner` first. Subagents read state from
+  files, not from your chat history — that is the whole point of file-first state.
 - **One spawn per role per phase, batched work inside it.** One `test-writer` gets ALL scenarios of the package;
   never spawn one agent per BDD scenario, per test, per finding, or per file. One `repair-agent` gets the whole
   consolidated findings list.

@@ -15,6 +15,7 @@ Two modes, same agent and same checklist depth:
   output) instead of the whole package, but apply the same checklists below.
 
 ## Inputs
+- The package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) — read it FIRST if it exists; it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 - Approved spec and version/hash.
 - Package plan (full mode) or named scope (quick mode): covered ACs, tasks, ownership paths, risks, gates.
 - Baseline and complete diff (package or task-scoped).

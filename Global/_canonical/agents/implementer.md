@@ -9,6 +9,7 @@ After USER_APPROVAL and PACKAGE_PLANNING, for backend, domain, API, scripting, o
 inside a package.
 
 ## Inputs
+- The package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) — read it FIRST if it exists; it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 - Approved spec and package plan.
 - Assigned task/work packet and ownership paths.
 - Acceptance criteria covered by the package.

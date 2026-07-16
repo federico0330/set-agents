@@ -183,6 +183,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "selected_role": None,
         "selected_model": None,
         "routing_reason": None,
+        "context_pack": None,
     }
 
 
@@ -590,6 +591,7 @@ def cmd_create_package(args: argparse.Namespace) -> int:
         package["selected_role"] = args.selected_role
         package["selected_model"] = args.selected_model
         package["routing_reason"] = args.routing_reason
+        package["context_pack"] = args.context_pack
         for task_id in args.task or []:
             package["tasks"].append({"id": task_id, "status": "planned", "local_validations": [], "blockers": []})
         if len(package["tasks"]) < 2 and package["complexity"] != "small":
@@ -623,6 +625,8 @@ def cmd_update_package(args: argparse.Namespace) -> int:
             package["selected_model"] = args.selected_model
         if args.routing_reason:
             package["routing_reason"] = args.routing_reason
+        if args.context_pack:
+            package["context_pack"] = args.context_pack
         for exception in args.exception or []:
             item = parse_json_object(exception)
             if not item.get("path") or item.get("status") != "approved":
@@ -1253,6 +1257,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--selected-role")
     create.add_argument("--selected-model")
     create.add_argument("--routing-reason")
+    create.add_argument("--context-pack")
     create.set_defaults(func=cmd_create_package)
 
     update = sub.add_parser("update-package")
@@ -1265,6 +1270,7 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--selected-role")
     update.add_argument("--selected-model")
     update.add_argument("--routing-reason")
+    update.add_argument("--context-pack")
     update.add_argument("--exception", action="append")
     update.set_defaults(func=cmd_update_package)
 

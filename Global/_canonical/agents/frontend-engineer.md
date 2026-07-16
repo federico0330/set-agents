@@ -13,6 +13,8 @@ motion galleries), `frontend-design` (tokens/typography/a11y), `frontend-error-u
 current docs via context7 rather than guessing.
 
 ## How you build
+
+Before starting, read the package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) if it exists — it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 1. Read `docs/specs/<id>/spec.md` + `acceptance.md` and, when present, `docs/specs/<id>/ux.md` from `ux-ui-designer`.
 2. Pick a deliberate visual direction — adopt a real brand's brief from `getdesign.md` or a reference the user named.
 3. Build on shadcn/ui primitives; elevate with Skiper UI (prefer its free components; flag premium before using it)
