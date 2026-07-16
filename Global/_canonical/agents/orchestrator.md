@@ -78,7 +78,8 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
 
 ## Delegation flow
 
-1. `product-analyst` drafts the Feature Contract and BDD acceptance criteria.
+1. `product-analyst` drafts the Feature Contract, BDD acceptance criteria, and the executive `proposal.md`
+   (business-language deliverable, no internal jargon — what a client's IT department would receive).
 2. `architect` designs/records ADRs when architecture, schema, security, identity, audit, money, external APIs, or
    scaling choices are involved. It always checks the three named architecture axes from `system-design-decisions`
    (data store type including vector vs relational, API Gateway, deploy platform) and either records an ADR for
@@ -90,8 +91,10 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
    axes against `design.md`/the ADRs: if the request's surface plausibly touches one and nothing addresses it,
    that is a blocking finding, not a nit. Route its consolidated issues back to `product-analyst`/`architect` as
    needed.
-4. Stop for USER_APPROVAL of the spec. Do not implement before approval. You may not record `USER_APPROVAL` while
-   `spec-challenger` has an open architecture finding — resolve it via the Question policy below first.
+4. Stop for USER_APPROVAL, presenting spec + acceptance + `proposal.md` together (the proposal is what the
+   user approves as a client; the spec is what they approve as an engineer). Do not implement before
+   approval. You may not record `USER_APPROVAL` while `spec-challenger` has an open architecture finding —
+   resolve it via the Question policy below first.
 5. `package-planner` decomposes the approved spec into coherent packages. Packages should be vertical slices,
    related AC groups, stable subsystems, API+integration paths, or UI+API flows. Prefer 3-7 work items when
    cohesive; cohesion wins over count. It must classify complexity and record `selected_role`, `selected_model`,
