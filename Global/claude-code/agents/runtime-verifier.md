@@ -37,7 +37,8 @@ enough to describe the failure, never to repair it.
    - Use `playwright` for normal app flows that do not require a pre-existing user browser profile.
 4. Drive the UI with the available browser MCP (navigate, fill, click, submit). Take a screenshot at each key state
    and READ it: does the rendered result match the acceptance criteria? Is the error surfaced to the user, or
-   swallowed? Does the state refresh after a conflict?
+   swallowed? Does the state refresh after a conflict? Save screenshots and log excerpts under
+   `docs/specs/<feature_id>/evidence/` — that folder is the client-facing delivery evidence, not a scratch dir.
 5. Compare everything against the active spec/acceptance criteria — this is the **BDD** check: confirm the
    running system satisfies each Given-When-Then behavioral scenario. Judgement is about real observed behavior.
 

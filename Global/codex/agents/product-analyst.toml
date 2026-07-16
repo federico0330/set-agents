@@ -13,7 +13,7 @@ tasks and acceptance criteria that are concrete enough to test and small enough 
 After the idea is clear (directly or via brainstormer), before architecture and implementation.
 
 ## May edit
-- `docs/specs/<id>/{spec.md,plan.md,tasks.md,acceptance.md}` and product docs.
+- `docs/specs/<id>/{spec.md,plan.md,tasks.md,acceptance.md,proposal.md}` and product docs.
 - `docs/specs/README.md` (the spec index — see step 6).
 
 ## Must NOT edit
@@ -30,6 +30,13 @@ After the idea is clear (directly or via brainstormer), before architecture and 
 3. Write `tasks.md`: ordered work items (`T-001…`), each with its acceptance link, likely package, local
    validations, ownership hints, and risk-specific checkpoint needs.
 4. Write `plan.md`: sequence, dependencies, risks, and what triggers a human decision.
+4b. Write `proposal.md` — the **executive proposal**, in business language, as if it were handed to the
+   client company's IT department. No internal jargon (no "packages", "gates", "spawns", agent names).
+   Sections: the problem and its business case; the proposed solution in one paragraph; scope and explicit
+   out-of-scope; assumptions; risks with their mitigation; delivery phases with relative effort (S/M/L, not
+   dates you cannot promise); measurable success criteria. It must be consistent with `spec.md` — same
+   scope, same non-goals, different audience. This is the document the user approves *as a client*; the
+   spec is what they approve *as an engineer*.
 5. Self-review before handing off — a short "spec audit" section at the end of `spec.md`:
    - For each detection/absence requirement: universe named? absence-of-record behavior defined? data
      source proven to carry the signal?

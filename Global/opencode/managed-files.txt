@@ -81,6 +81,11 @@ skills/safe-refactor/SKILL.md
 skills/sdd/SKILL.md
 skills/secrets-hygiene/SKILL.md
 skills/security-review/SKILL.md
+skills/solution-baselines/SKILL.md
+skills/solution-baselines/references/api-b2b-integraciones.md
+skills/solution-baselines/references/ecommerce-landing.md
+skills/solution-baselines/references/gestion-dashboard.md
+skills/solution-baselines/references/scraping-datos-ml.md
 skills/spec-challenge/SKILL.md
 skills/structured-findings/SKILL.md
 skills/system-design-decisions/SKILL.md

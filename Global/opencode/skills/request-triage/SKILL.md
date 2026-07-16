@@ -65,6 +65,22 @@ exception to the rigor default — not a licence to abandon it.
 
 Ambiguous which mode? Ask. When risk is unclear, bias toward the more rigorous mode.
 
+## Physical budgets per mode (enforced by the state CLI, not by prose)
+
+The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
+`feature-state.py init` via `--mode`:
+
+| Mode | `--mode` | Spawns/package | Deep review cycles |
+|---|---|---|---|
+| Feature / SDD | `feature` (default) | 12 | 2 |
+| Scoped-feature | `scoped` | 8 | 2 |
+| Quick-fix | `quick-fix` | 4 | 1 |
+| Incident | `incident` | 6 | 1 |
+
+`record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
+than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,
+logged decision), do not fight the budget.
+
 ## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
 Before delegating in ANY mode, check the request against the three named axes above: **data store type
 (including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. If

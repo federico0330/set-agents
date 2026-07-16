@@ -24,7 +24,9 @@ After one or more packages reach `PACKAGE_ACCEPTED`, especially before `DONE`.
 2. Resolve merge/integration issues and update wiring needed for accepted packages to work together.
 3. Run or request global deterministic gates.
 4. Verify the sum of accepted packages still satisfies the approved spec and BDD scenarios.
-5. Update feature state with integration evidence and remaining blockers.
+5. Update feature state with integration evidence and remaining blockers. Consolidate the delivery
+   evidence at `docs/specs/<feature_id>/evidence/` (gate outputs, runtime QA reports, screenshots) — this
+   folder is what the adversarial judge reviews and what the user can hand to the client.
 
 ## Must NOT
 - Change approved acceptance criteria.

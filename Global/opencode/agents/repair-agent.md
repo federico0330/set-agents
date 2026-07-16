@@ -81,6 +81,7 @@ You do not reinterpret the whole spec, expand scope, or ask the user for routine
 After `package-reviewer` or a focused checkpoint returns `repair_required`.
 
 ## Inputs
+- The package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) — read it FIRST if it exists; it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 - Approved spec and package plan.
 - Reviewer findings.
 - Current diff and gate output.

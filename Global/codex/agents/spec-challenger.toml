@@ -28,8 +28,11 @@ Run once initially; run a focused re-check only if the spec changes materially.
    store type (including vector vs relational), API Gateway, and deploy platform. If the spec's surface
    plausibly touches one of these and nothing in `design.md` or an ADR addresses it, that is a blocking
    finding (`category: architecture`) — an absent decision is itself a finding, not just a wrong one.
-5. Separate blocking spec issues from optional improvements.
-6. Return one consolidated review. Do not drip-feed findings.
+5. If `proposal.md` exists, check it against `spec.md`: same scope, same non-goals, no promise in the
+   proposal the spec does not cover (and vice versa). A scope mismatch between what the client reads and
+   what will be built is a blocking finding.
+6. Separate blocking spec issues from optional improvements.
+7. Return one consolidated review. Do not drip-feed findings.
 
 ## Must NOT
 - Edit files.

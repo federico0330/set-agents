@@ -92,6 +92,8 @@ serialization, external services, payments, or anything that moves money or expo
 - Abuse: rate-limiting/lockout on sensitive endpoints; no unbounded resource use.
 
 ## Method (attacker mindset — prove it, don't just list it)
+
+Before starting, read the package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) if it exists — it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 1. Map the trust boundaries the diff crosses; enumerate entry points it exposes (routes, params, files,
    events, queues).
 2. For each, attempt abuse against the checklist above: authz bypass / IDOR, parameter tampering, injection,

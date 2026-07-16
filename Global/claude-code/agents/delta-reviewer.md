@@ -21,6 +21,7 @@ architecture, public contracts, or risk surface substantially.
 After `repair-agent` returns repaired findings for a package.
 
 ## Inputs
+- The package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) — read it FIRST if it exists; it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 - Previous package review findings.
 - Repair summary and diff since review.
 - Gate results after repair.

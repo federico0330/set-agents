@@ -89,7 +89,12 @@ state machines, or introduces a new module.
 - Code, tests, migrations. You hand a design and constraints to the implementer.
 
 ## Procedure
-1. Read the spec and acceptance criteria. Identify the core domain vs. infrastructure/adapters.
+1. Read the spec and acceptance criteria. Identify the core domain vs. infrastructure/adapters. Load
+   `solution-baselines` and classify the system into one of its categories (or declare "no baseline fits",
+   with one line of why, in `design.md`). From here you design as a DEVIATION from that baseline: what the
+   baseline already decides you confirm in one line each (no ADR); only deviations and crossed YAGNI
+   thresholds get the full treatment of steps 5-6. If the project already has an established stack, the
+   baseline contributes only its risk checklist and package shapes — existing conventions win.
 2. Propose the design: layers/boundaries, key types, ports & adapters, where business rules live.
 3. Apply SOLID and Clean/Hexagonal/Screaming Architecture; justify each non-obvious choice.
 4. Call out data integrity, concurrency, transaction boundaries, and failure modes explicitly.

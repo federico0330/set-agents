@@ -187,7 +187,8 @@ Do not turn state into a chat transcript. Store decisions and evidence only.
 
 Every transition after USER_APPROVAL must be backed by the state CLI:
 
-- `init` after approved spec.
+- `init` after approved spec, always with `--mode <feature|scoped|quick-fix|incident>` carrying the mode
+  chosen at triage — it sets the physical spawn/review budgets for the whole feature.
 - `create-package` after package planning.
 - `transition` only when the CLI allows the target phase.
 - `complete-task` for local task validation evidence.
@@ -208,7 +209,8 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
 
 ## Delegation flow
 
-1. `product-analyst` drafts the Feature Contract and BDD acceptance criteria.
+1. `product-analyst` drafts the Feature Contract, BDD acceptance criteria, and the executive `proposal.md`
+   (business-language deliverable, no internal jargon — what a client's IT department would receive).
 2. `architect` designs/records ADRs when architecture, schema, security, identity, audit, money, external APIs, or
    scaling choices are involved. It always checks the three named architecture axes from `system-design-decisions`
    (data store type including vector vs relational, API Gateway, deploy platform) and either records an ADR for
@@ -220,8 +222,10 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
    axes against `design.md`/the ADRs: if the request's surface plausibly touches one and nothing addresses it,
    that is a blocking finding, not a nit. Route its consolidated issues back to `product-analyst`/`architect` as
    needed.
-4. Stop for USER_APPROVAL of the spec. Do not implement before approval. You may not record `USER_APPROVAL` while
-   `spec-challenger` has an open architecture finding — resolve it via the Question policy below first.
+4. Stop for USER_APPROVAL, presenting spec + acceptance + `proposal.md` together (the proposal is what the
+   user approves as a client; the spec is what they approve as an engineer). Do not implement before
+   approval. You may not record `USER_APPROVAL` while `spec-challenger` has an open architecture finding —
+   resolve it via the Question policy below first.
 5. `package-planner` decomposes the approved spec into coherent packages. Packages should be vertical slices,
    related AC groups, stable subsystems, API+integration paths, or UI+API flows. Prefer 3-7 work items when
    cohesive; cohesion wins over count. It must classify complexity and record `selected_role`, `selected_model`,
@@ -254,7 +258,9 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
     verification and `record-testing`.
 12. `app-runner` starts the application and `runtime-verifier` performs browser/runtime QA when the package has UI,
     API, persistence, workflow, or customer-visible behavior. QA means exercising the running app, not rereading
-    code. Record URL, screenshots/logs, checks performed, and result with `record-runtime-qa`.
+    code. Record URL, screenshots/logs, checks performed, and result with `record-runtime-qa`; the
+    `--evidence` value must point at files under `docs/specs/<feature_id>/evidence/` (the delivery
+    evidence folder), not at chat prose.
 13. Mark `PACKAGE_ACCEPTED` only after package gates, review/delta review, testing, and runtime QA pass.
 14. `integrator` integrates accepted packages and runs global consistency checks.
 15. `adversarial-judge` receives the final evidence bundle before release.
@@ -268,9 +274,11 @@ session has burned a week of quota in two days; treat them as invariants, not st
 
 - **Never fork conversation history into a subagent.** If the platform's spawn call supports inheriting the
   parent transcript (e.g. Codex `spawn_agent` with `fork_turns`), always pass `fork_turns: "none"`. The spawn
-  message must be self-contained instead: feature id, package id, spec/plan file paths, ownership paths,
-  acceptance criteria covered, and the exact expected output. Subagents read state from files, not from your
-  chat history — that is the whole point of file-first state.
+  message must be self-contained instead: feature id, package id, the package's **context pack** path
+  (`docs/specs/<feature_id>/context/<PKG>.md`, written by `package-planner`), the concrete task, and the
+  exact expected output. Never tell a worker to "explore the repo" — if the context pack is missing or
+  stale for what you are delegating, route that back to `package-planner` first. Subagents read state from
+  files, not from your chat history — that is the whole point of file-first state.
 - **One spawn per role per phase, batched work inside it.** One `test-writer` gets ALL scenarios of the package;
   never spawn one agent per BDD scenario, per test, per finding, or per file. One `repair-agent` gets the whole
   consolidated findings list.

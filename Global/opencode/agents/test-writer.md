@@ -90,6 +90,8 @@ accepted behavior.
 - Existing tests to weaken/skip/delete assertions.
 
 ## Procedure
+
+Before starting, read the package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) if it exists — it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 1. Load `regression-tests`, `quality-gates`, and `test-gap-analysis`.
 2. Trace each test to an acceptance criterion and package id.
 3. Cover happy path and required failure/edge paths.

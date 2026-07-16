@@ -6,9 +6,10 @@ Start package-based feature delivery for:
 $ARGUMENTS
 
 Workflow:
-1. Close the Feature Contract and BDD acceptance criteria.
+1. Close the Feature Contract and BDD acceptance criteria; `product-analyst` also writes the executive
+   `proposal.md` (business-language deliverable for the client).
 2. Run `spec-challenger` before human approval.
-3. Stop for USER_APPROVAL of the spec.
+3. Stop for USER_APPROVAL, presenting spec + acceptance + `proposal.md` together.
 4. Create coherent packages after approval.
 5. Implement related tasks with local validations; do not deep-audit ordinary tasks one by one.
 6. Run deterministic package gates.
@@ -24,8 +25,10 @@ Workers/reviewers must not interrupt the user for routine failures. Persist comp
 `ai/state/features/<feature_id>.json`.
 
 Executable state requirements:
-- After USER_APPROVAL, run `python3 ai/scripts/feature-state.py init <feature_id> <spec_path> <spec_hash> --ac <AC>...`.
-- Register each package with `create-package`, including multiple related `--task` values when functionally reasonable.
+- After USER_APPROVAL, run `python3 ai/scripts/feature-state.py init <feature_id> <spec_path> <spec_hash> --ac <AC>... --mode <triage mode>`.
+- Register each package with `create-package`, including multiple related `--task` values when functionally
+  reasonable and `--context-pack docs/specs/<feature_id>/context/<PKG>.md`.
+- Record every subagent delegation with `record-spawn <PKG> <role>` BEFORE spawning it.
 - Before delegating implementation, run `feature-state.py transition PACKAGE_IMPLEMENTATION --package-id <PKG>`.
 - After every implemented task, record local validation with `complete-task <PKG> <TASK> --validation <gate>`.
 - Before package review, `feature-state.py next <feature_id>` must report `PACKAGE_REVIEW`; otherwise do not invoke reviewers.
@@ -36,3 +39,7 @@ Executable state requirements:
 - Record tests with `record-testing` and runtime/browser QA with `record-runtime-qa` before package acceptance.
 
 Report current phase, package status, gates, findings, retry budget, and next transition from the state file.
+
+After DONE, close the delivery: the evidence bundle lives at `docs/specs/<feature_id>/evidence/`, and the
+consumption summary can be added with `cost-report.py --project . --md > docs/specs/<feature_id>/evidence/cost.md`
+(script lives in the SET-AGENTES repo, `ai/scripts/cost-report.py`).
