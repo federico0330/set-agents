@@ -62,6 +62,7 @@ MUTATING_COMMANDS = {
     "complete-task",
     "fail-task",
     "record-gate",
+    "record-spawn",
     "record-review",
     "start-review-panel",
     "record-subreview",
@@ -126,6 +127,7 @@ def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any
             "max_deep_review_cycles": 2,
             "max_repairs_per_finding": 2,
             "max_package_subdivisions": 1,
+            "max_spawns_per_package": 12,
         },
         "metrics": {
             "task_deep_reviews": 0,
@@ -165,6 +167,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
             "deep_review_cycles": 0,
             "repair_batches": 0,
             "subdivisions": 0,
+            "spawns": 0,
         },
         "integrated": False,
         "diff_ref": None,
@@ -235,6 +238,8 @@ def validate_state(data: dict[str, Any]) -> list[str]:
             errors.append(f"{pid}: deep review budget exceeded")
         if attempts.get("subdivisions", 0) > budgets.get("max_package_subdivisions", 1):
             errors.append(f"{pid}: subdivision budget exceeded")
+        if attempts.get("spawns", 0) > budgets.get("max_spawns_per_package", 12):
+            errors.append(f"{pid}: spawn budget exceeded")
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")
@@ -497,7 +502,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         raise StateError(f"state exists: {path}")
     data = base_state(args.feature_id, args.spec_path, args.spec_hash)
     data["acceptance_criteria"] = args.ac or []
-    for key in ("max_deep_review_cycles", "max_repairs_per_finding", "max_package_subdivisions"):
+    for key in ("max_deep_review_cycles", "max_repairs_per_finding", "max_package_subdivisions", "max_spawns_per_package"):
         value = getattr(args, key)
         if value is not None:
             data["budgets"][key] = value
@@ -716,6 +721,34 @@ def normalize_findings(raw_findings: list[str]) -> list[dict[str, Any]]:
         finding.setdefault("status", "open")
         findings.append(finding)
     return findings
+
+
+def cmd_record_spawn(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        if data["phase"] in TERMINAL:
+            raise StateError(f"cannot record spawn from phase {data['phase']}")
+        package = package_by_id(data, args.package_id)
+        attempts = package.setdefault("attempts", {})
+        budget = data.get("budgets", {}).get("max_spawns_per_package", 12)
+        if attempts.get("spawns", 0) >= budget:
+            return block_with_reason(data, args.actor, args.package_id, "spawn budget exhausted")
+        attempts["spawns"] = attempts.get("spawns", 0) + 1
+        record_event(
+            data,
+            "record-spawn",
+            data["phase"],
+            data["phase"],
+            args.actor,
+            args.package_id,
+            {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"]},
+            args.event_id,
+        )
+        return True
+
+    data, changed = mutate(path, args, "record-spawn", update)
+    return output_state(data, changed, path)
 
 
 def cmd_record_review(args: argparse.Namespace) -> int:
@@ -1175,6 +1208,7 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--max-deep-review-cycles", type=int)
     init.add_argument("--max-repairs-per-finding", type=int)
     init.add_argument("--max-package-subdivisions", type=int)
+    init.add_argument("--max-spawns-per-package", type=int)
     init.set_defaults(func=cmd_init)
 
     for name, func in (("status", cmd_status), ("next", cmd_next), ("resume", cmd_resume), ("validate", cmd_validate)):
@@ -1244,6 +1278,14 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--optional", action="store_true")
     gate.add_argument("--evidence", default="")
     gate.set_defaults(func=cmd_record_gate)
+
+    spawn = sub.add_parser("record-spawn")
+    add_common_state_args(spawn)
+    spawn.add_argument("package_id")
+    spawn.add_argument("role")
+    spawn.add_argument("--feature-id")
+    spawn.add_argument("--purpose", default="")
+    spawn.set_defaults(func=cmd_record_spawn)
 
     review = sub.add_parser("record-review")
     add_common_state_args(review)

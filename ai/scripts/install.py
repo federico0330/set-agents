@@ -118,9 +118,30 @@ def legacy_prompt_bytes(relative):
     return git_show(f"{commit}^")
 
 
+def roster_codex_orchestrator():
+    """Session-level model/effort for Codex come from the orchestrator row of roles.tsv."""
+    repo = Path(__file__).resolve().parents[2]
+    header, *rows = (repo / "roles.tsv").read_text().splitlines()
+    columns = header.split("\t")
+    for row in rows:
+        cells = dict(zip(columns, row.split("\t")))
+        if cells.get("role") == "orchestrator":
+            return cells["codex_model"], cells["codex_effort"]
+    raise RuntimeError("orchestrator row missing from roles.tsv")
+
+
 def merge_codex(current):
     text = current.read_text() if current.exists() else ""
     lines = text.splitlines()
+
+    def set_top_key(key, value):
+        end = next((i for i, line in enumerate(lines) if line.startswith("[")), len(lines))
+        pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
+        for index in range(end):
+            if pattern.match(lines[index]):
+                lines[index] = f"{key} = {value}"
+                return
+        lines.insert(0, f"{key} = {value}")
 
     def set_key(section, key, value):
         header = f"[{section}]"
@@ -139,6 +160,9 @@ def merge_codex(current):
                 return
         lines.insert(start + 1, f"{key} = {value}")
 
+    session_model, session_effort = roster_codex_orchestrator()
+    set_top_key("model_reasoning_effort", f'"{session_effort}"')
+    set_top_key("model", f'"{session_model}"')
     set_key("features", "multi_agent", "true")
     set_key("agents", "max_depth", "1")
     set_key("agents", "max_threads", "4")
@@ -308,6 +332,9 @@ try:
         codex_config = tomllib.loads((targets["codex"] / "config.toml").read_text())
         if codex_config.get("features", {}).get("multi_agent") is not True or codex_config.get("agents", {}).get("max_depth") != 1:
             raise RuntimeError("Codex multi-agent smoke check failed")
+        session_model, session_effort = roster_codex_orchestrator()
+        if codex_config.get("model") != session_model or codex_config.get("model_reasoning_effort") != session_effort:
+            raise RuntimeError("Codex session model smoke check failed")
         for name in ("engram", "context7", "playwright", "brave-cdp"):
             if codex_config.get("mcp_servers", {}).get(name, {}).get("enabled", False) is not False:
                 raise RuntimeError(f"Codex {name} MCP smoke check failed")

@@ -2,8 +2,9 @@
 # mcp.sh — Enciende/apaga MCPs de OpenCode bajo demanda y diagnostica browser gates.
 # Uso:
 #   ai/scripts/mcp.sh on|off|status <engram|context7|playwright|brave-cdp>
+#   ai/scripts/mcp.sh off-all
 #   ai/scripts/mcp.sh browser-gate <playwright|brave-cdp|auto>
-#   ai/scripts/mcp.sh ensure-brave-cdp
+#   ai/scripts/mcp.sh ensure-brave-cdp|stop-brave-cdp
 #
 # Los MCP arrancan apagados. El runtime/E2E gate es la excepción autorizada: el agente puede prender el MCP
 # de navegador que necesita, usarlo, registrar evidencia y apagarlo al terminar.
@@ -12,16 +13,15 @@ set -euo pipefail
 CFG="${OPENCODE_CONFIG:-$HOME/.config/opencode/opencode.json}"
 ACTION="${1:-}"
 SERVER="${2:-}"
-BRAVE_CDP_URL="${BRAVE_CDP_URL:-http://127.0.0.1:9222}"
-BRAVE_USER_DATA_DIR="${BRAVE_USER_DATA_DIR:-$HOME/.cache/set-agentes/brave-cdp}"
-BRAVE_LOG="${BRAVE_LOG:-/tmp/set-agentes-brave-cdp.log}"
+BRAVE_CDP_WRAPPER="$(dirname "$0")/brave-cdp-mcp.sh"
 
 usage() {
   cat <<'EOF'
 usar:
   ai/scripts/mcp.sh on|off|status <engram|context7|playwright|brave-cdp>
+  ai/scripts/mcp.sh off-all
   ai/scripts/mcp.sh browser-gate <playwright|brave-cdp|auto>
-  ai/scripts/mcp.sh ensure-brave-cdp
+  ai/scripts/mcp.sh ensure-brave-cdp|stop-brave-cdp
 EOF
 }
 
@@ -47,57 +47,22 @@ print_status() {
   jq -r '.mcp | to_entries[] | "MCP_STATUS server=\(.key) enabled=\(.value.enabled)"' "$CFG"
 }
 
-port_ready() {
-  local url="$1"
-  curl -fsS --max-time 2 "$url/json/version" >/dev/null 2>&1
-}
-
-find_brave() {
-  for bin in brave-browser brave brave-browser-stable chromium chromium-browser google-chrome google-chrome-stable; do
-    if command -v "$bin" >/dev/null 2>&1; then
-      command -v "$bin"
-      return 0
-    fi
-  done
-  return 1
-}
-
 ensure_brave_cdp() {
-  if port_ready "$BRAVE_CDP_URL"; then
-    echo "BRAVE_CDP_READY url=$BRAVE_CDP_URL"
-    return 0
-  fi
-
-  local bin
-  if ! bin="$(find_brave)"; then
-    echo "BRAVE_CDP_FAIL: no encontre Brave/Chromium/Chrome en PATH"
-    return 2
-  fi
-
-  mkdir -p "$BRAVE_USER_DATA_DIR"
-  nohup "$bin" \
-    --remote-debugging-port=9222 \
-    --remote-debugging-address=127.0.0.1 \
-    --user-data-dir="$BRAVE_USER_DATA_DIR" \
-    --no-first-run \
-    --new-window about:blank >"$BRAVE_LOG" 2>&1 &
-
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if port_ready "$BRAVE_CDP_URL"; then
-      echo "BRAVE_CDP_READY url=$BRAVE_CDP_URL log=$BRAVE_LOG"
-      return 0
-    fi
-    sleep 1
-  done
-
-  echo "BRAVE_CDP_FAIL: lance $bin pero $BRAVE_CDP_URL no respondio; log=$BRAVE_LOG"
-  return 2
+  [ -x "$BRAVE_CDP_WRAPPER" ] || { echo "MCP_FAIL: falta lifecycle wrapper"; return 2; }
+  "$BRAVE_CDP_WRAPPER" start
 }
 
 case "$ACTION" in
   on)
     [ -n "$SERVER" ] || { usage; exit 2; }
     set_enabled "$SERVER" true
+    print_status
+    echo "MCP_REMINDER: apagalo al terminar (ai/scripts/mcp.sh off $SERVER) — un MCP que queda prendido inyecta sus tools en TODAS las sesiones de TODOS los proyectos."
+    ;;
+  off-all)
+    jq -r '.mcp | keys[]' "$CFG" | while read -r server; do
+      set_enabled "$server" false
+    done
     print_status
     ;;
   off)
@@ -113,6 +78,11 @@ case "$ACTION" in
     set_enabled brave-cdp true
     print_status
     ;;
+  stop-brave-cdp)
+    "$BRAVE_CDP_WRAPPER" stop
+    set_enabled brave-cdp false
+    print_status
+    ;;
   browser-gate)
     mode="${SERVER:-auto}"
     case "$mode" in
@@ -125,13 +95,13 @@ case "$ACTION" in
         ensure_brave_cdp
         set_enabled brave-cdp true
         print_status
-        echo "BROWSER_GATE_READY mode=brave-cdp url=$BRAVE_CDP_URL"
+        echo "BROWSER_GATE_READY mode=brave-cdp url=http://127.0.0.1:9222"
         ;;
       auto)
         if ensure_brave_cdp; then
           set_enabled brave-cdp true
           print_status
-          echo "BROWSER_GATE_READY mode=brave-cdp url=$BRAVE_CDP_URL"
+          echo "BROWSER_GATE_READY mode=brave-cdp url=http://127.0.0.1:9222"
         else
           set_enabled playwright true
           print_status

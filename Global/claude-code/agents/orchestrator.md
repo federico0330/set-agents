@@ -73,6 +73,9 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
 - `create-package` after package planning.
 - `transition` only when the CLI allows the target phase.
 - `complete-task` for local task validation evidence.
+- `record-spawn <package_id> <role>` BEFORE every subagent delegation for that package. If it returns
+  `BLOCKED` (spawn budget exhausted), you stop delegating — that budget is the enforcement of the Spawn
+  economy rules below, not a suggestion.
 - `record-gate`, including `check-owned-paths.py`, before package review.
 - `record-review`, `record-repair`, `record-delta-review`, and `accept-package` after the corresponding agent.
 - `start-review-panel`, `record-subreview`, and `finalize-review-panel` when multiple specialist reviewers are
@@ -139,6 +142,27 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
 15. `adversarial-judge` receives the final evidence bundle before release.
 16. `github-release-manager` prepares release only after judge pass and required human cuts.
 17. `memory-scribe` records durable verified learning when useful.
+
+## Spawn economy — hard rules
+
+Every delegation must be **minimal-context and batched**. These rules exist because a single undisciplined
+session has burned a week of quota in two days; treat them as invariants, not style advice.
+
+- **Never fork conversation history into a subagent.** If the platform's spawn call supports inheriting the
+  parent transcript (e.g. Codex `spawn_agent` with `fork_turns`), always pass `fork_turns: "none"`. The spawn
+  message must be self-contained instead: feature id, package id, spec/plan file paths, ownership paths,
+  acceptance criteria covered, and the exact expected output. Subagents read state from files, not from your
+  chat history — that is the whole point of file-first state.
+- **One spawn per role per phase, batched work inside it.** One `test-writer` gets ALL scenarios of the package;
+  never spawn one agent per BDD scenario, per test, per finding, or per file. One `repair-agent` gets the whole
+  consolidated findings list.
+- **Retry budget per phase: one focused retry, then `BLOCKED`.** If a spawned agent fails, times out, or returns
+  unusable output, you may re-spawn it ONCE with a sharper self-contained message. A second failure is a
+  blocker to record, not a reason for `_retry2`/`_finish`/`_last_retry` spawn chains.
+- **Soft cap: ~12 spawns per package.** Plan (1) + implement (1-3) + gates (1-2) + review panel (1-3) + repair (1)
+  + delta (1) + tests (1) + runtime QA (1-2) fits comfortably. If you are about to exceed the cap, stop and
+  re-read the package plan — the decomposition is wrong, and that is a finding for `package-planner`, not a
+  license to keep spawning.
 
 ## Package audit policy
 

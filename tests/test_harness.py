@@ -601,6 +601,25 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(data["phase"], "BLOCKED")
         self.assertIn("deep review budget exhausted", json.dumps(data["blockers"]))
 
+    def test_spawn_budget_blocks_after_limit(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash",
+                "--state-file", str(state), "--ac", "AC-1", "--max-spawns-per-package", "2")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            self.run_state(state, "record-spawn", "PKG-01", "implementer", "--purpose", "implement T-001")
+            self.run_state(state, "record-spawn", "PKG-01", "gate-runner", "--purpose", "package gates")
+            result = self.run_state(state, "record-spawn", "PKG-01", "package-reviewer", check=False)
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("spawn budget exhausted", json.dumps(data["blockers"]))
+        self.assertEqual(data["packages"][0]["attempts"]["spawns"], 2)
+
     def test_accept_package_rejects_open_findings_and_bad_actors(self):
         with tempfile.TemporaryDirectory() as td:
             state = self.create_ready_package(td, review=False)
