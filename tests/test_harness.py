@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE_STATE = ROOT / "PROYECTO/ai/scripts/feature-state.py"
 CHECK_OWNED = ROOT / "PROYECTO/ai/scripts/check-owned-paths.py"
+COST_REPORT = ROOT / "ai/scripts/cost-report.py"
 
 
 def run(*args, env=None, check=True):
@@ -600,6 +601,55 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(data["phase"], "BLOCKED")
         self.assertIn("deep review budget exhausted", json.dumps(data["blockers"]))
+
+    def test_cost_report_aggregates_all_three_harnesses(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td)
+            proj = "/tmp/fake-proj"
+            oc = home / ".local/share/opencode"
+            oc.mkdir(parents=True)
+            conn = sqlite3.connect(oc / "opencode.db")
+            conn.execute(
+                "CREATE TABLE session (directory TEXT, model TEXT, agent TEXT, tokens_input INT,"
+                " tokens_output INT, tokens_cache_read INT, tokens_cache_write INT,"
+                " tokens_reasoning INT, time_updated INT)"
+            )
+            conn.execute(
+                "INSERT INTO session VALUES (?, ?, ?, 100, 50, 10, 5, 2, 2000000000000)",
+                (proj, '{"providerID": "openai", "id": "gpt-x"}', "orchestrator"),
+            )
+            conn.commit()
+            conn.close()
+            cc = home / ".claude/projects/-tmp-fake-proj"
+            cc.mkdir(parents=True)
+            line = json.dumps({
+                "type": "assistant", "cwd": proj, "attributionAgent": "implementer",
+                "message": {"model": "claude-y", "usage": {
+                    "input_tokens": 30, "output_tokens": 20,
+                    "cache_read_input_tokens": 7, "cache_creation_input_tokens": 3,
+                }},
+            })
+            (cc / "s1.jsonl").write_text(line + "\n" + line + "\n")
+            cx = home / ".codex"
+            cx.mkdir(parents=True)
+            conn = sqlite3.connect(cx / "state_5.sqlite")
+            conn.execute(
+                "CREATE TABLE threads (cwd TEXT, model TEXT, agent_role TEXT,"
+                " tokens_used INT, updated_at INT, rollout_path TEXT)"
+            )
+            conn.execute("INSERT INTO threads VALUES (?, 'gpt-z', NULL, 500, 2000000000, NULL)", (proj,))
+            conn.execute("INSERT INTO threads VALUES ('/other/project', 'gpt-z', NULL, 999, 2000000000, NULL)", ())
+            conn.commit()
+            conn.close()
+            result = run("python3", str(COST_REPORT), "--home", str(home), "--project", proj)
+        self.assertIn("opencode", result.stdout)
+        self.assertIn("claude-code", result.stdout)
+        self.assertIn("codex", result.stdout)
+        self.assertIn("openai/gpt-x", result.stdout)
+        self.assertNotIn("999", result.stdout)  # other project filtered out
+        # totals: oc 100+50+10+5+2=167, claude (30+20+7+3)*2=120, codex 500 → 787
+        self.assertIn("787", result.stdout)
 
     def test_init_mode_sets_physical_budgets(self):
         with tempfile.TemporaryDirectory() as td:

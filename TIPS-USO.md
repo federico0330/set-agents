@@ -45,6 +45,22 @@ and merge require separate confirmations, with green remote checks before merge.
 - Claude Code: `~/.claude/agents/*.md`, with Bash guards for read-only roles
 - Codex: `~/.codex/agents/*.toml`, with explicit model, reasoning effort, and sandbox
 
+## Measuring consumption
+
+`ai/scripts/cost-report.py` aggregates token usage per project across the three harnesses' own session
+stores (OpenCode sqlite, Claude Code transcripts, Codex threads). Tokens only — with subscription plans the
+number that matters is quota, not dollars.
+
+```bash
+ai/scripts/cost-report.py                                         # everything
+ai/scripts/cost-report.py --project ~/iey/ScrappingML --since 2026-07-01
+ai/scripts/cost-report.py --project . --md                        # markdown (e.g. into evidence/)
+ai/scripts/cost-report.py --deep                                  # Codex cached/reasoning split (slower)
+```
+
+Read it after every feature: cost per deliverable is margin. If one role/model dominates without matching
+value, that is a roles.tsv routing decision waiting to happen.
+
 ## MCP policy
 
 Engram, Context7, Playwright, and Brave CDP remain disabled by default. An eligible agent must ask permission,
