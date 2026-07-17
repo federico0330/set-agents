@@ -23,6 +23,12 @@ Tasks inside a package still run local validation, but deep review runs on the i
 reported together, repaired together, and re-reviewed as a delta. Each package has a maximum of two deep review
 cycles before `BLOCKED`.
 
+`BLOCKED` has no automatic exit and `transition` cannot leave it — it is a deliberate sink. The only formal way
+out is `feature-state.py reopen --reason ... --authorized-by ...`, which requires both fields, only applies from
+`BLOCKED`, and moves the feature back to `PACKAGE_PLANNING` so the remaining real work can be split into a new
+package (e.g. after a budget-exhaustion block where scope genuinely still needs finishing). It requires the human
+to have explicitly authorized the reopen; it is not a generic unblock.
+
 ## State
 Package features use compact state under `ai/state/features/<feature_id>.json` with approved spec version/hash,
 acceptance criteria, packages, tasks, ownership paths, gates, attempts, findings, repairs, and final state.

@@ -641,6 +641,72 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(data["phase"], "BLOCKED")
         self.assertIn("deep review budget exhausted", json.dumps(data["blockers"]))
 
+    def test_reopen_moves_blocked_back_to_planning_and_allows_new_package(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, max_cycles=1)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent", "--finding-id", "F-001")
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "repair_required",
+                "--actor", "delta-reviewer", "--requires-full-review", "--reason", "contract changed",
+            )
+            self.run_state(
+                state, "reopen", "--reason", "split remaining scope into a new package",
+                "--authorized-by", "human:agustin",
+            )
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_PLANNING")
+            self.assertNotIn("final_state", data)
+            blocker = data["blockers"][0]
+            self.assertEqual(blocker["resolved_reason"], "split remaining scope into a new package")
+            self.assertEqual(blocker["resolved_by"], "human:agustin")
+            self.assertEqual(data["history"][-1]["event"], "reopen")
+            self.run_state(
+                state, "create-package", "PKG-02", "Remaining scope",
+                "--ac", "AC-1", "--task", "T-004", "--task", "T-005",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            data = json.loads(state.read_text())
+            self.assertEqual(len(data["packages"]), 2)
+            self.assertEqual(data["packages"][1]["package_id"], "PKG-02")
+
+    def test_reopen_requires_reason_and_authorization(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, max_cycles=1)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent", "--finding-id", "F-001")
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "repair_required",
+                "--actor", "delta-reviewer", "--requires-full-review", "--reason", "contract changed",
+            )
+            missing_reason = self.run_state(state, "reopen", "--authorized-by", "human:agustin", check=False)
+            self.assertNotEqual(missing_reason.returncode, 0)
+            missing_auth = self.run_state(state, "reopen", "--reason", "split scope", check=False)
+            self.assertNotEqual(missing_auth.returncode, 0)
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "BLOCKED")
+
+    def test_reopen_rejected_outside_blocked_phase(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            result = self.run_state(
+                state, "reopen", "--reason", "no real blocker", "--authorized-by", "human:agustin", check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_REVIEW")
+
+    def test_transition_still_rejects_leaving_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, max_cycles=1)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent", "--finding-id", "F-001")
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "repair_required",
+                "--actor", "delta-reviewer", "--requires-full-review", "--reason", "contract changed",
+            )
+            result = self.run_state(
+                state, "transition", "PACKAGE_PLANNING", "--package-id", "PKG-01", check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
     def test_cost_report_aggregates_all_three_harnesses(self):
         import sqlite3
         with tempfile.TemporaryDirectory() as td:

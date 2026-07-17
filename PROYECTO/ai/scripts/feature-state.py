@@ -73,6 +73,7 @@ MUTATING_COMMANDS = {
     "record-runtime-qa",
     "accept-package",
     "block",
+    "reopen",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
 # Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
@@ -1094,6 +1095,38 @@ def cmd_block(args: argparse.Namespace) -> int:
     return output_state(data, changed, path)
 
 
+def cmd_reopen(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        from_phase = data["phase"]
+        if from_phase != "BLOCKED":
+            raise StateError(f"cannot reopen from phase {from_phase}; reopen only applies to BLOCKED")
+        if not args.reason or not args.authorized_by:
+            raise StateError("reopen requires explicit --reason and --authorized-by")
+        resolved_at = now()
+        for blocker in data.get("blockers", []):
+            blocker.setdefault("resolved_at", resolved_at)
+            blocker.setdefault("resolved_reason", args.reason)
+            blocker.setdefault("resolved_by", args.authorized_by)
+        data["phase"] = "PACKAGE_PLANNING"
+        data.pop("final_state", None)
+        record_event(
+            data,
+            "reopen",
+            from_phase,
+            "PACKAGE_PLANNING",
+            args.actor,
+            args.package_id,
+            {"reason": args.reason, "authorized_by": args.authorized_by},
+            args.event_id,
+        )
+        return True
+
+    data, changed = mutate(path, args, "reopen", update)
+    return output_state(data, changed, path)
+
+
 def cmd_resume(args: argparse.Namespace) -> int:
     return cmd_next(args)
 
@@ -1394,6 +1427,14 @@ def build_parser() -> argparse.ArgumentParser:
     block.add_argument("--feature-id")
     block.add_argument("--package-id")
     block.set_defaults(func=cmd_block)
+
+    reopen = sub.add_parser("reopen")
+    add_common_state_args(reopen)
+    reopen.add_argument("--feature-id")
+    reopen.add_argument("--package-id")
+    reopen.add_argument("--reason", required=True)
+    reopen.add_argument("--authorized-by", required=True)
+    reopen.set_defaults(func=cmd_reopen)
 
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")

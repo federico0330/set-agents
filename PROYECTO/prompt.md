@@ -62,6 +62,12 @@ especialistas y lo registra como una sola iteración de auditoría.
 >
 > Empezá mostrando `feature_id`, fase, próximo evento permitido y paquete activo. Después seguí hasta terminal
 > `DONE` o `BLOCKED`.
+>
+> `BLOCKED` no tiene salida automática ni por `transition`: es sumidero a propósito. La única vía de recuperación
+> es `feature-state.py reopen --reason ... --authorized-by ...`, que exige ambos campos y sólo aplica estando en
+> `BLOCKED`. Usalo solamente cuando el humano autorizó explícitamente reabrir (por ejemplo, para partir el
+> trabajo pendiente real en un paquete nuevo tras agotar budget), nunca para saltear un bloqueo sin esa
+> autorización explícita.
 
 ---
 
