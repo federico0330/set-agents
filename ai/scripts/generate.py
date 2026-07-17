@@ -126,7 +126,7 @@ def oc_steps(role, capability, duty):
         "test-writer": 10,
         "gate-runner": 8,
         "runtime-verifier": 8,
-        "app-runner": 6,
+        "app-runner": 12,
     }
     if role in role_steps:
         return role_steps[role]

@@ -3,7 +3,7 @@ description: "App runner \u2014 launch, health-check, and report the running app
 mode: subagent
 model: openai/gpt-5.4-mini
 temperature: 0.1
-steps: 6
+steps: 12
 permission:
   edit: deny
   question: deny
