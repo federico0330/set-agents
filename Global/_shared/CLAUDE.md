@@ -27,6 +27,10 @@ repairs are consolidated, and re-review focuses on the delta. Maximum two deep r
 No opportunistic refactors. Preserve public APIs/data contracts unless the approved spec says otherwise. Never
 store/log secrets, tokens, PII, or raw `.env`. Findings must be concrete and actionable.
 
+## Execution discipline
+Checkpoint before a budget cutoff: a mutating agent that senses it is near its execution limit writes partial
+progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply.
+
 ## Question policy
 Only the orchestrator asks, and only for incompatible product decisions, major scope changes, irreversible
 operations, missing credentials/access, or blockers after retry budget. Do not ask about routine test failures,

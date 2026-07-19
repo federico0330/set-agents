@@ -3,7 +3,7 @@ description: "Memory scribe \u2014 local-first durable verified learning"
 mode: subagent
 model: openai/gpt-5.4-mini
 temperature: 0.0
-steps: 6
+steps: 10
 permission:
   edit: allow
   question: deny

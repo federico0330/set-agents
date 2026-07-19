@@ -3,7 +3,7 @@ description: "Test-Writer \u2014 end-stage regression tests after package conver
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 10
+steps: 20
 permission:
   edit: allow
   question: deny

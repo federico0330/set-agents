@@ -3,7 +3,7 @@ description: "Orchestrator \u2014 read-only coordinator of the package-based del
 mode: primary
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 18
+steps: 50
 permission:
   edit: deny
   question: ask
@@ -92,6 +92,7 @@ permission:
     "curl http://127.0.0.1*": allow
     "curl localhost*": allow
     "curl 127.0.0.1*": allow
+    "python3 ai/scripts/feature-state.py *": allow
     "* > *": deny
     "*>*": deny
     "* >> *": deny

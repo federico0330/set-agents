@@ -3,7 +3,7 @@ description: "Refactor-Specialist \u2014 behavior-preserving refactors under a t
 mode: subagent
 model: openai/gpt-5.3-codex-spark
 temperature: 0.1
-steps: 10
+steps: 18
 permission:
   edit: allow
   question: deny

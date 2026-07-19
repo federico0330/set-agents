@@ -3,7 +3,7 @@ description: "Security-Auditor \u2014 offensive + defensive read-only security r
 mode: subagent
 model: openai/gpt-5.6-sol
 temperature: 0.0
-steps: 8
+steps: 14
 permission:
   edit: deny
   question: deny

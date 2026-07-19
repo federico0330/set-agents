@@ -3,7 +3,7 @@ description: "Integrator \u2014 integrate accepted packages and run global consi
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 12
+steps: 20
 hidden: true
 permission:
   edit: allow

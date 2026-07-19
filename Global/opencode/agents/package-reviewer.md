@@ -3,7 +3,7 @@ description: "Package-Reviewer \u2014 independent deep review of a complete impl
 mode: subagent
 model: openai/gpt-5.6-sol
 temperature: 0.0
-steps: 10
+steps: 18
 hidden: true
 permission:
   edit: deny

@@ -3,7 +3,7 @@ description: "Product-Analyst \u2014 turns intent into specs and acceptance crit
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.2
-steps: 10
+steps: 14
 permission:
   edit: allow
   question: deny

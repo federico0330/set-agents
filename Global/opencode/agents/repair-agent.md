@@ -3,7 +3,7 @@ description: "Repair-Agent \u2014 consolidated repair of package findings"
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 12
+steps: 24
 hidden: true
 permission:
   edit: allow

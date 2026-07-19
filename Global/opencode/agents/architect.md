@@ -3,7 +3,7 @@ description: "Architect \u2014 design, ADRs, Clean/Hexagonal/SOLID before implem
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.2
-steps: 10
+steps: 14
 permission:
   edit: allow
   question: deny

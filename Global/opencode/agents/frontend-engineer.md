@@ -3,7 +3,7 @@ description: "Frontend-engineer \u2014 build brand-grade, accessible UI that nev
 mode: subagent
 model: openai/gpt-5.3-codex-spark
 temperature: 0.2
-steps: 14
+steps: 30
 permission:
   edit: allow
   question: deny

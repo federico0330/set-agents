@@ -3,7 +3,7 @@ description: "Local gate runner \u2014 P001 deterministic commands only"
 mode: subagent
 model: opencode/deepseek-v4-flash-free
 temperature: 0.0
-steps: 6
+steps: 10
 permission:
   read: allow
   edit:

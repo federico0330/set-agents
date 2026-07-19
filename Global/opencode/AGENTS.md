@@ -47,6 +47,9 @@ questions.
 - One role, one step. Do the bounded task and stop.
 - Read only the named artifacts for the task.
 - No exploratory sandboxes or unbounded retries.
+- Checkpoint before a step-budget cutoff: a mutating agent that senses it is near its step limit writes partial
+  progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply
+  instead of re-deriving everything.
 - If acceptance conflicts, a migration risks money/identity/audit data, the same failure repeats after budget, or
   secrets/prod access are required, return `HUMAN_DECISION_REQUIRED` or `BLOCKED` with the exact blocker.
 

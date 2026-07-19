@@ -3,7 +3,7 @@ description: "Package-Planner \u2014 coherent package decomposition after spec a
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 10
+steps: 16
 hidden: true
 permission:
   edit: allow

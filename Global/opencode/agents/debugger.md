@@ -3,7 +3,7 @@ description: "Debugger \u2014 root-cause a failing gate and apply the minimal fi
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 10
+steps: 20
 permission:
   edit: allow
   question: deny

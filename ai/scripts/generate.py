@@ -110,33 +110,41 @@ def description(body):
     return match.group(1) if match else "Specialized harness agent"
 
 
+# OpenCode step budgets per role. Steps are a circuit breaker for a runaway agent,
+# NOT the anti-loop mechanism (feature-state.py budgets own that). Size them at
+# 2-3x the expected tool-call count for the role's bounded task: a spare step is
+# nearly free, while running out mid-task forces a full re-instantiation that
+# re-reads everything from scratch. Adjust here; steps are harness mechanics and
+# stay identical across model profiles, so they do not belong in roles.tsv.
+OC_STEPS = {
+    "orchestrator": 50,
+    "spec-challenger": 12,
+    "package-planner": 16,
+    "package-reviewer": 18,
+    "delta-reviewer": 12,
+    "repair-agent": 24,
+    "integrator": 20,
+    "implementer": 30,
+    "frontend-engineer": 30,
+    "refactor-specialist": 18,
+    "debugger": 20,
+    "test-writer": 20,
+    "gate-runner": 12,
+    "runtime-verifier": 16,
+    "app-runner": 24,
+}
+
+
 def oc_steps(role, capability, duty):
-    role_steps = {
-        "orchestrator": 18,
-        "spec-challenger": 8,
-        "package-planner": 10,
-        "package-reviewer": 10,
-        "delta-reviewer": 8,
-        "repair-agent": 12,
-        "integrator": 12,
-        "implementer": 14,
-        "frontend-engineer": 14,
-        "refactor-specialist": 10,
-        "debugger": 10,
-        "test-writer": 10,
-        "gate-runner": 8,
-        "runtime-verifier": 8,
-        "app-runner": 24,
-    }
-    if role in role_steps:
-        return role_steps[role]
+    if role in OC_STEPS:
+        return OC_STEPS[role]
     if duty in {"audit", "judge"}:
-        return 8
+        return 14
     if capability in {"docs-rw", "factory-rw"}:
-        return 10
+        return 14
     if capability == "review-ro":
-        return 8
-    return 6
+        return 12
+    return 10
 
 
 def oc_hidden(role):
@@ -222,8 +230,14 @@ def oc_permissions(capability, roles, role=None):
             for path in sorted((CANON / "opencode-agents").glob("*.md"))
             if path.stem in ORCHESTRATOR_TASK_ALLOW
         ]
+        # The state CLI is the orchestrator's sanctioned mutation channel: it only
+        # writes validated, atomic JSON under ai/state/ and enforces the physical
+        # budgets. Allowing the full subcommand surface (init, record-spawn,
+        # transition, ...) is what lets the orchestrator follow its own doctrine
+        # without a permission prompt per delegation. Shell composition is still
+        # caught by hard_denies below.
         lines += ["  bash:", '    "*": deny', *safe,
-                  '    "python3 ai/scripts/feature-state.py resume *": allow', *hard_denies]
+                  '    "python3 ai/scripts/feature-state.py *": allow', *hard_denies]
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe, *always_deny]
     elif capability == "gate-ro":

@@ -21,6 +21,10 @@ SAFE = [
     r"(claude|codex|opencode) (--version|-V)(\s|$)",
     r"(cat|ls|find|grep|head|tail|wc|tree|file|stat|diff|du|df|ps|pwd|which)(\s|$)",
     r"curl (?:-[A-Za-z]+\s+)*(?:http://)?(?:localhost|127\.0\.0\.1)(?::\d+)?(?:/|\s|$)",
+    # Sanctioned mutation channel: the state CLI validates every transition and
+    # writes only atomic JSON under ai/state/. FORBIDDEN_SYNTAX still blocks any
+    # shell composition around it.
+    r"python3 ai/scripts/feature-state\.py \S+",
 ]
 
 FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")

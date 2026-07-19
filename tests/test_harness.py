@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -78,6 +79,11 @@ class HarnessTests(unittest.TestCase):
             "git status --short", "git diff --stat", "dotnet --list-sdks",
             "node --version", "npm ls --depth=0", "python --version",
             "pip list", "go version", "rustup toolchain list", "opencode models",
+            # The state CLI is the orchestrator's sanctioned mutation channel: every
+            # subcommand must pass without a permission prompt.
+            "python3 ai/scripts/feature-state.py status feat-x",
+            "python3 ai/scripts/feature-state.py record-spawn PKG-01 implementer --state-file ai/state/features/feat-x.json",
+            "python3 ai/scripts/feature-state.py init feat-x docs/specs/feat-x/spec.md abc123 --mode scoped",
         ]
         denied = [
             "echo x > file", "printf x | tee file", "sed -i s/a/b/ file",
@@ -86,11 +92,35 @@ class HarnessTests(unittest.TestCase):
             "git diff --output=changed.patch", "rg --pre 'touch owned' pattern", "fd -x touch owned",
             "node --version -e 'require(\"fs\").writeFileSync(\"x\",\"y\")'",
             "git diff --stat>owned", "git diff --stat|tee owned", "git diff --stat&&git status",
+            # Shell composition around the state CLI stays blocked.
+            "python3 ai/scripts/feature-state.py status feat-x > owned",
+            "python3 ai/scripts/feature-state.py status feat-x && git push",
+            "python3 other/feature-state.py status feat-x",
         ]
         for command in allowed:
             self.assertEqual(run("python3", "ai/scripts/coord_policy.py", command, check=False).returncode, 0, command)
         for command in denied:
             self.assertEqual(run("python3", "ai/scripts/coord_policy.py", command, check=False).returncode, 2, command)
+
+    def test_oc_steps_meet_role_floors(self):
+        # Regression guard for the mid-task cutoff pain: step budgets are a circuit
+        # breaker, not the anti-loop mechanism, so key roles must keep enough steps
+        # to finish a bounded task in one instantiation.
+        floors = {
+            "orchestrator": 50,
+            "implementer": 30,
+            "frontend-engineer": 30,
+            "repair-agent": 24,
+            "package-reviewer": 18,
+            "gate-runner": 12,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"))
+            for role, floor in floors.items():
+                text = (Path(td) / "out/opencode/agents" / f"{role}.md").read_text()
+                match = re.search(r"^steps: (\d+)$", text, re.MULTILINE)
+                self.assertIsNotNone(match, role)
+                self.assertGreaterEqual(int(match.group(1)), floor, role)
 
     def test_profile_switch_does_not_rewrite_roster(self):
         before = (ROOT / "roles.tsv").read_bytes()

@@ -3,7 +3,7 @@ description: "Image describer \u2014 exact, literal visual transcription"
 mode: subagent
 model: openai/gpt-5.6-terra
 temperature: 0.1
-steps: 8
+steps: 12
 permission:
   edit: deny
   question: deny

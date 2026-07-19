@@ -30,6 +30,10 @@ cycles per package.
 No opportunistic refactors. Preserve public APIs/data contracts unless the spec says otherwise. Never store/log
 secrets, tokens, PII, or raw `.env`. Findings must be concrete and actionable.
 
+## Execution discipline
+Checkpoint before a budget cutoff: a mutating agent that senses it is near its execution limit writes partial
+progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply.
+
 ## Question policy
 Only the orchestrator asks, and only for real product decisions, major scope changes, irreversible operations,
 missing credentials/access, or blockers after retry budget. Routine failures are handled by the worker/retry
