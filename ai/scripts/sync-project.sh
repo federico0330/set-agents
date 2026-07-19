@@ -79,6 +79,22 @@ for script in "${GENERIC[@]}"; do
   copied+=("$script")
 done
 
+# 3. Conocimiento global por dominio: se refresca SIEMPRE (es de solo lectura en el proyecto).
+#    El conocimiento del proyecto (docs/ai/knowledge/*.md) no se toca: lo escribe memory-scribe.
+GLOBAL_KNOWLEDGE="$ROOT/knowledge"
+if compgen -G "$GLOBAL_KNOWLEDGE/*.md" >/dev/null; then
+  mkdir -p "$PROJECT/docs/ai/knowledge/_global"
+  synced_knowledge=0
+  for doc in "$GLOBAL_KNOWLEDGE"/*.md; do
+    dst="$PROJECT/docs/ai/knowledge/_global/$(basename "$doc")"
+    if [ ! -f "$dst" ] || ! cmp -s "$doc" "$dst"; then
+      install -m 0644 "$doc" "$dst"
+      synced_knowledge=$((synced_knowledge + 1))
+    fi
+  done
+  [ "$synced_knowledge" -gt 0 ] && echo "SYNC_KNOWLEDGE: $synced_knowledge documento(s) globales refrescados en docs/ai/knowledge/_global/"
+fi
+
 if [ "${#copied[@]}" -eq 0 ]; then
   echo "SYNC_OK: $PROJECT ya estaba al día."
 else

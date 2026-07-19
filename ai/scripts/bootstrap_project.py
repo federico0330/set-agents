@@ -18,6 +18,7 @@ root = Path(args.target)
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "PROYECTO" / "ai" / "scripts"
 SCRIPT_TEMPLATES = ["run.sh", "verify.sh", "loop.sh", "e2e.sh", "mcp.sh", "audit-readonly.sh"]
+KNOWLEDGE_TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "PROYECTO" / "docs" / "ai" / "knowledge"
 
 FILES = {
     "AGENTS.md": "# Project agent rules\n\nRun `ai/scripts/verify.sh` before review. Preserve existing project contracts.\n",
@@ -117,6 +118,16 @@ for name in SCRIPT_TEMPLATES:
     dest.write_text(content)
     dest.chmod(0o755)
     created.append(f"ai/scripts/{name}")
+
+# 3. Per-domain knowledge seeds (create-if-missing, never overwrite: memory-scribe grows them,
+#    so an existing file with more content is the expected state, not a conflict).
+for tpl in sorted(KNOWLEDGE_TEMPLATE_DIR.glob("*.md")) if KNOWLEDGE_TEMPLATE_DIR.is_dir() else []:
+    dest = root / "docs" / "ai" / "knowledge" / tpl.name
+    if dest.exists():
+        continue
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(tpl.read_text())
+    created.append(f"docs/ai/knowledge/{tpl.name}")
 
 print("BOOTSTRAP_CREATED=" + ",".join(created))
 print("BOOTSTRAP_CONFLICTS=" + ",".join(conflicts))

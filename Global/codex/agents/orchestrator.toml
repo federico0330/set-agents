@@ -152,7 +152,11 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
 14. `integrator` integrates accepted packages and runs global consistency checks.
 15. `adversarial-judge` receives the final evidence bundle before release.
 16. `github-release-manager` prepares release only after judge pass and required human cuts.
-17. `memory-scribe` records durable verified learning when useful.
+17. `memory-scribe` is MANDATORY at feature close (DONE or BLOCKED) and after any incident — not optional.
+    Its spawn message must name the concrete report/finding files that contain `## Destilado` sections
+    (reviews, audits, delta reviews, ADRs of this feature) so it can consolidate them into the per-domain
+    department knowledge under `docs/ai/knowledge/`. That accumulated knowledge is what makes every later
+    feature start smarter; skipping the scribe throws the analysis away.
 
 ## Spawn economy — hard rules
 

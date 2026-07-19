@@ -49,6 +49,10 @@ Return `blocked` when requirements conflict, the task needs secrets/prod access,
 needed, ownership paths conflict, or the same local validation failure repeats after one focused repair attempt.
 Do not ask the user directly.
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/data.md`, `docs/ai/knowledge/algorithms.md` and `docs/ai/knowledge/_global/data.md`, `docs/ai/knowledge/_global/algorithms.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output
 Return structured Markdown or JSON:
 ```json

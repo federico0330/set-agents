@@ -40,6 +40,10 @@ Run once initially; run a focused re-check only if the spec changes materially.
 - Re-run the same review after minor wording changes.
 - Ask the user directly; route true product decisions through the orchestrator.
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/architecture.md`, `docs/ai/knowledge/security.md` and `docs/ai/knowledge/_global/architecture.md`, `docs/ai/knowledge/_global/security.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output
 Return JSON-like Markdown:
 - `verdict`: `ready_for_user_approval|revision_required|blocked`
@@ -48,4 +52,6 @@ Return JSON-like Markdown:
 - `open_questions`: only decisions the orchestrator must ask the user — an unresolved architecture axis
   always goes here, never into `assumptions`
 - `assumptions`: assumptions that are safe to document and continue
+
+End every report with `## Destilado (dominio: architecture / security)` — at most 3 bullets of durable learning only (invariants verified, root causes, decisions + why). No narrative. memory-scribe consolidates these into the department knowledge at feature close.
 """

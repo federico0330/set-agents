@@ -10,11 +10,13 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument("entry")
 parser.add_argument("--log", default="docs/ai/memory-log.md")
+parser.add_argument("--domain", choices=["security", "data", "architecture", "algorithms", "frontend"],
+                    help="route the entry to the per-domain knowledge file instead of the general log")
 parser.add_argument("--engram-command")
 parser.add_argument("--timeout", type=float, default=60.0)
 args = parser.parse_args()
 
-path = Path(args.log)
+path = Path(f"docs/ai/knowledge/{args.domain}.md") if args.domain else Path(args.log)
 path.parent.mkdir(parents=True, exist_ok=True)
 with path.open("a", encoding="utf-8") as handle:
     handle.write(f"\n- {dt.date.today().isoformat()}: {args.entry}\n")

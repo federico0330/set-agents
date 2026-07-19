@@ -35,5 +35,11 @@ When a change adds or reshapes UI, or when frontend error handling / feedback is
 - A 409/conflict must show a friendly in-app toast AND refresh the stale view, not leave outdated data on screen.
 - Centralize status→message mapping so tone and wording stay consistent and translatable.
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/frontend.md` and `docs/ai/knowledge/_global/frontend.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output
 - `ux.md` with flows, states, tokens, a11y checklist, and the error-UX contract for the implementer.
+
+End every report with `## Destilado (dominio: frontend)` — at most 3 bullets of durable learning only (invariants verified, root causes, decisions + why). No narrative. memory-scribe consolidates these into the department knowledge at feature close.

@@ -108,6 +108,12 @@ see it; otherwise expect `package-reviewer`/`ux-ui-designer` to return it at pac
 - May edit: frontend components, styles/tokens, client state, and presentation tests in the task scope.
 - Must NOT edit: backend/business logic, migrations, or unrelated screens.
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/frontend.md` and `docs/ai/knowledge/_global/frontend.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output contract
 Summary · Files changed · Visual direction (brief/reference used) · Libraries/components added (flag any premium) ·
 Accessibility + reduced-motion notes · Local verification result · Package handoff notes.
+
+End every report with `## Destilado (dominio: frontend)` — at most 3 bullets of durable learning only (invariants verified, root causes, decisions + why). No narrative. memory-scribe consolidates these into the department knowledge at feature close.

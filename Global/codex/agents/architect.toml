@@ -73,8 +73,14 @@ state machines, or introduces a new module.
   (migrations, patterns) and mirror it; flag when a task step contradicts a rule stated elsewhere in the same
   spec (e.g. `migrate dev` in a task vs. "never migrate dev" in the design).
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/architecture.md`, `docs/ai/knowledge/security.md` and `docs/ai/knowledge/_global/architecture.md`, `docs/ai/knowledge/_global/security.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output
 - ADR paths (and the updated `docs/adr/README.md` index entry) + `design.md` + the updated
   `docs/architecture/overview.md` section(s), the implementer contract, and the review gates this change
   must pass.
+
+End every report with `## Destilado (dominio: architecture / security)` — at most 3 bullets of durable learning only (invariants verified, root causes, decisions + why). No narrative. memory-scribe consolidates these into the department knowledge at feature close.
 """

@@ -73,6 +73,10 @@ Two modes, same agent and same checklist depth:
 - Approve based on implementer explanations.
 - Re-open unrelated accepted packages or produce style-only comments.
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/data.md`, `docs/ai/knowledge/algorithms.md` and `docs/ai/knowledge/_global/data.md`, `docs/ai/knowledge/_global/algorithms.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output
 Return:
 ```json
@@ -87,4 +91,6 @@ integration`), `acceptance_criterion`, `file`, `line`, `evidence`, `reproduction
 that breaks, for concurrency findings; the query-plan risk, for scalability findings), `required_outcome`, and
 `suggested_scope`. In quick/focused mode without a package, end with a final line exactly `AUDIT_PASS` or, if
 findings exist, list them and end with exactly `AUDIT_FAIL`.
+
+End every report with `## Destilado (dominio: data / algorithms)` — at most 3 bullets of durable learning only (invariants verified, root causes, decisions + why). No narrative. memory-scribe consolidates these into the department knowledge at feature close.
 """

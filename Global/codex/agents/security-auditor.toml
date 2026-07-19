@@ -57,7 +57,13 @@ Binary: a finding IS a blocking security problem. Only report exploitable/real r
   `mitigation` (layer + detection/logging + respond) · `minimal_fix` · `verification` (test that proves the
   mitigation actually blocks the scenario).
 
+## Department knowledge
+
+Before working, read `docs/ai/knowledge/security.md` and `docs/ai/knowledge/_global/security.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).
+
 ## Output
 `SECURITY_PASS: no concrete findings.` or the findings list, most-impactful first (no severity grades), each
 with its attack path AND its mitigation plan together.
+
+End every report with `## Destilado (dominio: security)` — at most 3 bullets of durable learning only (invariants verified, root causes, decisions + why). No narrative. memory-scribe consolidates these into the department knowledge at feature close.
 """

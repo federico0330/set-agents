@@ -366,7 +366,13 @@ class HarnessTests(unittest.TestCase):
             self.assertTrue((target / "docs/architecture/overview.md").exists())
             self.assertTrue((target / "docs/adr/README.md").exists())
             self.assertTrue((target / "docs/specs/README.md").exists())
+            # per-domain knowledge seeds are created but an existing (grown) file is preserved
+            knowledge = target / "docs/ai/knowledge/security.md"
+            self.assertTrue(knowledge.exists())
+            knowledge.write_text("grown department memory\n")
             second = run("python3", "ai/scripts/bootstrap_project.py", td)
+            self.assertEqual(knowledge.read_text(), "grown department memory\n")
+            self.assertTrue((target / "docs/ai/knowledge/algorithms.md").exists())
             self.assertIn("BOOTSTRAP_CREATED=", first.stdout)
             self.assertIn("BOOTSTRAP_CONFLICTS=AGENTS.md", first.stdout)
             self.assertIn("BOOTSTRAP_CREATED=", second.stdout)
@@ -374,6 +380,29 @@ class HarnessTests(unittest.TestCase):
             self.assertTrue((target / ".opencode/AGENTS.md").exists())
             self.assertTrue((target / ".claude/CLAUDE.md").exists())
             self.assertTrue((target / ".codex/config.toml").exists())
+
+    def test_domain_knowledge_is_wired_through_the_canon(self):
+        run("./build.sh")
+        wiring = {
+            "security-auditor": "docs/ai/knowledge/security.md",
+            "package-reviewer": "docs/ai/knowledge/data.md",
+            "architect": "docs/ai/knowledge/architecture.md",
+            "spec-challenger": "docs/ai/knowledge/architecture.md",
+            "implementer": "docs/ai/knowledge/data.md",
+            "frontend-engineer": "docs/ai/knowledge/frontend.md",
+            "ux-ui-designer": "docs/ai/knowledge/frontend.md",
+        }
+        for agent, reference in wiring.items():
+            text = (ROOT / "Global/claude-code/agents" / f"{agent}.md").read_text()
+            self.assertIn(reference, text, agent)
+        scribe = (ROOT / "Global/claude-code/agents/memory-scribe.md").read_text()
+        self.assertIn("ONLY writer", scribe)
+        self.assertIn("docs/ai/knowledge/", scribe)
+        orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        self.assertIn("MANDATORY at feature close", orchestrator)
+        for domain in ("security", "data", "architecture", "algorithms", "frontend"):
+            self.assertTrue((ROOT / "PROYECTO/docs/ai/knowledge" / f"{domain}.md").exists(), domain)
+            self.assertTrue((ROOT / "knowledge" / f"{domain}.md").exists(), domain)
 
     def test_architecture_gate_is_wired_through_the_canon(self):
         run("./build.sh")
@@ -453,6 +482,10 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("project-specific", (project / "ai/scripts/run.sh").read_text())
             backups = list((project / "ai/state").glob("sync-backup-*/feature-state.py"))
             self.assertTrue(backups and "old divergent" in backups[0].read_text())
+            # global domain knowledge is distributed read-only; project knowledge is never touched
+            self.assertTrue((project / "docs/ai/knowledge/_global/security.md").exists())
+            self.assertIn("cross-proyecto", (project / "docs/ai/knowledge/_global/security.md").read_text().lower())
+            self.assertFalse((project / "docs/ai/knowledge/security.md").exists())
 
     def test_check_drift_detects_stale_and_clean_install(self):
         with tempfile.TemporaryDirectory() as td:
