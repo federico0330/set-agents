@@ -42,7 +42,7 @@ LEGAL_TRANSITIONS = {
     "PACKAGE_IMPLEMENTATION": {"PACKAGE_GATES", "BLOCKED"},
     "PACKAGE_GATES": {"PACKAGE_REVIEW", "PACKAGE_IMPLEMENTATION", "BLOCKED"},
     "PACKAGE_REVIEW": {"PACKAGE_TESTING", "PACKAGE_REPAIR", "BLOCKED"},
-    "PACKAGE_REPAIR": {"DELTA_REVIEW", "BLOCKED"},
+    "PACKAGE_REPAIR": {"DELTA_REVIEW", "PACKAGE_TESTING", "BLOCKED"},
     "DELTA_REVIEW": {"PACKAGE_TESTING", "PACKAGE_REPAIR", "PACKAGE_REVIEW", "BLOCKED"},
     "PACKAGE_TESTING": {"PACKAGE_RUNTIME_QA", "PACKAGE_REPAIR", "BLOCKED"},
     "PACKAGE_RUNTIME_QA": {"PACKAGE_ACCEPTED", "PACKAGE_REPAIR", "BLOCKED"},
@@ -78,10 +78,10 @@ MUTATING_COMMANDS = {
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
 # Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
 MODE_BUDGETS = {
-    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2},
-    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2},
-    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1},
-    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1},
+    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3},
+    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3},
+    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2},
+    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2},
 }
 
 
@@ -136,6 +136,7 @@ def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any
             "max_repairs_per_finding": 2,
             "max_package_subdivisions": 1,
             "max_spawns_per_package": 12,
+            "max_gate_failures_per_package": 3,
         },
         "metrics": {
             "task_deep_reviews": 0,
@@ -179,6 +180,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         },
         "integrated": False,
         "diff_ref": None,
+        "runtime_surface": True,
         "status": "planned",
         "complexity": None,
         "selected_role": None,
@@ -251,6 +253,8 @@ def validate_state(data: dict[str, Any]) -> list[str]:
             errors.append(f"{pid}: subdivision budget exceeded")
         if attempts.get("spawns", 0) > budgets.get("max_spawns_per_package", 12):
             errors.append(f"{pid}: spawn budget exceeded")
+        if attempts.get("gate_failures", 0) > budgets.get("max_gate_failures_per_package", 3):
+            errors.append(f"{pid}: gate failure budget exceeded")
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")
@@ -383,7 +387,8 @@ def package_accept_ready(data: dict[str, Any], package: dict[str, Any], actor: s
         errors.append("critical/high findings are still open")
     if has_open_findings(package, {"medium"}):
         errors.append("medium findings need closure or explicit acceptance")
-    if package.get("repairs") and not package.get("delta_reviews"):
+    unwaived_repairs = [item for item in package.get("repairs", []) if not item.get("delta_waived")]
+    if unwaived_repairs and not package.get("delta_reviews"):
         errors.append("delta review is required after repair")
     if package.get("delta_reviews") and package["delta_reviews"][-1].get("verdict") != "pass":
         errors.append("latest delta review did not pass")
@@ -711,6 +716,9 @@ def cmd_create_package(args: argparse.Namespace) -> int:
         package["selected_model"] = args.selected_model
         package["routing_reason"] = args.routing_reason
         package["context_pack"] = args.context_pack
+        # Fail-safe default: runtime QA is required unless the planner explicitly
+        # declares the package has no observable runtime surface.
+        package["runtime_surface"] = parse_bool(args.runtime_surface, default=True)
         for task_id in args.task or []:
             package["tasks"].append({"id": task_id, "status": "planned", "local_validations": [], "blockers": []})
         if len(package["tasks"]) < 2 and package["complexity"] != "small":
@@ -734,6 +742,8 @@ def cmd_update_package(args: argparse.Namespace) -> int:
         before = deepcopy(package)
         if args.integrated is not None:
             package["integrated"] = parse_bool(args.integrated)
+        if args.runtime_surface is not None:
+            package["runtime_surface"] = parse_bool(args.runtime_surface)
         if args.diff_ref:
             package["diff_ref"] = args.diff_ref
         if args.complexity:
@@ -839,6 +849,10 @@ def cmd_record_gate(args: argparse.Namespace) -> int:
             package = package_by_id(data, args.package_id)
             attempts = package.setdefault("attempts", {})
             attempts["gate_failures"] = attempts.get("gate_failures", 0) + 1
+            # The gates<->implementation loop was the only cycle without its own cap;
+            # repeated gate failures now hit a hard budget instead of burning spawns.
+            if attempts["gate_failures"] >= data.get("budgets", {}).get("max_gate_failures_per_package", 3):
+                return block_with_reason(data, args.actor, args.package_id, "gate failure budget exhausted")
         record_event(data, "record-gate", data["phase"], data["phase"], args.actor, args.package_id, {"name": args.name, "status": args.status, "global": args.global_gate}, args.event_id)
         return True
 
@@ -1054,21 +1068,41 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
         package = package_by_id(data, args.package_id)
         attempts = package.setdefault("attempts", {})
         ids = args.finding_id or []
+        changed_files = args.changed_file or []
+        repaired = []
         for finding_id in ids:
             finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
             if not finding:
                 raise StateError(f"unknown finding: {finding_id}")
+            repaired.append(finding)
+        if args.skip_delta:
+            # Physical waiver, not a prose one: skipping the delta review is legal
+            # only for a demonstrably small, low-severity repair.
+            blocking = [f["id"] for f in repaired if f.get("severity") in {"critical", "high"}]
+            if blocking:
+                raise StateError("--skip-delta requires all repaired findings <= medium severity; blocked by: " + ", ".join(blocking))
+            if len(changed_files) > 3:
+                raise StateError(f"--skip-delta requires <= 3 changed files, got {len(changed_files)}")
+        for finding in repaired:
             finding["repair_attempts"] = finding.get("repair_attempts", 0) + 1
             if finding["repair_attempts"] > data["budgets"]["max_repairs_per_finding"]:
-                return block_with_reason(data, args.actor, args.package_id, f"repair budget exhausted for {finding_id}")
+                return block_with_reason(data, args.actor, args.package_id, f"repair budget exhausted for {finding['id']}")
             finding["status"] = "closed"
-        repair = {"finding_ids": ids, "changed_files": args.changed_file or [], "verification": args.verification or [], "at": now()}
+        repair = {"finding_ids": ids, "changed_files": changed_files, "verification": args.verification or [], "at": now()}
+        if args.skip_delta:
+            repair["delta_waived"] = True
+            repair["waiver_reason"] = "all findings <= medium and <= 3 changed files"
         package.setdefault("repairs", []).append(repair)
         attempts["repair_batches"] = attempts.get("repair_batches", 0) + 1
         data["metrics"]["repair_batches"] += 1
-        data["phase"] = "DELTA_REVIEW"
-        package["status"] = "delta_review_required"
-        record_event(data, "record-repair", "PACKAGE_REPAIR", "DELTA_REVIEW", args.actor, args.package_id, {"finding_ids": ids}, args.event_id)
+        if args.skip_delta:
+            data["phase"] = "PACKAGE_TESTING"
+            package["status"] = "testing_required"
+        else:
+            data["phase"] = "DELTA_REVIEW"
+            package["status"] = "delta_review_required"
+        record_event(data, "record-repair", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
+                     {"finding_ids": ids, "delta_waived": bool(args.skip_delta)}, args.event_id)
         return True
 
     data, changed = mutate(path, args, "record-repair", update)
@@ -1139,7 +1173,18 @@ def cmd_record_testing(args: argparse.Namespace) -> int:
         package.setdefault("testing", []).append(result)
         if args.status == "pass":
             data["phase"] = "PACKAGE_RUNTIME_QA"
-            package["status"] = "runtime_qa_required"
+            if package.get("runtime_surface", True):
+                package["status"] = "runtime_qa_required"
+            else:
+                # No observable runtime surface: record a physical waiver so the
+                # package is accept-ready without spawning app-runner/runtime-verifier.
+                package["status"] = "accept_ready"
+                package.setdefault("runtime_qa", []).append({
+                    "status": "pass",
+                    "waived": True,
+                    "reason": "package declared runtime_surface=false at planning",
+                    "at": now(),
+                })
         elif args.status == "fail":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
@@ -1401,7 +1446,9 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--max-repairs-per-finding", type=int)
     init.add_argument("--max-package-subdivisions", type=int)
     init.add_argument("--max-spawns-per-package", type=int)
-    init.add_argument("--mode", choices=sorted(MODE_BUDGETS), default="feature")
+    # Doctrine default: scoped is the standard lane for bounded work on existing
+    # code; full feature/SDD budgets are opt-in via explicit --mode feature.
+    init.add_argument("--mode", choices=sorted(MODE_BUDGETS), default="scoped")
     init.set_defaults(func=cmd_init)
 
     for name, func in (("status", cmd_status), ("next", cmd_next), ("resume", cmd_resume), ("validate", cmd_validate)):
@@ -1435,6 +1482,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--selected-model")
     create.add_argument("--routing-reason")
     create.add_argument("--context-pack")
+    create.add_argument("--runtime-surface")
     create.set_defaults(func=cmd_create_package)
 
     update = sub.add_parser("update-package")
@@ -1442,6 +1490,7 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("package_id")
     update.add_argument("--feature-id")
     update.add_argument("--integrated")
+    update.add_argument("--runtime-surface")
     update.add_argument("--diff-ref")
     update.add_argument("--complexity", choices=["small", "medium", "high"])
     update.add_argument("--selected-role")
@@ -1525,6 +1574,7 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--finding-id", action="append")
     repair.add_argument("--changed-file", action="append")
     repair.add_argument("--verification", action="append")
+    repair.add_argument("--skip-delta", action="store_true")
     repair.set_defaults(func=cmd_record_repair)
 
     delta = sub.add_parser("record-delta-review")

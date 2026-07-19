@@ -41,15 +41,25 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
    - explicit out-of-scope: what a worker must NOT touch even if tempted.
    Curate, do not dump: a worker reading this should not need to re-explore the repository. Keep it current
    if repairs change the package surface.
-8. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
-   `--selected-role`, `--selected-model`, `--routing-reason`, and `--context-pack docs/specs/<feature_id>/context/<PACKAGE_ID>.md`.
+8. Declare the package's **runtime surface** and **test owner** explicitly:
+   - `--runtime-surface false` ONLY when the package has no observable runtime behavior (no UI, API,
+     persistence, workflow, or customer-visible effect — e.g. pure refactor, docs, build tooling). Default is
+     `true` and runtime QA will run; a false declaration is a physical waiver recorded in state, so err toward
+     `true` when unsure.
+   - test owner: in quick-fix and small scoped packages, focused tests are part of the implementer's
+     deliverable (executed by `gate-runner`); declare `test-writer` only for feature mode or when the risk
+     surface warrants independent end-stage regression tests.
+9. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
+   `--selected-role`, `--selected-model`, `--routing-reason`, `--runtime-surface`,
+   and `--context-pack docs/specs/<feature_id>/context/<PACKAGE_ID>.md`.
 
 ## Package fields
 Each package must include:
 - `package_id`, `objective`, `acceptance_criteria`, `tasks`, `dependencies`
 - `owned_paths`, `read_only_paths`, `shared_paths`, `risks`, `local_validations`, `package_gates`
 - `early_checkpoints`, `done_conditions`
-- `complexity`, `selected_role`, `selected_model`, `routing_reason`, `required_reviewers`, `context_pack`
+- `complexity`, `selected_role`, `selected_model`, `routing_reason`, `required_reviewers`, `context_pack`,
+  `runtime_surface`, test owner (implementer vs `test-writer`)
 
 ## Must NOT
 - Create one package per function/file.

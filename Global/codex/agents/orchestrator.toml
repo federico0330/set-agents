@@ -130,16 +130,25 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
    secrets, crypto, destructive migrations/deletes, incompatible public contracts, system permissions, or
    untrusted code execution.
 9. If findings exist, `repair-agent` repairs them in a consolidated pass.
-10. `delta-reviewer` reviews the repair delta and previous findings. It performs a full re-review only if the
-    repair substantially changed architecture, public contracts, or risk surface.
-11. `test-writer` writes end-stage regression tests after package behavior has converged, then `gate-runner` runs
-    verification and `record-testing`.
-12. `app-runner` starts the application and `runtime-verifier` performs browser/runtime QA when the package has UI,
-    API, persistence, workflow, or customer-visible behavior. QA means exercising the running app, not rereading
-    code. Record URL, screenshots/logs, checks performed, and result with `record-runtime-qa`; the
-    `--evidence` value must point at files under `docs/specs/<feature_id>/evidence/` (the delivery
-    evidence folder), not at chat prose.
-13. Mark `PACKAGE_ACCEPTED` only after package gates, review/delta review, testing, and runtime QA pass.
+10. `delta-reviewer` reviews the repair delta and previous findings — UNLESS the repair legally recorded the
+    physical waiver (`record-repair --skip-delta`: every repaired finding ≤ medium AND ≤ 3 changed files; the
+    CLI enforces both and records the waiver in the event). It performs a full re-review only if the repair
+    substantially changed architecture, public contracts, or risk surface.
+11. Testing, by mode: in quick-fix and small scoped packages the focused tests are part of the `implementer`'s
+    package deliverable and `gate-runner` EXECUTES them (separation preserved: the implementer never runs its
+    own approval gate, and `package-reviewer` reviews the tests with the diff). Spawn `test-writer` only in
+    feature mode or when the reviewer recorded test gaps. Either way `gate-runner` runs verification and
+    `record-testing`.
+12. `app-runner` starts the application and `runtime-verifier` performs browser/runtime QA ONLY when the package
+    declared a runtime surface (`runtime_surface=true`, the fail-safe default — UI, API, persistence, workflow,
+    or customer-visible behavior). A package planned with `--runtime-surface false` becomes accept-ready after
+    testing with a recorded waiver; do not spawn app-runner/runtime-verifier for it. QA means exercising the
+    running app, not rereading code. Record URL, screenshots/logs, checks performed, and result with
+    `record-runtime-qa`; the `--evidence` value must point at files under `docs/specs/<feature_id>/evidence/`
+    (the delivery evidence folder), not at chat prose.
+13. Mark `PACKAGE_ACCEPTED` only after package gates, review/delta review, testing, and runtime QA pass — or
+    their physical waivers are recorded in state (delta waiver, runtime-surface waiver). A waiver lives in the
+    state file, never in chat.
 14. `integrator` integrates accepted packages and runs global consistency checks.
 15. `adversarial-judge` receives the final evidence bundle before release.
 16. `github-release-manager` prepares release only after judge pass and required human cuts.

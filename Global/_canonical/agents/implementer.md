@@ -28,7 +28,9 @@ inside a package.
 1. Load `bounded-implementation`, `safe-implementation`, and any domain skill relevant to the touched surface:
    `clean-architecture`, `data-structure-selection`, `db-integrity`, `error-handling-http`,
    `performance-scalability`, or `context7` for uncertain external APIs.
-2. Implement the assigned work packet with the smallest safe diff.
+2. Implement the assigned work packet with the smallest safe diff. In quick-fix and small scoped packages the
+   focused tests for the change are part of your deliverable: write them with the implementation. You never run
+   them as an approval gate — `gate-runner` executes them and `package-reviewer` reviews them with the diff.
 3. After each task or coherent subtask, run local validation: typecheck/compile, lint on touched files, focused
    unit/contract tests, smoke checks, and ownership checks as available. When a local validation fails, fix and
    re-run it yourself — repeat this fix-verify loop as many times as it takes to converge. This local loop is

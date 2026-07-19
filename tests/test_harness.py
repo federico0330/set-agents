@@ -677,6 +677,100 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("required gates", result.stdout)
 
+    def test_gate_failure_budget_blocks(self):
+        # The gates<->implementation loop used to have no cap of its own; repeated
+        # gate failures must now hit a hard budget instead of burning spawns.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            self.run_state(state, "complete-task", "PKG-01", "T-001", "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "complete-task", "PKG-01", "T-002", "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            for attempt in range(1, 4):
+                self.run_state(state, "record-gate", "package verify", "fail",
+                               "--package-id", "PKG-01", "--evidence", f"failure {attempt}")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("gate failure budget exhausted", json.dumps(data["blockers"]))
+        self.assertEqual(data["packages"][0]["attempts"]["gate_failures"], 3)
+
+    def test_skip_delta_requires_low_severity_and_small_diff(self):
+        # Legal waiver: all findings <= medium and <= 3 changed files.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            finding = json.dumps({"id": "F-101", "severity": "medium", "category": "testing"})
+            self.run_state(state, "record-review", "PKG-01", "repair_required",
+                           "--actor", "package-reviewer", "--finding", finding)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                           "--finding-id", "F-101", "--changed-file", "src/a.py", "--skip-delta")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_TESTING")
+            self.assertTrue(data["packages"][0]["repairs"][-1]["delta_waived"])
+        # Illegal waiver: a high-severity finding rejects --skip-delta.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            result = self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                                    "--finding-id", "F-001", "--finding-id", "F-002",
+                                    "--changed-file", "src/a.py", "--skip-delta", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("skip-delta", result.stdout)
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_REPAIR")
+        # Illegal waiver: more than 3 changed files rejects --skip-delta.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            finding = json.dumps({"id": "F-101", "severity": "low", "category": "style"})
+            self.run_state(state, "record-review", "PKG-01", "repair_required",
+                           "--actor", "package-reviewer", "--finding", finding)
+            files = [arg for i in range(4) for arg in ("--changed-file", f"src/f{i}.py")]
+            result = self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                                    "--finding-id", "F-101", *files, "--skip-delta", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("3 changed files", result.stdout)
+
+    def test_non_runtime_package_accepts_without_runtime_qa(self):
+        def drive_to_testing(state, extra_create_args=()):
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium", *extra_create_args,
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            for task_id in ("T-001", "T-002"):
+                self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
+            self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "diff")
+            self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
+            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer")
+            self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+
+        # Declared non-runtime package: accept-ready after testing, runtime QA waived.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            drive_to_testing(state, ("--runtime-surface", "false"))
+            data = json.loads(state.read_text())
+            self.assertEqual(data["packages"][0]["status"], "accept_ready")
+            self.assertTrue(data["packages"][0]["runtime_qa"][-1]["waived"])
+            self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_ACCEPTED")
+        # Default (runtime surface true): acceptance still demands real runtime QA.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            drive_to_testing(state)
+            result = self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("runtime QA", result.stdout)
+
     def test_consolidated_findings_and_delta_review_do_not_increment_full_review(self):
         with tempfile.TemporaryDirectory() as td:
             state = self.create_ready_package(td)
