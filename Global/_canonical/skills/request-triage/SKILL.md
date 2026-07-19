@@ -1,6 +1,6 @@
 ---
 name: request-triage
-description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (consult/analysis, feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
 license: MIT
 compatibility: opencode
 metadata:
@@ -20,7 +20,21 @@ failure this skill exists to prevent (applying the heavy flow to a problem that 
    Terse in execution, but interrogate up front. This is where you "stop the cart".
 3. Only then delegate the first action of the chosen mode.
 
-## The four modes
+## The five modes
+
+### 0. Consult / analysis — thinking together, no pipeline (check this FIRST)
+Triggers: "qué opinás", "cómo encararías", "analizame esta idea", comparisons, design questions — any request
+where the user wants analysis or a recommendation, not a code change. This is a first-class mode, not a
+misclassified feature.
+Flow: NO `init`, NO state file, NO pipeline. Delegate in parallel (these spawns are allowed and cheap):
+- `brainstormer` — 3-6 genuinely different options with tradeoffs,
+- `architect` — read-only pass over the three axes (relational vs non-relational vs vector store, API Gateway,
+  deploy platform) plus design patterns / clean-architecture shape; NO ADR unless the user asks,
+- `security-auditor` — design-level threat sketch, only when the idea touches auth/money/PII/external input.
+Then SYNTHESIZE yourself into ONE multi-lens analysis: data model, architecture/patterns, security,
+algorithms/complexity — ending with a recommendation plus runner-up. Close by asking: "¿Lo convierto en spec
+(feature) o en scoped?". A consult NEVER starts the pipeline on its own; if durable learning surfaced,
+delegate a `memory-scribe` note to the domain knowledge.
 
 ### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
 Triggers — full SDD is chosen ONLY when at least one of these holds, otherwise default to scoped-feature:

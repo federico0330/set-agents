@@ -404,6 +404,22 @@ class HarnessTests(unittest.TestCase):
             self.assertTrue((ROOT / "PROYECTO/docs/ai/knowledge" / f"{domain}.md").exists(), domain)
             self.assertTrue((ROOT / "knowledge" / f"{domain}.md").exists(), domain)
 
+    def test_consult_mode_is_wired_and_never_starts_pipeline(self):
+        run("./build.sh")
+        triage = (ROOT / "Global/claude-code/skills/request-triage/SKILL.md").read_text()
+        orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        self.assertIn("Consult / analysis", triage)
+        self.assertIn("NEVER starts the pipeline", triage)
+        self.assertIn("NO `init`, NO state file, NO pipeline", triage)
+        self.assertIn("## Consult mode", orchestrator)
+        self.assertIn("NEVER starts the pipeline", orchestrator)
+        for harness in ("opencode", "claude-code"):
+            self.assertTrue((ROOT / "Global" / harness / "commands/consult.md").exists(), harness)
+            self.assertTrue((ROOT / "Global" / harness / "commands/status.md").exists(), harness)
+        # scoped is the default lane; full SDD stays opt-in.
+        self.assertIn("scoped-feature — the DEFAULT".lower(), triage.lower())
+        self.assertIn("opt-in", triage)
+
     def test_architecture_gate_is_wired_through_the_canon(self):
         run("./build.sh")
         orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()

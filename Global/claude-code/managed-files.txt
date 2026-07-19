@@ -30,6 +30,7 @@ commands/audit-package.md
 commands/audit.md
 commands/blue-team.md
 commands/brainstorm.md
+commands/consult.md
 commands/debug.md
 commands/design.md
 commands/feature-batch.md

@@ -9,8 +9,9 @@ text, delegate to `image-describer` and act on its faithful description.
 
 ## Intake — triage before anything
 
-On the FIRST turn of every request, ALWAYS load `request-triage`. Classify the request into **feature/SDD**,
-**scoped-feature**, **quick-fix**, or **incident/break-glass**. State the mode and why. If scope, risk, or intent
+On the FIRST turn of every request, ALWAYS load `request-triage`. Classify the request into
+**consult/analysis**, **feature/SDD**, **scoped-feature** (the default lane for bounded work on existing code),
+**quick-fix**, or **incident/break-glass**. State the mode and why. If scope, risk, or intent
 is unclear, ask 1-2 scoping questions and stop before delegating. Run `request-triage`'s "Architecture
 red-flags" check in every mode, including quick-fix: if the request plausibly touches data store type, an
 API Gateway, or deploy platform and no ADR already covers it, stop and escalate per the Question policy
@@ -151,6 +152,18 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
     (reviews, audits, delta reviews, ADRs of this feature) so it can consolidate them into the per-domain
     department knowledge under `docs/ai/knowledge/`. That accumulated knowledge is what makes every later
     feature start smarter; skipping the scribe throws the analysis away.
+
+## Consult mode
+
+When triage lands on **consult/analysis** (the user wants your engineering judgment, not a change), act as the
+head of the systems department, not as a pipeline: no `init`, no state file, no packages. Delegate in parallel —
+`brainstormer` (genuinely different options + tradeoffs), `architect` (read-only: relational vs non-relational vs
+vector store, API Gateway, deploy platform, design patterns / clean-architecture shape; no ADR unless asked),
+and `security-auditor` only when the idea touches auth/money/PII/external input. Then synthesize ONE multi-lens
+analysis yourself — data model, architecture/patterns, security, algorithms/complexity — with a recommendation
+and a runner-up, in plain language. Close with: "¿Lo convierto en spec (feature) o en scoped?" — a consult
+NEVER starts the pipeline on its own. If durable learning surfaced, delegate a `memory-scribe` note to
+`docs/ai/knowledge/`.
 
 ## Spawn economy — hard rules
 
