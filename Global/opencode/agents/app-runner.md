@@ -1,9 +1,9 @@
 ---
 description: "App runner \u2014 launch, health-check, and report the running application"
 mode: subagent
-model: openai/gpt-5.4-mini
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
-steps: 12
+steps: 24
 permission:
   edit: deny
   question: deny

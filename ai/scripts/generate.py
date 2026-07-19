@@ -126,7 +126,7 @@ def oc_steps(role, capability, duty):
         "test-writer": 10,
         "gate-runner": 8,
         "runtime-verifier": 8,
-        "app-runner": 12,
+        "app-runner": 24,
     }
     if role in role_steps:
         return role_steps[role]
@@ -222,7 +222,8 @@ def oc_permissions(capability, roles, role=None):
             for path in sorted((CANON / "opencode-agents").glob("*.md"))
             if path.stem in ORCHESTRATOR_TASK_ALLOW
         ]
-        lines += ["  bash:", '    "*": deny', *safe, *hard_denies]
+        lines += ["  bash:", '    "*": deny', *safe,
+                  '    "python3 ai/scripts/feature-state.py resume *": allow', *hard_denies]
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe, *always_deny]
     elif capability == "gate-ro":
