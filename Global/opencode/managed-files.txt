@@ -45,6 +45,7 @@ commands/review-perf.md
 commands/review-security.md
 commands/save-memory.md
 commands/sdd-start.md
+commands/status.md
 commands/verify.md
 hooks/release_action.py
 hooks/release_gate.py

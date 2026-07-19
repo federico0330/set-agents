@@ -330,6 +330,7 @@ def mutate(
         data["updated_at"] = now()
         fail_if_invalid(data)
         atomic_write(path, data)
+        render_status(path)
     return data, before != data
 
 
@@ -494,6 +495,122 @@ def next_transition(data: dict[str, Any]) -> dict[str, Any]:
     return {"phase": phase, "next": None, "reason": "record required event before continuing"}
 
 
+def status_root(state_file: Path) -> tuple[Path, Path]:
+    """Return (features_dir, status_dir) for a given state file.
+
+    Canonical layout is ai/state/features/<id>.json with STATUS.md one level up
+    in ai/state/. Arbitrary --state-file locations (tests, ad-hoc runs) keep
+    everything in the state file's own directory.
+    """
+    parent = state_file.resolve().parent
+    if parent.name == "features":
+        return parent, parent.parent
+    return parent, parent
+
+
+def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
+    budgets = data.get("budgets", {})
+    packages = data.get("packages", [])
+    current = None
+    try:
+        current = package_by_id(data)
+    except StateError:
+        pass
+    spawns = sum(p.get("attempts", {}).get("spawns", 0) for p in packages)
+    cycles = current.get("attempts", {}).get("deep_review_cycles", 0) if current else 0
+    open_findings = sum(
+        1
+        for p in packages
+        for f in p.get("findings", [])
+        if f.get("status", "open") not in {"closed", "accepted"}
+    )
+    blockers = [b for b in data.get("blockers", []) if not b.get("resolved_at")]
+    history = data.get("history", [])
+    last = history[-1] if history else {}
+    return {
+        "feature_id": data.get("feature_id", "?"),
+        "mode": data.get("mode") or "feature",
+        "phase": data.get("phase", "?"),
+        "package": f"{current.get('package_id')} ({current.get('status')})" if current else "-",
+        "accepted": f"{sum(1 for p in packages if p.get('status') == 'accepted')}/{len(packages)}",
+        "spawns": f"{spawns}/{budgets.get('max_spawns_per_package', '?')}",
+        "reviews": f"{cycles}/{budgets.get('max_deep_review_cycles', '?')}",
+        "open_findings": open_findings,
+        "blocker": blockers[-1].get("reason", "") if blockers else "-",
+        "next": (next_transition(data).get("next") or "-"),
+        "last_event": f"{last.get('timestamp', '')} {last.get('event', '')}".strip() or "-",
+    }
+
+
+def render_status(state_file: Path) -> None:
+    """Rebuild the multi-feature STATUS.md dashboard next to the state files.
+
+    Called after every successful mutation so the dashboard is always fresh
+    without any extra orchestration step. Never raises: a broken dashboard must
+    not block a state mutation.
+    """
+    try:
+        features_dir, out_dir = status_root(state_file)
+        rows = []
+        for path in sorted(features_dir.glob("*.json")):
+            try:
+                rows.append(summarize_feature(load_state(path)))
+            except (StateError, json.JSONDecodeError):
+                rows.append({"feature_id": path.stem, "mode": "?", "phase": "INVALID_STATE",
+                             "package": "-", "accepted": "-", "spawns": "-", "reviews": "-",
+                             "open_findings": "-", "blocker": "state file failed to parse",
+                             "next": "-", "last_event": "-"})
+        lines = [
+            "# Estado del desarrollo",
+            "",
+            "_Generado por `feature-state.py` en cada mutación de estado. No editar a mano._",
+            "",
+            f"Actualizado: {now()}",
+            "",
+            "## Features",
+            "",
+            "| Feature | Modo | Fase | Paquete | Aceptados | Spawns | Reviews | Findings abiertos | Blocker | Próximo paso | Último evento |",
+            "|---|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        if rows:
+            for row in rows:
+                lines.append(
+                    "| {feature_id} | {mode} | {phase} | {package} | {accepted} | {spawns} | {reviews} "
+                    "| {open_findings} | {blocker} | {next} | {last_event} |".format(**row)
+                )
+        else:
+            lines.append("| _sin features registradas_ | | | | | | | | | | |")
+        quickfix_log = out_dir / "quickfix-log.jsonl"
+        lines += ["", "## Quick-fixes recientes", ""]
+        entries = []
+        if quickfix_log.exists():
+            for raw in quickfix_log.read_text().splitlines():
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    entries.append(json.loads(raw))
+                except json.JSONDecodeError:
+                    continue
+        if entries:
+            for entry in entries[-10:][::-1]:
+                files = ", ".join(entry.get("files", [])) or "-"
+                lines.append(
+                    f"- [{entry.get('at', '?')}] {entry.get('summary', '?')} — archivos: {files} "
+                    f"— gate: {entry.get('gate', '-')} — resultado: {entry.get('result', '-')}"
+                )
+        else:
+            lines.append("- _sin quick-fixes registrados_")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        payload = "\n".join(lines) + "\n"
+        with tempfile.NamedTemporaryFile("w", dir=str(out_dir), delete=False) as handle:
+            handle.write(payload)
+            tmp_name = handle.name
+        os.replace(tmp_name, out_dir / "STATUS.md")
+    except OSError:
+        pass
+
+
 def output_state(data: dict[str, Any], changed: bool = False, path: Path | None = None) -> int:
     print_json({"ok": True, "changed": changed, "state_file": str(path) if path else None, "state": data, "next": next_transition(data)})
     return 0
@@ -521,6 +638,7 @@ def cmd_init(args: argparse.Namespace) -> int:
             data["budgets"][key] = value
     record_event(data, "init", "USER_APPROVAL", "PACKAGE_PLANNING", args.actor, metadata={"spec_path": args.spec_path})
     atomic_write(path, data)
+    render_status(path)
     return output_state(data, True, path)
 
 
@@ -1131,6 +1249,32 @@ def cmd_resume(args: argparse.Namespace) -> int:
     return cmd_next(args)
 
 
+def cmd_render_status(args: argparse.Namespace) -> int:
+    anchor = Path(args.state_dir or "ai/state") / "features" / "_anchor.json"
+    render_status(anchor)
+    features_dir, out_dir = status_root(anchor)
+    print_json({"ok": True, "status_file": str(out_dir / "STATUS.md")})
+    return 0
+
+
+def cmd_log_quickfix(args: argparse.Namespace) -> int:
+    log_path = Path(args.log_file) if args.log_file else Path("ai/state/quickfix-log.jsonl")
+    entry = {
+        "at": now(),
+        "summary": args.summary,
+        "files": args.file or [],
+        "gate": args.gate or "-",
+        "result": args.result,
+        "actor": args.actor,
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, sort_keys=True) + "\n")
+    render_status(log_path.parent / "features" / "_anchor.json")
+    print_json({"ok": True, "log_file": str(log_path), "entry": entry})
+    return 0
+
+
 def run_dry_workflow(feature_id: str) -> dict[str, Any]:
     data = base_state(feature_id, "docs/specs/example/spec.md", "dry-run")
     data["acceptance_criteria"] = ["AC-1", "AC-2", "AC-3"]
@@ -1435,6 +1579,19 @@ def build_parser() -> argparse.ArgumentParser:
     reopen.add_argument("--reason", required=True)
     reopen.add_argument("--authorized-by", required=True)
     reopen.set_defaults(func=cmd_reopen)
+
+    render = sub.add_parser("render-status")
+    render.add_argument("--state-dir")
+    render.set_defaults(func=cmd_render_status)
+
+    quickfix = sub.add_parser("log-quickfix")
+    quickfix.add_argument("--summary", required=True)
+    quickfix.add_argument("--result", required=True, choices=["done", "reverted", "blocked"])
+    quickfix.add_argument("--file", action="append")
+    quickfix.add_argument("--gate")
+    quickfix.add_argument("--actor", default="orchestrator")
+    quickfix.add_argument("--log-file")
+    quickfix.set_defaults(func=cmd_log_quickfix)
 
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")

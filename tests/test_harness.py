@@ -122,6 +122,36 @@ class HarnessTests(unittest.TestCase):
                 self.assertIsNotNone(match, role)
                 self.assertGreaterEqual(int(match.group(1)), floor, role)
 
+    def test_render_status_reflects_multi_feature_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            features = Path(td) / "ai/state/features"
+            for feature_id, mode in (("feat-a", "scoped"), ("feat-b", "quick-fix")):
+                run("python3", str(FEATURE_STATE), "init", feature_id,
+                    f"docs/specs/{feature_id}/spec.md", "hash", "--mode", mode,
+                    "--state-file", str(features / f"{feature_id}.json"))
+            run("python3", str(FEATURE_STATE), "log-quickfix",
+                "--summary", "fix header typo", "--result", "done",
+                "--file", "src/app.ts", "--gate", "verify pass",
+                "--log-file", str(Path(td) / "ai/state/quickfix-log.jsonl"))
+            status = (Path(td) / "ai/state/STATUS.md").read_text()
+            self.assertIn("feat-a", status)
+            self.assertIn("feat-b", status)
+            self.assertIn("scoped", status)
+            self.assertIn("quick-fix", status)
+            self.assertIn("fix header typo", status)
+
+    def test_log_quickfix_appends_and_renders(self):
+        with tempfile.TemporaryDirectory() as td:
+            log = Path(td) / "ai/state/quickfix-log.jsonl"
+            for summary in ("first fix", "second fix"):
+                run("python3", str(FEATURE_STATE), "log-quickfix",
+                    "--summary", summary, "--result", "done", "--log-file", str(log))
+            entries = [json.loads(line) for line in log.read_text().splitlines()]
+            self.assertEqual([e["summary"] for e in entries], ["first fix", "second fix"])
+            status = (Path(td) / "ai/state/STATUS.md").read_text()
+            self.assertIn("second fix", status)
+            self.assertIn("sin features registradas", status)
+
     def test_profile_switch_does_not_rewrite_roster(self):
         before = (ROOT / "roles.tsv").read_bytes()
         with tempfile.TemporaryDirectory() as td:

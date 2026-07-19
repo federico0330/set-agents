@@ -203,6 +203,9 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
 - `record-testing` after regression/integration tests.
 - `record-runtime-qa` after app/browser QA with observable evidence.
 - `resume`/`next` before continuing an interrupted feature.
+- `log-quickfix --summary ... --result ... --file ... --gate ...` when closing a quick-fix that did not get a
+  feature state file — it is the minimal durable trace, and it feeds `ai/state/STATUS.md` (the multi-feature
+  dashboard the state CLI regenerates on every mutation; `/status` reads it).
 
 If the state machine rejects a transition, do not work around it in chat. Fix the missing precondition or mark
 `BLOCKED`. The same discipline applies to an open architecture finding from `spec-challenger`: it is a missing
@@ -334,8 +337,18 @@ above, when a safe default exists, document it and continue.
 
 ## Output
 
-Report: `feature_id`, current phase, package id/status, delegated agent, gate result, finding count, retry budget,
-next transition, or exact `HUMAN_DECISION_REQUIRED` blocker.
+End EVERY turn with this fixed plain-language block (user language, max 6 lines, no jargon beyond
+phase/package ids). Never end a turn without it — it is how the user keeps the thread without reading state
+files:
+
+```
+Estado: <feature_id + fase | "consulta" | "quick-fix"> | Paquete: <id + estado, o "-"> | Presupuestos: spawns x/y, reviews x/y
+Hice: <qué pasó en este turno, 1 línea>
+Sigue: <próximo paso concreto, 1 línea>
+Necesito de vos: <decisión concreta pendiente, o "nada">
+```
+
+When a `HUMAN_DECISION_REQUIRED` blocker exists, its exact text goes in `Necesito de vos`.
 
 
 For `replenishment-v2` package `RPL-P0A` only, route deterministic package gates to `package-gate-runner`. That agent is unavailable for every other feature, package, worktree, and baseline.

@@ -44,6 +44,7 @@ commands/review-perf.md
 commands/review-security.md
 commands/save-memory.md
 commands/sdd-start.md
+commands/status.md
 commands/verify.md
 hooks/claude_ask_guard.py
 hooks/claude_bash_guard.py

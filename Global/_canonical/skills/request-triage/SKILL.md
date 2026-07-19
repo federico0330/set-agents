@@ -53,7 +53,9 @@ full feature → **go up to feature mode**.
 Triggers: a small, well-understood change with an obvious blast radius (copy tweak, one-function bug, config
 value). Flow: implement → `gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS
 real risk surfaces mid-way (touches auth/money/PII/migration), then **escalate to scoped-feature or feature
-mode**.
+mode**. MANDATORY at close: record the minimal durable trace with
+`python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
+— quick-fixes with no trace are how the development thread gets lost.
 
 ### 4. Incident / break-glass — production is broken NOW
 Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
