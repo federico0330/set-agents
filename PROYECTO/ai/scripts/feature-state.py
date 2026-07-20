@@ -335,6 +335,7 @@ def mutate(
         fail_if_invalid(data)
         atomic_write(path, data)
         render_status(path)
+        render_bitacora(path)
     return data, before != data
 
 
@@ -547,6 +548,131 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+NARRATIVE_LOG = "narrative-log.jsonl"
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    if not path.exists():
+        return entries
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            entries.append(json.loads(raw))
+        except json.JSONDecodeError:
+            continue
+    return entries
+
+
+def collect_narrative(features_dir: Path, out_dir: Path) -> list[dict[str, Any]]:
+    """Merge the two sources of narration into one chronological list.
+
+    The opening block of a delegation rides on `record-spawn` metadata, so it
+    stays attached to the budget it consumed. Every other block — closings,
+    consult, quick-fix — lands in narrative-log.jsonl. Reading both is what
+    makes the story hole-free.
+    """
+    entries: list[dict[str, Any]] = []
+    for entry in read_jsonl(out_dir / NARRATIVE_LOG):
+        if entry.get("client") or entry.get("tech"):
+            entries.append(entry)
+    for path in sorted(features_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for event in data.get("history", []):
+            meta = event.get("metadata") or {}
+            if not (meta.get("client") or meta.get("tech")):
+                continue
+            entries.append({
+                "at": event.get("timestamp", ""),
+                "feature_id": data.get("feature_id", path.stem),
+                "package_id": event.get("package_id") or "-",
+                "role": meta.get("role") or event.get("event", "-"),
+                "result": "started",
+                "client": meta.get("client", ""),
+                "tech": meta.get("tech", ""),
+                "actor": event.get("actor", "-"),
+            })
+    # Timestamps have second resolution, so an opening and its closing block can
+    # tie. Break the tie on result so a delegation never reads as having finished
+    # before it started.
+    entries.sort(key=lambda item: (
+        item.get("at", ""),
+        item.get("feature_id", ""),
+        0 if item.get("result") == "started" else 1,
+    ))
+    return entries
+
+
+def format_narrative(entry: dict[str, Any]) -> list[str]:
+    """One narration block: a header line plus the two labelled registers."""
+    tail = " · ".join(
+        part for part in (entry.get("package_id"), entry.get("role"), entry.get("result"))
+        if part and part != "-"
+    )
+    return [
+        f"[{entry.get('at', '?')}] {tail}".rstrip(),
+        f"Cliente: {entry.get('client') or '-'}",
+        f"Ingeniería: {entry.get('tech') or '-'}",
+        "",
+    ]
+
+
+def bitacora_path(out_dir: Path, feature_id: str) -> Path:
+    """Prefer the client-facing delivery folder; fall back to internal state.
+
+    docs/specs/<feature_id>/ is what a client actually receives (sibling of
+    evidence/), so the narration belongs there when the feature has one.
+    """
+    root = out_dir.parent.parent
+    delivery = root / "docs" / "specs" / feature_id
+    if delivery.is_dir():
+        return delivery / "bitacora.md"
+    return out_dir / "bitacora" / f"{feature_id}.md"
+
+
+def render_bitacora(state_file: Path) -> None:
+    """Rebuild the cumulative per-feature narration log.
+
+    STATUS.md keeps only the tail; this file keeps the whole story in the
+    language the user can hand to a client. Fully regenerated from state
+    history plus narrative-log.jsonl, so it is never hand-edited and never
+    drifts. Never raises: narration must not block a state mutation.
+    """
+    try:
+        features_dir, out_dir = status_root(state_file)
+        by_feature: dict[str, list[dict[str, Any]]] = {}
+        for entry in collect_narrative(features_dir, out_dir):
+            by_feature.setdefault(entry.get("feature_id") or "sin-feature", []).append(entry)
+        for feature_id, items in by_feature.items():
+            lines = [
+                f"# Bitácora — {feature_id}",
+                "",
+                "_Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la "
+                "justificación de ingeniería. No editar a mano._",
+                "",
+                f"Actualizado: {now()}",
+                "",
+            ]
+            for entry in items:
+                lines += format_narrative(entry)
+            target = bitacora_path(out_dir, feature_id)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            payload = "\n".join(lines).rstrip() + "\n"
+            with tempfile.NamedTemporaryFile(
+                "w", dir=str(target.parent), delete=False, encoding="utf-8"
+            ) as handle:
+                handle.write(payload)
+                tmp_name = handle.name
+            os.replace(tmp_name, target)
+    except OSError:
+        pass
+
+
 def render_status(state_file: Path) -> None:
     """Rebuild the multi-feature STATUS.md dashboard next to the state files.
 
@@ -585,18 +711,8 @@ def render_status(state_file: Path) -> None:
                 )
         else:
             lines.append("| _sin features registradas_ | | | | | | | | | | |")
-        quickfix_log = out_dir / "quickfix-log.jsonl"
         lines += ["", "## Quick-fixes recientes", ""]
-        entries = []
-        if quickfix_log.exists():
-            for raw in quickfix_log.read_text().splitlines():
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    entries.append(json.loads(raw))
-                except json.JSONDecodeError:
-                    continue
+        entries = read_jsonl(out_dir / "quickfix-log.jsonl")
         if entries:
             for entry in entries[-10:][::-1]:
                 files = ", ".join(entry.get("files", [])) or "-"
@@ -606,6 +722,13 @@ def render_status(state_file: Path) -> None:
                 )
         else:
             lines.append("- _sin quick-fixes registrados_")
+        lines += ["", "## Bitácora (últimos 15)", ""]
+        narrative = collect_narrative(features_dir, out_dir)
+        if narrative:
+            for entry in narrative[-15:][::-1]:
+                lines += format_narrative(entry)
+        else:
+            lines.append("- _sin narración registrada_")
         out_dir.mkdir(parents=True, exist_ok=True)
         payload = "\n".join(lines) + "\n"
         with tempfile.NamedTemporaryFile("w", dir=str(out_dir), delete=False) as handle:
@@ -644,6 +767,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     record_event(data, "init", "USER_APPROVAL", "PACKAGE_PLANNING", args.actor, metadata={"spec_path": args.spec_path})
     atomic_write(path, data)
     render_status(path)
+    render_bitacora(path)
     return output_state(data, True, path)
 
 
@@ -883,6 +1007,14 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         if attempts.get("spawns", 0) >= budget:
             return block_with_reason(data, args.actor, args.package_id, "spawn budget exhausted")
         attempts["spawns"] = attempts.get("spawns", 0) + 1
+        metadata = {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"]}
+        # The two registers of the opening narration block. Optional so older
+        # callers keep working, but the orchestrator doctrine requires them:
+        # they are what render_bitacora turns into the durable story.
+        if args.client:
+            metadata["client"] = args.client
+        if args.tech:
+            metadata["tech"] = args.tech
         record_event(
             data,
             "record-spawn",
@@ -890,7 +1022,7 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             data["phase"],
             args.actor,
             args.package_id,
-            {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"]},
+            metadata,
             args.event_id,
         )
         return True
@@ -1297,6 +1429,7 @@ def cmd_resume(args: argparse.Namespace) -> int:
 def cmd_render_status(args: argparse.Namespace) -> int:
     anchor = Path(args.state_dir or "ai/state") / "features" / "_anchor.json"
     render_status(anchor)
+    render_bitacora(anchor)
     features_dir, out_dir = status_root(anchor)
     print_json({"ok": True, "status_file": str(out_dir / "STATUS.md")})
     return 0
@@ -1316,6 +1449,34 @@ def cmd_log_quickfix(args: argparse.Namespace) -> int:
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
     render_status(log_path.parent / "features" / "_anchor.json")
+    print_json({"ok": True, "log_file": str(log_path), "entry": entry})
+    return 0
+
+
+def cmd_log_narrative(args: argparse.Namespace) -> int:
+    """Persist one narration block that has no record-spawn of its own.
+
+    Every closing block, and every block emitted in consult or quick-fix mode,
+    lands here. Narrating in chat without landing it here is exactly the hole
+    this command closes: the chat is gone next week, the bitacora is not.
+    """
+    log_path = Path(args.log_file) if args.log_file else Path("ai/state") / NARRATIVE_LOG
+    entry = {
+        "at": now(),
+        "feature_id": args.feature_id or "sin-feature",
+        "package_id": args.package_id or "-",
+        "role": args.role or "-",
+        "result": args.result,
+        "client": args.client,
+        "tech": args.tech,
+        "actor": args.actor,
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+    anchor = log_path.parent / "features" / "_anchor.json"
+    render_status(anchor)
+    render_bitacora(anchor)
     print_json({"ok": True, "log_file": str(log_path), "entry": entry})
     return 0
 
@@ -1529,6 +1690,8 @@ def build_parser() -> argparse.ArgumentParser:
     spawn.add_argument("role")
     spawn.add_argument("--feature-id")
     spawn.add_argument("--purpose", default="")
+    spawn.add_argument("--client", default="")
+    spawn.add_argument("--tech", default="")
     spawn.set_defaults(func=cmd_record_spawn)
 
     review = sub.add_parser("record-review")
@@ -1642,6 +1805,17 @@ def build_parser() -> argparse.ArgumentParser:
     quickfix.add_argument("--actor", default="orchestrator")
     quickfix.add_argument("--log-file")
     quickfix.set_defaults(func=cmd_log_quickfix)
+
+    narrative = sub.add_parser("log-narrative")
+    narrative.add_argument("--client", required=True)
+    narrative.add_argument("--tech", required=True)
+    narrative.add_argument("--result", default="done", choices=["started", "done", "blocked"])
+    narrative.add_argument("--role")
+    narrative.add_argument("--package-id")
+    narrative.add_argument("--feature-id")
+    narrative.add_argument("--actor", default="orchestrator")
+    narrative.add_argument("--log-file")
+    narrative.set_defaults(func=cmd_log_narrative)
 
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")

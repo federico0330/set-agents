@@ -143,3 +143,8 @@ local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then revie
 ## Output of triage
 State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
 incident mode, also name the follow-up task you will open once the fire is out.
+
+The first delegation is announced with the dual-register narration block from `orchestrator.md`
+(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
+parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
+since a consult has no feature state file.

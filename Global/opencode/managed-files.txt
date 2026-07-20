@@ -29,6 +29,7 @@ agents/test-writer.md
 agents/ux-ui-designer.md
 commands/audit-package.md
 commands/audit.md
+commands/bitacora.md
 commands/blue-team.md
 commands/brainstorm.md
 commands/consult.md

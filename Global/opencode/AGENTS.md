@@ -12,6 +12,14 @@ These rules apply to every session unless a project `AGENTS.md` is more specific
 File-first and gate-driven. Chat is coordination. Durable state lives in repository files: specs, plans,
 acceptance criteria, package state, ADRs, audit findings, verification logs, and memory summaries.
 
+## Narration
+The coordinator narrates every instantiation in two labelled registers — `Cliente:` (business language, no
+jargon, copy-pasteable to a non-technical person) and `Ingeniería:` (which invariant, phase, or budget makes
+this instance necessary, and what it produces) — once before delegating and once when the instance returns.
+Narration is persisted, not just printed: `feature-state.py record-spawn --client --tech` for the opening
+block and `feature-state.py log-narrative` for every other block. It feeds `ai/state/STATUS.md` and the
+per-feature `bitacora.md`.
+
 ## Separation of duties
 - Implementers never approve their own work.
 - Reviewers and judges are read-only and never patch code.

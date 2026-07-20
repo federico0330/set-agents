@@ -152,6 +152,86 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("second fix", status)
             self.assertIn("sin features registradas", status)
 
+    def test_log_narrative_appends_and_renders(self):
+        with tempfile.TemporaryDirectory() as td:
+            log = Path(td) / "ai/state/narrative-log.jsonl"
+            run("python3", str(FEATURE_STATE), "init", "feat-n",
+                "docs/specs/feat-n/spec.md", "hash", "--mode", "scoped",
+                "--state-file", str(Path(td) / "ai/state/features/feat-n.json"))
+            run("python3", str(FEATURE_STATE), "log-narrative",
+                "--client", "ya podés cobrar con tarjeta",
+                "--tech", "cierre del paquete de pagos, gate verde",
+                "--role", "implementer", "--feature-id", "feat-n", "--result", "done",
+                "--log-file", str(log))
+            entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(entries[0]["client"], "ya podés cobrar con tarjeta")
+            # The dashboard carries the tail of the story...
+            status = (Path(td) / "ai/state/STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("## Bitácora", status)
+            self.assertIn("ya podés cobrar con tarjeta", status)
+            self.assertIn("Ingeniería:", status)
+            # ...and the per-feature file carries all of it. No docs/specs/ dir
+            # here, so it must land on the internal fallback path.
+            bitacora = (Path(td) / "ai/state/bitacora/feat-n.md").read_text(encoding="utf-8")
+            self.assertIn("Bitácora — feat-n", bitacora)
+            self.assertIn("cierre del paquete de pagos", bitacora)
+
+    def test_record_spawn_carries_dual_register(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state = root / "ai/state/features/feat-s.json"
+            # A delivery folder exists, so the bitacora must prefer it over the
+            # internal fallback — it is what the client actually receives.
+            (root / "docs/specs/feat-s").mkdir(parents=True)
+            run("python3", str(FEATURE_STATE), "init", "feat-s",
+                "docs/specs/feat-s/spec.md", "hash", "--mode", "scoped", "--state-file", str(state))
+            run("python3", str(FEATURE_STATE), "create-package", "PKG-00", "reprovisión",
+                "--state-file", str(state), "--task", "T-1", "--ac", "AC-1",
+                "--complexity", "small", "--owned-path", "src/db")
+            run("python3", str(FEATURE_STATE), "record-spawn", "PKG-00", "implementer",
+                "--state-file", str(state),
+                "--client", "los datos ya no se pierden entre corridas",
+                "--tech", "el paquete toca schema; small, así que solo package-reviewer")
+            data = json.loads(state.read_text(encoding="utf-8"))
+            spawn = [e for e in data["history"] if e["event"] == "record-spawn"][-1]
+            self.assertEqual(spawn["metadata"]["client"], "los datos ya no se pierden entre corridas")
+            self.assertIn("package-reviewer", spawn["metadata"]["tech"])
+            bitacora = (root / "docs/specs/feat-s/bitacora.md").read_text(encoding="utf-8")
+            self.assertIn("los datos ya no se pierden entre corridas", bitacora)
+            self.assertIn("PKG-00 · implementer · started", bitacora)
+            self.assertFalse((root / "ai/state/bitacora/feat-s.md").exists())
+
+    def test_orchestrator_narration_reaches_all_three_harnesses(self):
+        # The user reads the harness through OpenCode, Claude Code and Codex.
+        # generate.py copies the canonical body verbatim into all three, so this
+        # is the test that proves the transparency protocol is not OpenCode-only.
+        run("./build.sh")
+        artifacts = [
+            (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (ROOT / "Global/codex/agents/orchestrator.toml").read_text(encoding="utf-8"),
+        ]
+        for text in artifacts:
+            self.assertIn("▸ Instancio", text)
+            self.assertIn("Cliente:", text)
+            self.assertIn("Ingeniería:", text)
+            # Both halves of the cadence, and the durability rule that keeps the
+            # narration out of chat-only limbo.
+            self.assertIn("terminó", text)
+            self.assertIn("log-narrative", text)
+            self.assertIn("record-spawn --client", text)
+            # The end-of-turn block must survive alongside the new protocol.
+            self.assertIn("Necesito de vos:", text)
+
+    def test_shared_doctrine_covers_narration(self):
+        for name in ("AGENTS.opencode.md", "CLAUDE.md", "AGENTS.codex.md"):
+            text = (ROOT / "Global/_shared" / name).read_text(encoding="utf-8")
+            self.assertIn("## Narration", text, name)
+            self.assertIn("two labelled registers", text, name)
+            self.assertIn("log-narrative", text, name)
+            self.assertIn("bitacora.md", text, name)
+
     def test_profile_switch_does_not_rewrite_roster(self):
         before = (ROOT / "roles.tsv").read_bytes()
         with tempfile.TemporaryDirectory() as td:

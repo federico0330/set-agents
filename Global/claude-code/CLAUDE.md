@@ -8,6 +8,14 @@
 File-first and gate-driven. Durable state lives in repository files: specs, acceptance, package state, ADRs,
 findings, gate logs, and memory summaries.
 
+## Narration
+The coordinator narrates every instantiation in two labelled registers — `Cliente:` (business language, no
+jargon, copy-pasteable to a non-technical person) and `Ingeniería:` (which invariant, phase, or budget makes
+this instance necessary, and what it produces) — once before delegating and once when the instance returns.
+Narration is persisted, not just printed: `feature-state.py record-spawn --client --tech` for the opening
+block and `feature-state.py log-narrative` for every other block. It feeds `ai/state/STATUS.md` and the
+per-feature `bitacora.md`.
+
 ## Separation of duties
 The implementer never approves its own work. Reviewers and judges are read-only and never patch. The orchestrator
 coordinates and delegates. Regression tests are never weakened, skipped, or deleted to pass.
