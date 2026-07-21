@@ -103,8 +103,13 @@ Two physical waivers keep light modes light without prose exceptions:
 - `record-repair --skip-delta` skips the delta review ONLY when every repaired finding is ≤ medium severity
   and the repair touched ≤ 3 files (the CLI rejects it otherwise, and the waiver is recorded in the event).
 - `create-package --runtime-surface false` (planner declaration) lets a package with no observable runtime
-  surface become accept-ready after testing, without spawning `app-runner`/`runtime-verifier`. Default is
-  `true` — fail-safe.
+  surface skip `app-runner`/`runtime-verifier` — but it is NOT self-approving: after testing an independent
+  reviewer (`package-reviewer` or `security-auditor`) must sign it with `confirm-runtime-waiver`. The planner
+  that scoped the risk cannot sign its own waiver, and the CLI rejects the attempt. Default is `true` — fail-safe.
+
+One physical floor cannot be waived away by mode: a package cannot enter `PACKAGE_REVIEW` until the minimum
+gate floor (a passing `verify` gate, or passing typecheck+test+lint) is recorded. A missing gate set is a
+blocked transition, not a vacuous pass.
 
 `record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
 than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,

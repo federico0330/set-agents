@@ -19,6 +19,14 @@ REQUIRED = {
 }
 PROFILE_COLUMN = {"go-zen": "opencode_go", "zen": "opencode_zen", "local": "opencode_local"}
 CAPABILITIES = {"coord-ro", "review-ro", "docs-rw", "factory-rw", "code-rw", "gate-ro", "release", "memory-rw", "run-ro"}
+# Allowed Codex model ids. This is the single extension point for the Codex lane: adding a new
+# Codex tier is one line here, not a regex edit. OpenCode ids are validated by shape only
+# (provider/model), so a new OpenCode provider — e.g. a Kimi Alegretto subscription — needs no
+# code change at all: it slots straight into the opencode_* columns of roles.tsv.
+CODEX_MODELS = frozenset({
+    "gpt-5.4", "gpt-5.4-mini", "gpt-5.5",
+    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+})
 READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
@@ -79,7 +87,7 @@ def load_roles(profile, roles_path=None):
             die(f"{row['role']}: invalid OpenCode model id")
         if row["claude_model"] not in {"opus", "sonnet", "haiku", "fable"}:
             die(f"{row['role']}: invalid Claude model alias")
-        if not re.fullmatch(r"gpt-5\.(?:4(?:-mini)?|5|6-(?:sol|terra|luna))", row["codex_model"]):
+        if row["codex_model"] not in CODEX_MODELS:
             die(f"{row['role']}: invalid Codex model id")
         if not (CANON / "agents" / f"{row['role']}.md").is_file():
             die(f"{row['role']}: missing canonical prompt")
@@ -193,7 +201,7 @@ def oc_permissions(capability, roles, role=None):
     if role == "local-gate-runner":
         lines += [
             "  read: allow", "  edit:", '    "*": deny',
-            '    "ai/state/002-local-uat-identities-and-feature-state.json": allow',
+            '    "ai/state/features/*.json": allow',
             "  glob: deny", "  grep: deny", "  list: deny",
             "  task: deny", "  question: deny", "  webfetch: deny", "  websearch: deny", "  lsp: deny",
             "  skill: deny", "  todowrite: deny", "  doom_loop: deny", "  external_directory: deny",
@@ -204,7 +212,7 @@ def oc_permissions(capability, roles, role=None):
             '    "python3 ai/scripts/check-owned-paths.py --help": allow',
             '    "python3 ai/scripts/check-owned-paths.py --state-file * --package-id * --baseline *": allow',
             '    "git diff --check": allow',
-            '    "python3 ai/scripts/feature-state.py record-gate * --state-file ai/state/002-local-uat-identities-and-feature-state.json*": allow',
+            '    "python3 ai/scripts/feature-state.py record-gate * --state-file ai/state/features/*.json*": allow',
             '    "*.env*": deny', *always_deny,
         ]
     elif capability == "coord-ro":
@@ -225,10 +233,15 @@ def oc_permissions(capability, roles, role=None):
         ]
         lines += ["  edit: deny", "  question: ask", "  doom_loop: deny", "  webfetch: allow", "  websearch: ask", "  task:", '    "*": deny']
         lines += [f'    "{r["role"]}": allow' for r in roles if r["role"] in ORCHESTRATOR_TASK_ALLOW]
+        # Names in ORCHESTRATOR_TASK_ALLOW that are not roles.tsv roles are project-override
+        # extension points: a project can drop a bounded, project-specific agent (e.g. a
+        # package-gate-runner scoped to one feature/worktree) into <repo>/.opencode/agent/ without
+        # the generic harness hardcoding that project's paths. Keep those names delegatable.
+        role_names = {r["role"] for r in roles}
         lines += [
-            f'    "{path.stem}": allow'
-            for path in sorted((CANON / "opencode-agents").glob("*.md"))
-            if path.stem in ORCHESTRATOR_TASK_ALLOW
+            f'    "{name}": allow'
+            for name in sorted(ORCHESTRATOR_TASK_ALLOW)
+            if name not in role_names
         ]
         # The state CLI is the orchestrator's sanctioned mutation channel: it only
         # writes validated, atomic JSON under ai/state/ and enforces the physical
@@ -330,12 +343,6 @@ def generate(out, profile, roles_path=None):
             ("hidden: true" if oc_hidden(row["role"]) else ""),
             oc_permissions(row["capability"], roles, row["role"]), "---", "", body,
         ])
-        if row["role"] == "orchestrator":
-            oc += (
-                "\n\nFor `replenishment-v2` package `RPL-P0A` only, route deterministic package gates to "
-                "`package-gate-runner`. That agent is unavailable for every other feature, package, worktree, "
-                "and baseline."
-            )
         oc = oc.replace("\n\npermission:", "\npermission:")
         path = out / "opencode/agents" / f"{row['role']}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -359,7 +366,7 @@ def generate(out, profile, roles_path=None):
         if row["capability"] == "release":
             escaped += "\n\nCodex release-manager is read-only in this harness. Prepare the exact gated commands and report readiness; do not execute mutations here."
         if row["role"] == "local-gate-runner":
-            escaped += "\n\nCodex requires workspace-write only because record-gate writes ai/state/002-local-uat-identities-and-feature-state.json. Do not write anything else."
+            escaped += "\n\nCodex requires workspace-write only because record-gate writes the active feature state under ai/state/features/. Do not write anything else."
         codex = "\n".join([
             f"name = {json.dumps(row['role'])}", f"description = {json.dumps(desc)}",
             f"model = {json.dumps(row['codex_model'])}",

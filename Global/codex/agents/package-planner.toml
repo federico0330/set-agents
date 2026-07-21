@@ -29,6 +29,15 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
    - `medium`: several related tasks, multiple layers, or integration work.
    - `high`: architecture-critical, auth/authz, concurrency, destructive migration, public contract, secrets, money,
      or high-risk data changes.
+   For `high` complexity, record `selected_model` = the **strong implementer tier**, not the default leaf, and
+   say why in `routing_reason`. A weak first draft on concurrency/atomicity/money/security logic triggers more
+   strong-auditor rework than it saves (see `request-triage` → "Hard logic → hosted implementer"). The strong
+   tier is a model from a family DISTINCT from the review panel (so the reviewer/implementer family-exclusivity
+   holds): the intended strong implementer is Kimi Alegretto once its subscription is wired into the `opencode_go`
+   column (see `COMO-CAMBIAR-MODELO.md`); until then, pin the strongest hosted implementer available that is not
+   a reviewer family. For `high` packages that need real end-stage regressions, also route `test-writer` to a
+   non-shallow tier rather than a free/mini model — a tautological test suite does not block, so under-routing it
+   silently weakens verification.
 6. Decide `required_reviewers` explicitly, for the orchestrator to use as a ceiling on the review panel — it may
    not invoke a reviewer you did not declare here:
    - `small`/`medium` (default): `["package-reviewer"]` only — it already covers correctness, data-integrity, and

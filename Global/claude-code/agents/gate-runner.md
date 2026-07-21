@@ -21,3 +21,18 @@ When the orchestrator supplies exact gate commands, execute them immediately in 
 - Never: edit source, tests, configuration, migrations, or documentation. Never repair a failure.
 - Return: the exact command, exit status, concise failure evidence, and artifact/log paths.
 - A missing or ambiguous verification command is a failure for the orchestrator to route — not permission to invent product behavior.
+
+## Gate cache — skip re-running an unchanged diff
+
+Deterministic gates over an unchanged diff always produce the same result, so re-executing them is wasted
+wall-clock. Before running a named gate, compute the diff hash and ask the cache:
+
+1. `hash=$(git diff <baseline> | sha1sum | cut -d' ' -f1)` (use the baseline the orchestrator supplied).
+2. `python3 ai/scripts/feature-state.py check-gate-cache "<gate name>" --package-id <PKG> --diff-hash "$hash"`.
+3. On `CACHE_HIT`, do NOT re-run the gate: report it as a cached pass and move on. On `CACHE_MISS`, run the
+   gate as usual.
+4. When a gate passes, record it with the hash so the next run can skip it:
+   `record-gate "<gate name>" pass --package-id <PKG> --evidence "<log path>" --diff-hash "$hash"`.
+
+The cache only ever short-circuits a *pass* against the *identical* diff; any change to the diff is a miss and
+the gate runs for real. The state CLI executes nothing — you run the gates and report the hash you computed.

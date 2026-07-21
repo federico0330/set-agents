@@ -7,12 +7,26 @@ import sys
 
 
 SCRIPTS = {"ai/scripts/feature-state.py", "ai/scripts/check-owned-paths.py"}
-STATE_FILE = "ai/state/002-local-uat-identities-and-feature-state.json"
+STATE_PREFIX = "ai/state/features/"
 
 
 def blocked() -> None:
     print("Blocked: local-gate-runner may only execute its P001 commands", file=sys.stderr)
     raise SystemExit(2)
+
+
+def is_feature_state(values: list[str]) -> bool:
+    # The sole write target is a flat feature state file under ai/state/features/, generic across
+    # projects. Reject nested paths and traversal so the lockdown stays as tight as a fixed filename.
+    if len(values) != 1:
+        return False
+    path = values[0]
+    return (
+        path.startswith(STATE_PREFIX)
+        and path.endswith(".json")
+        and ".." not in path
+        and "/" not in path[len(STATE_PREFIX):]
+    )
 
 
 try:
@@ -41,7 +55,7 @@ allowed = (
     len(argv) >= 5
     and argv[:3] == ["python3", "ai/scripts/feature-state.py", "record-gate"]
     and argv.count("--state-file") == 1
-    and argv[argv.index("--state-file") + 1:argv.index("--state-file") + 2] == [STATE_FILE]
+    and is_feature_state(argv[argv.index("--state-file") + 1:argv.index("--state-file") + 2])
 )
 
 if not allowed:

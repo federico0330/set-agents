@@ -665,57 +665,38 @@ class HarnessTests(unittest.TestCase):
         self.assertIn('"git push --force*": deny', gate)
         self.assertIn('"gh repo delete*": deny', gate)
 
-    def test_rpl_p0a_package_gate_runner_is_opencode_only_and_strictly_scoped(self):
+    def test_generic_harness_has_no_project_specific_leaks(self):
+        # The generic harness must never bake one project's paths, feature ids, worktrees, or
+        # baselines into the artifacts every project receives. Project-specific bounded agents (e.g.
+        # a package-gate-runner scoped to one feature/worktree) live as per-project overrides in
+        # <repo>/.opencode/agent/, not in the canonical source-of-truth.
         run("./build.sh")
-        agent = ROOT / "Global/opencode/agents/package-gate-runner.md"
-        text = agent.read_text()
-        self.assertTrue(agent.exists())
+        # No package-gate-runner is generated into any harness, and none ships from the canonical source.
+        self.assertFalse((ROOT / "Global/opencode/agents/package-gate-runner.md").exists())
         self.assertFalse((ROOT / "Global/claude-code/agents/package-gate-runner.md").exists())
         self.assertFalse((ROOT / "Global/codex/agents/package-gate-runner.toml").exists())
+        self.assertFalse((ROOT / "Global/_canonical/opencode-agents/package-gate-runner.md").exists())
 
-        catch_all = text.index('    "*": deny', text.index("  bash:"))
-        ownership = text.index(
-            '    "python3 ai/scripts/check-owned-paths.py --state-file '
-            '/home/federico/iey/iey-ai/ai/state/features/replenishment-v2.json '
-            '--package-id RPL-P0A --baseline 4ef70b0ab6da": allow'
-        )
-        self.assertLess(catch_all, ownership)
-        self.assertIn('    "git *": deny', text)
-        self.assertLess(text.index('    "git *": deny'), text.index('    "git status": allow'))
-        self.assertIn('    "git log --oneline -5": allow', text)
-        self.assertIn(
-            '    "/tmp/opencode/rpl-p0a-gates-4ef70b0ab6da/**": allow', text
-        )
-        self.assertIn(
-            '    "/home/federico/iey/iey-ai/ai/state/features/replenishment-v2.json": allow', text
-        )
-        self.assertIn(
-            '    "NODE_PATH=/home/federico/iey/iey-ai/node_modules '
-            '/home/federico/iey/iey-ai/node_modules/.bin/prisma validate": allow', text
-        )
-        self.assertIn(
-            '    "NODE_PATH=/home/federico/iey/iey-ai/node_modules '
-            '/home/federico/iey/iey-ai/node_modules/.bin/vitest run '
-            'src/lib/modules/contabilium-ingestion/repositories/__tests__/'
-            'ledger-rls.integration.test.ts": allow', text
-        )
-        self.assertIn("record-gate replenishment-v2 --description *", text)
-        self.assertIn('    "*--next-id*": deny', text)
-        self.assertIn('    "*verify.sh*": deny', text)
-        self.assertNotIn('    "*verify.sh*": allow', text)
-        self.assertNotIn('    "NODE_PATH=*', text)
+        # No orchestrator, on any harness, mentions a specific feature/package/worktree/baseline.
+        leaks = ("replenishment-v2", "RPL-P0A", "4ef70b0ab6da", "002-local-uat-identities")
+        oc_orch = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
+        cc_orch = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        cx_orch = tomllib.loads(
+            (ROOT / "Global/codex/agents/orchestrator.toml").read_text()
+        )["developer_instructions"]
+        for leak in leaks:
+            for text in (oc_orch, cc_orch, cx_orch):
+                self.assertNotIn(leak, text)
 
-        orchestrator = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
-        self.assertIn('    "package-gate-runner": allow', orchestrator)
-        self.assertIn("For `replenishment-v2` package `RPL-P0A` only", orchestrator)
-        self.assertNotIn(
-            "package-gate-runner",
-            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(),
-        )
-        self.assertNotIn(
-            "package-gate-runner",
-            tomllib.loads((ROOT / "Global/codex/agents/orchestrator.toml").read_text())["developer_instructions"],
-        )
+        # The orchestrator still permits delegating to a project-provided package-gate-runner, so a
+        # project override under <repo>/.opencode/agent/ stays reachable without any hardcoded path.
+        self.assertIn('    "package-gate-runner": allow', oc_orch)
+
+        # The generic local-gate-runner is scoped to the canonical state location, not one project's file.
+        oc_local_gate = (ROOT / "Global/opencode/agents/local-gate-runner.md").read_text()
+        self.assertIn('    "ai/state/features/*.json": allow', oc_local_gate)
+        for leak in leaks:
+            self.assertNotIn(leak, oc_local_gate)
 
     def test_package_workflow_happy_path_executes_real_transitions(self):
         with tempfile.TemporaryDirectory() as td:
@@ -863,7 +844,7 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("3 changed files", result.stdout)
 
-    def test_non_runtime_package_accepts_without_runtime_qa(self):
+    def test_non_runtime_waiver_requires_independent_signer(self):
         def drive_to_testing(state, extra_create_args=()):
             self.run_state(
                 state, "create-package", "PKG-01", "Slice",
@@ -880,25 +861,167 @@ class HarnessTests(unittest.TestCase):
             self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer")
             self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
 
-        # Declared non-runtime package: accept-ready after testing, runtime QA waived.
+        # Declared non-runtime package: testing alone no longer auto-waives runtime QA.
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "feature.json"
             run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
             drive_to_testing(state, ("--runtime-surface", "false"))
             data = json.loads(state.read_text())
+            self.assertEqual(data["packages"][0]["status"], "runtime_qa_required")
+            self.assertFalse(data["packages"][0]["runtime_qa"])
+            # The planner that scoped the risk cannot sign its own waiver.
+            result = self.run_state(state, "confirm-runtime-waiver", "PKG-01", "--actor", "package-planner", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("independent reviewer", result.stdout)
+            # An independent reviewer can.
+            self.run_state(state, "confirm-runtime-waiver", "PKG-01", "--actor", "package-reviewer", "--reason", "pure library slice")
+            data = json.loads(state.read_text())
             self.assertEqual(data["packages"][0]["status"], "accept_ready")
             self.assertTrue(data["packages"][0]["runtime_qa"][-1]["waived"])
+            self.assertEqual(data["packages"][0]["runtime_qa"][-1]["confirmed_by"], "package-reviewer")
             self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator")
             data = json.loads(state.read_text())
             self.assertEqual(data["phase"], "PACKAGE_ACCEPTED")
-        # Default (runtime surface true): acceptance still demands real runtime QA.
+        # A runtime-surface package cannot be waived; acceptance demands real runtime QA.
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "feature.json"
             run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
             drive_to_testing(state)
+            result = self.run_state(state, "confirm-runtime-waiver", "PKG-01", "--actor", "package-reviewer", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("declares a runtime surface", result.stdout)
             result = self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator", check=False)
             self.assertEqual(result.returncode, 2)
             self.assertIn("runtime QA", result.stdout)
+
+    def test_required_gate_floor_blocks_review(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "medium",
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            for task_id in ("T-001", "T-002"):
+                self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            # A gate that proves nothing about typecheck/test/lint does not satisfy the floor.
+            self.run_state(state, "record-gate", "smoke check", "pass", "--package-id", "PKG-01", "--evidence", "ok")
+            self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "diff")
+            result = self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("minimum gate floor", result.stdout)
+            # A passing verify gate (verify.sh runs lint+typecheck+test+build) clears the floor.
+            self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
+            self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_REVIEW")
+
+    def test_gate_cache_hit_short_circuits(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice", "--ac", "AC-1",
+                "--task", "T-001", "--task", "T-002", "--owned-path", "src/**", "--complexity", "medium",
+            )
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            for task_id in ("T-001", "T-002"):
+                self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            self.run_state(
+                state, "record-gate", "package verify", "pass", "--package-id", "PKG-01",
+                "--evidence", "ok", "--diff-hash", "abc123",
+            )
+            hit = self.run_state(state, "check-gate-cache", "package verify", "--package-id", "PKG-01", "--diff-hash", "abc123")
+            self.assertIn("CACHE_HIT", hit.stdout)
+            # A changed diff or a different gate name is a miss.
+            miss = self.run_state(state, "check-gate-cache", "package verify", "--package-id", "PKG-01", "--diff-hash", "zzz")
+            self.assertIn("CACHE_MISS", miss.stdout)
+            miss2 = self.run_state(state, "check-gate-cache", "other gate", "--package-id", "PKG-01", "--diff-hash", "abc123")
+            self.assertIn("CACHE_MISS", miss2.stdout)
+            # The cache query is read-only: it neither adds nor duplicates a gate.
+            data = json.loads(state.read_text())
+            verify_gates = [g for g in data["packages"][0]["gates"] if g["name"] == "package verify"]
+            self.assertEqual(len(verify_gates), 1)
+            self.assertEqual(verify_gates[0]["diff_hash"], "abc123")
+
+    def test_ready_packages_schedules_disjoint_respecting_deps(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state),
+                "--ac", "AC-1", "--ac", "AC-2", "--ac", "AC-3", "--ac", "AC-4")
+            self.run_state(state, "create-package", "PKG-01", "A", "--ac", "AC-1", "--task", "T-1",
+                           "--owned-path", "src/a/**", "--complexity", "small")
+            self.run_state(state, "create-package", "PKG-02", "B", "--ac", "AC-2", "--task", "T-1",
+                           "--owned-path", "src/b/**", "--complexity", "small", "--depends-on", "PKG-01")
+            self.run_state(state, "create-package", "PKG-03", "C", "--ac", "AC-3", "--task", "T-1",
+                           "--owned-path", "src/a/sub/**", "--complexity", "small")
+            self.run_state(state, "create-package", "PKG-04", "D", "--ac", "AC-4", "--task", "T-1",
+                           "--owned-path", "src/d/**", "--complexity", "small")
+            result = json.loads(self.run_state(state, "ready-packages").stdout)
+            # PKG-01 and PKG-04 have disjoint ownership and no unmet deps -> parallelizable.
+            self.assertIn("PKG-01", result["ready"])
+            self.assertIn("PKG-04", result["ready"])
+            # PKG-02 depends on the not-yet-accepted PKG-01.
+            self.assertIn("PKG-02", result["blocked_by_deps"])
+            # PKG-03 (src/a/sub) overlaps PKG-01 (src/a) -> cannot run concurrently.
+            self.assertIn("PKG-03", result["blocked_by_overlap"])
+            self.assertNotIn("PKG-03", result["ready"])
+
+    def test_packages_hold_independent_phases(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state),
+                "--ac", "AC-1", "--ac", "AC-2")
+            self.run_state(state, "create-package", "PKG-01", "A", "--ac", "AC-1", "--task", "T-1",
+                           "--owned-path", "src/a/**", "--complexity", "small")
+            self.run_state(state, "create-package", "PKG-02", "B", "--ac", "AC-2", "--task", "T-1",
+                           "--owned-path", "src/b/**", "--complexity", "small")
+            # Advance PKG-01 to its GATES phase.
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            self.run_state(state, "complete-task", "PKG-01", "T-1", "--actor", "implementer", "--validation", "unit")
+            self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            # Now touch PKG-02: this moves the global working phase, but must NOT disturb PKG-01.
+            self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-02")
+            data = json.loads(state.read_text())
+            pkgs = {p["package_id"]: p for p in data["packages"]}
+            self.assertEqual(pkgs["PKG-01"]["phase"], "PACKAGE_GATES")
+            self.assertEqual(pkgs["PKG-02"]["phase"], "PACKAGE_IMPLEMENTATION")
+            # PKG-01 continues from its OWN GATES phase even though the last global op was on PKG-02.
+            # If transitions used a single global phase, IMPLEMENTATION -> PACKAGE_REVIEW would be illegal.
+            self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
+            self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "d")
+            self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
+            data = json.loads(state.read_text())
+            pkgs = {p["package_id"]: p for p in data["packages"]}
+            self.assertEqual(pkgs["PKG-01"]["phase"], "PACKAGE_REVIEW")
+            self.assertEqual(pkgs["PKG-02"]["phase"], "PACKAGE_IMPLEMENTATION")
+
+    def test_migrate_upgrades_v1_and_validate_detects_old(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            run("python3", str(FEATURE_STATE), "init", "feat", "spec.md", "hash", "--state-file", str(state), "--ac", "AC-1")
+            self.run_state(state, "create-package", "PKG-01", "A", "--ac", "AC-1", "--task", "T-1",
+                           "--owned-path", "src/**", "--complexity", "small")
+            # Simulate a pre-v2 file: bump down and strip the per-package phase.
+            data = json.loads(state.read_text())
+            data["schema_version"] = 1
+            for package in data["packages"]:
+                package.pop("phase", None)
+            state.write_text(json.dumps(data))
+            # validate flags the old schema.
+            result = self.run_state(state, "validate", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("schema_version", result.stdout)
+            # migrate upgrades in place; validate then passes and every package has a phase.
+            self.run_state(state, "migrate")
+            migrated = json.loads(state.read_text())
+            self.assertEqual(migrated["schema_version"], 2)
+            self.assertEqual(migrated["packages"][0]["phase"], "PACKAGE_PLANNING")
+            self.run_state(state, "validate")  # check=True: raises if it does not pass
 
     def test_consolidated_findings_and_delta_review_do_not_increment_full_review(self):
         with tempfile.TemporaryDirectory() as td:

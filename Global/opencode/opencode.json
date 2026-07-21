@@ -80,7 +80,7 @@
     "engram": {
       "type": "local",
       "command": [
-        "/home/federico/.local/bin/engram",
+        "engram",
         "mcp",
         "--tools=agent"
       ],

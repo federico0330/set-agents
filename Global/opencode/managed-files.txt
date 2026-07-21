@@ -15,7 +15,6 @@ agents/integrator.md
 agents/local-gate-runner.md
 agents/memory-scribe.md
 agents/orchestrator.md
-agents/package-gate-runner.md
 agents/package-planner.md
 agents/package-reviewer.md
 agents/product-analyst.md

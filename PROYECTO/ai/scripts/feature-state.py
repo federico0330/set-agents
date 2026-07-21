@@ -53,6 +53,15 @@ LEGAL_TRANSITIONS = {
 }
 
 TERMINAL = {"DONE", "BLOCKED"}
+# Current on-disk schema. v2 adds a per-package `phase` so packages advance through their lifecycle
+# independently (parallel packages). `migrate` upgrades a v1 file in place; `validate` flags older files.
+SCHEMA_VERSION = 2
+# Phases a package can hold in its own `phase` field. The feature-level phases REQUIREMENTS..USER_APPROVAL,
+# INTEGRATION, and DONE are never a package's phase — they coordinate the feature, not a single package.
+PACKAGE_PHASES = {
+    "PACKAGE_PLANNING", "PACKAGE_IMPLEMENTATION", "PACKAGE_GATES", "PACKAGE_REVIEW", "PACKAGE_REPAIR",
+    "DELTA_REVIEW", "PACKAGE_TESTING", "PACKAGE_RUNTIME_QA", "PACKAGE_ACCEPTED", "BLOCKED",
+}
 MUTATING_COMMANDS = {
     "init",
     "transition",
@@ -76,6 +85,17 @@ MUTATING_COMMANDS = {
     "reopen",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
+# A package that declares no runtime surface still may not self-skip runtime proof. The planner
+# scoped the risk, so it (and the implementers) cannot also sign it off — an independent reviewer
+# must. This closes the "planner both scopes and waives" loophole.
+RUNTIME_WAIVER_SIGNERS = {"package-reviewer", "security-auditor"}
+# Minimum verification floor. A package cannot enter deep review or be accepted until it shows
+# recorded evidence that automated verification ran, closing the "zero/weak gates => vacuous pass"
+# hole. A passing aggregate gate (verify.sh runs lint+typecheck+test+build) satisfies the whole
+# floor; otherwise each kind needs its own passing gate. The CLI executes nothing — it only checks
+# that the evidence records exist. A stack that genuinely lacks a kind records `gate_floor_waived`.
+GATE_FLOOR_KINDS = ("typecheck", "test", "lint")
+GATE_FLOOR_AGGREGATE = "verify"
 # Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
 MODE_BUDGETS = {
     "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3},
@@ -122,7 +142,7 @@ def parse_bool(raw: str | None, default: bool | None = None) -> bool | None:
 def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any]:
     stamp = now()
     return {
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "revision": 0,
         "feature_id": feature_id,
         "phase": "PACKAGE_PLANNING",
@@ -181,6 +201,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "integrated": False,
         "diff_ref": None,
         "runtime_surface": True,
+        "phase": "PACKAGE_PLANNING",
         "status": "planned",
         "complexity": None,
         "selected_role": None,
@@ -211,8 +232,8 @@ def atomic_write(path: Path, data: dict[str, Any]) -> None:
 
 def validate_state(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if data.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
+    if data.get("schema_version") != SCHEMA_VERSION:
+        errors.append(f"schema_version must be {SCHEMA_VERSION} (older files: run `feature-state.py migrate`)")
     if not isinstance(data.get("revision"), int) or data.get("revision", -1) < 0:
         errors.append("revision must be a non-negative integer")
     if not data.get("feature_id"):
@@ -328,14 +349,36 @@ def mutate(
     if expected is not None and data.get("revision") != expected:
         raise StateError(f"stale revision: expected {expected}, found {data.get('revision')}")
     before = deepcopy(data)
+    # Per-package phase (schema v2): load the addressed package's own phase into the working register
+    # `data["phase"]` so each command advances THAT package independently — packages can sit in
+    # different phases at once. Command bodies keep reading/writing data["phase"] unchanged; a
+    # single-package feature behaves exactly as before because there is only one phase to load.
+    pkg_id = getattr(args, "package_id", None)
+    loaded = False
+    if pkg_id:
+        target = next((p for p in data.get("packages", []) if p.get("package_id") == pkg_id), None)
+        if target is not None and target.get("phase"):
+            data["phase"] = target["phase"]
+            loaded = True
     changed = updater(data)
     if changed:
+        # Save the advanced phase back to the package we loaded from (never to a just-created package,
+        # which keeps its own initial phase — gated on `loaded`). INTEGRATION/DONE are feature-level
+        # and never a package phase, so they are excluded by PACKAGE_PHASES.
+        if loaded and data.get("phase") in PACKAGE_PHASES:
+            target = next((p for p in data.get("packages", []) if p.get("package_id") == pkg_id), None)
+            if target is not None:
+                target["phase"] = data["phase"]
         data["revision"] = int(data.get("revision", 0)) + 1
         data["updated_at"] = now()
         fail_if_invalid(data)
         atomic_write(path, data)
         render_status(path)
         render_bitacora(path)
+        return data, True
+    # No change: undo the transient phase load so we do not report a phantom diff.
+    if loaded:
+        data["phase"] = before.get("phase")
     return data, before != data
 
 
@@ -356,6 +399,62 @@ def failing_required_gates(package: dict[str, Any]) -> list[str]:
     return [gate.get("name", "<unnamed>") for gate in required_gates(package) if gate.get("status") != "pass"]
 
 
+def missing_gate_floor(package: dict[str, Any]) -> list[str]:
+    if package.get("gate_floor_waived"):
+        return []
+    passing = [gate.get("name", "").lower() for gate in package.get("gates", []) if gate.get("status") == "pass"]
+    if any(GATE_FLOOR_AGGREGATE in name for name in passing):
+        return []
+    return [kind for kind in GATE_FLOOR_KINDS if not any(kind in name for name in passing)]
+
+
+def _glob_prefix(path: str) -> str:
+    # Reduce a glob to its literal directory prefix so overlap detection is conservative: any
+    # ambiguity resolves toward "these two packages might touch the same tree" and serializes them.
+    for marker in ("**", "*"):
+        idx = path.find(marker)
+        if idx != -1:
+            path = path[:idx]
+    return path.strip("/")
+
+
+def paths_overlap(a_paths: list[str], b_paths: list[str]) -> bool:
+    a = [_glob_prefix(p) for p in a_paths]
+    b = [_glob_prefix(p) for p in b_paths]
+    for x in a:
+        for y in b:
+            if x == "" or y == "" or x == y or x.startswith(y + "/") or y.startswith(x + "/"):
+                return True
+    return False
+
+
+def ready_packages(data: dict[str, Any]) -> dict[str, list[str]]:
+    # DAG + ownership scheduler: which not-yet-accepted packages can be worked concurrently right now.
+    # A package is ready when every dependency is accepted AND its write surface (owned + shared paths)
+    # is disjoint from every package already selected this round. Disjoint owned paths are exactly the
+    # signal that two packages are safe to run in parallel; check-owned-paths.py enforces the same
+    # boundary at gate time. This is read-only: it advises the orchestrator, it does not mutate phase.
+    accepted = {p.get("package_id") for p in data.get("packages", []) if p.get("status") == "accepted"}
+    ready: list[str] = []
+    blocked_by_deps: list[str] = []
+    blocked_by_overlap: list[str] = []
+    selected_surfaces: list[list[str]] = []
+    for package in data.get("packages", []):
+        pid = package.get("package_id")
+        if package.get("status") in {"accepted", "blocked"}:
+            continue
+        if any(dep not in accepted for dep in package.get("dependencies", [])):
+            blocked_by_deps.append(pid)
+            continue
+        surface = list(package.get("owned_paths", [])) + list(package.get("shared_paths", []))
+        if any(paths_overlap(surface, chosen) for chosen in selected_surfaces):
+            blocked_by_overlap.append(pid)
+            continue
+        ready.append(pid)
+        selected_surfaces.append(surface)
+    return {"ready": ready, "blocked_by_deps": blocked_by_deps, "blocked_by_overlap": blocked_by_overlap}
+
+
 def tasks_complete(package: dict[str, Any]) -> bool:
     tasks = package.get("tasks", [])
     return bool(tasks) and all(task.get("status") == "completed" for task in tasks)
@@ -367,6 +466,9 @@ def package_review_ready(package: dict[str, Any]) -> list[str]:
         errors.append("tasks are not all completed")
     if failing_required_gates(package):
         errors.append("required gates are missing or failing")
+    floor = missing_gate_floor(package)
+    if floor:
+        errors.append("minimum gate floor not met (need a passing verify gate, or passing: " + ", ".join(floor) + ")")
     if not package.get("diff_ref"):
         errors.append("diff_ref is required")
     if not package.get("integrated"):
@@ -382,6 +484,9 @@ def package_accept_ready(data: dict[str, Any], package: dict[str, Any], actor: s
         errors.append("tasks are not all completed")
     if failing_required_gates(package):
         errors.append("required gates are missing or failing")
+    floor = missing_gate_floor(package)
+    if floor:
+        errors.append("minimum gate floor not met (need a passing verify gate, or passing: " + ", ".join(floor) + ")")
     if not package.get("acceptance_criteria"):
         errors.append("package has no acceptance criteria")
     if has_open_findings(package, {"critical", "high"}):
@@ -683,9 +788,17 @@ def render_status(state_file: Path) -> None:
     try:
         features_dir, out_dir = status_root(state_file)
         rows = []
+        inflight = []  # per-package phase view: (feature_id, package_id, phase, status)
         for path in sorted(features_dir.glob("*.json")):
             try:
-                rows.append(summarize_feature(load_state(path)))
+                data = load_state(path)
+                rows.append(summarize_feature(data))
+                for pkg in data.get("packages", []):
+                    if pkg.get("status") != "accepted":
+                        inflight.append((
+                            data.get("feature_id", path.stem), pkg.get("package_id", "?"),
+                            pkg.get("phase", "-"), pkg.get("status", "-"),
+                        ))
             except (StateError, json.JSONDecodeError):
                 rows.append({"feature_id": path.stem, "mode": "?", "phase": "INVALID_STATE",
                              "package": "-", "accepted": "-", "spawns": "-", "reviews": "-",
@@ -711,6 +824,14 @@ def render_status(state_file: Path) -> None:
                 )
         else:
             lines.append("| _sin features registradas_ | | | | | | | | | | |")
+        lines += ["", "## Paquetes en vuelo", ""]
+        if inflight:
+            lines.append("| Feature | Paquete | Fase | Estado |")
+            lines.append("|---|---|---|---|")
+            for fid, pid, phase, status in inflight:
+                lines.append(f"| {fid} | {pid} | {phase} | {status} |")
+        else:
+            lines.append("- _sin paquetes en vuelo_")
         lines += ["", "## Quick-fixes recientes", ""]
         entries = read_jsonl(out_dir / "quickfix-log.jsonl")
         if entries:
@@ -782,11 +903,60 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def migrate_state(data: dict[str, Any]) -> bool:
+    # Upgrade an older state file in place. v1 -> v2 adds a per-package `phase`, derived from each
+    # package's status (and the global phase for the package that was current). Idempotent.
+    changed = False
+    if data.get("schema_version", 1) < SCHEMA_VERSION:
+        data["schema_version"] = SCHEMA_VERSION
+        changed = True
+    global_phase = data.get("phase")
+    current = data.get("current_package_id")
+    for package in data.get("packages", []):
+        if "phase" not in package:
+            if package.get("status") == "accepted":
+                package["phase"] = "PACKAGE_ACCEPTED"
+            elif package.get("status") == "blocked":
+                package["phase"] = "BLOCKED"
+            elif package.get("package_id") == current and global_phase in PACKAGE_PHASES:
+                package["phase"] = global_phase
+            else:
+                package["phase"] = "PACKAGE_PLANNING"
+            changed = True
+    return changed
+
+
+def cmd_migrate(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+    data = load_state(path)
+    changed = migrate_state(data)
+    if changed:
+        data["revision"] = int(data.get("revision", 0)) + 1
+        data["updated_at"] = now()
+        errors = validate_state(data)
+        if errors:
+            raise StateError("migration produced invalid state: " + "; ".join(errors))
+        atomic_write(path, data)
+        render_status(path)
+        render_bitacora(path)
+    print_json({"ok": True, "migrated": changed, "schema_version": data.get("schema_version"), "state_file": str(path)})
+    return 0
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
     data = load_state(path)
     fail_if_invalid(data)
     return output_state(data, False, path)
+
+
+def cmd_ready_packages(args: argparse.Namespace) -> int:
+    # Read-only scheduler advice: the set of not-yet-accepted packages the orchestrator can spawn
+    # concurrently right now (dependencies satisfied + disjoint write surface), plus why the rest wait.
+    path = state_file_arg(args)
+    data = load_state(path)
+    print_json(ready_packages(data))
+    return 0
 
 
 def cmd_next(args: argparse.Namespace) -> int:
@@ -961,6 +1131,11 @@ def cmd_record_gate(args: argparse.Namespace) -> int:
     def update(data: dict[str, Any]) -> bool:
         target = data.setdefault("global_gates", []) if args.global_gate else package_by_id(data, args.package_id).setdefault("gates", [])
         gate = {"name": args.name, "status": args.status, "required": not args.optional, "evidence": args.evidence, "at": now()}
+        # Content-addressed gate cache: a passing gate remembers the diff hash it passed against, so
+        # gate-runner can skip re-executing an identical command set on an unchanged diff (see
+        # check-gate-cache). The CLI still executes nothing — it only records the hash the runner reports.
+        if getattr(args, "diff_hash", None):
+            gate["diff_hash"] = args.diff_hash
         for index, existing in enumerate(target):
             if existing.get("name") == args.name:
                 if existing == gate:
@@ -982,6 +1157,26 @@ def cmd_record_gate(args: argparse.Namespace) -> int:
 
     data, changed = mutate(path, args, "record-gate", update)
     return output_state(data, changed, path)
+
+
+def cmd_check_gate_cache(args: argparse.Namespace) -> int:
+    # Read-only query: has a gate of this name already passed against this exact diff hash? Lets
+    # gate-runner short-circuit re-execution on an unchanged diff. Never mutates state.
+    path = state_file_arg(args)
+    data = load_state(path)
+    if args.global_gate:
+        gates = data.get("global_gates", [])
+    else:
+        gates = package_by_id(data, args.package_id).get("gates", [])
+    hit = any(
+        gate.get("name") == args.name
+        and gate.get("status") == "pass"
+        and gate.get("diff_hash")
+        and gate.get("diff_hash") == args.diff_hash
+        for gate in gates
+    )
+    print("CACHE_HIT" if hit else "CACHE_MISS")
+    return 0
 
 
 def normalize_findings(raw_findings: list[str]) -> list[dict[str, Any]]:
@@ -1304,19 +1499,12 @@ def cmd_record_testing(args: argparse.Namespace) -> int:
         }
         package.setdefault("testing", []).append(result)
         if args.status == "pass":
+            # Always advance to runtime QA. A package that declared runtime_surface=false is NOT
+            # auto-waived here anymore: an independent reviewer must sign the waiver with
+            # `confirm-runtime-waiver`. The planner that scoped the risk can no longer self-skip
+            # runtime proof.
             data["phase"] = "PACKAGE_RUNTIME_QA"
-            if package.get("runtime_surface", True):
-                package["status"] = "runtime_qa_required"
-            else:
-                # No observable runtime surface: record a physical waiver so the
-                # package is accept-ready without spawning app-runner/runtime-verifier.
-                package["status"] = "accept_ready"
-                package.setdefault("runtime_qa", []).append({
-                    "status": "pass",
-                    "waived": True,
-                    "reason": "package declared runtime_surface=false at planning",
-                    "at": now(),
-                })
+            package["status"] = "runtime_qa_required"
         elif args.status == "fail":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
@@ -1357,6 +1545,40 @@ def cmd_record_runtime_qa(args: argparse.Namespace) -> int:
         return True
 
     data, changed = mutate(path, args, "record-runtime-qa", update)
+    return output_state(data, changed, path)
+
+
+def cmd_confirm_runtime_waiver(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        if data["phase"] != "PACKAGE_RUNTIME_QA":
+            raise StateError(f"cannot confirm runtime waiver from phase {data['phase']}")
+        if args.actor not in RUNTIME_WAIVER_SIGNERS:
+            raise StateError(
+                "runtime waiver must be signed by an independent reviewer "
+                f"({', '.join(sorted(RUNTIME_WAIVER_SIGNERS))}); {args.actor} cannot self-waive"
+            )
+        package = package_by_id(data, args.package_id)
+        if package.get("runtime_surface", True):
+            raise StateError("cannot waive runtime QA: package declares a runtime surface — run real runtime QA")
+        reason = args.reason or "no observable runtime surface, confirmed by independent reviewer"
+        package["runtime_waiver"] = {"confirmed_by": args.actor, "reason": reason, "at": now()}
+        package.setdefault("runtime_qa", []).append({
+            "status": "pass",
+            "waived": True,
+            "reason": reason,
+            "confirmed_by": args.actor,
+            "at": now(),
+        })
+        package["status"] = "accept_ready"
+        record_event(
+            data, "confirm-runtime-waiver", "PACKAGE_RUNTIME_QA", "PACKAGE_RUNTIME_QA",
+            args.actor, args.package_id, {"confirmed_by": args.actor}, args.event_id,
+        )
+        return True
+
+    data, changed = mutate(path, args, "confirm-runtime-waiver", update)
     return output_state(data, changed, path)
 
 
@@ -1612,7 +1834,10 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--mode", choices=sorted(MODE_BUDGETS), default="scoped")
     init.set_defaults(func=cmd_init)
 
-    for name, func in (("status", cmd_status), ("next", cmd_next), ("resume", cmd_resume), ("validate", cmd_validate)):
+    for name, func in (
+        ("status", cmd_status), ("next", cmd_next), ("resume", cmd_resume),
+        ("validate", cmd_validate), ("ready-packages", cmd_ready_packages),
+    ):
         item = sub.add_parser(name)
         item.add_argument("feature_id", nargs="?")
         item.add_argument("--state-file")
@@ -1682,7 +1907,17 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--global-gate", action="store_true")
     gate.add_argument("--optional", action="store_true")
     gate.add_argument("--evidence", default="")
+    gate.add_argument("--diff-hash", help="git-diff hash this gate passed against, for the gate cache")
     gate.set_defaults(func=cmd_record_gate)
+
+    cache = sub.add_parser("check-gate-cache")
+    cache.add_argument("name")
+    cache.add_argument("--state-file")
+    cache.add_argument("--feature-id")
+    cache.add_argument("--package-id")
+    cache.add_argument("--global-gate", action="store_true")
+    cache.add_argument("--diff-hash", required=True)
+    cache.set_defaults(func=cmd_check_gate_cache)
 
     spawn = sub.add_parser("record-spawn")
     add_common_state_args(spawn)
@@ -1772,6 +2007,13 @@ def build_parser() -> argparse.ArgumentParser:
     runtime.add_argument("--evidence", default="")
     runtime.set_defaults(func=cmd_record_runtime_qa)
 
+    waiver = sub.add_parser("confirm-runtime-waiver")
+    add_common_state_args(waiver)
+    waiver.add_argument("package_id")
+    waiver.add_argument("--feature-id")
+    waiver.add_argument("--reason", default="")
+    waiver.set_defaults(func=cmd_confirm_runtime_waiver)
+
     accept = sub.add_parser("accept-package")
     add_common_state_args(accept)
     accept.add_argument("package_id")
@@ -1792,6 +2034,11 @@ def build_parser() -> argparse.ArgumentParser:
     reopen.add_argument("--reason", required=True)
     reopen.add_argument("--authorized-by", required=True)
     reopen.set_defaults(func=cmd_reopen)
+
+    migrate = sub.add_parser("migrate")
+    migrate.add_argument("feature_id", nargs="?")
+    migrate.add_argument("--state-file")
+    migrate.set_defaults(func=cmd_migrate)
 
     render = sub.add_parser("render-status")
     render.add_argument("--state-dir")

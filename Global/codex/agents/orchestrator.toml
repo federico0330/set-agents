@@ -50,6 +50,11 @@ approval. The change is after approval: implement related work as packages, run 
 run a bounded review panel over the complete package, repair in batches, test with deterministic commands, and
 verify the running application when relevant.
 
+Each package carries its OWN phase through this lifecycle (state schema v2), so independent packages advance in
+parallel — one can be in review while another is still implementing. Use `ready-packages` to pick the set that
+is safe to run at once (see the delegation flow); the state CLI keys every package-scoped command on
+`--package-id`, so you never serialize disjoint packages behind a single global phase.
+
 ## Durable state
 
 For package-based features, maintain a compact structured state file at `ai/state/features/<feature_id>.json`
@@ -79,7 +84,11 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
   useful. A panel consumes one deep review cycle no matter how many subreviewers contribute.
 - `record-testing` after regression/integration tests.
 - `record-runtime-qa` after app/browser QA with observable evidence.
+- `confirm-runtime-waiver` (by `package-reviewer` or `security-auditor` only) to sign off a
+  `runtime_surface=false` package instead of runtime QA. The planner cannot sign its own waiver.
 - `resume`/`next` before continuing an interrupted feature.
+- `ready-packages` to see which packages can be worked concurrently; `migrate` to upgrade a state file
+  written by an older harness before resuming it (the CLI rejects an outdated `schema_version` otherwise).
 - `log-quickfix --summary ... --result ... --file ... --gate ...` when closing a quick-fix that did not get a
   feature state file — it is the minimal durable trace, and it feeds `ai/state/STATUS.md` (the multi-feature
   dashboard the state CLI regenerates on every mutation; `/status` reads it).
@@ -126,13 +135,27 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
    that wasn't declared, that is itself a finding to record, not a silent addition to the panel.
 6. For each package, delegate implementation to `implementer`, `frontend-engineer`, `refactor-specialist`, or
    `integrator` as appropriate. Workers run local validation per task but never deep-audit or approve themselves.
+   Do NOT drain packages one at a time by default: run
+   `python3 ai/scripts/feature-state.py ready-packages --state-file ai/state/features/<feature_id>.json` — it
+   returns the packages whose dependencies are accepted AND whose write surface (owned + shared paths) is
+   disjoint, so they are safe to implement CONCURRENTLY. Spawn that ready set in one batch (one message,
+   parallel `task` calls); each spawn still costs against its package's spawn budget. `blocked_by_deps` waits
+   for a dependency; `blocked_by_overlap` waits because another in-flight package owns overlapping paths —
+   never run two packages with overlapping ownership at once (`check-owned-paths.py` would fail their gates).
 7. `gate-runner` runs deterministic package gates after the package is integrated enough to review.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
+   A package cannot enter `PACKAGE_REVIEW` until the minimum gate floor is recorded as passing: a
+   `verify` gate (`verify.sh` runs lint+typecheck+test+build) satisfies it, or each of typecheck, test,
+   and lint has its own passing gate. The CLI blocks the transition otherwise — a missing gate is not a
+   vacuous pass.
 8. `package-reviewer` leads the bounded package review panel — it covers correctness, architecture, test gaps,
    data-integrity, and scalability itself in one pass (no separate DB/performance/legacy-audit agent to
    delegate those to). Add only the reviewers `package-planner` declared in `required_reviewers`: typically
    `security-auditor` (offensive+defensive, one pass) when auth/payments/PII/tenant-isolation is in scope, or
-   `ux-ui-designer` for UI/UX risk. Their outputs are subreviews inside one panel and must be consolidated
+   `ux-ui-designer` for UI/UX risk. Spawn the declared reviewers in a SINGLE concurrent batch (one message,
+   parallel `task` calls): they are independent read-only passes over the same frozen diff, so serializing
+   them only burns wall-clock. The panel still counts as ONE deep review cycle no matter how many reviewers
+   run. Their outputs are subreviews inside one panel and must be consolidated
    before repair. Trigger early focused checkpoints only for auth, authorization, tenant isolation, payments,
    secrets, crypto, destructive migrations/deletes, incompatible public contracts, system permissions, or
    untrusted code execution.
@@ -148,8 +171,11 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
     `record-testing`.
 12. `app-runner` starts the application and `runtime-verifier` performs browser/runtime QA ONLY when the package
     declared a runtime surface (`runtime_surface=true`, the fail-safe default — UI, API, persistence, workflow,
-    or customer-visible behavior). A package planned with `--runtime-surface false` becomes accept-ready after
-    testing with a recorded waiver; do not spawn app-runner/runtime-verifier for it. QA means exercising the
+    or customer-visible behavior). A package planned with `--runtime-surface false` may NOT self-skip runtime
+    proof: after testing, an independent reviewer (`package-reviewer` or `security-auditor`) must sign the
+    waiver with `confirm-runtime-waiver` — the `package-planner` that scoped the risk cannot sign it, and the
+    CLI rejects the attempt. Only after that signature is the package accept-ready without
+    app-runner/runtime-verifier. QA means exercising the
     running app, not rereading code. Record URL, screenshots/logs, checks performed, and result with
     `record-runtime-qa`; the `--evidence` value must point at files under `docs/specs/<feature_id>/evidence/`
     (the delivery evidence folder), not at chat prose.

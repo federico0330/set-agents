@@ -35,6 +35,12 @@ except (OSError, ValueError):
     sys.exit(1)  # unreadable state counts as incompatible
 if phase in ("DONE", "BLOCKED"):
     sys.exit(0)  # terminal: syncing cannot break it
+# Migration runs before validation: bring a compatible older file up to the new schema in place
+# (additive — schema_version + per-package phase). A genuinely divergent schema stays invalid and blocks.
+subprocess.run(
+    ["python3", script, "migrate", "--state-file", state],
+    capture_output=True, text=True,
+)
 proc = subprocess.run(
     ["python3", script, "validate", "--state-file", state],
     capture_output=True, text=True,

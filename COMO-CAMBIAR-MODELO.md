@@ -39,6 +39,25 @@ The three profiles differ in the hosted model column selected by `active-profile
 subscription models with `opencode-go/*`, `zen` uses `opencode/*` routers, and `local` uses `openai/*` only.
 Only OpenCode has a local-model column; `claude_model`/`codex_model` are profile-independent (hosted).
 
+## Kimi Alegretto as the strong implementer (one-cell change)
+
+Model-id validation is provider-agnostic: OpenCode ids are checked by shape only (`provider/model`), so a new
+provider needs **no code change** — only a cell edit. Codex ids come from the extensible `CODEX_MODELS` set in
+`generate.py` (add one line there for a new Codex tier). Kimi lands as an OpenCode provider alongside GPT.
+
+To make Kimi Alegretto the strong implementer for hard logic once the subscription is live:
+1. Set the `opencode_go` cell of `implementer` (and `repair-agent`, optionally `frontend-engineer` /
+   `refactor-specialist`) in `roles.tsv` to the Kimi model id (e.g. `moonshot/kimi-alegretto` — confirm the real
+   id with `opencode models`).
+2. `./build.sh --check` → `--diff` → `--install`.
+
+This satisfies the reviewer/implementer **family-exclusivity** invariant automatically: Kimi is a family distinct
+from the review panel (`opus` on Claude, `gpt-5.6-sol` on Codex/go), so the generator's separation check passes
+without forcing the implementer down a tier — which is exactly the constraint that caps the implementer today.
+Precedent: the `zen` profile already routes implementer/repair/integrator/frontend/refactor to
+`opencode/kimi-k2.7-code`. `package-planner` routes `high`-complexity packages to this strong tier via
+`selected_model`; small/medium stay on the cheaper default.
+
 ## Codex reasoning effort (`codex_effort` column)
 Only Codex has a per-agent reasoning-effort knob (`codex_effort` → `model_reasoning_effort`). It is tuned by
 activity: **xhigh** for auditors and the judge (best of the best), **high** for coordination/root-cause/spec
