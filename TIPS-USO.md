@@ -1,4 +1,4 @@
-# SET-AGENTES usage
+# SET-AGENTS usage
 
 This independent repository is the versioned source for OpenCode, Claude Code, and Codex.
 
@@ -53,14 +53,22 @@ Detalles en `INSTALACION.md`.
 
 Installation merges only managed configuration keys, preserves unrelated plugins/files, removes legacy Codex
 role prompts, and rolls back managed paths if smoke checks fail. Backups live under
-`~/.local/state/set-agentes/backups/`.
+`~/.local/state/set-agentes/backups/` (the state dir keeps its historical `set-agentes` spelling on
+purpose: migrating it would orphan every machine's manifest and backups).
 
-Profile wrappers change only `active-profile` and use the same confirmation flow:
+Profile wrappers change only `active-profile` (per-machine, untracked; fresh clones default to go-zen)
+and use the same confirmation flow:
 
 ```bash
 ./use-go-zen.sh
 ./use-zen.sh
+./use-local.sh
 ```
+
+Known debt: `Global/_canonical/opencode-agents/package-gate-runner.md` hardcodes absolute paths from the
+original `~/iey/iey-ai` project in its allow-list. Outside that repo those permissions are inert (the agent
+is scoped to the `replenishment-v2` feature only), but new machines inherit dead paths until that prompt is
+parameterized.
 
 ## Required lifecycle
 

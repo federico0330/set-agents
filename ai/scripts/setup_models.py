@@ -216,7 +216,9 @@ def wizard(config, roster, profile, roles_path, models_out):
             atomic_write(models_out, models_config.emit(config))
             print(f"MODELS_WRITTEN {models_out}")
             if input("¿Correr ./build.sh --check ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
-                subprocess.run([str(ROOT / "build.sh"), "--check"], check=True)
+                if subprocess.run([str(ROOT / "build.sh"), "--check"], check=False).returncode != 0:
+                    print("BUILD_CHECK_FAIL — el archivo quedó escrito; corré ./build.sh --check para ver el detalle")
+                    return 1
                 if input("¿Instalar globalmente (./build.sh --install)? [y/N] ").strip().lower() in {"y", "yes", "s", "si"}:
                     subprocess.run([str(ROOT / "build.sh"), "--install"], check=False)
             return 0
@@ -245,7 +247,7 @@ def main():
     roles_path = Path(args.roles) if args.roles else ROOT / "roles.tsv"
     output = Path(args.output_models or models_path)
     plumbing = bool(args.models or args.output_models)
-    profile = args.profile or (ROOT / "active-profile").read_text().strip()
+    profile = args.profile or models_config.active_profile()
 
     try:
         config = models_config.load_config(models_path)
@@ -297,12 +299,16 @@ def main():
         atomic_write(output, models_config.emit(config))
         print(f"MODELS_WRITTEN {output}")
         if not plumbing:
-            subprocess.run([str(ROOT / "build.sh"), "--check"], check=True)
-            if not args.no_install:
-                install = [str(ROOT / "build.sh"), "--install"]
-                if args.yes:
-                    install.append("--yes")
-                subprocess.run(install, check=True)
+            try:
+                subprocess.run([str(ROOT / "build.sh"), "--check"], check=True)
+                if not args.no_install:
+                    install = [str(ROOT / "build.sh"), "--install"]
+                    if args.yes:
+                        install.append("--yes")
+                    subprocess.run(install, check=True)
+            except subprocess.CalledProcessError as exc:
+                print(f"BUILD_CHECK_FAIL rc={exc.returncode} — corré ./build.sh --check para ver el detalle", file=sys.stderr)
+                return 1
         return 0
     except ModelsError as exc:
         print(f"MODELS_INVALID: {exc}", file=sys.stderr)

@@ -11,7 +11,12 @@ QUIET="${1:-}"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-drift.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 
-python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" >/dev/null
+# Generation failure is an internal error (2), never "stale" (1): the caller's
+# badge must not read a broken generator as a drifted install.
+if ! python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" >/dev/null; then
+  echo "DRIFT_UNKNOWN: generate.py falló; corré ./build.sh --check para ver el detalle." >&2
+  exit 2
+fi
 
 PREVIEW="$(python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "${DRIFT_HOME:-$HOME}" --preview 2>/dev/null | tail -5)"
 COUNT="$(sed -n 's/^MANAGED_DIFF_FILES=//p' <<<"$PREVIEW")"

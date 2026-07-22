@@ -399,8 +399,12 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("TOOL supabase installed=no", result.stdout)
             self.assertIn("TOOL vercel installed=no", result.stdout)
             # Dry-run plans the right method and never fetches anything.
-            result = run("bash", "set-agents", "--tools-install", "supabase", "--dry-run", env=env)
-            self.assertIn("TOOL_PLAN supabase method=npm", result.stdout)
+            result = run("bash", "set-agents", "--tools-install", "vercel", "--dry-run", env=env)
+            self.assertIn("TOOL_PLAN vercel method=npm", result.stdout)
+            # supabase has no automatable method on Linux (npm global is blocked upstream).
+            result = run("bash", "set-agents", "--tools-install", "supabase", env=env, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("TOOL_MANUAL supabase", result.stdout)
             result = run("bash", "set-agents", "--tools-install", "jq", "--dry-run", env=env)
             self.assertIn("TOOL_SKIP jq", result.stdout)
             result = run("bash", "set-agents", "--tools-install", "ghost", env=env, check=False)
@@ -499,7 +503,7 @@ class HarnessTests(unittest.TestCase):
                        "README.md"):
             self.assertIn(marker, ps1)
         cmd = (ROOT / "set-agents.cmd").read_text()
-        self.assertIn('wsl -e bash -lc "~/SET-AGENTS/set-agents %*"', cmd)
+        self.assertIn('wsl -e bash -lc "\\"$HOME/SET-AGENTS/set-agents\\" \\"$@\\"" set-agents %*', cmd)
         import shutil as _shutil
         if _shutil.which("pwsh"):
             # Full syntax validation when PowerShell Core is available locally;

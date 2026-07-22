@@ -17,11 +17,14 @@ import tempfile
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import models_config
+
 # SET_AGENTS_ROOT/SET_AGENTS_STATE are test seams; real runs never set them.
 ROOT = Path(os.environ.get("SET_AGENTS_ROOT") or Path(__file__).resolve().parents[2])
 STATE_DIR = Path(os.environ.get("SET_AGENTS_STATE") or Path.home() / ".local/state/set-agentes")
 APP_CONFIG = STATE_DIR / "config.toml"
-MANAGED_MCP = ("engram", "context7", "playwright", "brave-cdp")
+MANAGED_MCP = models_config.MANAGED_MCP
 HARNESS_CLIS = ("opencode", "claude", "codex")
 
 
@@ -116,7 +119,12 @@ def auto_update_enabled():
 
 def set_auto_update(enabled):
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    APP_CONFIG.write_text(f"auto_update = {'true' if enabled else 'false'}\n")
+    config = {**app_config(), "auto_update": enabled}
+    lines = [
+        f"{key} = {'true' if value else 'false'}" if isinstance(value, bool) else f"{key} = {json.dumps(value)}"
+        for key, value in sorted(config.items())
+    ]
+    APP_CONFIG.write_text("\n".join(lines) + "\n")
     print(f"AUTO_UPDATE={'on' if enabled else 'off'}")
 
 
@@ -126,6 +134,8 @@ def git(*args, timeout=None):
     return subprocess.run(
         ["git", "-C", str(ROOT), *args],
         capture_output=True, text=True, timeout=timeout, check=False,
+        # Never let git throw an interactive credential prompt at a captured TTY.
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
     )
 
 
@@ -187,7 +197,7 @@ def cmd_status(human=False):
     drift = drift_state()
     print(
         f"APP_STATUS sha={short_sha()} drift={drift} "
-        f"update={behind if behind is not None else '?'} "
+        f"update={behind if behind is not None else '?'} "  # cached; --check-update fetches
         f"auto_update={'on' if auto_update_enabled() else 'off'}"
     )
     if not human:
@@ -233,7 +243,11 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
     old = short_sha()
     print(f"Novedades ({behind} commits):")
     print(git("log", "--oneline", "HEAD..origin/main").stdout.rstrip())
-    pull = git("pull", "--ff-only")
+    try:
+        pull = git("pull", "--ff-only", timeout=180)
+    except subprocess.TimeoutExpired:
+        print("UPDATE_BLOCKED: git pull colgado (¿red o credenciales? probá `gh auth status`).")
+        return 1
     if pull.returncode != 0:
         print(f"UPDATE_BLOCKED: git pull falló:\n{pull.stderr.strip()}")
         return 1
@@ -252,7 +266,7 @@ def launch_update_check():
     online = fetch(timeout=6)
     behind = rev_count("HEAD..origin/main")
     if not online and behind is None:
-        return "sin red"
+        return "sin red o sin acceso (probá `gh auth status`)"
     if not behind:
         return "al día"
     if not auto_update_enabled():
@@ -324,7 +338,11 @@ def cmd_tools_install(name, dry=False, yes=False):
         print(f"Se necesita privilegio de administrador para:\n    {command}")
         if input("¿Ejecutar ese comando? [y/N] ").strip().lower() not in {"y", "yes", "s", "si"}:
             return 1
-    elif not yes and sys.stdin.isatty():
+    elif not yes:
+        # No TTY and no --yes -> never run anything silently.
+        if not sys.stdin.isatty():
+            print(f"TOOL_MANUAL {name}: sin TTY y sin --yes — corré: {command}")
+            return 1
         if input(f"¿Ejecutar '{command}'? [y/N] ").strip().lower() not in {"y", "yes", "s", "si"}:
             return 1
     result = subprocess.run(["bash", "-c", command], check=False)
@@ -376,6 +394,18 @@ def read_json(path):
         return json.loads(Path(path).read_text())
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def read_json_for_write(path):
+    """Like read_json, but NEVER treats an existing-but-corrupt file as empty:
+    rewriting it would silently destroy the user's config."""
+    path = Path(path)
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"MCP_ABORT {path} existe pero no parsea como JSON ({exc}); arreglalo antes de tocarlo")
 
 
 def mcp_targets():
@@ -471,9 +501,11 @@ def mcp_write(harness, target, name, spec=None, enabled=None, remove=False):
             if lines and lines[-1] != "":
                 lines.append("")
             lines.extend(_codex_section(name, spec))
-        atomic_write(path, "\n".join(lines).rstrip() + "\n" if lines else "")
+        if not lines:
+            return  # nothing to write; never create an empty config.toml
+        atomic_write(path, "\n".join(lines).rstrip() + "\n")
         return
-    data = read_json(path)
+    data = read_json_for_write(path)
     servers = data.setdefault(_servers_key(harness), {})
     if remove:
         servers.pop(name, None)
@@ -528,19 +560,23 @@ def cmd_mcp_add(name, harness=None):
 
 
 def cmd_mcp_toggle(name, harness, enabled):
-    spec = _mcp_spec(name)
-    if spec is None:
-        return 2
+    # opencode/codex toggle an existing entry in place, so managed servers
+    # (engram/brave-cdp) work here even without a tools.toml spec; the
+    # add-on-enable formats (claude/cursor/gemini) do need the catalog.
+    spec = load_catalog().get("mcp", {}).get(name)
     for h, target in _mcp_selected(harness).items():
         state = mcp_state(h, target, name)
         if h in ("opencode", "codex"):
-            if state == "absent" and h == "opencode" and name not in MANAGED_MCP:
+            if state == "absent":
                 print(f"MCP_ABSENT {name} harness={h} (primero --mcp-add)")
                 continue
             mcp_write(h, target, name, enabled=enabled)
         else:
             # No disable flag in these formats: on == present, off == removed.
             if enabled and state == "absent":
+                if spec is None:
+                    print(f"MCP_UNKNOWN {name} harness={h} — agregalo en tools.toml para poder encenderlo acá")
+                    continue
                 mcp_write(h, target, name, spec=spec)
             elif not enabled and state != "absent":
                 mcp_write(h, target, name, remove=True)
@@ -549,7 +585,15 @@ def cmd_mcp_toggle(name, harness, enabled):
 
 
 def cmd_mcp_remove(name, harness=None):
-    for h, target in _mcp_selected(harness).items():
+    targets = _mcp_selected(harness)
+    known = name in load_catalog().get("mcp", {}) or any(
+        mcp_state(h, target, name) != "absent" for h, target in targets.items()
+    )
+    if not known:
+        # A typo must never delete a user's own unrelated server.
+        print(f"MCP_UNKNOWN {name} — no está en el catálogo ni configurado en ningún harness")
+        return 2
+    for h, target in targets.items():
         if h == "opencode" and name in MANAGED_MCP:
             print(f"MCP_MANAGED {name} harness=opencode — no se remueve un server gestionado")
             continue
@@ -577,7 +621,7 @@ def cmd_plugin_set(name, enabled):
     if name == "engram@engram":
         print("PLUGIN_MANAGED engram@engram — la política del repo lo fuerza apagado en cada install")
         return 1
-    data = read_json(claude_settings_path())
+    data = read_json_for_write(claude_settings_path())
     data.setdefault("enabledPlugins", {})[name] = enabled
     atomic_write(claude_settings_path(), json.dumps(data, indent=2) + "\n")
     print(f"PLUGIN_SET {name} enabled={'true' if enabled else 'false'}")
@@ -661,14 +705,16 @@ def menu():
         print("[8] ⏻  Salir")
         choice = input("> ").strip()
         if choice == "1":
-            run_tty([str(ROOT / "install.sh")])
+            if run_tty([str(ROOT / "install.sh")]) != 0:
+                print(color("El instalador terminó con error — revisá la salida de arriba.", "31"))
             drift = drift_state()
         elif choice == "2":
-            cmd_update()
-            update_badge = "al día"
+            if cmd_update() == 0:
+                update_badge = "al día"
             drift = drift_state()
         elif choice == "3":
-            run_tty([str(ROOT / "setup-models.sh")])
+            if run_tty([str(ROOT / "setup-models.sh")]) != 0:
+                print(color("El wizard terminó con error — revisá la salida de arriba.", "31"))
             drift = drift_state()
         elif choice == "4":
             tools_menu()

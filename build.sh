@@ -67,7 +67,7 @@ case "$MODE" in
       rm -rf "$ROOT/Global/$harness"
       cp -a "$STAGING/$harness" "$ROOT/Global/$harness"
     done
-    echo "Generated tracked artifacts for ${PROFILE:-$(<"$ROOT/active-profile")}."
+    echo "Generated tracked artifacts for ${PROFILE:-$(cat "$ROOT/active-profile" 2>/dev/null || echo go-zen)}."
     ensure_drift_hook
     ;;
   install)

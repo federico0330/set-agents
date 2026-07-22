@@ -27,6 +27,7 @@ el acceso, la próxima actualización de esa persona falla — así de simple.
 ### Linux / macOS / WSL
 
 ```bash
+# si no tenés gh: pacman -S github-cli / apt install gh / brew install gh
 gh auth login                                        # una vez
 gh repo clone federico0330/SET-AGENTS ~/SET-AGENTS
 cd ~/SET-AGENTS && ./set-agents                      # menú → [1] Instalar
@@ -51,9 +52,10 @@ Detalle completo por sistema en [INSTALACION.md](INSTALACION.md).
 2. **Posiblemente un reinicio** — si Windows lo pide, reiniciá tranquilo: el instalador
    queda registrado para **continuar solo** cuando volvés a iniciar sesión.
 3. **Tu usuario de Linux se crea automáticamente** (mismo nombre que tu usuario de Windows,
-   en minúsculas) — sin pantallas de configuración. Queda **sin contraseña y con sudo sin
-   password dentro de WSL** para que la instalación no te interrumpa. Si preferís cerrarlo
-   después: `passwd` para ponerle contraseña y `sudo rm /etc/sudoers.d/set-agents`.
+   en minúsculas) — sin pantallas de configuración. Queda con **sudo sin password SOLO para
+   instalar paquetes** (`apt`/`pacman`) dentro de WSL; cualquier otro sudo requiere root
+   (`wsl -u root`). Para revertirlo: `wsl -u root -- rm /etc/sudoers.d/set-agents` y
+   `wsl -u root -- passwd <tu-usuario>` para ponerle contraseña.
 4. **Una ventana del navegador para iniciar sesión en GitHub** (`gh auth login`) — este es
    el control de acceso real; necesitás estar invitado al repo.
 5. Al final tenés el comando **`set-agents`** disponible en cmd y PowerShell (abrí una
@@ -84,6 +86,12 @@ Detalle completo por sistema en [INSTALACION.md](INSTALACION.md).
 Al abrir `set-agents`, la app chequea el repo: si hay novedades las muestra y las aplica
 sola (siempre con backup y rollback automático ante fallas). Nunca toca un repo con
 cambios locales sin commitear. Para desactivarlo: `set-agents --auto-update off`.
+
+**Modelo de confianza, sin vueltas**: el auto-update ejecuta lo que esté en `main` del repo
+privado — solo Federico tiene acceso de escritura; los invitados son solo-lectura. Los CLIs
+(opencode/claude/codex, gcloud) se instalan con sus instaladores oficiales vía
+`curl | bash` sin pinning de versión: es el mecanismo oficial de cada vendor y se acepta
+ese riesgo a cambio de recibir siempre la última versión.
 
 ## El menú
 

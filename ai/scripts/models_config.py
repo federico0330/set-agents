@@ -33,6 +33,9 @@ SUBSCRIPTION_BY_PREFIX = {
     "ollama": "ollama",
 }
 OPENCODE_MODEL_RE = re.compile(r"[a-z0-9][a-z0-9-]*/[A-Za-z0-9][A-Za-z0-9._:-]*")
+# Single source of truth for the repo-managed MCP servers (installer smoke
+# check, drift, and the set-agents MCP catalog all import this).
+MANAGED_MCP = ("engram", "context7", "playwright", "brave-cdp")
 _OPENCODE_FAMILY_SUFFIX = re.compile(r"(?:-mini|-flash-free|-code-free)$")
 
 EMIT_HEADER = (
@@ -44,6 +47,14 @@ EMIT_HEADER = (
 
 class ModelsError(ValueError):
     pass
+
+
+def active_profile():
+    """Per-machine lane selection; untracked, so a fresh clone defaults to go-zen."""
+    try:
+        return (ROOT / "active-profile").read_text().strip() or "go-zen"
+    except OSError:
+        return "go-zen"
 
 
 def die(message):

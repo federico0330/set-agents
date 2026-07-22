@@ -365,7 +365,7 @@ def generate(out, profile, roles_path=None, models_path=None):
 
 
 def validate(out, roles=None):
-    roles = roles or load_roles((ROOT / "active-profile").read_text().strip())
+    roles = roles or load_roles(models_config.active_profile())
     json.loads((out / "opencode/opencode.json").read_text())
     json.loads((out / "claude-code/settings.overlay.json").read_text())
     for path in (out / "codex/agents").glob("*.toml"):
@@ -398,7 +398,7 @@ def main():
     parser.add_argument("--roles")
     parser.add_argument("--models")
     args = parser.parse_args()
-    profile = args.profile or (ROOT / "active-profile").read_text().strip()
+    profile = args.profile or models_config.active_profile()
     try:
         generate(Path(args.output), profile, args.roles, args.models)
     except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:

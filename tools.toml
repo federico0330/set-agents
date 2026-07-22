@@ -11,9 +11,9 @@
 
 [cli.supabase]
 detect = "supabase"
+# npm global install is blocked by the package's own postinstall — brew or binary only.
 [cli.supabase.install]
 brew = "brew install supabase/tap/supabase"
-npm = "npm install -g supabase"
 doc = "https://supabase.com/docs/guides/local-development/cli/getting-started"
 
 [cli.vercel]
@@ -38,7 +38,7 @@ doc = "https://cli.github.com"
 
 [cli.docker]
 detect = "docker"
-note = "después de instalar: sudo systemctl enable --now docker && sudo usermod -aG docker $USER"
+note = "después de instalar: sudo systemctl enable --now docker && sudo usermod -aG docker $USER (ojo: el grupo docker equivale a root). En WSL requiere systemd ([boot] systemd=true en /etc/wsl.conf + wsl --shutdown) o usar Docker Desktop de Windows."
 [cli.docker.install]
 pacman = "sudo pacman -S --needed --noconfirm docker"
 apt = "sudo apt-get install -y docker.io"

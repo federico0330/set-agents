@@ -9,9 +9,13 @@ import os
 import re
 import subprocess
 import shutil
+import sys
 import tempfile
 import tomllib
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from models_config import MANAGED_MCP
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--staging", required=True)
@@ -62,8 +66,10 @@ def merged_json(current, overlay, union_lists=False):
         for key, value in update.items():
             if isinstance(value, list):
                 result[key] = sorted(set(base.get(key, [])) | set(value))
-    # Tracked templates stay machine-independent; the live config gets this repo's root.
-    return (json.dumps(result, indent=2) + "\n").replace("__SET_AGENTS_ROOT__", str(REPO_ROOT))
+    # Tracked templates stay machine-independent; the live config gets this repo's
+    # root, JSON-escaped so a clone path with quotes/backslashes can't break the file.
+    escaped_root = json.dumps(str(REPO_ROOT))[1:-1]
+    return (json.dumps(result, indent=2) + "\n").replace("__SET_AGENTS_ROOT__", escaped_root)
 
 
 def managed_files():
@@ -124,9 +130,6 @@ def legacy_prompt_bytes(relative):
 
 def roster_codex_orchestrator():
     """Session-level model/effort for Codex come from the orchestrator area in models.toml."""
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
     import models_config
 
     return models_config.codex_orchestrator()
@@ -278,8 +281,14 @@ if args.preview:
     raise SystemExit(0)
 
 stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S_%f")
-backup = home / ".local/state/set-agentes/backups" / stamp
+backups_root = home / ".local/state/set-agentes/backups"
+backup = backups_root / stamp
 backup.mkdir(parents=True, exist_ok=False)
+# Backups can hold user configs (possibly with keys): keep them private and bounded.
+os.chmod(backups_root, 0o700)
+os.chmod(backups_root.parent, 0o700)
+for old in sorted(backups_root.iterdir())[:-20]:
+    shutil.rmtree(old, ignore_errors=True)
 affected = [target for _, target in files] + [target for _, target in specials] + legacy + orphans
 missing = []
 for target in affected:
@@ -323,8 +332,7 @@ try:
     if "opencode" in targets:
         oc = json.loads((targets["opencode"] / "opencode.json").read_text())
         # Only the managed servers must land disabled; user-added MCPs are theirs to run.
-        managed_mcp = {"engram", "context7", "playwright", "brave-cdp"}
-        if any(item.get("enabled") for name, item in oc.get("mcp", {}).items() if name in managed_mcp):
+        if any(item.get("enabled") for name, item in oc.get("mcp", {}).items() if name in MANAGED_MCP):
             raise RuntimeError("OpenCode MCP smoke check failed")
     if "claude-code" in targets:
         cc = json.loads((targets["claude-code"] / "settings.json").read_text())

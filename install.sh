@@ -39,8 +39,8 @@ confirm() {
   # Honors --yes. For anything that does NOT involve sudo.
   [ "$YES" -eq 1 ] && return 0
   local answer
-  read -r -p "$1 [y/N] " answer
-  case "$answer" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+  read -r -p "$1 [s/N] " answer
+  case "$answer" in y|Y|yes|YES|s|S|si|SI|sí) return 0 ;; *) return 1 ;; esac
 }
 
 confirm_sudo() {
@@ -48,8 +48,8 @@ confirm_sudo() {
   local answer
   echo "Se necesita privilegio de administrador para:"
   echo "    $1"
-  read -r -p "¿Ejecutar ese comando? [y/N] " answer
-  case "$answer" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+  read -r -p "¿Ejecutar ese comando? [s/N] " answer
+  case "$answer" in y|Y|yes|YES|s|S|si|SI|sí) return 0 ;; *) return 1 ;; esac
 }
 
 # ---------------------------------------------------------------- detect_os

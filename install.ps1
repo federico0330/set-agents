@@ -31,7 +31,8 @@ $env:WSL_UTF8 = "1"  # sane wsl.exe output encoding (WSL >= 0.64)
 Write-Host "SET-AGENTS para Windows — esto es lo que vas a ver (detalle: README.md):"
 Write-Host "  1) puede aparecer un diálogo de administrador (UAC) → hacé clic en 'Sí'"
 Write-Host "  2) puede pedir un reinicio → la instalación se reanuda sola al volver"
-Write-Host "  3) tu usuario de Linux se crea automáticamente (sin pantallas de setup)"
+Write-Host "  3) tu usuario de Linux se crea automáticamente, con sudo sin password"
+Write-Host "     SOLO para instalar paquetes (apt/pacman) dentro de WSL — reversible, ver README.md"
 Write-Host "  4) una ventana del navegador para iniciar sesión en GitHub"
 Write-Host ""
 
@@ -78,9 +79,13 @@ function Initialize-DistroUser($TargetDistro) {
     }
     $user = ($env:USERNAME.ToLower() -replace '[^a-z0-9]', '')
     if (-not $user) { $user = "agente" }
+    # wsl.conf is APPENDED to (Ubuntu ships [boot] systemd=true there — clobbering
+    # it would silently kill systemd). NOPASSWD is scoped to package managers only:
+    # the bootstrap needs apt/pacman, nothing else runs sudo unattended.
     $setup = "id -u $user >/dev/null 2>&1 || useradd -m -s /bin/bash $user; " +
-             "printf '[user]\ndefault=%s\n' $user > /etc/wsl.conf; " +
-             "echo '$user ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/set-agents; " +
+             "touch /etc/wsl.conf; " +
+             "grep -q '^\[user\]' /etc/wsl.conf || printf '\n[user]\ndefault=%s\n' $user >> /etc/wsl.conf; " +
+             "echo '$user ALL=(ALL) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/pacman' > /etc/sudoers.d/set-agents; " +
              "chmod 440 /etc/sudoers.d/set-agents"
     & wsl.exe -d $TargetDistro -u root -- bash -c $setup
     if ($LASTEXITCODE -ne 0) {
@@ -90,6 +95,10 @@ function Initialize-DistroUser($TargetDistro) {
     & wsl.exe --terminate $TargetDistro 2>$null
     Write-Host "PS_OK linux-user ($user)"
 }
+
+# A RunOnce left behind by an interrupted run must not fire by surprise later:
+# clear it on entry, re-register only right before an install that may reboot.
+if (-not $DryRun) { Remove-AutoResume }
 
 # ------------------------------------------------------------------ 1. WSL
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
@@ -183,7 +192,13 @@ if ($DryRun) {
     Write-Host "PS_PLAN shim ($shim + PATH de usuario)"
 } else {
     New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
-    Copy-Item -Force (Join-Path $PSScriptRoot "set-agents.cmd") $shim
+    # Generated (not copied) so it pins the chosen distro and passes args safely:
+    # \" survives wsl.exe's MSVCRT parsing and "$@" re-expands each cmd arg in bash.
+    $shimLine = 'wsl -d ' + $Distro + ' -e bash -lc "\"$HOME/SET-AGENTS/set-agents\" \"$@\"" set-agents %*'
+    $shimBody = "@echo off`r`n" +
+        "rem set-agents shim (generado por install.ps1): el harness vive dentro de WSL.`r`n" +
+        $shimLine + "`r`n"
+    Set-Content -Path $shim -Value $shimBody -Encoding ASCII
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -notlike "*$shimDir*") {
         [Environment]::SetEnvironmentVariable("Path", "$userPath;$shimDir", "User")

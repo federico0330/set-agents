@@ -26,3 +26,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 node_modules/
+
+# Per-machine selection (each machine picks its own opencode lane)
+active-profile
+
+# Obsidian workspace and MCP session dumps
+.obsidian/
+.playwright-mcp/

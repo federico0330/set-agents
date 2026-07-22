@@ -10,8 +10,9 @@ on:
 jobs:
   verify-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # legacy-prompt detection walks git history
       - name: verify.sh (full gate)
@@ -20,8 +21,9 @@ jobs:
   # Real macOS: validates the BSD/bash-3.2 portability fixes on every push.
   verify-macos:
     runs-on: macos-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # legacy-prompt detection walks git history
       - name: verify.sh (full gate)
@@ -29,8 +31,9 @@ jobs:
 
   windows-bootstrap:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Parse install.ps1
         shell: pwsh
         run: $null = [ScriptBlock]::Create((Get-Content -Raw install.ps1))
