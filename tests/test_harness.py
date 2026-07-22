@@ -870,7 +870,12 @@ class HarnessTests(unittest.TestCase):
             claude_settings = home / ".claude/settings.json"
             claude_settings.write_text(json.dumps({"enabledPlugins": {"custom@local": True, "engram@engram": True}}))
             oc_settings = home / ".config/opencode/opencode.json"
-            oc_settings.write_text(json.dumps({"plugin": ["custom"], "mcp": {"playwright": {"enabled": True}}}))
+            oc_settings.write_text(json.dumps({
+                "plugin": ["custom"],
+                # playwright is managed (must land disabled); supabase is the user's own
+                # server and must survive the install still enabled.
+                "mcp": {"playwright": {"enabled": True}, "supabase": {"type": "local", "enabled": True}},
+            }))
             (home / ".codex/config.toml").write_text('[agents]\nmax_threads = 9\n\n[mcp_servers.playwright]\ncommand = "npx"\nenabled = true\n')
             run("./build.sh", "--output", staging_dir)
             run("python3", "ai/scripts/install.py", "--staging", staging_dir, "--home", td)
@@ -878,6 +883,9 @@ class HarnessTests(unittest.TestCase):
             self.assertTrue(json.loads(claude_settings.read_text())["enabledPlugins"]["custom@local"])
             self.assertFalse(json.loads(claude_settings.read_text())["enabledPlugins"]["engram@engram"])
             self.assertEqual(json.loads(oc_settings.read_text())["plugin"], ["custom"])
+            oc_mcp = json.loads(oc_settings.read_text())["mcp"]
+            self.assertFalse(oc_mcp["playwright"]["enabled"])
+            self.assertTrue(oc_mcp["supabase"]["enabled"], "user MCP must stay enabled and not fail smoke")
             codex_config = tomllib.loads((home / ".codex/config.toml").read_text())
             self.assertTrue(codex_config["features"]["multi_agent"])
             self.assertEqual(codex_config["agents"]["max_depth"], 1)

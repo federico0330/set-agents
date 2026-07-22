@@ -102,7 +102,7 @@
     "brave-cdp": {
       "type": "local",
       "command": [
-        "/home/federico/SET-AGENTES/PROYECTO/ai/scripts/brave-cdp-mcp.sh",
+        "/home/federico/SET-AGENTS/PROYECTO/ai/scripts/brave-cdp-mcp.sh",
         "run-mcp"
       ],
       "enabled": false

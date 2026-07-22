@@ -318,7 +318,9 @@ try:
 
     if "opencode" in targets:
         oc = json.loads((targets["opencode"] / "opencode.json").read_text())
-        if any(item.get("enabled") for item in oc.get("mcp", {}).values()):
+        # Only the managed servers must land disabled; user-added MCPs are theirs to run.
+        managed_mcp = {"engram", "context7", "playwright", "brave-cdp"}
+        if any(item.get("enabled") for name, item in oc.get("mcp", {}).items() if name in managed_mcp):
             raise RuntimeError("OpenCode MCP smoke check failed")
     if "claude-code" in targets:
         cc = json.loads((targets["claude-code"] / "settings.json").read_text())
