@@ -84,6 +84,49 @@ class HarnessTests(unittest.TestCase):
             with self.subTest(script=str(script.relative_to(ROOT))):
                 run("bash", "-n", str(script))
 
+    def _bootstrap_env(self, td, tools):
+        """Fake HOME + stub PATH (stubs first, system dirs for bash/coreutils)."""
+        stubs = Path(td) / "stubs"
+        stubs.mkdir(exist_ok=True)
+        for tool in tools:
+            stub = stubs / tool
+            stub.write_text("#!/bin/sh\necho stub-1.0\n")
+            stub.chmod(0o755)
+        home = Path(td) / "home"
+        home.mkdir(exist_ok=True)
+        return {"PATH": f"{stubs}:/usr/bin:/bin", "HOME": str(home)}, stubs
+
+    def test_install_sh_dry_run_plans_missing_tools(self):
+        with tempfile.TemporaryDirectory() as td:
+            # Virgin machine: base deps come from /usr/bin, agent CLIs are absent.
+            env, _ = self._bootstrap_env(td, ())
+            result = run("bash", "install.sh", "--dry-run", env=env)
+            for cli in ("opencode", "claude", "codex"):
+                self.assertIn(f"BOOTSTRAP_PLAN {cli}", result.stdout)
+                self.assertIn(f"AUTH_NEEDED {cli}", result.stdout)
+            self.assertIn("BOOTSTRAP_PLAN repo-config", result.stdout)
+            self.assertIn("BOOTSTRAP_DONE", result.stdout)
+            # Fully provisioned machine: everything is a skip, nothing planned.
+            env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex"))
+            result = run("bash", "install.sh", "--dry-run", env=env)
+            for cli in ("opencode", "claude", "codex"):
+                self.assertIn(f"BOOTSTRAP_SKIP {cli}", result.stdout)
+                self.assertNotIn(f"BOOTSTRAP_PLAN {cli}", result.stdout)
+            self.assertIn("BOOTSTRAP_DONE", result.stdout)
+
+    def test_install_sh_dry_run_never_touches_network(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, stubs = self._bootstrap_env(td, ())
+            sentinel = Path(td) / "curl-was-called"
+            curl = stubs / "curl"
+            # --version is a local probe, anything else means a network fetch.
+            curl.write_text(
+                f'#!/bin/sh\ncase "$1" in --version) echo stub-curl-1.0;; *) touch {sentinel};; esac\n'
+            )
+            curl.chmod(0o755)
+            run("bash", "install.sh", "--dry-run", env=env)
+            self.assertFalse(sentinel.exists())
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
