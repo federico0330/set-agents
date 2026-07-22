@@ -2,6 +2,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import time
 import tomllib
@@ -92,6 +93,11 @@ class HarnessTests(unittest.TestCase):
             stub = stubs / tool
             stub.write_text("#!/bin/sh\necho stub-1.0\n")
             stub.chmod(0o755)
+        # Keep the SAME interpreter under the constrained PATH: on macOS
+        # /usr/bin/python3 is the old CLT one (no tomllib) and would crash the app.
+        python_link = stubs / "python3"
+        if not python_link.exists():
+            python_link.symlink_to(sys.executable)
         home = Path(td) / "home"
         home.mkdir(exist_ok=True)
         return {"PATH": f"{stubs}:/usr/bin:/bin", "HOME": str(home)}, stubs
