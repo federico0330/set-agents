@@ -38,8 +38,13 @@ endpoint_ready() {
 
 pid_is_our_brave() {
   local pid="$1" profile="$2" cmdline
-  [ -r "/proc/${pid}/cmdline" ] || return 1
-  cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline")"
+  if [ -r "/proc/${pid}/cmdline" ]; then
+    cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline")"
+  else
+    # macOS/BSD: no /proc — ps exposes the full command line.
+    cmdline="$(ps -p "$pid" -o command= 2>/dev/null)" || return 1
+    [ -n "$cmdline" ] || return 1
+  fi
   [[ "$cmdline" == *"--remote-debugging-address=${CDP_HOST}"* ]] && \
     [[ "$cmdline" == *"--remote-debugging-port=${CDP_PORT}"* ]] && \
     [[ "$cmdline" == *"--user-data-dir=${profile}"* ]]

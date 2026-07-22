@@ -64,7 +64,15 @@ detect_os() {
         echo "AVISO: falta Homebrew. Instalalo desde https://brew.sh y volvé a correr ./install.sh"
       fi
       ;;
+    MINGW*|MSYS*|CYGWIN*)
+      echo "Windows detectado (git-bash). El harness corre dentro de WSL:"
+      echo "    abrí PowerShell y ejecutá  .\\install.ps1  desde este mismo directorio."
+      exit 2
+      ;;
     Linux)
+      if grep -qi microsoft /proc/version 2>/dev/null; then
+        echo "AVISO: WSL detectado — perfecto, el harness corre acá como en cualquier Linux."
+      fi
       local ids=""
       if [ -r /etc/os-release ]; then
         ids="$(. /etc/os-release 2>/dev/null; echo "${ID:-} ${ID_LIKE:-}")"

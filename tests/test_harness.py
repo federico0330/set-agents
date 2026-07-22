@@ -464,6 +464,26 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("PLUGIN_MANAGED", result.stdout)
 
+    def test_set_agents_launcher_resolves_symlink_without_readlink_f(self):
+        # macOS has no `readlink -f`: the launcher must resolve its own symlink chain.
+        with tempfile.TemporaryDirectory() as td:
+            link = Path(td) / "bin" / "set-agents"
+            link.parent.mkdir()
+            link.symlink_to(ROOT / "set-agents")
+            env = {"SET_AGENTS_STATE": str(Path(td) / "state")}
+            result = run("bash", str(link), "--status", env=env)
+            self.assertIn("APP_STATUS", result.stdout)
+
+    def test_install_sh_redirects_windows_gitbash_to_ps1(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, stubs = self._bootstrap_env(td, ())
+            uname = stubs / "uname"
+            uname.write_text('#!/bin/sh\necho MINGW64_NT-10.0-19045\n')
+            uname.chmod(0o755)
+            result = run("bash", "install.sh", "--dry-run", env=env, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("install.ps1", result.stdout)
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",

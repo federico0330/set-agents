@@ -36,7 +36,7 @@ mkdir -p "$EVIDENCE_DIR"
 EVIDENCE_FILE="$EVIDENCE_DIR/e2e-$(date +%Y%m%d-%H%M%S).md"
 {
   echo "# E2E runtime QA — ${TASK_ID}"
-  echo "- date: $(date -Is)"
+  echo "- date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   echo "- browser mode: ${BROWSER_MODE}"
   echo ""
 } > "$EVIDENCE_FILE"
