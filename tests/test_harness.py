@@ -616,6 +616,56 @@ class HarnessTests(unittest.TestCase):
             feature = (root / "docs/notas/features/feat-x.md").read_text()
             self.assertIn("SQLite y no Postgres", feature)
 
+    def test_vault_init_seeds_company_vault(self):
+        with tempfile.TemporaryDirectory() as td:
+            env = {"SET_AGENTS_STATE": str(Path(td) / "state")}
+            company = Path(td) / "empresa"
+            result = run("bash", "set-agents", "--vault-init", str(company), "--company", "IEY", env=env)
+            self.assertIn("VAULT_INIT_OK", result.stdout)
+            hub = company / "obsidian/00 - INICIO.md"
+            for section in ("## Rol", "## Forma de trabajo", "## Entrega de resultados", "## Qué falta por proyecto"):
+                self.assertIn(section, hub.read_text())
+            self.assertTrue((company / "obsidian/IEY/contexto.md").exists())
+            self.assertTrue((company / "obsidian/Proyectos").is_dir())
+            # Re-run never clobbers manual edits.
+            hub.write_text(hub.read_text().replace("_TODO: quién sos", "Soy el dev principal"))
+            result = run("bash", "set-agents", "--vault-init", str(company), "--company", "IEY", env=env)
+            self.assertIn("VAULT_INIT_SKIP", result.stdout)
+            self.assertIn("Soy el dev principal", hub.read_text())
+
+    def test_vault_link_creates_seed_and_symlink(self):
+        with tempfile.TemporaryDirectory() as td:
+            env = {"SET_AGENTS_STATE": str(Path(td) / "state")}
+            company = Path(td) / "empresa"
+            run("bash", "set-agents", "--vault-init", str(company), env=env)
+            project = company / "mi-app"
+            project.mkdir()
+            result = run("bash", "set-agents", "--vault-link", str(project), env=env)
+            self.assertIn("VAULT_LINK_OK", result.stdout)
+            seed = project / "docs/notas/00 - Proyecto.md"
+            self.assertIn("notas:auto", seed.read_text())
+            link = company / "obsidian/Proyectos/mi-app"
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(link.resolve(), seed.parent.resolve())
+            result = run("bash", "set-agents", "--vault-link", str(project), env=env)
+            self.assertIn("VAULT_LINK_SKIP", result.stdout)
+            # A link pointing elsewhere is never clobbered.
+            other = Path(td) / "otro"
+            other.mkdir()
+            link.unlink()
+            link.symlink_to(other)
+            result = run("bash", "set-agents", "--vault-link", str(project), env=env, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("VAULT_LINK_CONFLICT", result.stdout)
+            # End to end with the notes engine: a real feature renders through the symlink.
+            link.unlink()
+            link.symlink_to(seed.parent)
+            state = project / "ai/state/features/feat-v.json"
+            state.parent.mkdir(parents=True)
+            run("python3", str(FEATURE_STATE), "init", "feat-v", "spec.md", "h",
+                "--state-file", str(state), "--ac", "AC-1")
+            self.assertIn("[[features/feat-v|feat-v]]", (link / "00 - Proyecto.md").read_text())
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",

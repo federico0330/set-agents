@@ -602,6 +602,123 @@ def cmd_mcp_remove(name, harness=None):
     return 0
 
 
+# --------------------------------------------------------------------- vault
+# Company-level Obsidian vault: one graph per company/client. Project notes
+# live INSIDE each repo (docs/notas/, versioned, auto-rendered by
+# feature-state.py) and join the vault through a symlink under Proyectos/.
+
+VAULT_HUB = "00 - INICIO.md"
+
+
+def vault_seed_hub(company):
+    return (
+        f"# {company} — INICIO\n\n"
+        "_La nota del café: abrila a la mañana y navegá desde acá._\n\n"
+        "## Rol\n\n_TODO: quién sos en esta empresa/cliente y qué se espera de vos._\n\n"
+        "## Forma de trabajo\n\n_TODO: cómo querés que los agentes trabajen acá "
+        "(prioridades, estilo, límites, qué preguntar y qué no)._\n\n"
+        "## Entrega de resultados\n\n_TODO: formato y tono en que querés los resultados "
+        "(resumen ejecutivo primero, evidencia después, etc.)._\n\n"
+        "## Qué falta por proyecto\n\n"
+        "Cada proyecto linkeado mantiene su propio hub con la sección «Qué falta»:\n\n"
+        "_(los proyectos aparecen acá abajo a medida que los linkees)_\n"
+    )
+
+
+def cmd_vault_init(target, company=None):
+    target = Path(target).expanduser()
+    company = company or target.resolve().name.upper()
+    vault = target / "obsidian"
+    seeds = {
+        vault / VAULT_HUB: vault_seed_hub(company),
+        vault / company / "contexto.md": (
+            f"# {company} — contexto\n\n_TODO: contexto general de la empresa/cliente que "
+            "cualquier agente debería conocer antes de trabajar en sus proyectos._\n"
+        ),
+    }
+    created = False
+    for path, content in seeds.items():
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+            print(f"VAULT_CREATED {path.relative_to(target)}")
+            created = True
+    projects = vault / "Proyectos"
+    if not projects.exists():
+        projects.mkdir(parents=True)
+        created = True
+    print(f"{'VAULT_INIT_OK' if created else 'VAULT_INIT_SKIP'} dir={vault}")
+    return 0
+
+
+def find_vault(project, explicit=None):
+    if explicit:
+        vault = Path(explicit).expanduser()
+        return vault if (vault / VAULT_HUB).exists() else None
+    for ancestor in Path(project).resolve().parents:
+        candidate = ancestor / "obsidian"
+        if (candidate / VAULT_HUB).exists():
+            return candidate
+    configured = app_config().get("vault")
+    if configured and (Path(configured).expanduser() / VAULT_HUB).exists():
+        return Path(configured).expanduser()
+    return None
+
+
+def cmd_vault_link(project, vault=None):
+    project = Path(project).expanduser().resolve()
+    if not project.is_dir():
+        print(f"VAULT_NOT_FOUND proyecto inexistente: {project}")
+        return 2
+    target_vault = find_vault(project, vault)
+    if target_vault is None:
+        print("VAULT_NOT_FOUND: no hay obsidian/00 - INICIO.md en los ancestros; corré --vault-init o pasá --vault")
+        return 2
+    notes = project / "docs" / "notas"
+    seed = notes / "00 - Proyecto.md"
+    if not seed.exists():
+        notes.mkdir(parents=True, exist_ok=True)
+        # feature-state.py regenerates the auto block; this seed adds the manual frame.
+        seed.write_text(
+            f"# {project.name} — notas\n\n"
+            "<!-- notas:auto -->\n_Se completa solo con la primera mutación de estado "
+            "(o corré `python3 ai/scripts/feature-state.py sync-notes`)._\n<!-- /notas:auto -->\n\n"
+            "## Notas propias\n\n_Qué es este proyecto, contexto, links útiles — esto no se pisa._\n"
+        )
+        print(f"VAULT_CREATED {seed}")
+    link = target_vault / "Proyectos" / project.name
+    if link.is_symlink():
+        if link.resolve() == notes.resolve():
+            print(f"VAULT_LINK_SKIP project={project.name} vault={target_vault}")
+            return 0
+        print(f"VAULT_LINK_CONFLICT {link} ya apunta a {link.resolve()} — resolvelo a mano")
+        return 1
+    if link.exists():
+        print(f"VAULT_LINK_CONFLICT {link} existe y no es symlink — resolvelo a mano")
+        return 1
+    link.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        relative = os.path.relpath(notes, link.parent)
+        link.symlink_to(relative)
+    except OSError as exc:
+        print(f"VAULT_LINK_CONFLICT no pude crear el symlink: {exc}")
+        return 1
+    print(f"VAULT_LINK_OK project={project.name} vault={target_vault}")
+    return 0
+
+
+def vault_menu():
+    print()
+    print("El vault de empresa junta las notas de todos tus proyectos en un solo grafo Obsidian.")
+    target = input("Directorio de la empresa (ej ~/iey; Enter vuelve): ").strip()
+    if not target:
+        return
+    cmd_vault_init(target)
+    project = input("¿Linkear un proyecto ahora? (path, Enter salta): ").strip()
+    if project:
+        cmd_vault_link(project, str(Path(target).expanduser() / "obsidian"))
+
+
 # ------------------------------------------------------------------- plugins
 
 def claude_settings_path():
@@ -703,6 +820,7 @@ def menu():
         print("[6] 🧩 Plugins Claude Code")
         print("[7] 📊 Estado")
         print("[8] ⏻  Salir")
+        print("[9] 🗒  Vault Obsidian")
         choice = input("> ").strip()
         if choice == "1":
             if run_tty([str(ROOT / "install.sh")]) != 0:
@@ -730,6 +848,8 @@ def menu():
                 set_auto_update(not auto_update_enabled())
         elif choice == "8":
             return 0
+        elif choice == "9":
+            vault_menu()
 
 
 def main():
@@ -756,6 +876,10 @@ def main():
     parser.add_argument("--plugins", action="store_true")
     parser.add_argument("--plugin-on", metavar="NAME")
     parser.add_argument("--plugin-off", metavar="NAME")
+    parser.add_argument("--vault-init", metavar="DIR", help="crea el vault Obsidian de la empresa en DIR/obsidian")
+    parser.add_argument("--vault-link", metavar="PROYECTO", help="linkea docs/notas del proyecto al vault")
+    parser.add_argument("--vault", metavar="DIR", help="vault explícito para --vault-link")
+    parser.add_argument("--company", metavar="NAME")
     args = parser.parse_args()
 
     if args.status:
@@ -787,6 +911,10 @@ def main():
         return cmd_plugin_set(args.plugin_on, True)
     if args.plugin_off:
         return cmd_plugin_set(args.plugin_off, False)
+    if args.vault_init:
+        return cmd_vault_init(args.vault_init, args.company)
+    if args.vault_link:
+        return cmd_vault_link(args.vault_link, args.vault)
     if not sys.stdin.isatty():
         parser.print_help()
         return 2

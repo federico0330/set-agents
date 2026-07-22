@@ -47,6 +47,14 @@ FILES = {
         "(`Draft`), aprobar (`Aprobado`), integrar (`Shippeado`), o superar (`Superado por <id>`) un spec.\n\n"
         "| ID | Título | Estado | Fecha |\n|---|---|---|---|\n"
     ),
+    "docs/notas/00 - Proyecto.md": (
+        "# Notas del proyecto\n\n"
+        "<!-- notas:auto -->\n"
+        "_Se completa solo con la primera mutación de estado (o corré "
+        "`python3 ai/scripts/feature-state.py sync-notes`)._\n"
+        "<!-- /notas:auto -->\n\n"
+        "## Notas propias\n\n_Qué es este proyecto, contexto, links útiles — esto no se pisa._\n"
+    ),
     ".opencode/AGENTS.md": "# Local OpenCode rules\n\nFollow ../../AGENTS.md and delegate deterministic gates.\n",
     ".claude/CLAUDE.md": "# Local Claude rules\n\nFollow ../AGENTS.md and preserve separation of duties.\n",
     ".codex/config.toml": "[agents]\nmax_depth = 1\nmax_threads = 4\n",
