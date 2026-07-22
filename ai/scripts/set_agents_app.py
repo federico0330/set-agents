@@ -25,12 +25,80 @@ MANAGED_MCP = ("engram", "context7", "playwright", "brave-cdp")
 HARNESS_CLIS = ("opencode", "claude", "codex")
 
 
+def use_color():
+    return sys.stdout.isatty() and not os.environ.get("NO_COLOR") and os.environ.get("TERM") != "dumb"
+
+
 def color(text, code):
-    return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
+    return f"\033[{code}m{text}\033[0m" if use_color() else text
 
 
 def bold(text):
     return color(text, "1")
+
+
+def dim(text):
+    return color(text, "2")
+
+
+# --------------------------------------------------------------------- banner
+
+# Two-row half-block wordmark; per-character truecolor gradient cyan -> violet.
+WORDMARK = (
+    "█▀▀ █▀▀ ▀█▀ ▄▄ ▄▀▄ █▀▀ █▀▀ █▄ █ ▀█▀ █▀▀",
+    "▄▄█ █▄▄  █     █▀█ █▄█ █▄▄ █ ▀█  █  ▄▄█",
+)
+GRADIENT = ((0, 229, 255), (167, 80, 255))
+# The app's motif: three agent nodes (one per harness) wired into one system.
+NODES = (("opencode", "38;2;77;208;225"), ("claude", "38;2;217;119;87"), ("codex", "38;2;120;220;120"))
+
+
+def _lerp(t):
+    (r1, g1, b1), (r2, g2, b2) = GRADIENT
+    return (round(r1 + (r2 - r1) * t), round(g1 + (g2 - g1) * t), round(b1 + (b2 - b1) * t))
+
+
+def _gradient_row(row, offset):
+    width = max(1, len(row) - 1)
+    out = []
+    for index, char in enumerate(row):
+        if char == " ":
+            out.append(char)
+            continue
+        r, g, b = _lerp(min(1.0, (index + offset) / width))
+        out.append(f"\033[38;2;{r};{g};{b}m{char}")
+    return "".join(out) + "\033[0m"
+
+
+def banner():
+    if not use_color():
+        print("SET-AGENTS — opencode · claude · codex")
+        return
+    node_rows = [
+        f"  \033[{code}m●\033[0m \033[2m{name:<8}\033[0m" for name, code in NODES
+    ]
+    wire = ["─┐", "─┤", "─┘"]
+    rows = [
+        f"{node_rows[0]}\033[2m{wire[0]}\033[0m   {_gradient_row(WORDMARK[0], 0)}",
+        f"{node_rows[1]}\033[2m{wire[1]}\033[0m   {_gradient_row(WORDMARK[1], 6)}",
+        f"{node_rows[2]}\033[2m{wire[2]}\033[0m   " + dim("un comando · tres agentes · cero drift"),
+    ]
+    print("\n".join(rows))
+
+
+def platform_label():
+    if sys.platform == "darwin":
+        return "macOS"
+    try:
+        if "microsoft" in Path("/proc/version").read_text().lower():
+            return "WSL"
+    except OSError:
+        pass
+    return "Linux"
+
+
+def first_run():
+    return not APP_CONFIG.exists()
 
 
 # ---------------------------------------------------------------- app config
@@ -555,30 +623,53 @@ def run_tty(command):
     return subprocess.run(command, check=False).returncode
 
 
+DRIFT_BADGE = {
+    "ok": lambda: color("OK", "32"),
+    "stale": lambda: color("DESACTUALIZADO", "33"),
+    "unknown": lambda: "?",
+}
+
+
 def menu():
+    print()
+    banner()
+    if first_run():
+        print()
+        print(bold(f"📖 Primera vez acá → leé README.md (sección {platform_label()}) para saber qué esperar."))
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        APP_CONFIG.write_text("auto_update = true\n")
+    print(dim("· chequeando updates…"))
     update_badge = launch_update_check()
+    # Drift regenerates a full staging (~2 s): cache it and refresh only after
+    # actions that can change it, instead of on every redraw.
+    drift = drift_state()
     while True:
-        drift = {"ok": "OK", "stale": color("DESACTUALIZADO", "33"), "unknown": "?"}[drift_state()]
         print()
         print(bold(f"=== SET-AGENTS {short_sha()} ==="))
-        print(f"drift: {drift} | update: {update_badge} | auto-update: {'on' if auto_update_enabled() else 'off'}")
+        print(
+            f"drift: {DRIFT_BADGE[drift]()} | update: {color(update_badge, '36')} | "
+            + dim(f"auto-update: {'on' if auto_update_enabled() else 'off'}")
+        )
         print()
-        print("[1] Instalar / Reparar")
-        print("[2] Actualizar")
-        print("[3] Modelos")
-        print("[4] Herramientas (CLIs)")
-        print("[5] MCPs")
-        print("[6] Plugins Claude Code")
-        print("[7] Estado")
-        print("[8] Salir")
+        print("[1] 📦 Instalar / Reparar")
+        print("[2] 🔄 Actualizar")
+        print("[3] 🧠 Modelos")
+        print("[4] 🧰 Herramientas (CLIs)")
+        print("[5] 🔌 MCPs")
+        print("[6] 🧩 Plugins Claude Code")
+        print("[7] 📊 Estado")
+        print("[8] ⏻  Salir")
         choice = input("> ").strip()
         if choice == "1":
             run_tty([str(ROOT / "install.sh")])
+            drift = drift_state()
         elif choice == "2":
             cmd_update()
             update_badge = "al día"
+            drift = drift_state()
         elif choice == "3":
             run_tty([str(ROOT / "setup-models.sh")])
+            drift = drift_state()
         elif choice == "4":
             tools_menu()
         elif choice == "5":
@@ -586,6 +677,7 @@ def menu():
         elif choice == "6":
             plugins_menu()
         elif choice == "7":
+            drift = drift_state()
             cmd_status(human=True)
             answer = input("auto-update: [t]oggle / Enter para volver: ").strip().lower()
             if answer == "t":
@@ -595,7 +687,11 @@ def menu():
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="set-agents", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="set-agents",
+        description=__doc__,
+        epilog="Primera vez: leé README.md — explica qué vas a ver según tu sistema operativo.",
+    )
     parser.add_argument("--status", action="store_true", help="estado en una línea (APP_STATUS ...)")
     parser.add_argument("--check-update", action="store_true")
     parser.add_argument("--update", action="store_true")

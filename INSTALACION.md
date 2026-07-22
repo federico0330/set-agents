@@ -34,11 +34,14 @@ Recibís `install.ps1` (o lo bajás del repo si ya tenés acceso desde el navega
 .\install.ps1
 ```
 
-El script: instala WSL2+Ubuntu si hace falta (puede pedir Administrador y un reinicio —
-re-ejecutalo después, es resumable), adentro instala git+gh, te guía por el login de GitHub,
-clona el repo y abre la app. Además instala el comando `set-agents` para cmd/PowerShell:
-desde ahí en adelante escribís `set-agents` en cualquier terminal de Windows y listo.
-Los CLIs (opencode/claude/codex) viven dentro de WSL.
+El script hace todo solo: se **auto-eleva** si necesita Administrador (un clic en el UAC),
+instala WSL2+Ubuntu si falta, y si Windows pide reiniciar queda **registrado para continuar
+automáticamente** al volver a iniciar sesión. El **usuario de Linux se crea solo** (sin
+pantallas de configuración; queda con sudo sin password dentro de WSL — reversible, ver
+README.md). Adentro instala git+gh, te guía por el login de GitHub, clona el repo y abre la
+app. Además instala el comando `set-agents` para cmd/PowerShell: desde ahí en adelante
+escribís `set-agents` en cualquier terminal de Windows y listo. Los CLIs
+(opencode/claude/codex) viven dentro de WSL. Qué vas a ver en pantalla: README.md.
 
 `./set-agents` es la puerta de entrada a todo (instala también el comando global
 `set-agents` para usarlo desde cualquier directorio):

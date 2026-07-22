@@ -325,6 +325,7 @@ verify_final() {
   done
 }
 
+echo "Detalle de todo lo que vas a ver paso a paso: README.md"
 detect_os
 ensure_base_deps
 ensure_agent_clis

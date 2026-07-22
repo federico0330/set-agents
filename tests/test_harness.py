@@ -493,7 +493,10 @@ class HarnessTests(unittest.TestCase):
     def test_windows_bootstrap_artifacts(self):
         ps1 = (ROOT / "install.ps1").read_text()
         for marker in ("PS_PLAN", "PS_SKIP", "PS_NEED_ADMIN", "BOOTSTRAP_DONE_WINDOWS",
-                       "gh auth login", "gh repo clone federico0330/SET-AGENTS", "[switch]$DryRun"):
+                       "gh auth login", "gh repo clone federico0330/SET-AGENTS", "[switch]$DryRun",
+                       # invisibility upgrades: self-elevation, reboot auto-resume, auto user
+                       "-Verb RunAs", "RunOnce", "/etc/wsl.conf", "sudoers.d/set-agents",
+                       "README.md"):
             self.assertIn(marker, ps1)
         cmd = (ROOT / "set-agents.cmd").read_text()
         self.assertIn('wsl -e bash -lc "~/SET-AGENTS/set-agents %*"', cmd)
@@ -503,6 +506,22 @@ class HarnessTests(unittest.TestCase):
             # CI's windows job always does this regardless.
             run("pwsh", "-NoProfile", "-Command",
                 f"$null = [ScriptBlock]::Create((Get-Content -Raw '{ROOT / 'install.ps1'}'))")
+
+    def test_readme_covers_all_oses(self):
+        readme = (ROOT / "README.md").read_text()
+        for section in ("Windows", "Linux", "macOS", "WSL", "Qué vas a ver la primera vez",
+                        "UAC", "sudoers.d/set-agents", "gh auth login"):
+            self.assertIn(section, readme)
+        result = run("bash", "set-agents", "--help")
+        self.assertIn("README.md", result.stdout)
+
+    def test_banner_degrades_without_tty(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, _ = self._bootstrap_env(td, ())
+            env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+            for flags in (["--status"], ["--help"], ["--tools"]):
+                result = run("bash", "set-agents", *flags, env=env)
+                self.assertNotIn("\x1b[", result.stdout, f"ANSI leaked into non-TTY output of {flags}")
 
     def test_coordinator_policy(self):
         allowed = [
