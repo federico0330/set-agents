@@ -970,6 +970,16 @@ class HarnessTests(unittest.TestCase):
             oc_mcp = json.loads(oc_settings.read_text())["mcp"]
             self.assertFalse(oc_mcp["playwright"]["enabled"])
             self.assertTrue(oc_mcp["supabase"]["enabled"], "user MCP must stay enabled and not fail smoke")
+            # Installed config must be machine-portable: no placeholder, no federico path,
+            # brave-cdp resolved to THIS repo's root, engram resolved via PATH.
+            raw = oc_settings.read_text()
+            self.assertNotIn("__SET_AGENTS_ROOT__", raw)
+            self.assertNotIn("/home/federico/.local/bin/engram", raw)
+            self.assertEqual(oc_mcp["engram"]["command"][0], "engram")
+            self.assertEqual(
+                oc_mcp["brave-cdp"]["command"][0],
+                str(ROOT / "PROYECTO/ai/scripts/brave-cdp-mcp.sh"),
+            )
             codex_config = tomllib.loads((home / ".codex/config.toml").read_text())
             self.assertTrue(codex_config["features"]["multi_agent"])
             self.assertEqual(codex_config["agents"]["max_depth"], 1)

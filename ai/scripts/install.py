@@ -51,6 +51,9 @@ def deep_merge(base, overlay):
     return result
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 def merged_json(current, overlay, union_lists=False):
     base = json.loads(current.read_text()) if current.exists() else {}
     update = json.loads(overlay.read_text())
@@ -59,7 +62,8 @@ def merged_json(current, overlay, union_lists=False):
         for key, value in update.items():
             if isinstance(value, list):
                 result[key] = sorted(set(base.get(key, [])) | set(value))
-    return json.dumps(result, indent=2) + "\n"
+    # Tracked templates stay machine-independent; the live config gets this repo's root.
+    return (json.dumps(result, indent=2) + "\n").replace("__SET_AGENTS_ROOT__", str(REPO_ROOT))
 
 
 def managed_files():
