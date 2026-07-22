@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -281,6 +282,272 @@ def tools_menu():
         cmd_tools_install(names[int(answer) - 1])
 
 
+# ----------------------------------------------------------------------- mcp
+
+_BACKED_UP = set()
+
+
+def atomic_write(path, content):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path not in _BACKED_UP:
+        shutil.copy2(path, str(path) + ".bak")
+        _BACKED_UP.add(path)
+    fd, temp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(content)
+        os.replace(temp, path)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def read_json(path):
+    try:
+        return json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def mcp_targets():
+    """Detected harnesses that can host MCP servers, adapter config per target."""
+    home = Path.home()
+    table = {
+        "opencode": {"detect": shutil.which("opencode"), "path": home / ".config/opencode/opencode.json"},
+        "claude": {"detect": shutil.which("claude"), "path": home / ".claude.json"},
+        "codex": {"detect": shutil.which("codex"), "path": home / ".codex/config.toml"},
+        "cursor": {"detect": (home / ".cursor").is_dir(), "path": home / ".cursor/mcp.json"},
+        "gemini": {"detect": shutil.which("gemini"), "path": home / ".gemini/settings.json"},
+    }
+    return {name: entry for name, entry in table.items() if entry["detect"]}
+
+
+def _servers_key(harness):
+    return "mcp" if harness == "opencode" else "mcpServers"
+
+
+def _mcp_json_entry(harness, spec):
+    if harness == "opencode":
+        entry = {"type": spec["type"]}
+        if spec["type"] == "local":
+            entry["command"] = spec["command"]
+        else:
+            entry["url"] = spec["url"]
+        entry["enabled"] = False  # repo policy: added disabled, toggled on demand
+        return entry
+    if spec["type"] == "local":
+        return {"command": spec["command"][0], "args": spec["command"][1:]}
+    return {"type": "http", "url": spec["url"]}
+
+
+def _codex_section(name, spec):
+    lines = [f"[mcp_servers.{name}]"]
+    if spec["type"] == "local":
+        lines.append(f"command = {json.dumps(spec['command'][0])}")
+        lines.append(f"args = {json.dumps(spec['command'][1:])}")
+    else:
+        lines.append(f"url = {json.dumps(spec['url'])}")
+    lines.append("enabled = false")
+    return lines
+
+
+def _codex_span(lines, name):
+    header = f"[mcp_servers.{name}]"
+    try:
+        start = lines.index(header)
+    except ValueError:
+        return None
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].startswith("[") and lines[i].endswith("]")),
+        len(lines),
+    )
+    return start, end
+
+
+def mcp_state(harness, target, name):
+    path = target["path"]
+    if harness == "codex":
+        try:
+            section = tomllib.loads(path.read_text()).get("mcp_servers", {}).get(name)
+        except (OSError, tomllib.TOMLDecodeError):
+            section = None
+        if section is None:
+            return "absent"
+        return "on" if section.get("enabled", True) else "off"
+    entry = read_json(path).get(_servers_key(harness), {}).get(name)
+    if entry is None:
+        return "absent"
+    if harness == "opencode":
+        return "on" if entry.get("enabled") else "off"
+    return "on"  # claude/cursor/gemini: present == active
+
+
+def mcp_write(harness, target, name, spec=None, enabled=None, remove=False):
+    """Add (spec), toggle (enabled) or remove a server in the target's native format."""
+    path = target["path"]
+    if harness == "codex":
+        lines = path.read_text().splitlines() if path.exists() else []
+        span = _codex_span(lines, name)
+        if remove and span:
+            del lines[span[0]:span[1]]
+        elif enabled is not None and span:
+            start, end = span
+            pattern = [i for i in range(start + 1, end) if lines[i].split("=")[0].strip() == "enabled"]
+            value = f"enabled = {'true' if enabled else 'false'}"
+            if pattern:
+                lines[pattern[0]] = value
+            else:
+                lines.insert(start + 1, value)
+        elif spec is not None and not span:
+            if lines and lines[-1] != "":
+                lines.append("")
+            lines.extend(_codex_section(name, spec))
+        atomic_write(path, "\n".join(lines).rstrip() + "\n" if lines else "")
+        return
+    data = read_json(path)
+    servers = data.setdefault(_servers_key(harness), {})
+    if remove:
+        servers.pop(name, None)
+    elif enabled is not None and harness == "opencode" and name in servers:
+        servers[name]["enabled"] = enabled
+    elif spec is not None and name not in servers:
+        servers[name] = _mcp_json_entry(harness, spec)
+    atomic_write(path, json.dumps(data, indent=2) + "\n")
+
+
+def _mcp_spec(name):
+    spec = load_catalog().get("mcp", {}).get(name)
+    if spec is None:
+        print(f"MCP_UNKNOWN {name} — agregalo en tools.toml")
+    return spec
+
+
+def _mcp_selected(harness):
+    targets = mcp_targets()
+    if harness:
+        if harness not in targets:
+            print(f"MCP_NO_HARNESS {harness} (no detectado en esta máquina)")
+            return {}
+        return {harness: targets[harness]}
+    return targets
+
+
+def cmd_mcp():
+    targets = mcp_targets()
+    for name in load_catalog().get("mcp", {}):
+        for harness, target in targets.items():
+            print(f"MCP {name} harness={harness} state={mcp_state(harness, target, name)}")
+    return 0
+
+
+def cmd_mcp_add(name, harness=None):
+    spec = _mcp_spec(name)
+    if spec is None:
+        return 2
+    for h, target in _mcp_selected(harness).items():
+        if h == "opencode" and name in MANAGED_MCP:
+            print(f"MCP_MANAGED {name} harness=opencode — ya lo gestiona el repo (toggle con --mcp-on/--mcp-off)")
+            continue
+        if mcp_state(h, target, name) != "absent":
+            print(f"MCP_SKIP {name} harness={h} (ya existe)")
+            continue
+        mcp_write(h, target, name, spec=spec)
+        print(f"MCP_ADDED {name} harness={h} state={mcp_state(h, target, name)}")
+    if spec.get("note"):
+        print(f"NOTA: {spec['note']}")
+    return 0
+
+
+def cmd_mcp_toggle(name, harness, enabled):
+    spec = _mcp_spec(name)
+    if spec is None:
+        return 2
+    for h, target in _mcp_selected(harness).items():
+        state = mcp_state(h, target, name)
+        if h in ("opencode", "codex"):
+            if state == "absent" and h == "opencode" and name not in MANAGED_MCP:
+                print(f"MCP_ABSENT {name} harness={h} (primero --mcp-add)")
+                continue
+            mcp_write(h, target, name, enabled=enabled)
+        else:
+            # No disable flag in these formats: on == present, off == removed.
+            if enabled and state == "absent":
+                mcp_write(h, target, name, spec=spec)
+            elif not enabled and state != "absent":
+                mcp_write(h, target, name, remove=True)
+        print(f"MCP_SET {name} harness={h} state={mcp_state(h, target, name)}")
+    return 0
+
+
+def cmd_mcp_remove(name, harness=None):
+    for h, target in _mcp_selected(harness).items():
+        if h == "opencode" and name in MANAGED_MCP:
+            print(f"MCP_MANAGED {name} harness=opencode — no se remueve un server gestionado")
+            continue
+        mcp_write(h, target, name, remove=True)
+        print(f"MCP_REMOVED {name} harness={h}")
+    return 0
+
+
+# ------------------------------------------------------------------- plugins
+
+def claude_settings_path():
+    return Path.home() / ".claude/settings.json"
+
+
+def cmd_plugins():
+    plugins = read_json(claude_settings_path()).get("enabledPlugins", {})
+    if not plugins:
+        print("PLUGINS_NONE")
+    for name, enabled in sorted(plugins.items()):
+        print(f"PLUGIN {name} enabled={'true' if enabled else 'false'}")
+    return 0
+
+
+def cmd_plugin_set(name, enabled):
+    if name == "engram@engram":
+        print("PLUGIN_MANAGED engram@engram — la política del repo lo fuerza apagado en cada install")
+        return 1
+    data = read_json(claude_settings_path())
+    data.setdefault("enabledPlugins", {})[name] = enabled
+    atomic_write(claude_settings_path(), json.dumps(data, indent=2) + "\n")
+    print(f"PLUGIN_SET {name} enabled={'true' if enabled else 'false'}")
+    return 0
+
+
+def mcp_menu():
+    catalog = list(load_catalog().get("mcp", {}))
+    targets = mcp_targets()
+    print()
+    print(f"harnesses detectados: {', '.join(targets)}")
+    for name in catalog:
+        states = ", ".join(f"{h}:{mcp_state(h, t, name)}" for h, t in targets.items())
+        print(f"  {name:<12} {states}")
+    name = input("Server (Enter vuelve): ").strip()
+    if not name:
+        return
+    action = input("[a]gregar / [e]ncender / a[p]agar / [r]emover: ").strip().lower()
+    harness = input(f"Harness ({'/'.join(targets)}, Enter=todos): ").strip() or None
+    if action == "a":
+        cmd_mcp_add(name, harness)
+    elif action == "e":
+        cmd_mcp_toggle(name, harness, True)
+    elif action == "p":
+        cmd_mcp_toggle(name, harness, False)
+    elif action == "r":
+        cmd_mcp_remove(name, harness)
+
+
+def plugins_menu():
+    cmd_plugins()
+    name = input("Plugin a togglear (Enter vuelve): ").strip()
+    if not name:
+        return
+    current = read_json(claude_settings_path()).get("enabledPlugins", {}).get(name, False)
+    cmd_plugin_set(name, not current)
+
+
 # ---------------------------------------------------------------------- menu
 
 def run_tty(command):
@@ -300,6 +567,8 @@ def menu():
         print("[2] Actualizar")
         print("[3] Modelos")
         print("[4] Herramientas (CLIs)")
+        print("[5] MCPs")
+        print("[6] Plugins Claude Code")
         print("[7] Estado")
         print("[8] Salir")
         choice = input("> ").strip()
@@ -312,6 +581,10 @@ def menu():
             run_tty([str(ROOT / "setup-models.sh")])
         elif choice == "4":
             tools_menu()
+        elif choice == "5":
+            mcp_menu()
+        elif choice == "6":
+            plugins_menu()
         elif choice == "7":
             cmd_status(human=True)
             answer = input("auto-update: [t]oggle / Enter para volver: ").strip().lower()
@@ -332,6 +605,15 @@ def main():
     parser.add_argument("--tools", action="store_true", help="TOOL <name> installed=yes/no")
     parser.add_argument("--tools-install", metavar="NAME")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--mcp", action="store_true", help="MCP <name> harness=<h> state=...")
+    parser.add_argument("--mcp-add", metavar="NAME")
+    parser.add_argument("--mcp-remove", metavar="NAME")
+    parser.add_argument("--mcp-on", metavar="NAME")
+    parser.add_argument("--mcp-off", metavar="NAME")
+    parser.add_argument("--harness", choices=("opencode", "claude", "codex", "cursor", "gemini"))
+    parser.add_argument("--plugins", action="store_true")
+    parser.add_argument("--plugin-on", metavar="NAME")
+    parser.add_argument("--plugin-off", metavar="NAME")
     args = parser.parse_args()
 
     if args.status:
@@ -347,6 +629,22 @@ def main():
         return cmd_tools()
     if args.tools_install:
         return cmd_tools_install(args.tools_install, dry=args.dry_run, yes=args.yes)
+    if args.mcp:
+        return cmd_mcp()
+    if args.mcp_add:
+        return cmd_mcp_add(args.mcp_add, args.harness)
+    if args.mcp_remove:
+        return cmd_mcp_remove(args.mcp_remove, args.harness)
+    if args.mcp_on:
+        return cmd_mcp_toggle(args.mcp_on, args.harness, True)
+    if args.mcp_off:
+        return cmd_mcp_toggle(args.mcp_off, args.harness, False)
+    if args.plugins:
+        return cmd_plugins()
+    if args.plugin_on:
+        return cmd_plugin_set(args.plugin_on, True)
+    if args.plugin_off:
+        return cmd_plugin_set(args.plugin_off, False)
     if not sys.stdin.isatty():
         parser.print_help()
         return 2

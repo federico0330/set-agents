@@ -402,6 +402,68 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("TOOL_UNKNOWN", result.stdout)
             self.assertFalse(sentinel.exists())
 
+    def _mcp_home(self, td):
+        """Fake HOME with all five MCP targets present (CLIs stubbed on PATH)."""
+        env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex", "gemini"))
+        home = Path(env["HOME"])
+        (home / ".config/opencode").mkdir(parents=True, exist_ok=True)
+        (home / ".config/opencode/opencode.json").write_text('{"mcp": {}}\n')
+        (home / ".codex").mkdir(exist_ok=True)
+        (home / ".codex/config.toml").write_text('[features]\nmulti_agent = true\n')
+        (home / ".cursor").mkdir(exist_ok=True)
+        env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+        return env, home
+
+    def test_set_agents_mcp_across_harnesses(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, home = self._mcp_home(td)
+            result = run("bash", "set-agents", "--mcp-add", "supabase", env=env)
+            for harness in ("opencode", "claude", "codex", "cursor", "gemini"):
+                self.assertIn(f"MCP_ADDED supabase harness={harness}", result.stdout)
+            oc = json.loads((home / ".config/opencode/opencode.json").read_text())
+            self.assertFalse(oc["mcp"]["supabase"]["enabled"], "opencode adds disabled per policy")
+            self.assertEqual(oc["mcp"]["supabase"]["command"][0], "npx")
+            codex = tomllib.loads((home / ".codex/config.toml").read_text())
+            self.assertFalse(codex["mcp_servers"]["supabase"]["enabled"])
+            self.assertTrue(codex["features"]["multi_agent"], "existing sections preserved")
+            claude = json.loads((home / ".claude.json").read_text())
+            self.assertEqual(claude["mcpServers"]["supabase"]["command"], "npx")
+            self.assertIn("supabase", json.loads((home / ".cursor/mcp.json").read_text())["mcpServers"])
+            # Toggle on/off where the format supports it.
+            result = run("bash", "set-agents", "--mcp-on", "supabase", "--harness", "opencode", env=env)
+            self.assertIn("MCP_SET supabase harness=opencode state=on", result.stdout)
+            result = run("bash", "set-agents", "--mcp-off", "supabase", "--harness", "codex", env=env)
+            self.assertIn("MCP_SET supabase harness=codex state=off", result.stdout)
+            # claude off == removed; managed servers stay off-limits on opencode.
+            result = run("bash", "set-agents", "--mcp-off", "supabase", "--harness", "claude", env=env)
+            self.assertIn("MCP_SET supabase harness=claude state=absent", result.stdout)
+            result = run("bash", "set-agents", "--mcp-add", "context7", "--harness", "opencode", env=env)
+            self.assertIn("MCP_MANAGED context7", result.stdout)
+            self.assertNotIn("context7", json.loads((home / ".config/opencode/opencode.json").read_text())["mcp"])
+            # Remove cleans up and backups exist for touched files.
+            run("bash", "set-agents", "--mcp-remove", "supabase", env=env)
+            result = run("bash", "set-agents", "--mcp", env=env)
+            self.assertNotIn("supabase harness=opencode state=off", result.stdout)
+            for line in result.stdout.splitlines():
+                if line.startswith("MCP supabase"):
+                    self.assertIn("state=absent", line)
+            self.assertTrue((home / ".config/opencode/opencode.json.bak").exists())
+
+    def test_set_agents_plugins(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, home = self._mcp_home(td)
+            (home / ".claude").mkdir(exist_ok=True)
+            (home / ".claude/settings.json").write_text(json.dumps({"enabledPlugins": {"foo@bar": True}}))
+            result = run("bash", "set-agents", "--plugins", env=env)
+            self.assertIn("PLUGIN foo@bar enabled=true", result.stdout)
+            result = run("bash", "set-agents", "--plugin-off", "foo@bar", env=env)
+            self.assertIn("PLUGIN_SET foo@bar enabled=false", result.stdout)
+            settings = json.loads((home / ".claude/settings.json").read_text())
+            self.assertFalse(settings["enabledPlugins"]["foo@bar"])
+            result = run("bash", "set-agents", "--plugin-on", "engram@engram", env=env, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("PLUGIN_MANAGED", result.stdout)
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
