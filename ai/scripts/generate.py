@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Generate and validate native harness artifacts from roles.tsv."""
+"""Generate and validate native harness artifacts from roles.tsv + models.toml."""
 
 import argparse
-import csv
 import json
 import re
 import shutil
@@ -10,19 +9,13 @@ import sys
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import models_config
+
 ROOT = Path(__file__).resolve().parents[2]
 CANON = ROOT / "Global/_canonical"
 SHARED = ROOT / "Global/_shared"
-REQUIRED = {
-    "role", "mode", "temperature", "capability", "duty", "opencode_go",
-    "opencode_zen", "opencode_local", "claude_model", "codex_model", "codex_effort",
-}
-PROFILE_COLUMN = {"go-zen": "opencode_go", "zen": "opencode_zen", "local": "opencode_local"}
-CAPABILITIES = {"coord-ro", "review-ro", "docs-rw", "factory-rw", "code-rw", "gate-ro", "release", "memory-rw", "run-ro"}
-READ_ONLY = {"coord-ro", "review-ro"}
-IMPLEMENT_DUTIES = {"implement"}
-REVIEW_DUTIES = {"audit", "judge"}
-MUTATING_CAPABILITIES = {"docs-rw", "factory-rw", "code-rw", "release", "memory-rw"}
+READ_ONLY = models_config.READ_ONLY
 ORCHESTRATOR_TASK_ALLOW = {
     "brainstormer",
     "product-analyst",
@@ -58,50 +51,12 @@ def die(message):
     raise ValueError(message)
 
 
-def load_roles(profile, roles_path=None):
-    with Path(roles_path or ROOT / "roles.tsv").open(newline="", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
-        if set(reader.fieldnames or ()) != REQUIRED:
-            die("roles.tsv has an invalid header")
-        roles = list(reader)
-    names = [row["role"] for row in roles]
-    if len(names) != len(set(names)):
-        die("roles.tsv contains duplicate roles")
-    if profile not in PROFILE_COLUMN:
-        die(f"unsupported profile: {profile}")
+def load_roles(profile, roles_path=None, models_path=None):
+    """Resolution and doctrine validation live in models_config; this adds the prompt check."""
+    roles = models_config.load_roles(profile, roles_path, models_path)
     for row in roles:
-        row["opencode_model"] = row[PROFILE_COLUMN[profile]]
-        if row["capability"] not in CAPABILITIES:
-            die(f"{row['role']}: invalid capability {row['capability']}")
-        if row["mode"] not in {"primary", "subagent"}:
-            die(f"{row['role']}: invalid mode")
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*/[A-Za-z0-9][A-Za-z0-9._:-]*", row["opencode_model"]):
-            die(f"{row['role']}: invalid OpenCode model id")
-        if row["claude_model"] not in {"opus", "sonnet", "haiku", "fable"}:
-            die(f"{row['role']}: invalid Claude model alias")
-        if not re.fullmatch(r"gpt-5\.(?:4(?:-mini)?|5|6-(?:sol|terra|luna))", row["codex_model"]):
-            die(f"{row['role']}: invalid Codex model id")
         if not (CANON / "agents" / f"{row['role']}.md").is_file():
             die(f"{row['role']}: missing canonical prompt")
-        if row["duty"] in REVIEW_DUTIES and row["capability"] != "review-ro":
-            die(f"separation violation: {row['role']} reviews with mutating capability {row['capability']}")
-        if row["duty"] == "implement" and row["capability"] != "code-rw":
-            die(f"separation violation: {row['role']} implements without code-rw")
-
-    implementers = [r for r in roles if r["duty"] in IMPLEMENT_DUTIES]
-    reviewers = [r for r in roles if r["duty"] in REVIEW_DUTIES]
-    family = {
-        "opencode_model": lambda value: re.sub(r"(?:-mini|-flash-free|-code-free)$", "", value),
-        "claude_model": lambda value: value,
-        "codex_model": lambda value: value.removesuffix("-mini"),
-    }
-    for field in ("opencode_model", "claude_model", "codex_model"):
-        implementation_models = {family[field](r[field]) for r in implementers}
-        for reviewer in reviewers:
-            if family[field](reviewer[field]) in implementation_models:
-                die(f"separation violation: {reviewer['role']} shares {field}={reviewer[field]} with implementation")
-    if not any(r["duty"] == "judge" for r in roles):
-        die("adversarial judge is required")
     return roles
 
 
@@ -313,8 +268,8 @@ def write_indexes(out):
         (base / "managed-files.txt").write_text("\n".join(files) + "\n")
 
 
-def generate(out, profile, roles_path=None):
-    roles = load_roles(profile, roles_path)
+def generate(out, profile, roles_path=None, models_path=None):
+    roles = load_roles(profile, roles_path, models_path)
     if out.exists():
         shutil.rmtree(out)
     for harness in ("opencode", "claude-code", "codex"):
@@ -384,6 +339,7 @@ def generate(out, profile, roles_path=None):
 
     oc_config = json.loads((SHARED / "opencode.json").read_text())
     oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
+    oc_config["small_model"] = models_config.small_model(profile, models_path)
     for item in oc_config.get("mcp", {}).values():
         item["enabled"] = False
     (out / "opencode/opencode.json").write_text(json.dumps(oc_config, indent=2) + "\n")
@@ -440,10 +396,11 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--profile")
     parser.add_argument("--roles")
+    parser.add_argument("--models")
     args = parser.parse_args()
     profile = args.profile or (ROOT / "active-profile").read_text().strip()
     try:
-        generate(Path(args.output), profile, args.roles)
+        generate(Path(args.output), profile, args.roles, args.models)
     except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
         print(f"CHECK_FAILED: {exc}", file=sys.stderr)
         return 2

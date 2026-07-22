@@ -74,6 +74,10 @@ def load_roster(roles_path=None):
             die(f"{row['role']}: invalid capability {row['capability']}")
         if row["mode"] not in {"primary", "subagent"}:
             die(f"{row['role']}: invalid mode")
+        if row["duty"] in REVIEW_DUTIES and row["capability"] != "review-ro":
+            die(f"separation violation: {row['role']} reviews with mutating capability {row['capability']}")
+        if row["duty"] == "implement" and row["capability"] != "code-rw":
+            die(f"separation violation: {row['role']} implements without code-rw")
     return roles
 
 

@@ -119,15 +119,13 @@ def legacy_prompt_bytes(relative):
 
 
 def roster_codex_orchestrator():
-    """Session-level model/effort for Codex come from the orchestrator row of roles.tsv."""
-    repo = Path(__file__).resolve().parents[2]
-    header, *rows = (repo / "roles.tsv").read_text().splitlines()
-    columns = header.split("\t")
-    for row in rows:
-        cells = dict(zip(columns, row.split("\t")))
-        if cells.get("role") == "orchestrator":
-            return cells["codex_model"], cells["codex_effort"]
-    raise RuntimeError("orchestrator row missing from roles.tsv")
+    """Session-level model/effort for Codex come from the orchestrator area in models.toml."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import models_config
+
+    return models_config.codex_orchestrator()
 
 
 def merge_codex(current):

@@ -133,7 +133,7 @@ class HarnessTests(unittest.TestCase):
     @staticmethod
     def _import(name):
         import importlib.util
-        spec = importlib.util.spec_from_file_location(name, ROOT / "ai/scripts" / f"{name.replace('_', '_')}.py")
+        spec = importlib.util.spec_from_file_location(name, ROOT / "ai/scripts" / f"{name}.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
@@ -196,8 +196,14 @@ class HarnessTests(unittest.TestCase):
 
     def test_models_config_rejects_legacy_roster_header(self):
         mc = self._import("models_config")
-        with self.assertRaisesRegex(ValueError, "migrated model routing"):
-            mc.load_roles("zen", ROOT / "roles.tsv", self.FIXTURES / "models.toml")
+        with tempfile.TemporaryDirectory() as td:
+            legacy = Path(td) / "roles.tsv"
+            legacy.write_text(
+                "role\tmode\ttemperature\tcapability\tduty\topencode_go\topencode_zen"
+                "\topencode_local\tclaude_model\tcodex_model\tcodex_effort\n"
+            )
+            with self.assertRaisesRegex(ValueError, "migrated model routing"):
+                mc.load_roles("zen", legacy, self.FIXTURES / "models.toml")
 
     def test_models_config_separation_violation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -231,28 +237,6 @@ class HarnessTests(unittest.TestCase):
             second = mc.emit(mc.load_config(models))
             self.assertEqual(first, second)
             self.assertEqual(first, (self.FIXTURES / "models.toml").read_text())
-
-    def test_migrator_preserves_legacy_assignment(self):
-        mc = self._import("models_config")
-        generate = self._import("generate")
-        with tempfile.TemporaryDirectory() as td:
-            models_out = Path(td) / "models.toml"
-            roles_out = Path(td) / "roles.tsv"
-            result = run(
-                "python3", "ai/scripts/migrate-roles-to-models.py",
-                "--models-out", str(models_out), "--roles-out", str(roles_out),
-            )
-            self.assertIn("MIGRATE_OK", result.stdout)
-            for profile in ("go-zen", "zen", "local"):
-                legacy = {row["role"]: row for row in generate.load_roles(profile)}
-                migrated = {row["role"]: row for row in mc.load_roles(profile, roles_out, models_out)}
-                self.assertEqual(set(legacy), set(migrated))
-                for role, row in legacy.items():
-                    for field in ("opencode_model", "claude_model", "codex_model", "codex_effort"):
-                        self.assertEqual(
-                            migrated[role][field], row[field],
-                            f"{profile}/{role}/{field} diverged in migration",
-                        )
 
     def test_coordinator_policy(self):
         allowed = [
@@ -414,9 +398,11 @@ class HarnessTests(unittest.TestCase):
 
     def test_profile_switch_does_not_rewrite_roster(self):
         before = (ROOT / "roles.tsv").read_bytes()
+        models_before = (ROOT / "models.toml").read_bytes()
         with tempfile.TemporaryDirectory() as td:
             run("./build.sh", "--profile", "zen", "--output", td)
         self.assertEqual(before, (ROOT / "roles.tsv").read_bytes())
+        self.assertEqual(models_before, (ROOT / "models.toml").read_bytes())
 
     def test_local_profile_generates_and_validates(self):
         # The `local` profile (leaf agents on Ollama, judgment roles hosted) must
@@ -426,19 +412,28 @@ class HarnessTests(unittest.TestCase):
                          "--output", str(Path(td) / "out"), check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
 
+    def _repo_models_variant(self, td, mutate):
+        """Copy the repo's models.toml with a mutation, via the deterministic emitter."""
+        mc = self._import("models_config")
+        config = mc.load_config(ROOT / "models.toml")
+        mutate(config)
+        path = Path(td) / "models.toml"
+        path.write_text(mc.emit(config))
+        return path
+
     def test_invalid_separation_graph_is_rejected(self):
-        roster = (ROOT / "roles.tsv").read_text().replace(
-            "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topenai/gpt-5.6-sol",
-            "adversarial-judge\tsubagent\t0.0\treview-ro\tjudge\topenai/gpt-5.3-codex-spark",
-        )
         with tempfile.TemporaryDirectory() as td:
-            roles = Path(td) / "roles.tsv"
-            roles.write_text(roster)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
+            def judge_on_implementer_model(config):
+                config["areas"]["judge"]["opencode"]["go-zen"] = "openai/gpt-5.6-terra"
+            models = self._repo_models_variant(td, judge_on_implementer_model)
+            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("separation violation", result.stderr)
 
-        mutating_reviewer = (ROOT / "roles.tsv").read_text().replace("package-reviewer\tsubagent\t0.0\treview-ro\taudit", "package-reviewer\tsubagent\t0.0\tcode-rw\taudit")
+        mutating_reviewer = (ROOT / "roles.tsv").read_text().replace(
+            "package-reviewer\tsubagent\t0.0\treview-ro\taudit",
+            "package-reviewer\tsubagent\t0.0\tcode-rw\taudit",
+        )
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"
             roles.write_text(mutating_reviewer)
@@ -446,13 +441,29 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("mutating capability", result.stderr)
 
-        family_overlap = (ROOT / "roles.tsv").read_text().replace("package-reviewer\tsubagent\t0.0\treview-ro\taudit\topenai/gpt-5.6-sol\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-sol", "package-reviewer\tsubagent\t0.0\treview-ro\taudit\topenai/gpt-5.6-sol\topenai/gpt-5.5\topenai/gpt-5.5\topus\tgpt-5.6-terra")
         with tempfile.TemporaryDirectory() as td:
-            roles = Path(td) / "roles.tsv"
-            roles.write_text(family_overlap)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
+            def audit_on_implementer_codex(config):
+                config["areas"]["audit"]["codex"] = "gpt-5.6-terra"
+            models = self._repo_models_variant(td, audit_on_implementer_codex)
+            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("gpt-5.6-terra", result.stderr)
+
+    def test_roles_tsv_with_model_columns_rejected_with_hint(self):
+        legacy_header = "\t".join([
+            "role", "mode", "temperature", "capability", "duty", "opencode_go",
+            "opencode_zen", "opencode_local", "claude_model", "codex_model", "codex_effort",
+        ])
+        legacy_row = "\t".join([
+            "orchestrator", "primary", "0.1", "coord-ro", "coord", "openai/gpt-5.6-terra",
+            "openai/gpt-5.4", "openai/gpt-5.4", "fable", "gpt-5.6-terra", "high",
+        ])
+        with tempfile.TemporaryDirectory() as td:
+            roles = Path(td) / "roles.tsv"
+            roles.write_text(legacy_header + "\n" + legacy_row + "\n")
+            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("models.toml", result.stderr)
 
     def test_generated_mcp_is_off(self):
         run("./build.sh")
