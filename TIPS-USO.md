@@ -24,9 +24,12 @@ feature whose state does not validate against the new schema — close the featu
 
 ## Bootstrap / compartir
 
-`git clone` + `./set-agents` abre la app de consola: instalar/reparar, auto-update, modelos,
-catálogo de herramientas (`tools.toml`), MCPs por harness detectado y plugins. `./install.sh`
-y `./setup-models.sh` quedan como plomería directa de [1] y [3]. Detalles en `INSTALACION.md`.
+Repo privado: se comparte invitando collaborators (Read) en GitHub; `gh auth login` +
+`gh repo clone` + `./set-agents` abre la app de consola: instalar/reparar, auto-update,
+modelos, catálogo de herramientas (`tools.toml`), MCPs por harness detectado y plugins.
+Windows va por `install.ps1` (WSL administrado). `./install.sh` y `./setup-models.sh` quedan
+como plomería directa de [1] y [3]. CI valida ubuntu+macos+windows en cada push a main.
+Detalles en `INSTALACION.md`.
 
 ## Source layout
 

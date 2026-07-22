@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: verify.sh (full gate)
+        run: ./ai/scripts/verify.sh
+
+  # Real macOS: validates the BSD/bash-3.2 portability fixes on every push.
+  verify-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: verify.sh (full gate)
+        run: ./ai/scripts/verify.sh
+
+  windows-bootstrap:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse install.ps1
+        shell: pwsh
+        run: $null = [ScriptBlock]::Create((Get-Content -Raw install.ps1))
+      - name: install.ps1 -DryRun
+        shell: pwsh
+        run: ./install.ps1 -DryRun
+      - name: Compile python scripts
+        shell: pwsh
+        run: python -m py_compile (Get-ChildItem ai/scripts/*.py).FullName

@@ -42,9 +42,13 @@ function Test-Admin {
 
 # ------------------------------------------------------------------ 1. WSL
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
-    Write-Host "PS_FAIL wsl.exe no existe. Este Windows es demasiado viejo para WSL2"
-    Write-Host "(se necesita Windows 10 build 19041+ o Windows 11)."
-    exit 1
+    if ($DryRun) {
+        Write-Host "PS_PLAN wsl-install (wsl.exe ausente; se instalaría WSL2 + Ubuntu)"
+    } else {
+        Write-Host "PS_FAIL wsl.exe no existe. Este Windows es demasiado viejo para WSL2"
+        Write-Host "(se necesita Windows 10 build 19041+ o Windows 11)."
+        exit 1
+    }
 }
 
 $distros = Get-WslDistros

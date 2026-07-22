@@ -1,12 +1,44 @@
 # Instalación desde cero
 
-Para dejar SET-AGENTS funcionando en cualquier máquina (nueva o a medio configurar):
+## Acceso (el repo es privado)
+
+El repo privado ES el control de acceso: solo entra quien Federico invitó como collaborator
+(GitHub → Settings → Collaborators → Add people, rol Read). Sin invitación no se puede clonar
+ni actualizar; al revocar el acceso, el próximo auto-update de esa persona falla y listo.
+Cada usuario se autentica una sola vez con `gh auth login` (device flow) — el auto-update
+reutiliza esas credenciales.
+
+## Sistemas soportados
+
+| OS | Camino |
+|---|---|
+| Linux (Arch/CachyOS, Debian/Ubuntu) | nativo |
+| WSL (cualquier distro) | nativo dentro de WSL |
+| macOS | nativo (Homebrew) |
+| Windows 10/11 | `install.ps1` → WSL administrado (invisible para el usuario) |
+
+## Linux / macOS / WSL
 
 ```bash
-git clone https://github.com/federico0330/SET-AGENTS.git
-cd SET-AGENTS
-./set-agents        # abre la app de consola → opción [1] Instalar
+gh auth login        # una vez (instalá gh primero si no está: pacman/apt/brew install gh)
+gh repo clone federico0330/SET-AGENTS ~/SET-AGENTS
+cd ~/SET-AGENTS
+./set-agents         # abre la app de consola → opción [1] Instalar
 ```
+
+## Windows 10/11 (PowerShell, sin necesidad de saber qué es WSL)
+
+Recibís `install.ps1` (o lo bajás del repo si ya tenés acceso desde el navegador) y:
+
+```powershell
+.\install.ps1
+```
+
+El script: instala WSL2+Ubuntu si hace falta (puede pedir Administrador y un reinicio —
+re-ejecutalo después, es resumable), adentro instala git+gh, te guía por el login de GitHub,
+clona el repo y abre la app. Además instala el comando `set-agents` para cmd/PowerShell:
+desde ahí en adelante escribís `set-agents` en cualquier terminal de Windows y listo.
+Los CLIs (opencode/claude/codex) viven dentro de WSL.
 
 `./set-agents` es la puerta de entrada a todo (instala también el comando global
 `set-agents` para usarlo desde cualquier directorio):
