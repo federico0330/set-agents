@@ -1,0 +1,5 @@
+role	mode	temperature	capability	duty
+orchestrator	primary	0.1	coord-ro	coord
+implementer	subagent	0.1	code-rw	implement
+debugger	subagent	0.1	code-rw	implement
+adversarial-judge	subagent	0.0	review-ro	judge

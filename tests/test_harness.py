@@ -127,6 +127,133 @@ class HarnessTests(unittest.TestCase):
             run("bash", "install.sh", "--dry-run", env=env)
             self.assertFalse(sentinel.exists())
 
+    # ------------------------------------------------------- models_config
+    FIXTURES = ROOT / "tests/fixtures"
+
+    @staticmethod
+    def _import(name):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(name, ROOT / "ai/scripts" / f"{name.replace('_', '_')}.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _models_fixture(self, td, mutate=None):
+        """Load the fixture config, optionally mutate it, and write it via emit()."""
+        mc = self._import("models_config")
+        config = mc.load_config(self.FIXTURES / "models.toml")
+        if mutate:
+            mutate(config)
+        path = Path(td) / "models.toml"
+        path.write_text(mc.emit(config))
+        return mc, path
+
+    def test_models_config_resolves_area_and_role_override(self):
+        mc = self._import("models_config")
+        roles = {
+            row["role"]: row
+            for row in mc.load_roles("zen", self.FIXTURES / "roles.tsv", self.FIXTURES / "models.toml")
+        }
+        # Pure area inheritance.
+        self.assertEqual(roles["implementer"]["opencode_model"], "opencode/kimi-k2.7-code")
+        self.assertEqual(roles["implementer"]["codex_effort"], "medium")
+        # Role override wins field by field; untouched fields fall back to the area.
+        self.assertEqual(roles["debugger"]["codex_effort"], "high")
+        self.assertEqual(roles["debugger"]["opencode_model"], "openai/gpt-5.4")
+        self.assertEqual(roles["debugger"]["codex_model"], "gpt-5.6-terra")
+        # Lane merge is per lane: the go-zen lane is not overridden for debugger.
+        go = {
+            row["role"]: row
+            for row in mc.load_roles("go-zen", self.FIXTURES / "roles.tsv", self.FIXTURES / "models.toml")
+        }
+        self.assertEqual(go["debugger"]["opencode_model"], "openai/gpt-5.6-terra")
+
+    def test_models_config_rejects_incomplete_area(self):
+        with tempfile.TemporaryDirectory() as td:
+            def drop_field(config):
+                del config["areas"]["coord"]["codex"]
+            mc, models = self._models_fixture(td, drop_field)
+            with self.assertRaisesRegex(ValueError, "unresolved codex_model"):
+                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+
+    def test_models_config_rejects_inactive_subscription(self):
+        with tempfile.TemporaryDirectory() as td:
+            def drop_zen(config):
+                config["subscriptions"]["zen"] = False
+            mc, models = self._models_fixture(td, drop_zen)
+            with self.assertRaisesRegex(ValueError, "needs the 'zen' subscription"):
+                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+            # The go-zen lane of the fixture uses no zen-subscription model: still fine.
+            mc.load_roles("go-zen", self.FIXTURES / "roles.tsv", models)
+
+    def test_models_config_rejects_orphan_role_override(self):
+        with tempfile.TemporaryDirectory() as td:
+            def orphan(config):
+                config["roles"]["ghost-role"] = {"codex_effort": "low"}
+            mc, models = self._models_fixture(td, orphan)
+            with self.assertRaisesRegex(ValueError, r"roles.ghost-role.*does not match"):
+                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+
+    def test_models_config_rejects_legacy_roster_header(self):
+        mc = self._import("models_config")
+        with self.assertRaisesRegex(ValueError, "migrated model routing"):
+            mc.load_roles("zen", ROOT / "roles.tsv", self.FIXTURES / "models.toml")
+
+    def test_models_config_separation_violation(self):
+        with tempfile.TemporaryDirectory() as td:
+            def collide(config):
+                # judge inherits the implementer's codex family -> doctrine violation
+                config["areas"]["judge"]["codex"] = "gpt-5.6-terra"
+            mc, models = self._models_fixture(td, collide)
+            with self.assertRaisesRegex(ValueError, "separation violation"):
+                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+
+    def test_models_config_families_override_separation(self):
+        with tempfile.TemporaryDirectory() as td:
+            def collide_by_suffix(config):
+                # Default family strips -mini: gpt-5.4-mini collides with gpt-5.4.
+                config["areas"]["implement"]["codex"] = "gpt-5.4"
+                config["areas"]["judge"]["codex"] = "gpt-5.4-mini"
+            mc, models = self._models_fixture(td, collide_by_suffix)
+            with self.assertRaisesRegex(ValueError, "separation violation"):
+                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+
+            def separate_by_family(config):
+                collide_by_suffix(config)
+                config["families"]["gpt-5.4-mini"] = "gpt-5.4-mini-reviewer"
+            mc, models = self._models_fixture(td, separate_by_family)
+            mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+
+    def test_models_config_emit_roundtrip(self):
+        with tempfile.TemporaryDirectory() as td:
+            mc, models = self._models_fixture(td)
+            first = models.read_text()
+            second = mc.emit(mc.load_config(models))
+            self.assertEqual(first, second)
+            self.assertEqual(first, (self.FIXTURES / "models.toml").read_text())
+
+    def test_migrator_preserves_legacy_assignment(self):
+        mc = self._import("models_config")
+        generate = self._import("generate")
+        with tempfile.TemporaryDirectory() as td:
+            models_out = Path(td) / "models.toml"
+            roles_out = Path(td) / "roles.tsv"
+            result = run(
+                "python3", "ai/scripts/migrate-roles-to-models.py",
+                "--models-out", str(models_out), "--roles-out", str(roles_out),
+            )
+            self.assertIn("MIGRATE_OK", result.stdout)
+            for profile in ("go-zen", "zen", "local"):
+                legacy = {row["role"]: row for row in generate.load_roles(profile)}
+                migrated = {row["role"]: row for row in mc.load_roles(profile, roles_out, models_out)}
+                self.assertEqual(set(legacy), set(migrated))
+                for role, row in legacy.items():
+                    for field in ("opencode_model", "claude_model", "codex_model", "codex_effort"):
+                        self.assertEqual(
+                            migrated[role][field], row[field],
+                            f"{profile}/{role}/{field} diverged in migration",
+                        )
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",

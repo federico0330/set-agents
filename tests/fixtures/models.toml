@@ -1,0 +1,40 @@
+# models.toml — model routing source of truth (subscriptions, areas, role overrides).
+# Edit by hand or via ./setup-models.sh; the wizard rewrites this file
+# deterministically and does not preserve standalone comments.
+schema = 1
+
+[subscriptions]
+anthropic = true
+ollama = false
+openai = true
+zen = true
+
+[catalog]
+claude = ["haiku", "opus", "sonnet"]
+codex = ["gpt-5.4", "gpt-5.4-mini", "gpt-5.6-sol", "gpt-5.6-terra"]
+codex_effort = ["high", "low", "medium", "xhigh"]
+
+[session]
+opencode_small_model = { "go-zen" = "opencode/small-free", "zen" = "opencode/small-free", "local" = "openai/gpt-5.4-mini" }
+
+[areas.coord]
+claude = "sonnet"
+codex = "gpt-5.6-terra"
+codex_effort = "high"
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.4", "local" = "openai/gpt-5.4" }
+
+[areas.implement]
+claude = "sonnet"
+codex = "gpt-5.6-terra"
+codex_effort = "medium"
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "opencode/kimi-k2.7-code", "local" = "openai/gpt-5.4" }
+
+[areas.judge]
+claude = "opus"
+codex = "gpt-5.6-sol"
+codex_effort = "xhigh"
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.5", "local" = "openai/gpt-5.5" }
+
+[roles.debugger]
+codex_effort = "high"
+opencode = { "zen" = "openai/gpt-5.4" }
