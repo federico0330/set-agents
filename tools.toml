@@ -54,6 +54,14 @@ apt = "sudo apt-get install -y jq"
 brew = "brew install jq"
 doc = "https://jqlang.org"
 
+[cli.obsidian]
+detect = "obsidian"
+note = "abrí ~/tu-empresa/obsidian como vault: ahí viven las notas de la documentación viva"
+[cli.obsidian.install]
+pacman = "sudo pacman -S --needed --noconfirm obsidian"
+brew = "brew install --cask obsidian"
+doc = "https://obsidian.md/download"
+
 [mcp.supabase]
 type = "local"
 command = ["npx", "-y", "@supabase/mcp-server-supabase@latest"]

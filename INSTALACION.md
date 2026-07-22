@@ -56,7 +56,7 @@ escribís `set-agents` en cualquier terminal de Windows y listo. Los CLIs
 - **Auto-update**: al abrirla chequea el repo; si hay novedades las aplica sola mostrando qué
   cambió (backup + rollback de siempre). Se desactiva con `set-agents --auto-update off`.
   Nunca toca un repo con cambios locales sin commitear.
-- **Herramientas**: catálogo opcional (supabase, vercel, gcloud, gh, docker, jq) definido en
+- **Herramientas**: catálogo opcional (supabase, vercel, gcloud, gh, docker, jq, obsidian) definido en
   `tools.toml` — agregar una herramienta es un bloque de datos, no código.
 - **MCPs**: agrega servers (supabase, context7, playwright) a los harnesses que detecte
   instalados: opencode, claude, codex, y también cursor y gemini CLI si están. En opencode se
