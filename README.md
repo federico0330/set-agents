@@ -105,6 +105,24 @@ ese riesgo a cambio de recibir siempre la última versión.
 Todo tiene equivalente scripteable (`set-agents --help`): `--status`, `--update`,
 `--tools-install gcloud`, `--mcp-add supabase --harness opencode`, etc.
 
+## Documentación viva (Obsidian)
+
+Los agentes documentan mientras trabajan: cada proyecto mantiene `docs/notas/` (hub con
+"qué falta", una nota por feature, por paquete y por decisión, enlazadas con `[[wikilinks]]`)
+**regeneradas automáticamente** por el workflow — nadie las escribe a mano. Un vault por
+empresa/cliente las junta en un solo grafo navegable:
+
+```bash
+set-agents --vault-init ~/iey --company IEY        # una vez por empresa/cliente
+set-agents --vault-link ~/iey/mi-proyecto           # una vez por proyecto
+```
+
+Abrís `~/iey/obsidian` en Obsidian: `00 - INICIO` es la nota del café ☕ (tu rol, cómo se
+trabaja, qué falta por proyecto) y desde ahí navegás hasta cualquier paquete. Las notas del
+proyecto viven versionadas dentro de su repo; lo que escribas fuera de los bloques
+`notas:auto` nunca se pisa. Las decisiones que trascienden un paquete se registran con
+`feature-state.py log-decision`.
+
 ## Más documentación
 
 - [INSTALACION.md](INSTALACION.md) — instalación en detalle y flags del instalador.
