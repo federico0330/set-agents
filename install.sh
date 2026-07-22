@@ -264,6 +264,23 @@ guide_auth() {
   auth_claude
 }
 
+# ----------------------------------------------------------- ensure_app_link
+ensure_app_link() {
+  # `set-agents` callable from anywhere; the wrapper resolves the symlink back here.
+  local link="$HOME/.local/bin/set-agents"
+  if [ -L "$link" ] && [ "$(readlink "$link")" = "$ROOT/set-agents" ]; then
+    echo "BOOTSTRAP_SKIP set-agents-link"
+    return 0
+  fi
+  if [ "$DRY" -eq 1 ]; then
+    echo "BOOTSTRAP_PLAN set-agents-link"
+    return 0
+  fi
+  mkdir -p "$HOME/.local/bin"
+  ln -sfn "$ROOT/set-agents" "$link"
+  echo "BOOTSTRAP_OK set-agents-link"
+}
+
 # -------------------------------------------------------------- repo_config
 repo_config() {
   if [ "$DRY" -eq 1 ]; then
@@ -303,6 +320,7 @@ verify_final() {
 detect_os
 ensure_base_deps
 ensure_agent_clis
+ensure_app_link
 guide_auth
 repo_config
 verify_final

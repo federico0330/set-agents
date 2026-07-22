@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Unified console app for the harness: install, update, models, tools, MCPs.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+exec python3 "$ROOT/ai/scripts/set_agents_app.py" "$@"

@@ -309,6 +309,77 @@ class HarnessTests(unittest.TestCase):
             result, _ = self._setup_models(td, "--check")
             self.assertIn("MODELS_CHECK_PASS", result.stdout)
 
+    # ---------------------------------------------------------- set-agents
+    GIT_ENV = {
+        "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t",
+    }
+
+    def _fake_origin_pair(self, td):
+        """Bare origin + seed pushing commits + a clone acting as the app's repo."""
+        origin = Path(td) / "origin.git"
+        run("git", "init", "--quiet", "--bare", "-b", "main", str(origin))
+        seed = Path(td) / "seed"
+        run("git", "clone", "--quiet", str(origin), str(seed))
+        (seed / "file.txt").write_text("v1\n")
+        run("git", "-C", str(seed), "add", ".", env=self.GIT_ENV)
+        run("git", "-C", str(seed), "commit", "--quiet", "-m", "v1", env=self.GIT_ENV)
+        run("git", "-C", str(seed), "push", "--quiet", "origin", "main", env=self.GIT_ENV)
+        app_root = Path(td) / "app"
+        run("git", "clone", "--quiet", str(origin), str(app_root))
+        return seed, app_root
+
+    def _push_commit(self, seed, content):
+        (seed / "file.txt").write_text(content)
+        run("git", "-C", str(seed), "commit", "--quiet", "-am", content, env=self.GIT_ENV)
+        run("git", "-C", str(seed), "push", "--quiet", "origin", "main", env=self.GIT_ENV)
+
+    def test_set_agents_update_flow(self):
+        with tempfile.TemporaryDirectory() as td:
+            seed, app_root = self._fake_origin_pair(td)
+            env = {"SET_AGENTS_ROOT": str(app_root), "SET_AGENTS_STATE": str(Path(td) / "state")}
+            result = run("bash", "set-agents", "--check-update", env=env)
+            self.assertIn("UPDATE_AVAILABLE=0", result.stdout)
+            self._push_commit(seed, "v2\n")
+            result = run("bash", "set-agents", "--check-update", env=env)
+            self.assertIn("UPDATE_AVAILABLE=1", result.stdout)
+            result = run("bash", "set-agents", "--update", "--no-install", env=env)
+            self.assertIn("UPDATE_APPLIED", result.stdout)
+            self.assertEqual((app_root / "file.txt").read_text(), "v2\n")
+            # Dirty tree must block, applied update must converge to 0.
+            self._push_commit(seed, "v3\n")
+            (app_root / "file.txt").write_text("local change\n")
+            result = run("bash", "set-agents", "--update", "--no-install", env=env, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("UPDATE_BLOCKED", result.stdout)
+
+    def test_set_agents_status_and_auto_update_config(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, _ = self._bootstrap_env(td, ())
+            env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+            result = run("bash", "set-agents", "--auto-update", "off", env=env)
+            self.assertIn("AUTO_UPDATE=off", result.stdout)
+            result = run("bash", "set-agents", "--status", env=env)
+            self.assertRegex(result.stdout, r"APP_STATUS sha=\S+ drift=(ok|stale|unknown) update=\S+ auto_update=off")
+
+    def test_install_sh_creates_set_agents_link(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex"))
+            result = run("bash", "install.sh", "--dry-run", env=env)
+            self.assertIn("BOOTSTRAP_PLAN set-agents-link", result.stdout)
+            result = run(
+                "bash", "install.sh", "--skip-deps", "--skip-auth", "--no-install", "--yes",
+                env=env,
+            )
+            self.assertIn("BOOTSTRAP_OK set-agents-link", result.stdout)
+            link = Path(env["HOME"]) / ".local/bin/set-agents"
+            self.assertEqual(link.resolve(), ROOT / "set-agents")
+            result = run(
+                "bash", "install.sh", "--skip-deps", "--skip-auth", "--no-install", "--yes",
+                env=env,
+            )
+            self.assertIn("BOOTSTRAP_SKIP set-agents-link", result.stdout)
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
