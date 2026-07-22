@@ -213,6 +213,12 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
   [--feature-id ...]` to persist a narration block that has no `record-spawn` of its own: every closing
   block, and every block emitted in consult or quick-fix mode. It feeds the `## Bitácora` section of
   `ai/state/STATUS.md` and the cumulative per-feature `bitacora.md` that `/bitacora` reads.
+- `log-decision --title ... --context ... --decision ...` when a decision transcends its package (approach
+  chosen over alternatives, contract shape, accepted tradeoff). It feeds `docs/notas/decisiones/` in the
+  project's living notes. ADRs written by `architect` are NOT duplicated here — `log-decision` is the
+  lighter tier below an ADR.
+- The living notes under `docs/notas/` regenerate automatically on every state mutation when the directory
+  exists; run `sync-notes` explicitly only to backfill a project that just got its notes seeded.
 
 If the state machine rejects a transition, do not work around it in chat. Fix the missing precondition or mark
 `BLOCKED`. The same discipline applies to an open architecture finding from `spec-challenger`: it is a missing

@@ -96,3 +96,8 @@ When the orchestrator hands you finding/report files at feature close (or after 
 4. Compaction, same pass: if a domain file exceeds ~120 lines, dedupe, generalize entries that repeat,
    and delete what is obsolete. The file is a curated department memory, not an append-only log.
 5. Never touch `docs/ai/knowledge/_global/*.md` — that layer is distributed read-only from the harness repo.
+6. Living notes: at feature close, run `python3 ai/scripts/feature-state.py sync-notes` and verify
+   `docs/notas/features/<feature-id>.md` reflects the final state. If a `## Decisiones y porqués` item is a
+   decision that transcends its package and has no `log-decision` entry yet, record it with
+   `feature-state.py log-decision` (it lands in `docs/notas/decisiones/`). Never hand-edit generated
+   `notas:auto` blocks.

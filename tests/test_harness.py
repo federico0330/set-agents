@@ -616,6 +616,17 @@ class HarnessTests(unittest.TestCase):
             feature = (root / "docs/notas/features/feat-x.md").read_text()
             self.assertIn("SQLite y no Postgres", feature)
 
+    def test_shared_doctrine_covers_living_docs(self):
+        for name in ("AGENTS.opencode.md", "CLAUDE.md", "AGENTS.codex.md"):
+            text = (ROOT / "Global/_shared" / name).read_text(encoding="utf-8")
+            self.assertIn("## Living documentation", text, name)
+            self.assertIn("docs/notas", text, name)
+            self.assertIn("log-decision", text, name)
+        orchestrator = (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("log-decision", orchestrator)
+        scribe = (ROOT / "Global/codex/agents/memory-scribe.toml").read_text(encoding="utf-8")
+        self.assertIn("sync-notes", scribe)
+
     def test_vault_init_seeds_company_vault(self):
         with tempfile.TemporaryDirectory() as td:
             env = {"SET_AGENTS_STATE": str(Path(td) / "state")}
