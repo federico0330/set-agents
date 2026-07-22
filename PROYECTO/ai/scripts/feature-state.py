@@ -336,6 +336,7 @@ def mutate(
         atomic_write(path, data)
         render_status(path)
         render_bitacora(path)
+        render_notes(path)
     return data, before != data
 
 
@@ -739,6 +740,283 @@ def render_status(state_file: Path) -> None:
         pass
 
 
+# ------------------------------------------------------------ living notes ---
+# Obsidian-friendly living docs under docs/notas/: a project hub, one note per
+# feature, one per package, and one per logged decision, all wired with
+# [[wikilinks]]. Same contract as STATUS.md/bitacora: fully regenerated from
+# state on every mutation, atomic writes, never raises. Opt-in by directory:
+# a repo without docs/notas/ never gets notes written.
+
+NOTES_AUTO_BEGIN = "<!-- notas:auto -->"
+NOTES_AUTO_END = "<!-- /notas:auto -->"
+DECISIONS_LOG = "decisions-log.jsonl"
+
+
+def slugify(text: str) -> str:
+    slug = "".join(ch if ch.isalnum() else "-" for ch in text.lower())
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-") or "decision"
+
+
+def notes_root(state_file: Path, notes_dir: str | None = None) -> Path | None:
+    if notes_dir:
+        return Path(notes_dir)
+    _, out_dir = status_root(state_file)
+    notes = out_dir.parent.parent / "docs" / "notas"
+    return notes if notes.is_dir() else None
+
+
+def merge_note(existing: str | None, title: str, body: str) -> str:
+    """Regenerate only the machine-owned block; everything else is the human's."""
+    generated = f"{NOTES_AUTO_BEGIN}\n{body.rstrip()}\n{NOTES_AUTO_END}"
+    if existing and NOTES_AUTO_BEGIN in existing and NOTES_AUTO_END in existing:
+        prefix, rest = existing.split(NOTES_AUTO_BEGIN, 1)
+        _, suffix = rest.split(NOTES_AUTO_END, 1)
+        return prefix + generated + suffix
+    return (
+        f"# {title}\n\n{generated}\n\n"
+        "## Notas propias\n\n_Lo que escribas fuera del bloque auto se preserva en cada regeneración._\n"
+    )
+
+
+def write_note(path: Path, title: str, body: str) -> bool:
+    existing = path.read_text(encoding="utf-8") if path.exists() else None
+    payload = merge_note(existing, title, body)
+    if existing == payload:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", dir=str(path.parent), delete=False, encoding="utf-8") as handle:
+        handle.write(payload)
+        tmp_name = handle.name
+    os.replace(tmp_name, path)
+    return True
+
+
+def _short(text: Any, limit: int = 120) -> str:
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _decision_name(entry: dict[str, Any]) -> str:
+    return f"{entry.get('at', '')[:10]} {entry.get('slug', 'decision')}".strip()
+
+
+def _unique_decisions(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    keyed: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        keyed[_decision_name(entry)] = entry  # last write wins per (date, slug)
+    return list(keyed.values())
+
+
+def _pending_bits(data: dict[str, Any]) -> list[str]:
+    bits = []
+    step = next_transition(data)
+    if step.get("next"):
+        bits.append(f"→ `{step['next']}` — {step.get('reason', '')}")
+    for blocker in data.get("blockers", []):
+        if not blocker.get("resolved_at"):
+            bits.append(f"⛔ bloqueo: {_short(blocker.get('reason', ''))}")
+    open_findings = sum(
+        1
+        for package in data.get("packages", [])
+        for finding in package.get("findings", [])
+        if finding.get("status", "open") not in {"closed", "accepted"}
+    )
+    if open_findings:
+        bits.append(f"{open_findings} hallazgos abiertos")
+    try:
+        package = package_by_id(data)
+    except StateError:
+        package = None
+    if package:
+        pending = [t.get("id", "?") for t in package.get("tasks", []) if t.get("status") != "completed"]
+        if pending:
+            bits.append(f"tareas pendientes en {package.get('package_id')}: {', '.join(pending)}")
+    return bits
+
+
+def _hub_body(states: list[dict[str, Any]], out_dir: Path, decisions: list[dict[str, Any]]) -> str:
+    lines = ["## Features", ""]
+    if not states:
+        lines.append("- _todavía no hay features en el state_")
+    for data in states:
+        fid = data.get("feature_id", "?")
+        packages = data.get("packages", [])
+        accepted = sum(1 for p in packages if p.get("status") == "accepted")
+        tail = f" · **{data['final_state']}**" if data.get("final_state") else ""
+        lines.append(
+            f"- [[features/{fid}|{fid}]] — fase `{data.get('phase')}` · paquetes {accepted}/{len(packages)}{tail}"
+        )
+    lines += ["", "## Qué falta", ""]
+    pending_any = False
+    for data in states:
+        for bit in _pending_bits(data):
+            lines.append(f"- **{data.get('feature_id')}** {bit}")
+            pending_any = True
+    if not pending_any:
+        lines.append("- _nada pendiente en features activas_ ✅")
+    quickfixes = read_jsonl(out_dir / "quickfix-log.jsonl")
+    if quickfixes:
+        lines += ["", "## Quick-fixes recientes", ""]
+        for entry in quickfixes[-5:][::-1]:
+            lines.append(f"- {entry.get('at', '')[:16]} — {_short(entry.get('summary', ''))} ({entry.get('result', '')})")
+    if decisions:
+        lines += ["", "## Decisiones", ""]
+        for entry in decisions[-8:][::-1]:
+            lines.append(f"- [[decisiones/{_decision_name(entry)}|{entry.get('title', '')}]]")
+    updated = max((data.get("updated_at", "") for data in states), default="-")
+    lines += [
+        "", "## Referencias", "",
+        "- `ai/state/STATUS.md` — dashboard técnico",
+        "- `docs/adr/` — decisiones formales de arquitectura",
+        "", f"_Actualizado: {updated}_",
+    ]
+    return "\n".join(lines)
+
+
+def _feature_body(
+    data: dict[str, Any], out_dir: Path,
+    narrative: list[dict[str, Any]], decisions: list[dict[str, Any]],
+) -> str:
+    fid = data.get("feature_id", "?")
+    lines = ["## Estado", "", f"- fase: `{data.get('phase')}` · modo: {data.get('mode') or 'feature'} · revisión {data.get('revision', 0)}"]
+    if data.get("final_state"):
+        lines.append(f"- estado final: **{data['final_state']}**")
+    spec = data.get("approved_spec") or {}
+    if spec.get("path"):
+        lines.append(f"- spec: `{spec['path']}` (hash `{str(spec.get('hash', ''))[:12]}`)")
+    criteria = data.get("acceptance_criteria", [])
+    if criteria:
+        lines += ["", "## Criterios de aceptación", ""] + [f"- {item}" for item in criteria]
+    packages = data.get("packages", [])
+    if packages:
+        lines += ["", "## Paquetes", ""]
+        for package in packages:
+            pid = package.get("package_id", "?")
+            lines.append(f"- [[features/{fid}/{pid}|{pid}]] — {package.get('status')} · {_short(package.get('objective', ''), 90)}")
+    approach = []
+    for package in packages:
+        if package.get("routing_reason"):
+            approach.append(f"- ruteo {package.get('package_id')}: {_short(package['routing_reason'])}")
+    for entry in [e for e in narrative if e.get("feature_id") == fid and e.get("tech")][-6:]:
+        approach.append(f"- [{entry.get('at', '')[:10]}] {entry.get('role', '-')}: {_short(entry.get('tech', ''), 180)}")
+    for entry in decisions:
+        if entry.get("feature_id") == fid:
+            approach.append(f"- decisión: [[decisiones/{_decision_name(entry)}|{entry.get('title', '')}]]")
+    if approach:
+        lines += ["", "## Approach y decisiones", ""] + approach
+    pending = _pending_bits(data)
+    lines += ["", "## Qué falta", ""] + ([f"- {bit}" for bit in pending] or ["- _nada pendiente_ ✅"])
+    budgets = data.get("budgets", {})
+    spawns = sum(p.get("attempts", {}).get("spawns", 0) for p in packages)
+    lines += [
+        "", "## Presupuestos", "",
+        f"- spawns: {spawns} (máx {budgets.get('max_spawns_per_package', '?')}/paquete) · "
+        f"deep review máx {budgets.get('max_deep_review_cycles', '?')} ciclos",
+        "", f"[[00 - Proyecto|⌂ Proyecto]] · bitácora: `{bitacora_path(out_dir, fid)}`",
+        "", f"_Actualizado: {data.get('updated_at', '-')}_",
+    ]
+    return "\n".join(lines)
+
+
+def _package_body(fid: str, package: dict[str, Any]) -> str:
+    lines = ["## Motivo", "", f"- objetivo: {package.get('objective', '-')}"]
+    if package.get("routing_reason"):
+        lines.append(f"- ruteo: {_short(package['routing_reason'])} → {package.get('selected_role', '?')} ({package.get('selected_model', '?')})")
+    if package.get("complexity"):
+        lines.append(f"- complejidad: {package['complexity']}")
+    for risk in package.get("risks", []):
+        lines.append(f"- riesgo: {_short(risk)}")
+    if package.get("owned_paths"):
+        lines.append("- paths: `" + "`, `".join(package["owned_paths"]) + "`")
+    if package.get("dependencies"):
+        lines.append(f"- depende de: {', '.join(package['dependencies'])}")
+    tasks = package.get("tasks", [])
+    if tasks:
+        lines += ["", "## Tareas", ""]
+        for task in tasks:
+            mark = "x" if task.get("status") == "completed" else " "
+            extra = f" · {', '.join(task.get('local_validations', []))}" if task.get("local_validations") else ""
+            lines.append(f"- [{mark}] {task.get('id')} ({task.get('status')}){extra}")
+    findings = package.get("findings", [])
+    if findings:
+        lines += ["", "## Hallazgos", ""]
+        for finding in findings:
+            label = finding.get("category") or finding.get("summary") or ""
+            lines.append(f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')} — {_short(label)}")
+    trail = []
+    for review in package.get("reviews", []):
+        trail.append(f"- review: {review.get('verdict')} ({len(review.get('findings', []))} hallazgos)")
+    for repair in package.get("repairs", []):
+        trail.append(f"- repair: {', '.join(repair.get('finding_ids', []))} → {len(repair.get('changed_files', []))} archivos")
+    for delta in package.get("delta_reviews", []):
+        trail.append(f"- delta review: {delta.get('verdict')}")
+    for testing in package.get("testing", []):
+        trail.append(f"- testing: {testing.get('status')}")
+    for qa in package.get("runtime_qa", []):
+        trail.append(f"- runtime QA: {qa.get('status')}{' (waived)' if qa.get('waived') else ''}")
+    for gate in package.get("gates", []):
+        trail.append(f"- gate `{gate.get('name')}`: {gate.get('status')}")
+    if trail:
+        lines += ["", "## Recorrido", ""] + trail
+    if package.get("context_pack"):
+        lines += ["", f"context pack: `{package['context_pack']}`"]
+    lines += ["", f"↩ [[features/{fid}|{fid}]]"]
+    return "\n".join(lines)
+
+
+def _decision_body(entry: dict[str, Any]) -> str:
+    lines = [f"- fecha: {entry.get('at', '')[:10]} · actor: {entry.get('actor', '-')}"]
+    links = []
+    if entry.get("feature_id"):
+        links.append(f"[[features/{entry['feature_id']}|{entry['feature_id']}]]")
+        if entry.get("package_id"):
+            links.append(f"[[features/{entry['feature_id']}/{entry['package_id']}|{entry['package_id']}]]")
+    if links:
+        lines.append("- alcance: " + " · ".join(links))
+    lines += ["", "## Contexto", "", entry.get("context", "-"), "", "## Decisión", "", entry.get("decision", "-")]
+    if entry.get("consequences"):
+        lines += ["", "## Consecuencias", "", entry["consequences"]]
+    return "\n".join(lines)
+
+
+def render_notes(state_file: Path, notes_dir: str | None = None, project_name: str | None = None) -> list[str]:
+    """Rebuild the living docs. Never raises: a broken note must not block state."""
+    written: list[str] = []
+    try:
+        notes = notes_root(state_file, notes_dir)
+        if notes is None:
+            return written
+        features_dir, out_dir = status_root(state_file)
+        states = []
+        for path in sorted(features_dir.glob("*.json")):
+            try:
+                states.append(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError):
+                continue
+        narrative = collect_narrative(features_dir, out_dir)
+        decisions = _unique_decisions(read_jsonl(out_dir / DECISIONS_LOG))
+        project = project_name or notes.resolve().parent.parent.name
+        if write_note(notes / "00 - Proyecto.md", f"{project} — notas", _hub_body(states, out_dir, decisions)):
+            written.append("00 - Proyecto.md")
+        for data in states:
+            fid = data.get("feature_id", "?")
+            if write_note(notes / "features" / f"{fid}.md", fid, _feature_body(data, out_dir, narrative, decisions)):
+                written.append(f"features/{fid}.md")
+            for package in data.get("packages", []):
+                pid = package.get("package_id", "?")
+                if write_note(notes / "features" / fid / f"{pid}.md", f"{fid} · {pid}", _package_body(fid, package)):
+                    written.append(f"features/{fid}/{pid}.md")
+        for entry in decisions:
+            name = _decision_name(entry)
+            if write_note(notes / "decisiones" / f"{name}.md", entry.get("title", "Decisión"), _decision_body(entry)):
+                written.append(f"decisiones/{name}.md")
+    except OSError:
+        pass
+    return written
+
+
 def output_state(data: dict[str, Any], changed: bool = False, path: Path | None = None) -> int:
     print_json({"ok": True, "changed": changed, "state_file": str(path) if path else None, "state": data, "next": next_transition(data)})
     return 0
@@ -768,6 +1046,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     atomic_write(path, data)
     render_status(path)
     render_bitacora(path)
+    render_notes(path)
     return output_state(data, True, path)
 
 
@@ -1448,7 +1727,9 @@ def cmd_log_quickfix(args: argparse.Namespace) -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
-    render_status(log_path.parent / "features" / "_anchor.json")
+    anchor = log_path.parent / "features" / "_anchor.json"
+    render_status(anchor)
+    render_notes(anchor)
     print_json({"ok": True, "log_file": str(log_path), "entry": entry})
     return 0
 
@@ -1477,7 +1758,60 @@ def cmd_log_narrative(args: argparse.Namespace) -> int:
     anchor = log_path.parent / "features" / "_anchor.json"
     render_status(anchor)
     render_bitacora(anchor)
+    render_notes(anchor)
     print_json({"ok": True, "log_file": str(log_path), "entry": entry})
+    return 0
+
+
+def cmd_log_decision(args: argparse.Namespace) -> int:
+    """Persist a decision that outlives its package (the tier below a formal ADR).
+
+    Appends to ai/state/decisions-log.jsonl and re-renders the living notes so
+    docs/notas/decisiones/ gets its own [[linked]] note. Idempotent: logging the
+    same decision again is a no-op.
+    """
+    log_path = Path(args.log_file) if args.log_file else Path("ai/state") / DECISIONS_LOG
+    slug = args.slug or slugify(args.title)
+    duplicate = next(
+        (
+            entry for entry in read_jsonl(log_path)
+            if entry.get("slug") == slug and entry.get("title") == args.title
+            and entry.get("decision") == args.decision
+        ),
+        None,
+    )
+    entry = duplicate or {
+        "at": now(),
+        "slug": slug,
+        "title": args.title,
+        "context": args.context,
+        "decision": args.decision,
+        "consequences": args.consequences or "",
+        "feature_id": args.feature_id or "",
+        "package_id": args.package_id or "",
+        "actor": args.actor,
+    }
+    if duplicate is None:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+    render_notes(log_path.parent / "features" / "_anchor.json")
+    print_json({"ok": True, "log_file": str(log_path), "entry": entry, "deduped": duplicate is not None})
+    return 0
+
+
+def cmd_sync_notes(args: argparse.Namespace) -> int:
+    """Backfill/refresh the living notes explicitly (auto-render covers the rest)."""
+    state_dir = Path(args.state_dir) if args.state_dir else Path("ai/state")
+    # Same root derivation the bitacora uses: ai/state -> repo root.
+    default_notes = state_dir.resolve().parent.parent / "docs" / "notas"
+    notes_dir = Path(args.notes_dir) if args.notes_dir else default_notes
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    written = render_notes(
+        state_dir / "features" / "_anchor.json", str(notes_dir), args.project_name,
+    )
+    print(f"NOTES_SYNCED n={len(written)}")
+    print_json({"ok": True, "notes_dir": str(notes_dir), "written": written})
     return 0
 
 
@@ -1816,6 +2150,24 @@ def build_parser() -> argparse.ArgumentParser:
     narrative.add_argument("--actor", default="orchestrator")
     narrative.add_argument("--log-file")
     narrative.set_defaults(func=cmd_log_narrative)
+
+    decision = sub.add_parser("log-decision")
+    decision.add_argument("--title", required=True)
+    decision.add_argument("--context", required=True)
+    decision.add_argument("--decision", required=True)
+    decision.add_argument("--consequences")
+    decision.add_argument("--feature-id")
+    decision.add_argument("--package-id")
+    decision.add_argument("--slug")
+    decision.add_argument("--actor", default="orchestrator")
+    decision.add_argument("--log-file")
+    decision.set_defaults(func=cmd_log_decision)
+
+    notes = sub.add_parser("sync-notes")
+    notes.add_argument("--state-dir")
+    notes.add_argument("--notes-dir")
+    notes.add_argument("--project-name")
+    notes.set_defaults(func=cmd_sync_notes)
 
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")

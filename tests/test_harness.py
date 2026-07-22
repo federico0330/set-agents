@@ -523,6 +523,95 @@ class HarnessTests(unittest.TestCase):
                 result = run("bash", "set-agents", *flags, env=env)
                 self.assertNotIn("\x1b[", result.stdout, f"ANSI leaked into non-TTY output of {flags}")
 
+    # ---------------------------------------------------------- living notes
+    def _notes_project(self, td):
+        """Canonical project layout: ai/state/features + docs/notas, one feature."""
+        root = Path(td)
+        (root / "docs/notas").mkdir(parents=True)
+        state = root / "ai/state/features/feat-x.json"
+        state.parent.mkdir(parents=True)
+        run("python3", str(FEATURE_STATE), "init", "feat-x", "docs/specs/feat-x/spec.md", "hash-abc",
+            "--state-file", str(state), "--ac", "AC-1")
+        run("python3", str(FEATURE_STATE), "create-package", "PKG-01", "Slice observable",
+            "--state-file", str(state), "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+            "--owned-path", "src/**", "--complexity", "small",
+            "--selected-role", "implementer", "--selected-model", "openai/gpt-5.6-terra",
+            "--routing-reason", "tareas chicas y relacionadas")
+        return root, state
+
+    def test_sync_notes_renders_hub_feature_and_package_notes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            hub = (root / "docs/notas/00 - Proyecto.md").read_text()
+            self.assertIn("[[features/feat-x|feat-x]]", hub)
+            self.assertIn("## Qué falta", hub)
+            feature = (root / "docs/notas/features/feat-x.md").read_text()
+            self.assertIn("[[features/feat-x/PKG-01|PKG-01]]", feature)
+            self.assertIn("hash-abc", feature)
+            self.assertIn("tareas chicas y relacionadas", feature)
+            package = (root / "docs/notas/features/feat-x/PKG-01.md").read_text()
+            self.assertIn("- [ ] T-001 (planned)", package)
+            self.assertIn("↩ [[features/feat-x|feat-x]]", package)
+            result = run(
+                "python3", str(FEATURE_STATE), "sync-notes",
+                "--state-dir", str(root / "ai/state"),
+            )
+            self.assertIn("NOTES_SYNCED", result.stdout)
+
+    def test_notes_are_idempotent_and_preserve_manual_edits(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            hub_path = root / "docs/notas/00 - Proyecto.md"
+            run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
+            first = hub_path.read_bytes()
+            run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
+            self.assertEqual(first, hub_path.read_bytes(), "sync-notes must be byte-idempotent")
+            hub_path.write_text(hub_path.read_text() + "\nMi apunte del café.\n")
+            run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
+            after = hub_path.read_text()
+            self.assertIn("Mi apunte del café.", after, "manual text outside the auto block must survive")
+
+    def test_notes_autorender_on_state_mutation_and_optin_by_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            package_note = root / "docs/notas/features/feat-x/PKG-01.md"
+            self.assertIn("- [ ] T-001", package_note.read_text())
+            run("python3", str(FEATURE_STATE), "transition", "PACKAGE_IMPLEMENTATION",
+                "--package-id", "PKG-01", "--state-file", str(state))
+            run("python3", str(FEATURE_STATE), "complete-task", "PKG-01", "T-001",
+                "--actor", "implementer", "--validation", "focused-test", "--state-file", str(state))
+            self.assertIn("- [x] T-001 (completed)", package_note.read_text(),
+                          "a state mutation must refresh notes without calling sync-notes")
+        with tempfile.TemporaryDirectory() as td:
+            # No docs/notas/ -> strictly opt-in, nothing gets created.
+            root = Path(td)
+            state = root / "ai/state/features/feat-y.json"
+            state.parent.mkdir(parents=True)
+            run("python3", str(FEATURE_STATE), "init", "feat-y", "spec.md", "h",
+                "--state-file", str(state), "--ac", "AC-1")
+            self.assertFalse((root / "docs/notas").exists())
+
+    def test_log_decision_appends_and_renders_note(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            log = root / "ai/state/decisions-log.jsonl"
+            for _ in range(2):  # second run must dedupe
+                result = run(
+                    "python3", str(FEATURE_STATE), "log-decision",
+                    "--title", "SQLite y no Postgres", "--context", "proyecto chico, un solo host",
+                    "--decision", "usamos SQLite embebido", "--consequences", "migrar si crece",
+                    "--feature-id", "feat-x", "--log-file", str(log),
+                )
+            self.assertIn('"deduped": true', result.stdout)
+            self.assertEqual(len(log.read_text().strip().splitlines()), 1)
+            notes = list((root / "docs/notas/decisiones").glob("* sqlite-y-no-postgres.md"))
+            self.assertEqual(len(notes), 1)
+            body = notes[0].read_text()
+            self.assertIn("[[features/feat-x|feat-x]]", body)
+            self.assertIn("usamos SQLite embebido", body)
+            feature = (root / "docs/notas/features/feat-x.md").read_text()
+            self.assertIn("SQLite y no Postgres", feature)
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
