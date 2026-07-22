@@ -195,6 +195,92 @@ def launch_update_check():
     return "al día (recién actualizado)"
 
 
+# --------------------------------------------------------------------- tools
+
+def load_catalog():
+    return tomllib.loads((ROOT / "tools.toml").read_text())
+
+
+def platform_pm():
+    if sys.platform == "darwin":
+        return "brew" if shutil.which("brew") else None
+    for pm, binary in (("pacman", "pacman"), ("apt", "apt-get")):
+        if shutil.which(binary):
+            return pm
+    return None
+
+
+def pick_method(install):
+    """First applicable method: platform pm -> npm -> curl. None -> manual."""
+    order = [platform_pm()]
+    if shutil.which("npm") or shutil.which("pnpm"):
+        order.append("npm")
+    order.append("curl")
+    for method in order:
+        if method and method in install:
+            return method
+    return None
+
+
+def cmd_tools():
+    for name, entry in load_catalog().get("cli", {}).items():
+        installed = bool(shutil.which(entry["detect"]))
+        print(f"TOOL {name} installed={'yes' if installed else 'no'}")
+    return 0
+
+
+def cmd_tools_install(name, dry=False, yes=False):
+    entry = load_catalog().get("cli", {}).get(name)
+    if entry is None:
+        print(f"TOOL_UNKNOWN {name} — agregalo en tools.toml")
+        return 2
+    if shutil.which(entry["detect"]):
+        print(f"TOOL_SKIP {name} ({version_of(entry['detect'])})")
+        return 0
+    method = pick_method(entry["install"])
+    if method is None:
+        print(f"TOOL_MANUAL {name}: sin método automático acá — {entry['install'].get('doc', '')}")
+        return 1
+    command = entry["install"][method]
+    if command.startswith("npm ") and not shutil.which("npm"):
+        command = "p" + command  # pnpm fallback, same verbs
+    if dry:
+        print(f"TOOL_PLAN {name} method={method}")
+        return 0
+    if command.startswith("sudo "):
+        # Never silent sudo (same contract as install.sh), even with --yes.
+        if not sys.stdin.isatty():
+            print(f"TOOL_MANUAL {name}: necesita sudo — corré: {command}")
+            return 1
+        print(f"Se necesita privilegio de administrador para:\n    {command}")
+        if input("¿Ejecutar ese comando? [y/N] ").strip().lower() not in {"y", "yes", "s", "si"}:
+            return 1
+    elif not yes and sys.stdin.isatty():
+        if input(f"¿Ejecutar '{command}'? [y/N] ").strip().lower() not in {"y", "yes", "s", "si"}:
+            return 1
+    result = subprocess.run(["bash", "-c", command], check=False)
+    if result.returncode == 0:
+        print(f"TOOL_OK {name}")
+        if entry.get("note"):
+            print(f"NOTA: {entry['note']}")
+        return 0
+    print(f"TOOL_FAIL {name} rc={result.returncode} — {entry['install'].get('doc', '')}")
+    return 1
+
+
+def tools_menu():
+    catalog = load_catalog().get("cli", {})
+    names = list(catalog)
+    print()
+    for index, name in enumerate(names, 1):
+        installed = bool(shutil.which(catalog[name]["detect"]))
+        state = color("instalado", "32") if installed else "falta"
+        print(f"  [{index}] {name:<10} {state}")
+    answer = input("¿Cuál instalo? (número, Enter vuelve): ").strip()
+    if answer.isdigit() and 1 <= int(answer) <= len(names):
+        cmd_tools_install(names[int(answer) - 1])
+
+
 # ---------------------------------------------------------------------- menu
 
 def run_tty(command):
@@ -213,6 +299,7 @@ def menu():
         print("[1] Instalar / Reparar")
         print("[2] Actualizar")
         print("[3] Modelos")
+        print("[4] Herramientas (CLIs)")
         print("[7] Estado")
         print("[8] Salir")
         choice = input("> ").strip()
@@ -223,6 +310,8 @@ def menu():
             update_badge = "al día"
         elif choice == "3":
             run_tty([str(ROOT / "setup-models.sh")])
+        elif choice == "4":
+            tools_menu()
         elif choice == "7":
             cmd_status(human=True)
             answer = input("auto-update: [t]oggle / Enter para volver: ").strip().lower()
@@ -240,6 +329,9 @@ def main():
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--no-install", action="store_true")
     parser.add_argument("--auto-update", choices=("on", "off"))
+    parser.add_argument("--tools", action="store_true", help="TOOL <name> installed=yes/no")
+    parser.add_argument("--tools-install", metavar="NAME")
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     if args.status:
@@ -251,6 +343,10 @@ def main():
     if args.auto_update:
         set_auto_update(args.auto_update == "on")
         return 0
+    if args.tools:
+        return cmd_tools()
+    if args.tools_install:
+        return cmd_tools_install(args.tools_install, dry=args.dry_run, yes=args.yes)
     if not sys.stdin.isatty():
         parser.print_help()
         return 2

@@ -1,0 +1,68 @@
+# tools.toml — optional tools catalog for ./set-agents (data only: adding a
+# tool or an MCP server is a new block here, never code).
+#
+# [cli.<name>]  detect = binary to probe; install.<method> = exact command.
+# Methods tried in order: platform package manager (pacman/apt/brew), npm, curl.
+# `doc` is the fallback URL when no method applies. sudo commands always show
+# the exact line and ask, even under --yes.
+#
+# [mcp.<name>]  type local (command) or remote (url); added DISABLED where the
+# harness supports it, per the repo MCP policy.
+
+[cli.supabase]
+detect = "supabase"
+[cli.supabase.install]
+brew = "brew install supabase/tap/supabase"
+npm = "npm install -g supabase"
+doc = "https://supabase.com/docs/guides/local-development/cli/getting-started"
+
+[cli.vercel]
+detect = "vercel"
+[cli.vercel.install]
+npm = "npm install -g vercel"
+doc = "https://vercel.com/docs/cli"
+
+[cli.gcloud]
+detect = "gcloud"
+[cli.gcloud.install]
+curl = "curl -sSL https://sdk.cloud.google.com | bash"
+doc = "https://cloud.google.com/sdk/docs/install"
+
+[cli.gh]
+detect = "gh"
+[cli.gh.install]
+pacman = "sudo pacman -S --needed --noconfirm github-cli"
+apt = "sudo apt-get install -y gh"
+brew = "brew install gh"
+doc = "https://cli.github.com"
+
+[cli.docker]
+detect = "docker"
+note = "después de instalar: sudo systemctl enable --now docker && sudo usermod -aG docker $USER"
+[cli.docker.install]
+pacman = "sudo pacman -S --needed --noconfirm docker"
+apt = "sudo apt-get install -y docker.io"
+brew = "brew install --cask docker"
+doc = "https://docs.docker.com/engine/install/"
+
+[cli.jq]
+detect = "jq"
+note = "requerido por ai/scripts/mcp.sh"
+[cli.jq.install]
+pacman = "sudo pacman -S --needed --noconfirm jq"
+apt = "sudo apt-get install -y jq"
+brew = "brew install jq"
+doc = "https://jqlang.org"
+
+[mcp.supabase]
+type = "local"
+command = ["npx", "-y", "@supabase/mcp-server-supabase@latest"]
+note = "requiere SUPABASE_ACCESS_TOKEN en el entorno"
+
+[mcp.context7]
+type = "remote"
+url = "https://mcp.context7.com/mcp"
+
+[mcp.playwright]
+type = "local"
+command = ["npx", "-y", "@playwright/mcp@latest"]

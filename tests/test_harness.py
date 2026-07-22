@@ -380,6 +380,28 @@ class HarnessTests(unittest.TestCase):
             )
             self.assertIn("BOOTSTRAP_SKIP set-agents-link", result.stdout)
 
+    def test_set_agents_tools_catalog(self):
+        with tempfile.TemporaryDirectory() as td:
+            env, stubs = self._bootstrap_env(td, ("npm", "jq"))
+            sentinel = Path(td) / "curl-was-called"
+            curl = stubs / "curl"
+            curl.write_text(f"#!/bin/sh\ntouch {sentinel}\n")
+            curl.chmod(0o755)
+            env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+            result = run("bash", "set-agents", "--tools", env=env)
+            self.assertIn("TOOL jq installed=yes", result.stdout)
+            self.assertIn("TOOL supabase installed=no", result.stdout)
+            self.assertIn("TOOL vercel installed=no", result.stdout)
+            # Dry-run plans the right method and never fetches anything.
+            result = run("bash", "set-agents", "--tools-install", "supabase", "--dry-run", env=env)
+            self.assertIn("TOOL_PLAN supabase method=npm", result.stdout)
+            result = run("bash", "set-agents", "--tools-install", "jq", "--dry-run", env=env)
+            self.assertIn("TOOL_SKIP jq", result.stdout)
+            result = run("bash", "set-agents", "--tools-install", "ghost", env=env, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("TOOL_UNKNOWN", result.stdout)
+            self.assertFalse(sentinel.exists())
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
