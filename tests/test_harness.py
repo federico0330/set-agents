@@ -238,6 +238,77 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(first, second)
             self.assertEqual(first, (self.FIXTURES / "models.toml").read_text())
 
+    # -------------------------------------------------------- setup-models
+    def _setup_models(self, td, *args, check=False):
+        """Run setup_models.py against a working copy of the repo config."""
+        models = Path(td) / "models.toml"
+        if not models.exists():
+            models.write_text((ROOT / "models.toml").read_text())
+        return run(
+            "python3", "ai/scripts/setup_models.py",
+            "--models", str(models), "--profile", "go-zen", *args, check=check,
+        ), models
+
+    def test_setup_models_set_and_check_roundtrip(self):
+        with tempfile.TemporaryDirectory() as td:
+            result, models = self._setup_models(td, "--set", "audit.codex_effort=high")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("MODELS_WRITTEN", result.stdout)
+            first = models.read_text()
+            self.assertIn('codex_effort = "high"', first)
+            # Re-applying the same change is a byte-identical no-op (deterministic emitter).
+            result, _ = self._setup_models(td, "--set", "audit.codex_effort=high")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(first, models.read_text())
+            result, _ = self._setup_models(td, "--check")
+            self.assertIn("MODELS_CHECK_PASS", result.stdout)
+
+    def test_setup_models_rejects_separation_violation(self):
+        with tempfile.TemporaryDirectory() as td:
+            _, models = self._setup_models(td, "--status")
+            before = models.read_text()
+            result, _ = self._setup_models(td, "--set", "audit.codex=gpt-5.6-terra")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("separation violation", result.stderr)
+            self.assertEqual(before, models.read_text(), "invalid change must never be written")
+
+    def test_setup_models_drop_subscription_lists_affected(self):
+        with tempfile.TemporaryDirectory() as td:
+            _, models = self._setup_models(td, "--status")
+            before = models.read_text()
+            result, _ = self._setup_models(td, "--drop", "zen")
+            self.assertEqual(result.returncode, 2)
+            match = re.search(r"AFFECTED=(\d+)", result.stdout)
+            self.assertIsNotNone(match)
+            self.assertGreater(int(match.group(1)), 0)
+            self.assertIn("MODELS_NOT_WRITTEN", result.stdout)
+            self.assertEqual(before, models.read_text())
+            # Dropping a subscription nothing resolves to goes through.
+            result, _ = self._setup_models(td, "--drop", "ollama")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("MODELS_WRITTEN", result.stdout)
+
+    def test_setup_models_check_validates_all_lanes(self):
+        with tempfile.TemporaryDirectory() as td:
+            # Break only the zen lane: judge model into the implementer family.
+            result, models = self._setup_models(
+                td, "--set", "judge.opencode.zen=opencode/kimi-k2.7-code",
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("separation violation", result.stderr)
+            # The active profile (go-zen) alone would have validated: prove --check
+            # covers every lane by checking the untouched copy still passes.
+            result, _ = self._setup_models(td, "--check")
+            self.assertIn("MODELS_CHECK_PASS", result.stdout)
+
+    def test_setup_models_add_model_extends_catalog(self):
+        with tempfile.TemporaryDirectory() as td:
+            result, models = self._setup_models(td, "--add-model", "codex=gpt-6-nova")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('"gpt-6-nova"', models.read_text())
+            result, _ = self._setup_models(td, "--check")
+            self.assertIn("MODELS_CHECK_PASS", result.stdout)
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",

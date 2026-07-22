@@ -273,6 +273,7 @@ repo_config() {
   "$ROOT/build.sh" --check
   if [ ! -f "$HOME/.local/state/set-agentes/managed-files.json" ]; then
     echo "Primera instalación en esta máquina: se aplican los modelos por defecto del repo."
+    echo "Para remapearlos por área/suscripción después: ./setup-models.sh (ver COMO-CAMBIAR-MODELO.md)."
   fi
   [ "$NO_INSTALL" -eq 1 ] && return 0
   if [ "$YES" -eq 1 ]; then
