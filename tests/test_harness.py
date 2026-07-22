@@ -484,6 +484,20 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("install.ps1", result.stdout)
 
+    def test_windows_bootstrap_artifacts(self):
+        ps1 = (ROOT / "install.ps1").read_text()
+        for marker in ("PS_PLAN", "PS_SKIP", "PS_NEED_ADMIN", "BOOTSTRAP_DONE_WINDOWS",
+                       "gh auth login", "gh repo clone federico0330/SET-AGENTS", "[switch]$DryRun"):
+            self.assertIn(marker, ps1)
+        cmd = (ROOT / "set-agents.cmd").read_text()
+        self.assertIn('wsl -e bash -lc "~/SET-AGENTS/set-agents %*"', cmd)
+        import shutil as _shutil
+        if _shutil.which("pwsh"):
+            # Full syntax validation when PowerShell Core is available locally;
+            # CI's windows job always does this regardless.
+            run("pwsh", "-NoProfile", "-Command",
+                f"$null = [ScriptBlock]::Create((Get-Content -Raw '{ROOT / 'install.ps1'}'))")
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
