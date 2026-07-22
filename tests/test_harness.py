@@ -74,6 +74,16 @@ class HarnessTests(unittest.TestCase):
         gate_runner = tomllib.loads((ROOT / "Global/codex/agents/gate-runner.toml").read_text())
         self.assertEqual(gate_runner["sandbox_mode"], "read-only")
 
+    def test_shell_scripts_parse(self):
+        scripts = sorted(
+            path for pattern in ("*.sh", "ai/scripts/*.sh", "PROYECTO/ai/scripts/*.sh")
+            for path in ROOT.glob(pattern)
+        )
+        self.assertGreaterEqual(len(scripts), 5)
+        for script in scripts:
+            with self.subTest(script=str(script.relative_to(ROOT))):
+                run("bash", "-n", str(script))
+
     def test_coordinator_policy(self):
         allowed = [
             "git status --short", "git diff --stat", "dotnet --list-sdks",
