@@ -5,6 +5,33 @@ Para dejar SET-AGENTS funcionando en cualquier máquina (nueva o a medio configu
 ```bash
 git clone https://github.com/federico0330/SET-AGENTS.git
 cd SET-AGENTS
+./set-agents        # abre la app de consola → opción [1] Instalar
+```
+
+`./set-agents` es la puerta de entrada a todo (instala también el comando global
+`set-agents` para usarlo desde cualquier directorio):
+
+```
+[1] Instalar / Reparar    [5] MCPs
+[2] Actualizar            [6] Plugins Claude Code
+[3] Modelos               [7] Estado
+[4] Herramientas (CLIs)   [8] Salir
+```
+
+- **Auto-update**: al abrirla chequea el repo; si hay novedades las aplica sola mostrando qué
+  cambió (backup + rollback de siempre). Se desactiva con `set-agents --auto-update off`.
+  Nunca toca un repo con cambios locales sin commitear.
+- **Herramientas**: catálogo opcional (supabase, vercel, gcloud, gh, docker, jq) definido en
+  `tools.toml` — agregar una herramienta es un bloque de datos, no código.
+- **MCPs**: agrega servers (supabase, context7, playwright) a los harnesses que detecte
+  instalados: opencode, claude, codex, y también cursor y gemini CLI si están. En opencode se
+  agregan apagados (política del repo) y se togglean desde el menú.
+- Todo tiene equivalente scripteable: `set-agents --status | --update | --tools |
+  --tools-install X --dry-run | --mcp-add X --harness h | --plugins` (ver `--help`).
+
+Si preferís el instalador directo sin menú:
+
+```bash
 ./install.sh
 ```
 
