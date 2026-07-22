@@ -22,10 +22,17 @@ scripts (feature-state.py, mcp.sh, e2e.sh, …) into a project, backing up what 
 project-specific `run.sh`/`verify.sh` untouched. It ABORTS if the project has an active (non-terminal)
 feature whose state does not validate against the new schema — close the feature first, or `--force`.
 
+## Bootstrap / compartir
+
+`git clone` + `./install.sh` deja cualquier máquina lista (dependencias, CLIs oficiales,
+logins guiados, config gestionada). Re-ejecutarlo actualiza; detalles en `INSTALACION.md`.
+
 ## Source layout
 
-- `roles.tsv`: one row per role, capabilities, duties, and quota-first models.
-- `active-profile`: `go-zen` or `zen`.
+- `roles.tsv`: one row per role — structure only (mode, temperature, capability, duty).
+- `models.toml`: subscriptions, model catalog, per-area models with per-role overrides.
+  Edit via `./setup-models.sh` (see `COMO-CAMBIAR-MODELO.md`).
+- `active-profile`: `go-zen`, `zen`, or `local` (the opencode lane).
 - `Global/_canonical`: canonical prompts, commands, and skills.
 - `Global/_shared`: shared policy and disabled MCP configuration.
 - `Global/{opencode,claude-code,codex}`: generated, reviewable native output.
