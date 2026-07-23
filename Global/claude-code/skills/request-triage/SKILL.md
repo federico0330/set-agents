@@ -37,7 +37,8 @@ algorithms/complexity — ending with a recommendation plus runner-up. Close by 
 delegate a `memory-scribe` note to the domain knowledge.
 
 ### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
-Triggers — full SDD is chosen ONLY when at least one of these holds, otherwise default to scoped-feature:
+Triggers — full SDD is chosen ONLY when at least one of these holds; otherwise drop to scoped-feature (if a
+concrete risk signal is present) or quick-fix (the default lane):
 - a net-new system or module (not an addition to established infrastructure),
 - genuinely multi-package work (several coherent packages with dependencies),
 - the request touches one of the three architecture axes (data store type, API Gateway, deploy platform)
@@ -54,12 +55,13 @@ integration → judge → release → memory. Tests do NOT approve implementatio
 does. This order is mandatory in feature mode; the three lanes below are the only
 exceptions (scoped-feature / quick-fix / incident).
 
-### 2. Scoped-feature — the DEFAULT for bounded work on existing code
-Triggers: any **well-bounded** change with a clear blast radius on established infrastructure that is too big
-or too sensitive for quick-fix — from "a new endpoint + view" up to the canonical sensitive case, "a login view
-+ password recovery on Supabase". This is the default lane: most day-to-day requests land here, and the full
-SDD ceremony is reserved for the explicit feature-mode triggers above. Running the full panel after every task
-and every repair is waste (that is what turned a login into a 4-5h grind).
+### 2. Scoped-feature — for bounded work that shows a concrete risk signal
+Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
+present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
+multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
+change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
+the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
 Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
 decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
 consolidated package review over the complete package diff** → `security-auditor` when the package
@@ -69,11 +71,13 @@ reviewing the complete relevant package/diff once, then delta-reviewing repairs.
 when one of feature mode's explicit triggers appears (net-new system, multi-package, uncovered architecture
 axis) — "this feels big" is a reason to scope the package better, not to escalate.
 
-### 3. Quick-fix — bounded and low-risk
-Triggers: a small, well-understood change with an obvious blast radius (copy tweak, one-function bug, config
-value). Flow: implement → `gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS
-real risk surfaces mid-way (touches auth/money/PII/migration), then **escalate to scoped-feature or feature
-mode**. MANDATORY at close: record the minimal durable trace with
+### 3. Quick-fix — the DEFAULT for small and medium bounded work
+Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the default lane: most
+day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
+`gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
+to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
+or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
 `python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
 — quick-fixes with no trace are how the development thread gets lost.
 
@@ -85,7 +89,11 @@ Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual cha
 (b) open a follow-up task to do it properly, (c) delegate a memory note. Break-glass is a conscious, logged
 exception to the rigor default — not a licence to abandon it.
 
-Ambiguous which mode? Ask. When risk is unclear, bias toward the more rigorous mode.
+Ambiguous which mode? Ask. Otherwise pick the LIGHTEST mode that covers the risk actually observed in the
+request and the code — not the hypothetical risk. Escalate only when you find a concrete signal from the
+lists above, and name that signal in the narration. Downgrading is equally legitimate: if mid-scoped the
+planner or implementer establishes the change is smaller than assumed (no signal actually present), degrade
+to quick-fix and record why with `log-decision` — escalation is not a one-way ratchet.
 
 ## Physical budgets per mode (enforced by the state CLI, not by prose)
 
@@ -112,16 +120,22 @@ logged decision), do not fight the budget.
 
 ## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
 Before delegating in ANY mode, check the request against the three named axes above: **data store type
-(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. If
-the request plausibly touches one of these AND no existing ADR already covers it for this project, do not
-implement directly — escalate to at least `scoped-feature` with an architecture checkpoint (`architect`
-loads `system-design-decisions`, proposes options, and the orchestrator asks the user per its Question
-policy) before any code is written. This applies even to a request that looks like a quick-fix on its
-surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store decision). A safe
-default is NOT an escape hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. The
+check fires on EVIDENCE, not plausibility: the request or the files it names concretely require one of these
+axes (a new kind of persistence, a new external entry point, a deploy change) AND no existing ADR covers it.
+When it fires, do not implement directly — escalate to at least `scoped-feature` with an architecture
+checkpoint (`architect` loads `system-design-decisions`, proposes options, and the orchestrator asks the user
+per its Question policy) before any code is written. This applies even to a request that looks like a
+quick-fix on its surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store
+decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
+ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
+hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
 
 ## Waking the dormant agents (concrete triggers, not "by risk")
-These agents are permitted but easy to forget — pull them in on these triggers:
+These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in
+the plan or the diff (the concrete files/paths the package owns: auth/, payments/, migrations/, ui
+components, .env-adjacent config), not the topic of the request in the abstract; `package-planner` justifies
+each entry in `required_reviewers` with the paths that demand it:
 - **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
   covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
 - **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).

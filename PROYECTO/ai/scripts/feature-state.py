@@ -83,6 +83,9 @@ MODE_BUDGETS = {
     "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2},
     "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2},
 }
+# --no-render: high-frequency intra-phase writes (record-spawn, log-narrative)
+# defer STATUS/bitacora/notes regeneration; sync-notes consolidates later.
+RENDER_SKIP = False
 
 
 class StateError(RuntimeError):
@@ -334,9 +337,10 @@ def mutate(
         data["updated_at"] = now()
         fail_if_invalid(data)
         atomic_write(path, data)
+        only = data.get("feature_id")
         render_status(path)
-        render_bitacora(path)
-        render_notes(path)
+        render_bitacora(path, only_feature=only)
+        render_notes(path, only_feature=only)
     return data, before != data
 
 
@@ -636,20 +640,27 @@ def bitacora_path(out_dir: Path, feature_id: str) -> Path:
     return out_dir / "bitacora" / f"{feature_id}.md"
 
 
-def render_bitacora(state_file: Path) -> None:
+def render_bitacora(state_file: Path, only_feature: str | None = None) -> None:
     """Rebuild the cumulative per-feature narration log.
 
     STATUS.md keeps only the tail; this file keeps the whole story in the
     language the user can hand to a client. Fully regenerated from state
     history plus narrative-log.jsonl, so it is never hand-edited and never
     drifts. Never raises: narration must not block a state mutation.
+
+    only_feature limits the rebuild to that feature's bitacora — mutations
+    touch one feature, so rewriting every other feature's log is waste.
     """
+    if RENDER_SKIP:
+        return
     try:
         features_dir, out_dir = status_root(state_file)
         by_feature: dict[str, list[dict[str, Any]]] = {}
         for entry in collect_narrative(features_dir, out_dir):
             by_feature.setdefault(entry.get("feature_id") or "sin-feature", []).append(entry)
         for feature_id, items in by_feature.items():
+            if only_feature and feature_id != only_feature:
+                continue
             lines = [
                 f"# Bitácora — {feature_id}",
                 "",
@@ -670,7 +681,7 @@ def render_bitacora(state_file: Path) -> None:
                 handle.write(payload)
                 tmp_name = handle.name
             os.replace(tmp_name, target)
-    except OSError:
+    except Exception:  # narration is best-effort by contract, never blocks state
         pass
 
 
@@ -681,13 +692,15 @@ def render_status(state_file: Path) -> None:
     without any extra orchestration step. Never raises: a broken dashboard must
     not block a state mutation.
     """
+    if RENDER_SKIP:
+        return
     try:
         features_dir, out_dir = status_root(state_file)
         rows = []
         for path in sorted(features_dir.glob("*.json")):
             try:
                 rows.append(summarize_feature(load_state(path)))
-            except (StateError, json.JSONDecodeError):
+            except Exception:  # legacy/malformed schemas degrade to a row, never a crash
                 rows.append({"feature_id": path.stem, "mode": "?", "phase": "INVALID_STATE",
                              "package": "-", "accepted": "-", "spawns": "-", "reviews": "-",
                              "open_findings": "-", "blocker": "state file failed to parse",
@@ -736,7 +749,7 @@ def render_status(state_file: Path) -> None:
             handle.write(payload)
             tmp_name = handle.name
         os.replace(tmp_name, out_dir / "STATUS.md")
-    except OSError:
+    except Exception:  # the dashboard is best-effort by contract, never blocks state
         pass
 
 
@@ -1031,9 +1044,23 @@ def _decision_body(entry: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_notes(state_file: Path, notes_dir: str | None = None, project_name: str | None = None) -> list[str]:
-    """Rebuild the living docs. Never raises: a broken note must not block state."""
+def render_notes(
+    state_file: Path,
+    notes_dir: str | None = None,
+    project_name: str | None = None,
+    only_feature: str | None = None,
+    force: bool = False,
+) -> list[str]:
+    """Rebuild the living docs. Never raises: a broken note must not block state.
+
+    only_feature keeps the hub fresh but regenerates feature/package notes for
+    that feature alone and skips decision notes (they only change on
+    log-decision). force ignores --no-render: sync-notes is the consolidation
+    point and must always render everything.
+    """
     written: list[str] = []
+    if RENDER_SKIP and not force:
+        return written
     try:
         notes = notes_root(state_file, notes_dir)
         if notes is None:
@@ -1053,6 +1080,8 @@ def render_notes(state_file: Path, notes_dir: str | None = None, project_name: s
         for data in states:
             try:
                 fid = data.get("feature_id", "?")
+                if only_feature and fid != only_feature:
+                    continue
                 if write_note(notes / "features" / f"{fid}.md", fid, _feature_body(data, out_dir, narrative, decisions)):
                     written.append(f"features/{fid}.md")
                 for package in _note_packages(data):
@@ -1061,10 +1090,11 @@ def render_notes(state_file: Path, notes_dir: str | None = None, project_name: s
                         written.append(f"features/{fid}/{pid}.md")
             except Exception:  # one malformed feature must not block the rest
                 continue
-        for entry in decisions:
-            name = _decision_name(entry)
-            if write_note(notes / "decisiones" / f"{name}.md", entry.get("title", "Decisión"), _decision_body(entry)):
-                written.append(f"decisiones/{name}.md")
+        if not only_feature:
+            for entry in decisions:
+                name = _decision_name(entry)
+                if write_note(notes / "decisiones" / f"{name}.md", entry.get("title", "Decisión"), _decision_body(entry)):
+                    written.append(f"decisiones/{name}.md")
     except Exception:  # the living docs are best-effort by contract
         pass
     return written
@@ -1098,8 +1128,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     record_event(data, "init", "USER_APPROVAL", "PACKAGE_PLANNING", args.actor, metadata={"spec_path": args.spec_path})
     atomic_write(path, data)
     render_status(path)
-    render_bitacora(path)
-    render_notes(path)
+    render_bitacora(path, only_feature=args.feature_id)
+    render_notes(path, only_feature=args.feature_id)
     return output_state(data, True, path)
 
 
@@ -1809,9 +1839,10 @@ def cmd_log_narrative(args: argparse.Namespace) -> int:
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
     anchor = log_path.parent / "features" / "_anchor.json"
+    only = args.feature_id or None
     render_status(anchor)
-    render_bitacora(anchor)
-    render_notes(anchor)
+    render_bitacora(anchor, only_feature=only)
+    render_notes(anchor, only_feature=only)
     print_json({"ok": True, "log_file": str(log_path), "entry": entry})
     return 0
 
@@ -1854,15 +1885,22 @@ def cmd_log_decision(args: argparse.Namespace) -> int:
 
 
 def cmd_sync_notes(args: argparse.Namespace) -> int:
-    """Backfill/refresh the living notes explicitly (auto-render covers the rest)."""
+    """Consolidation point: full regen of STATUS, bitacora, and the living notes.
+
+    Intra-phase writes may defer rendering via --no-render; this command always
+    renders everything, so run it at phase close and end of turn.
+    """
+    global RENDER_SKIP
+    RENDER_SKIP = False
     state_dir = Path(args.state_dir) if args.state_dir else Path("ai/state")
     # Same root derivation the bitacora uses: ai/state -> repo root.
     default_notes = state_dir.resolve().parent.parent / "docs" / "notas"
     notes_dir = Path(args.notes_dir) if args.notes_dir else default_notes
     notes_dir.mkdir(parents=True, exist_ok=True)
-    written = render_notes(
-        state_dir / "features" / "_anchor.json", str(notes_dir), args.project_name,
-    )
+    anchor = state_dir / "features" / "_anchor.json"
+    render_status(anchor)
+    render_bitacora(anchor)
+    written = render_notes(anchor, str(notes_dir), args.project_name, force=True)
     print(f"NOTES_SYNCED n={len(written)}")
     print_json({"ok": True, "notes_dir": str(notes_dir), "written": written})
     return 0
@@ -1994,8 +2032,9 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--max-repairs-per-finding", type=int)
     init.add_argument("--max-package-subdivisions", type=int)
     init.add_argument("--max-spawns-per-package", type=int)
-    # Doctrine default: scoped is the standard lane for bounded work on existing
-    # code; full feature/SDD budgets are opt-in via explicit --mode feature.
+    # A feature that reaches init already carries a risk signal (quick-fixes
+    # close via log-quickfix, no state file), so scoped budgets are the floor;
+    # full feature/SDD budgets stay opt-in via explicit --mode feature.
     init.add_argument("--mode", choices=sorted(MODE_BUDGETS), default="scoped")
     init.set_defaults(func=cmd_init)
 
@@ -2225,12 +2264,19 @@ def build_parser() -> argparse.ArgumentParser:
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")
     dry.set_defaults(func=cmd_dry_run)
+
+    # Available on every subcommand: defer STATUS/bitacora/notes regeneration
+    # for high-frequency intra-phase writes; sync-notes always renders anyway.
+    for item in sub.choices.values():
+        item.add_argument("--no-render", action="store_true")
     return parser
 
 
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    global RENDER_SKIP
+    RENDER_SKIP = bool(getattr(args, "no_render", False))
     try:
         return args.func(args)
     except (OSError, json.JSONDecodeError, StateError) as exc:

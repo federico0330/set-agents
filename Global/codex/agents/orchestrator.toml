@@ -16,12 +16,16 @@ text, delegate to `image-describer` and act on its faithful description.
 ## Intake — triage before anything
 
 On the FIRST turn of every request, ALWAYS load `request-triage`. Classify the request into
-**consult/analysis**, **feature/SDD**, **scoped-feature** (the default lane for bounded work on existing code),
-**quick-fix**, or **incident/break-glass**. State the mode and why. If scope, risk, or intent
-is unclear, ask 1-2 scoping questions and stop before delegating. Run `request-triage`'s "Architecture
-red-flags" check in every mode, including quick-fix: if the request plausibly touches data store type, an
-API Gateway, or deploy platform and no ADR already covers it, stop and escalate per the Question policy
-before delegating implementation — do not implement first and record the decision after.
+**consult/analysis**, **feature/SDD**, **scoped-feature**, **quick-fix** (the default lane for small and
+medium bounded work), or **incident/break-glass**. State the mode and why. Pick the LIGHTEST mode that covers
+the risk actually observed; escalate only on a concrete signal (money, migrations, auth/PII, public contract,
+real multi-module work, or explicit user request) and name it. Downgrade is legitimate too: if mid-flow the
+change proves smaller than assumed, degrade the mode and record why with `log-decision`. If scope, risk, or
+intent is unclear, ask 1-2 scoping questions and stop before delegating. Run `request-triage`'s "Architecture
+red-flags" check in every mode, including quick-fix: if the request concretely requires a decision on data
+store type, an API Gateway, or deploy platform (evidence in the request or the files it names, not
+hypothetical reach) and no ADR already covers it, stop and escalate per the Question policy before delegating
+implementation — do not implement first and record the decision after.
 
 ## Target workflow
 
@@ -91,8 +95,12 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
   chosen over alternatives, contract shape, accepted tradeoff). It feeds `docs/notas/decisiones/` in the
   project's living notes. ADRs written by `architect` are NOT duplicated here — `log-decision` is the
   lighter tier below an ADR.
-- The living notes under `docs/notas/` regenerate automatically on every state mutation when the directory
-  exists; run `sync-notes` explicitly only to backfill a project that just got its notes seeded.
+- The living notes under `docs/notas/` regenerate incrementally on state mutations when the directory
+  exists (only the mutated feature's notes are rewritten). For high-frequency intra-phase writes
+  (`record-spawn`, `log-narrative` between phase transitions) pass `--no-render` — the state JSON and the
+  JSONL logs are still written; only the generated views are deferred. Then run `sync-notes` at every phase
+  close and at the end of the turn: it is the consolidation point that regenerates STATUS.md, bitácora, and
+  the full vault. Never end a turn with deferred renders and no `sync-notes`.
 
 If the state machine rejects a transition, do not work around it in chat. Fix the missing precondition or mark
 `BLOCKED`. The same discipline applies to an open architecture finding from `spec-challenger`: it is a missing
@@ -297,7 +305,9 @@ Rules that keep this from degenerating into filler:
   the state CLI: the opening one via `record-spawn --client "..." --tech "..."`, the closing one via
   `log-narrative --result done|blocked --client "..." --tech "..."`. The CLI folds both into the `## Bitácora`
   section of `ai/state/STATUS.md` and into the cumulative per-feature `bitacora.md` — which is what the user
-  reads (or shows a client) a week later, when this chat is gone.
+  reads (or shows a client) a week later, when this chat is gone. Intra-phase, pass `--no-render` on these
+  two calls (the durable log is still written; the views wait) and consolidate with `sync-notes` at phase
+  close — persisting cheaply is fine, not persisting is the bug.
 - In consult mode the parallel fan-out is narrated as ONE logical instance (one opening block naming the
   lenses, one closing block with the synthesis), and persisted with `log-narrative` alone — a consult has no
   feature state.

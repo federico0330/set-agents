@@ -595,6 +595,45 @@ class HarnessTests(unittest.TestCase):
                 "--state-file", str(state), "--ac", "AC-1")
             self.assertFalse((root / "docs/notas").exists())
 
+    def test_no_render_defers_views_but_persists_state(self):
+        # Intra-phase writes pass --no-render: JSON/JSONL land, views wait for
+        # sync-notes (the consolidation point).
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            status = root / "ai/state/STATUS.md"
+            feature_note = root / "docs/notas/features/feat-x.md"
+            status_before = status.read_bytes()
+            note_before = feature_note.read_bytes()
+            run("python3", str(FEATURE_STATE), "log-narrative", "--no-render",
+                "--client", "avanzamos con el paquete", "--tech", "spawn intra-fase, render diferido",
+                "--feature-id", "feat-x", "--result", "done",
+                "--log-file", str(root / "ai/state/narrative-log.jsonl"))
+            self.assertEqual(status_before, status.read_bytes(), "--no-render must not touch STATUS.md")
+            self.assertEqual(note_before, feature_note.read_bytes(), "--no-render must not touch notes")
+            log = (root / "ai/state/narrative-log.jsonl").read_text(encoding="utf-8")
+            self.assertIn("render diferido", log, "the durable log must be written regardless")
+            result = run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
+            self.assertIn("NOTES_SYNCED", result.stdout)
+            self.assertIn("avanzamos con el paquete", status.read_text(encoding="utf-8"),
+                          "sync-notes must consolidate the deferred narration into STATUS.md")
+
+    def test_mutation_renders_only_the_mutated_feature(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            other_state = root / "ai/state/features/feat-otro.json"
+            run("python3", str(FEATURE_STATE), "init", "feat-otro", "docs/specs/feat-otro/spec.md",
+                "hash-otro", "--state-file", str(other_state), "--ac", "AC-1")
+            other_note = root / "docs/notas/features/feat-otro.md"
+            sentinel = "# tocado por humano, el render incremental no debe pasar por acá\n"
+            other_note.write_text(sentinel)
+            run("python3", str(FEATURE_STATE), "transition", "PACKAGE_IMPLEMENTATION",
+                "--package-id", "PKG-01", "--state-file", str(state))
+            self.assertEqual(sentinel, other_note.read_text(),
+                             "mutating feat-x must not regenerate feat-otro's note")
+            # sync-notes remains the full-regen path and restores the auto block.
+            run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
+            self.assertIn("notas:auto", other_note.read_text())
+
     def test_sync_notes_tolerates_legacy_dict_packages(self):
         # Pre-schema states keyed packages by id (dict, not list); one malformed
         # feature must not abort the whole render (never-raises contract).
@@ -1257,8 +1296,11 @@ class HarnessTests(unittest.TestCase):
         for harness in ("opencode", "claude-code"):
             self.assertTrue((ROOT / "Global" / harness / "commands/consult.md").exists(), harness)
             self.assertTrue((ROOT / "Global" / harness / "commands/status.md").exists(), harness)
-        # scoped is the default lane; full SDD stays opt-in.
-        self.assertIn("scoped-feature — the DEFAULT".lower(), triage.lower())
+        # quick-fix is the default lane; scoped needs a concrete risk signal; full SDD stays opt-in.
+        self.assertIn("Quick-fix — the DEFAULT".lower(), triage.lower())
+        self.assertIn("concrete risk signal", triage)
+        self.assertNotIn("bias toward the more rigorous mode", triage)
+        self.assertIn("LIGHTEST mode", triage)
         self.assertIn("opt-in", triage)
 
     def test_architecture_gate_is_wired_through_the_canon(self):
