@@ -9,7 +9,7 @@ permission:
   question: ask
   doom_loop: deny
   webfetch: allow
-  websearch: ask
+  websearch: allow
   task:
     "*": deny
     "brainstormer": allow

@@ -93,6 +93,14 @@ privado — solo Federico tiene acceso de escritura; los invitados son solo-lect
 `curl | bash` sin pinning de versión: es el mecanismo oficial de cada vendor y se acepta
 ese riesgo a cambio de recibir siempre la última versión.
 
+**Perfil de permisos (OpenCode)**: el repo se distribuye en modo **yolo** — los agentes y la
+sesión principal ejecutan bash/edits sin pedir confirmación, para que un run no se frene por
+prompts de autorización. Lo irreversible sigue bloqueado SIEMPRE (sudo, `rm -rf`,
+`git push --force`, borrar repos, leer `.env`/secretos) y la separación de deberes se
+mantiene (reviewers/gates no pueden editar; el orchestrator sigue deny-by-default). Si
+preferís aprobar cada comando: en `models.toml` poné `[permissions] profile = "guarded"` y
+corré `./build.sh --install`.
+
 ## El menú
 
 ```

@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LANES = ("go-zen", "zen", "local")
+PERMISSION_PROFILES = ("guarded", "yolo")
 DUTY_ORDER = ("coord", "analysis", "docs", "implement", "gate", "audit", "judge", "release", "memory", "ops")
 ROSTER_COLUMNS = {"role", "mode", "temperature", "capability", "duty"}
 LEGACY_MODEL_COLUMNS = {"opencode_go", "opencode_zen", "opencode_local", "claude_model", "codex_model", "codex_effort"}
@@ -110,7 +111,20 @@ def load_config(models_path=None):
     config.setdefault("families", {})
     config.setdefault("roles", {})
     config.setdefault("providers", {})
+    permissions = config.setdefault("permissions", {})
+    if not isinstance(permissions, dict):
+        die("models.toml: [permissions] must be a table")
+    for key in permissions:
+        if key != "profile":
+            die(f"models.toml: [permissions] has unknown field {key}")
+    if permissions.get("profile") not in (None, *PERMISSION_PROFILES):
+        die("models.toml: [permissions].profile must be one of " + ", ".join(PERMISSION_PROFILES))
     return config
+
+
+def permission_profile(models_path=None):
+    """OpenCode permission posture: guarded (prompt-heavy) or yolo (hard denies only)."""
+    return load_config(models_path)["permissions"].get("profile", "guarded")
 
 
 def subscription_of(model, config):
@@ -249,6 +263,11 @@ def emit(config):
     lines.append("")
     lines.append("[session]")
     lines.append(f"opencode_small_model = {_inline(config['session']['opencode_small_model'], LANES)}")
+    if config.get("permissions"):
+        lines.append("")
+        lines.append("[permissions]")
+        for key in sorted(config["permissions"]):
+            lines.append(f"{key} = {_value(config['permissions'][key])}")
     duties = [d for d in DUTY_ORDER if d in config["areas"]]
     duties += sorted(set(config["areas"]) - set(duties))
     for duty in duties:

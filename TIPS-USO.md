@@ -37,6 +37,9 @@ Detalles en `INSTALACION.md`.
 - `models.toml`: subscriptions, model catalog, per-area models with per-role overrides.
   Edit via `./setup-models.sh` (see `COMO-CAMBIAR-MODELO.md`).
 - `active-profile`: `go-zen`, `zen`, or `local` (the opencode lane).
+- `models.toml [permissions]`: `profile = "yolo" | "guarded"` — OpenCode permission posture
+  (yolo = no bash/edit prompts; hard denies and duty separation always survive). Tracked, so
+  it applies fleet-wide on the next build/auto-update.
 - `Global/_canonical`: canonical prompts, commands, and skills.
 - `Global/_shared`: shared policy and disabled MCP configuration.
 - `Global/{opencode,claude-code,codex}`: generated, reviewable native output.
@@ -64,6 +67,9 @@ and use the same confirmation flow:
 ./use-zen.sh
 ./use-local.sh
 ```
+
+Runtime gate timeout: `e2e.sh` cuts the runtime-verifier at `E2E_TIMEOUT` seconds (default 600).
+If a project's E2E legitimately needs longer, export a bigger `E2E_TIMEOUT` instead of authorizing reruns.
 
 Known debt: `Global/_canonical/opencode-agents/package-gate-runner.md` hardcodes absolute paths from the
 original `~/iey/iey-ai` project in its allow-list. Outside that repo those permissions are inert (the agent

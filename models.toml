@@ -17,6 +17,9 @@ codex_effort = ["high", "low", "medium", "xhigh"]
 [session]
 opencode_small_model = { "go-zen" = "opencode/north-mini-code-free", "zen" = "opencode/north-mini-code-free", "local" = "opencode/north-mini-code-free" }
 
+[permissions]
+profile = "yolo"
+
 [areas.coord]
 claude = "fable"
 codex = "gpt-5.6-terra"

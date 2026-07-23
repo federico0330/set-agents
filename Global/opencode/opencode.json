@@ -33,9 +33,9 @@
       "*.key": "deny",
       "**/secrets/**": "deny"
     },
-    "edit": "ask",
+    "edit": "allow",
     "bash": {
-      "*": "ask",
+      "*": "allow",
       "git status*": "allow",
       "git diff*": "allow",
       "git log*": "allow",
@@ -58,10 +58,10 @@
       "rm *": "deny",
       "sudo *": "deny",
       "git push*": "deny",
-      "git commit*": "ask"
+      "git commit*": "allow"
     },
     "webfetch": "allow",
-    "websearch": "ask"
+    "websearch": "allow"
   },
   "watcher": {
     "ignore": [

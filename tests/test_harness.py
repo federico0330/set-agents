@@ -860,6 +860,43 @@ class HarnessTests(unittest.TestCase):
         path.write_text(mc.emit(config))
         return path
 
+    def test_permission_profile_knob_parses_and_validates(self):
+        mc = self._import("models_config")
+        # Fixture has no [permissions] section: defaults to guarded, emit round-trips.
+        self.assertEqual(mc.permission_profile(self.FIXTURES / "models.toml"), "guarded")
+        with tempfile.TemporaryDirectory() as td:
+            _, models = self._models_fixture(td, lambda c: c.update(permissions={"profile": "yolo"}))
+            self.assertEqual(mc.permission_profile(models), "yolo")
+            self.assertEqual(models.read_text(), mc.emit(mc.load_config(models)))
+            models.write_text(models.read_text().replace('profile = "yolo"', 'profile = "party"'))
+            with self.assertRaisesRegex(ValueError, "permissions"):
+                mc.load_config(models)
+
+    def test_permission_profile_yolo_vs_guarded_generation(self):
+        for profile, expected in (("yolo", "allow"), ("guarded", "ask")):
+            with tempfile.TemporaryDirectory() as td:
+                models = self._repo_models_variant(
+                    td, lambda c, p=profile: c["permissions"].__setitem__("profile", p))
+                out = Path(td) / "out"
+                run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
+                    "--output", str(out), "--models", str(models))
+                gate = (out / "opencode/agents/gate-runner.md").read_text()
+                self.assertIn(f'    "*": {expected}', gate)
+                self.assertNotIn('    "*": ask' if profile == "yolo" else '    "*": allow', gate)
+                # The irreducible hard denies and separation of duties survive yolo.
+                self.assertIn('"sudo *": deny', gate)
+                self.assertIn('"git push --force*": deny', gate)
+                self.assertIn("edit: deny", (out / "opencode/agents/package-reviewer.md").read_text())
+                orchestrator = (out / "opencode/agents/orchestrator.md").read_text()
+                self.assertIn('    "*": deny', orchestrator)  # bash stays deny-by-default
+                session = json.loads((out / "opencode/opencode.json").read_text())["permission"]
+                self.assertEqual(session["edit"], expected)
+                self.assertEqual(session["bash"]["*"], expected)
+                self.assertEqual(session["websearch"], expected)
+                self.assertEqual(session["bash"]["sudo *"], "deny")
+                self.assertEqual(session["bash"]["git push*"], "deny")
+                self.assertEqual(session["read"]["*.env"], "deny")
+
     def test_invalid_separation_graph_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             def judge_on_implementer_model(config):
@@ -1306,8 +1343,13 @@ class HarnessTests(unittest.TestCase):
             payload = json.dumps({"tool_input": {"command": command}})
             result = subprocess.run(["python3", "ai/scripts/claude_ask_guard.py"], input=payload, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, command)
+        # The shipped gate-runner honors the repo's [permissions] profile for the bash
+        # fallthrough (ask under guarded, allow under yolo); the always-deny list is
+        # irreducible in both.
+        mc = self._import("models_config")
+        fallthrough = "allow" if mc.permission_profile(ROOT / "models.toml") == "yolo" else "ask"
         gate = (ROOT / "Global/opencode/agents/gate-runner.md").read_text()
-        self.assertIn('"*": ask', gate)
+        self.assertIn(f'"*": {fallthrough}', gate)
         self.assertIn('"sudo *": deny', gate)
         self.assertIn('"rm -rf*": deny', gate)
         self.assertIn('"git push --force*": deny', gate)

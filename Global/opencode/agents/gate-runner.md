@@ -10,7 +10,7 @@ permission:
   doom_loop: deny
   task: deny
   bash:
-    "*": ask
+    "*": allow
     "./ai/scripts/verify.sh*": allow
     "npm test*": allow
     "npm run test*": allow

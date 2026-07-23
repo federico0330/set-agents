@@ -113,7 +113,7 @@ def oc_hidden(role):
     }
 
 
-def oc_permissions(capability, roles, role=None):
+def oc_permissions(capability, roles, role=None, yolo=False):
     safe = [
         '    "git status*": allow', '    "git diff*": allow', '    "git log*": allow',
         '    "git show*": allow', '    "rg*": allow', '    "bat*": allow', '    "eza*": allow',
@@ -144,6 +144,10 @@ def oc_permissions(capability, roles, role=None):
     # Shell tricks that could smuggle a denied command past a prefix match still fall
     # through to "ask" (rather than a hard block) for every role except the orchestrator,
     # since a human reviewing the literal command text is the real backstop now.
+    # The yolo permission profile ([permissions] in models.toml) turns that fallthrough
+    # into "allow": only always_deny and the orchestrator/local-gate-runner postures
+    # remain, trading the human backstop for uninterrupted runs.
+    bash_default = '    "*": allow' if yolo else '    "*": ask'
     lines = ["permission:"]
     if role == "local-gate-runner":
         lines += [
@@ -178,7 +182,8 @@ def oc_permissions(capability, roles, role=None):
             '    "*--exec*": deny', '    "fd * -x *": deny', '    "node * -e *": deny',
             '    "* -exec *": deny', '    "*-toolexec*": deny',
         ]
-        lines += ["  edit: deny", "  question: ask", "  doom_loop: deny", "  webfetch: allow", "  websearch: ask", "  task:", '    "*": deny']
+        lines += ["  edit: deny", "  question: ask", "  doom_loop: deny", "  webfetch: allow",
+                  "  websearch: allow" if yolo else "  websearch: ask", "  task:", '    "*": deny']
         lines += [f'    "{r["role"]}": allow' for r in roles if r["role"] in ORCHESTRATOR_TASK_ALLOW]
         lines += [
             f'    "{path.stem}": allow'
@@ -194,19 +199,19 @@ def oc_permissions(capability, roles, role=None):
         lines += ["  bash:", '    "*": deny', *safe,
                   '    "python3 ai/scripts/feature-state.py *": allow', *hard_denies]
     elif capability == "review-ro":
-        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe, *always_deny]
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]
     elif capability == "gate-ro":
-        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask',
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default,
                   '    "./ai/scripts/verify.sh*": allow', '    "npm test*": allow',
                   '    "npm run test*": allow', '    "npm run lint*": allow',
                   '    "npm run typecheck*": allow', '    "npm run build*": allow',
                   '    "dotnet test*": allow', '    "go test*": allow', '    "cargo test*": allow',
                   '    "python -m pytest*": allow', *safe, *always_deny]
     elif capability == "release":
-        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe,
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe,
                   '    "python3 ~/.config/opencode/hooks/release_action.py*": allow', *always_deny]
     elif capability == "run-ro":
-        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe,
+        lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe,
                   '    "./ai/scripts/run.sh*": allow', '    "./ai/scripts/verify.sh*": allow',
                   '    "./ai/scripts/e2e.sh*": allow',
                   '    "./ai/scripts/mcp.sh browser-gate*": allow',
@@ -217,7 +222,7 @@ def oc_permissions(capability, roles, role=None):
                   '    "./ai/scripts/mcp.sh off brave-cdp*": allow',
                   '    "./ai/scripts/mcp.sh status*": allow', *always_deny]
     else:
-        lines += ["  edit: allow", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", '    "*": ask', *safe, *always_deny]
+        lines += ["  edit: allow", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]
     return "\n".join(lines)
 
 
@@ -268,8 +273,18 @@ def write_indexes(out):
         (base / "managed-files.txt").write_text("\n".join(files) + "\n")
 
 
+def yolofy(node):
+    """Flip every 'ask' in a permission tree to 'allow'; denies and allows survive."""
+    if node == "ask":
+        return "allow"
+    if isinstance(node, dict):
+        return {key: yolofy(value) for key, value in node.items()}
+    return node
+
+
 def generate(out, profile, roles_path=None, models_path=None):
     roles = load_roles(profile, roles_path, models_path)
+    yolo = models_config.permission_profile(models_path) == "yolo"
     if out.exists():
         shutil.rmtree(out)
     for harness in ("opencode", "claude-code", "codex"):
@@ -283,7 +298,7 @@ def generate(out, profile, roles_path=None, models_path=None):
             f"model: {row['opencode_model']}", f"temperature: {row['temperature']}",
             f"steps: {oc_steps(row['role'], row['capability'], row['duty'])}",
             ("hidden: true" if oc_hidden(row["role"]) else ""),
-            oc_permissions(row["capability"], roles, row["role"]), "---", "", body,
+            oc_permissions(row["capability"], roles, row["role"], yolo), "---", "", body,
         ])
         if row["role"] == "orchestrator":
             oc += (
@@ -340,6 +355,8 @@ def generate(out, profile, roles_path=None, models_path=None):
     oc_config = json.loads((SHARED / "opencode.json").read_text())
     oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
     oc_config["small_model"] = models_config.small_model(profile, models_path)
+    if yolo:
+        oc_config["permission"] = yolofy(oc_config.get("permission", {}))
     for item in oc_config.get("mcp", {}).values():
         item["enabled"] = False
     (out / "opencode/opencode.json").write_text(json.dumps(oc_config, indent=2) + "\n")
