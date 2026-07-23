@@ -62,6 +62,15 @@ pacman = "sudo pacman -S --needed --noconfirm obsidian"
 brew = "brew install --cask obsidian"
 doc = "https://obsidian.md/download"
 
+[cli.syncthing]
+detect = "syncthing"
+note = "sincroniza el vault Obsidian entre tus máquinas (P2P, sin nube). Habilitá con: systemctl --user enable --now syncthing — GUI en http://localhost:8384. NO sincronices repos git, solo el vault."
+[cli.syncthing.install]
+pacman = "sudo pacman -S --needed --noconfirm syncthing"
+apt = "sudo apt-get install -y syncthing"
+brew = "brew install syncthing"
+doc = "https://syncthing.net"
+
 [mcp.supabase]
 type = "local"
 command = ["npx", "-y", "@supabase/mcp-server-supabase@latest"]

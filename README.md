@@ -121,15 +121,51 @@ Los agentes documentan mientras trabajan: cada proyecto mantiene `docs/notas/` (
 empresa/cliente las junta en un solo grafo navegable:
 
 ```bash
-set-agents --vault-init ~/iey --company IEY        # una vez por empresa/cliente
-set-agents --vault-link ~/iey/mi-proyecto           # una vez por proyecto
+set-agents --vault-init ~/iey --company IEY            # una vez por empresa/cliente
+set-agents --vault-link ~/iey/mi-proyecto               # notas dentro del repo (default)
+set-agents --vault-link ~/iey/mi-proyecto --private     # notas dentro del vault, fuera del git
 ```
 
 Abrís `~/iey/obsidian` en Obsidian: `00 - INICIO` es la nota del café ☕ (tu rol, cómo se
-trabaja, qué falta por proyecto) y desde ahí navegás hasta cualquier paquete. Las notas del
-proyecto viven versionadas dentro de su repo; lo que escribas fuera de los bloques
-`notas:auto` nunca se pisa. Las decisiones que trascienden un paquete se registran con
-`feature-state.py log-decision`.
+trabaja, qué falta por proyecto) y desde ahí navegás hasta cualquier paquete. Lo que escribas
+fuera de los bloques `notas:auto` nunca se pisa. Las decisiones que trascienden un paquete se
+registran con `feature-state.py log-decision`. El vault también trae `Casos/` con una
+plantilla de caso de una página por proyecto terminado (tu portfolio).
+
+**¿Default o `--private`?** En el default las notas viven versionadas en `docs/notas/` del
+repo (bien para repos propios). Con `--private` las notas viven **dentro del vault** y el
+repo queda con un symlink local excluido de git (`.git/info/exclude`): nada llega jamás al
+remoto del proyecto — usalo cuando el repo es de un tercero (empresa/cliente) y las notas
+son tuyas. El motor de notas escribe igual en ambos modos.
+
+## Trabajar en dos máquinas
+
+Cada cosa viaja por su canal — nada se copia a mano:
+
+| Qué | Cómo viaja |
+|---|---|
+| El harness (SET-AGENTS) | auto-update al abrir `set-agents` |
+| Los proyectos (código) | git normal (clone/pull/push) |
+| El estado del workflow | `ai/state/` dentro del repo de cada proyecto (git) |
+| Las notas Obsidian (vault) | **Syncthing** entre tus máquinas (P2P, open source, sin nube) |
+
+Setup una sola vez (en ambas máquinas):
+
+```bash
+set-agents --tools-install syncthing
+systemctl --user enable --now syncthing
+```
+
+Abrí `http://localhost:8384` en cada máquina: **Actions → Show ID** en una, **Add Remote
+Device** en la otra (en la misma red se autodescubren), aceptá en ambas, y compartí la
+carpeta `~/iey/obsidian` (Add Folder → path exacto en las dos). Un cliente freelance nuevo =
+Add Folder de su vault; sin repos nuevos.
+
+- ⚠️ Syncthing es P2P: sincroniza cuando **ambas máquinas están prendidas** (típicamente en
+  tu LAN antes de salir y al volver). Dejá la que editaste prendida un minuto junto a la otra.
+- ⚠️ **Nunca** sincronices repos git por Syncthing (corrompe `.git`); solo el vault.
+- En una máquina nueva, después del primer sync corré `set-agents --vault-link <proyecto>
+  --private` en cada proyecto: el symlink y el exclude de git son por-máquina.
 
 ## Más documentación
 

@@ -595,6 +595,30 @@ class HarnessTests(unittest.TestCase):
                 "--state-file", str(state), "--ac", "AC-1")
             self.assertFalse((root / "docs/notas").exists())
 
+    def test_sync_notes_tolerates_legacy_dict_packages(self):
+        # Pre-schema states keyed packages by id (dict, not list); one malformed
+        # feature must not abort the whole render (never-raises contract).
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            legacy = state.parent / "legacy-feat.json"
+            legacy.write_text(json.dumps({
+                "feature_id": "legacy-feat", "phase": "PACKAGE_GATES",
+                "packages": {
+                    "PKG-A": {"status": "accepted", "objective": "viejo pero válido",
+                              "tasks": [{"id": "T-1", "status": "completed"}]},
+                    "PKG-B": "corrupto",
+                },
+            }))
+            result = run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
+            self.assertIn("NOTES_SYNCED", result.stdout)
+            hub = (root / "docs/notas/00 - Proyecto.md").read_text()
+            self.assertIn("[[features/legacy-feat|legacy-feat]]", hub)
+            self.assertIn("paquetes 1/2", hub)  # the corrupt entry degrades to a placeholder, not a crash
+            package = (root / "docs/notas/features/legacy-feat/PKG-A.md").read_text()
+            self.assertIn("viejo pero válido", package)
+            # The healthy feature still renders alongside the legacy one.
+            self.assertIn("[[features/feat-x|feat-x]]", hub)
+
     def test_log_decision_appends_and_renders_note(self):
         with tempfile.TemporaryDirectory() as td:
             root, state = self._notes_project(td)
@@ -638,6 +662,7 @@ class HarnessTests(unittest.TestCase):
                 self.assertIn(section, hub.read_text())
             self.assertTrue((company / "obsidian/IEY/contexto.md").exists())
             self.assertTrue((company / "obsidian/Proyectos").is_dir())
+            self.assertIn("## Resultado medible", (company / "obsidian/Casos/00 - Plantilla Caso.md").read_text())
             # Re-run never clobbers manual edits.
             hub.write_text(hub.read_text().replace("_TODO: quién sos", "Soy el dev principal"))
             result = run("bash", "set-agents", "--vault-init", str(company), "--company", "IEY", env=env)
@@ -676,6 +701,60 @@ class HarnessTests(unittest.TestCase):
             run("python3", str(FEATURE_STATE), "init", "feat-v", "spec.md", "h",
                 "--state-file", str(state), "--ac", "AC-1")
             self.assertIn("[[features/feat-v|feat-v]]", (link / "00 - Proyecto.md").read_text())
+
+    def test_vault_link_private_moves_notes_and_excludes_from_git(self):
+        with tempfile.TemporaryDirectory() as td:
+            env = {"SET_AGENTS_STATE": str(Path(td) / "state")}
+            company = Path(td) / "empresa"
+            run("bash", "set-agents", "--vault-init", str(company), env=env)
+            project = company / "mi-app"
+            (project / "docs/notas").mkdir(parents=True)
+            (project / "docs/notas/00 - Proyecto.md").write_text(
+                "# mi-app — notas\n\n<!-- notas:auto -->\npendiente\n<!-- /notas:auto -->\n\n"
+                "## Notas propias\n\nApunte manual.\n"
+            )
+            subprocess.run(["git", "init", "-q", str(project)], check=True)
+            # Start from default mode: private must replace the outward symlink and migrate.
+            run("bash", "set-agents", "--vault-link", str(project), env=env)
+            result = run("bash", "set-agents", "--vault-link", str(project), "--private", env=env)
+            self.assertIn("VAULT_LINK_OK", result.stdout)
+            self.assertIn("mode=private", result.stdout)
+            self.assertIn("VAULT_PRIVATE_EXCLUDED", result.stdout)
+            home = company / "obsidian/Proyectos/mi-app"
+            self.assertTrue(home.is_dir() and not home.is_symlink())
+            self.assertIn("Apunte manual.", (home / "00 - Proyecto.md").read_text())
+            notes = project / "docs/notas"
+            self.assertTrue(notes.is_symlink())
+            self.assertEqual(notes.resolve(), home.resolve())
+            # Invisible for the company repo: excluded locally, clean status.
+            self.assertIn("docs/notas", (project / ".git/info/exclude").read_text())
+            status = subprocess.run(
+                ["git", "-C", str(project), "status", "--porcelain"],
+                capture_output=True, text=True).stdout
+            self.assertNotIn("docs/notas", status)
+            # Idempotent re-run: skip, and no duplicated exclude line.
+            result = run("bash", "set-agents", "--vault-link", str(project), "--private", env=env)
+            self.assertIn("VAULT_LINK_SKIP", result.stdout)
+            exclude_lines = (project / ".git/info/exclude").read_text().splitlines()
+            self.assertEqual(exclude_lines.count("docs/notas"), 1)
+            # E2E: the notes engine renders through the inverted symlink into the vault.
+            state = project / "ai/state/features/feat-p.json"
+            state.parent.mkdir(parents=True)
+            run("python3", str(FEATURE_STATE), "init", "feat-p", "spec.md", "h",
+                "--state-file", str(state), "--ac", "AC-1")
+            self.assertIn("[[features/feat-p|feat-p]]", (home / "00 - Proyecto.md").read_text())
+            self.assertIn("Apunte manual.", (home / "00 - Proyecto.md").read_text())
+            # A differing note in the vault is never clobbered by migration.
+            other = company / "otra-app"
+            (other / "docs/notas").mkdir(parents=True)
+            (other / "docs/notas/00 - Proyecto.md").write_text("versión repo\n")
+            vault_side = company / "obsidian/Proyectos/otra-app"
+            vault_side.mkdir(parents=True)
+            (vault_side / "00 - Proyecto.md").write_text("versión vault distinta\n")
+            result = run("bash", "set-agents", "--vault-link", str(other), "--private", env=env, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("VAULT_LINK_CONFLICT", result.stdout)
+            self.assertEqual((other / "docs/notas/00 - Proyecto.md").read_text(), "versión repo\n")
 
     def test_coordinator_policy(self):
         allowed = [

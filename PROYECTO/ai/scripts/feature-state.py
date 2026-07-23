@@ -809,9 +809,23 @@ def _unique_decisions(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return list(keyed.values())
 
 
+def _note_packages(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize packages for the notes renderer: legacy pre-schema states keyed them by id."""
+    packages = data.get("packages", [])
+    if isinstance(packages, dict):
+        packages = [
+            {**value, "package_id": value.get("package_id", key)} if isinstance(value, dict) else {"package_id": key}
+            for key, value in packages.items()
+        ]
+    return [package for package in packages if isinstance(package, dict)]
+
+
 def _pending_bits(data: dict[str, Any]) -> list[str]:
     bits = []
-    step = next_transition(data)
+    try:
+        step = next_transition(data)
+    except Exception:  # legacy states may predate the transition schema
+        step = {}
     if step.get("next"):
         bits.append(f"→ `{step['next']}` — {step.get('reason', '')}")
     for blocker in data.get("blockers", []):
@@ -819,7 +833,7 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
             bits.append(f"⛔ bloqueo: {_short(blocker.get('reason', ''))}")
     open_findings = sum(
         1
-        for package in data.get("packages", [])
+        for package in _note_packages(data)
         for finding in package.get("findings", [])
         if finding.get("status", "open") not in {"closed", "accepted"}
     )
@@ -827,7 +841,7 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
         bits.append(f"{open_findings} hallazgos abiertos")
     try:
         package = package_by_id(data)
-    except StateError:
+    except Exception:
         package = None
     if package:
         pending = [t.get("id", "?") for t in package.get("tasks", []) if t.get("status") != "completed"]
@@ -842,7 +856,7 @@ def _hub_body(states: list[dict[str, Any]], out_dir: Path, decisions: list[dict[
         lines.append("- _todavía no hay features en el state_")
     for data in states:
         fid = data.get("feature_id", "?")
-        packages = data.get("packages", [])
+        packages = _note_packages(data)
         accepted = sum(1 for p in packages if p.get("status") == "accepted")
         tail = f" · **{data['final_state']}**" if data.get("final_state") else ""
         lines.append(
@@ -889,7 +903,7 @@ def _feature_body(
     criteria = data.get("acceptance_criteria", [])
     if criteria:
         lines += ["", "## Criterios de aceptación", ""] + [f"- {item}" for item in criteria]
-    packages = data.get("packages", [])
+    packages = _note_packages(data)
     if packages:
         lines += ["", "## Paquetes", ""]
         for package in packages:
@@ -1001,18 +1015,21 @@ def render_notes(state_file: Path, notes_dir: str | None = None, project_name: s
         if write_note(notes / "00 - Proyecto.md", f"{project} — notas", _hub_body(states, out_dir, decisions)):
             written.append("00 - Proyecto.md")
         for data in states:
-            fid = data.get("feature_id", "?")
-            if write_note(notes / "features" / f"{fid}.md", fid, _feature_body(data, out_dir, narrative, decisions)):
-                written.append(f"features/{fid}.md")
-            for package in data.get("packages", []):
-                pid = package.get("package_id", "?")
-                if write_note(notes / "features" / fid / f"{pid}.md", f"{fid} · {pid}", _package_body(fid, package)):
-                    written.append(f"features/{fid}/{pid}.md")
+            try:
+                fid = data.get("feature_id", "?")
+                if write_note(notes / "features" / f"{fid}.md", fid, _feature_body(data, out_dir, narrative, decisions)):
+                    written.append(f"features/{fid}.md")
+                for package in _note_packages(data):
+                    pid = package.get("package_id", "?")
+                    if write_note(notes / "features" / fid / f"{pid}.md", f"{fid} · {pid}", _package_body(fid, package)):
+                        written.append(f"features/{fid}/{pid}.md")
+            except Exception:  # one malformed feature must not block the rest
+                continue
         for entry in decisions:
             name = _decision_name(entry)
             if write_note(notes / "decisiones" / f"{name}.md", entry.get("title", "Decisión"), _decision_body(entry)):
                 written.append(f"decisiones/{name}.md")
-    except OSError:
+    except Exception:  # the living docs are best-effort by contract
         pass
     return written
 

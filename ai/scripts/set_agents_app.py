@@ -603,9 +603,12 @@ def cmd_mcp_remove(name, harness=None):
 
 
 # --------------------------------------------------------------------- vault
-# Company-level Obsidian vault: one graph per company/client. Project notes
-# live INSIDE each repo (docs/notas/, versioned, auto-rendered by
-# feature-state.py) and join the vault through a symlink under Proyectos/.
+# Company-level Obsidian vault: one graph per company/client. Default mode:
+# project notes live INSIDE each repo (docs/notas/, versioned, auto-rendered
+# by feature-state.py) and join the vault through a symlink under Proyectos/.
+# Private mode inverts that: notes live INSIDE the vault (so syncing the vault
+# folder between machines carries them) and the repo holds a git-excluded
+# symlink — nothing note-related ever reaches the project's remote.
 
 VAULT_HUB = "00 - INICIO.md"
 
@@ -621,7 +624,26 @@ def vault_seed_hub(company):
         "(resumen ejecutivo primero, evidencia después, etc.)._\n\n"
         "## Qué falta por proyecto\n\n"
         "Cada proyecto linkeado mantiene su propio hub con la sección «Qué falta»:\n\n"
-        "_(los proyectos aparecen acá abajo a medida que los linkees)_\n"
+        "_(los proyectos aparecen acá abajo a medida que los linkees)_\n\n"
+        "## Casos (portfolio)\n\n"
+        "Un caso de una página por proyecto terminado — plantilla: [[Casos/00 - Plantilla Caso]]\n"
+    )
+
+
+def vault_seed_case_template():
+    return (
+        "# Caso — (nombre del proyecto)\n\n"
+        "_Plantilla de portfolio: copiá esta nota por cada proyecto terminado y pedí "
+        "autorización antes de publicar versiones anonimizadas. La experiencia se mide "
+        "por decisiones, sistemas y resultados — no por meses trabajados._\n\n"
+        "## Situación inicial\n\n_TODO_\n\n"
+        "## Problema de negocio\n\n_TODO_\n\n"
+        "## Riesgos y restricciones\n\n_TODO_\n\n"
+        "## Alternativas evaluadas\n\n_TODO_\n\n"
+        "## Arquitectura elegida\n\n_TODO_\n\n"
+        "## Implementación\n\n_TODO_\n\n"
+        "## Resultado medible\n\n_TODO: de X a Y, horas eliminadas, errores evitados._\n\n"
+        "## Aprendizajes\n\n_TODO_\n"
     )
 
 
@@ -635,6 +657,7 @@ def cmd_vault_init(target, company=None):
             f"# {company} — contexto\n\n_TODO: contexto general de la empresa/cliente que "
             "cualquier agente debería conocer antes de trabajar en sus proyectos._\n"
         ),
+        vault / "Casos" / "00 - Plantilla Caso.md": vault_seed_case_template(),
     }
     created = False
     for path, content in seeds.items():
@@ -665,7 +688,82 @@ def find_vault(project, explicit=None):
     return None
 
 
-def cmd_vault_link(project, vault=None):
+def project_notes_seed(project_name):
+    # feature-state.py regenerates the auto block; this seed adds the manual frame.
+    return (
+        f"# {project_name} — notas\n\n"
+        "<!-- notas:auto -->\n_Se completa solo con la primera mutación de estado "
+        "(o corré `python3 ai/scripts/feature-state.py sync-notes`)._\n<!-- /notas:auto -->\n\n"
+        "## Notas propias\n\n_Qué es este proyecto, contexto, links útiles — esto no se pisa._\n"
+    )
+
+
+def exclude_notes_from_git(project):
+    """Hide docs/notas from the project's git locally (.git/info/exclude, never pushed)."""
+    if not (project / ".git").is_dir():
+        return False
+    info = project / ".git" / "info"
+    info.mkdir(parents=True, exist_ok=True)
+    exclude = info / "exclude"
+    lines = exclude.read_text().splitlines() if exclude.exists() else []
+    if "docs/notas" in lines:
+        return False
+    exclude.write_text("\n".join(lines + ["docs/notas"]) + "\n")
+    return True
+
+
+def vault_link_private(project, target_vault, notes, notes_home):
+    """Private mode: notes live in the vault; the repo gets an excluded symlink."""
+    if notes.is_symlink():
+        if notes.resolve() == notes_home.resolve():
+            if exclude_notes_from_git(project):
+                print("VAULT_PRIVATE_EXCLUDED docs/notas (.git/info/exclude)")
+            print(f"VAULT_LINK_SKIP project={project.name} vault={target_vault} mode=private")
+            return 0
+        print(f"VAULT_LINK_CONFLICT {notes} ya apunta a {notes.resolve()} — resolvelo a mano")
+        return 1
+    if notes_home.is_symlink():
+        # Old outward link (vault -> repo) from default mode: replace with the real home.
+        notes_home.unlink()
+    if notes_home.exists() and not notes_home.is_dir():
+        print(f"VAULT_LINK_CONFLICT {notes_home} existe y no es un directorio — resolvelo a mano")
+        return 1
+    notes_home.mkdir(parents=True, exist_ok=True)
+    if notes.is_dir():
+        # Migrate repo-resident notes into the vault: never clobber a differing file.
+        files = [path for path in sorted(notes.rglob("*")) if path.is_file()]
+        conflicts = [
+            path.relative_to(notes) for path in files
+            if (notes_home / path.relative_to(notes)).exists()
+            and (notes_home / path.relative_to(notes)).read_bytes() != path.read_bytes()
+        ]
+        if conflicts:
+            listed = ", ".join(str(item) for item in conflicts[:5])
+            print(f"VAULT_LINK_CONFLICT notas difieren entre repo y vault ({listed}) — resolvelo a mano")
+            return 1
+        for path in files:
+            destination = notes_home / path.relative_to(notes)
+            if not destination.exists():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(path), str(destination))
+        shutil.rmtree(notes)
+    seed = notes_home / "00 - Proyecto.md"
+    if not seed.exists():
+        seed.write_text(project_notes_seed(project.name))
+        print(f"VAULT_CREATED {seed}")
+    notes.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        notes.symlink_to(os.path.relpath(notes_home, notes.parent))
+    except OSError as exc:
+        print(f"VAULT_LINK_CONFLICT no pude crear el symlink: {exc}")
+        return 1
+    if exclude_notes_from_git(project):
+        print("VAULT_PRIVATE_EXCLUDED docs/notas (.git/info/exclude)")
+    print(f"VAULT_LINK_OK project={project.name} vault={target_vault} mode=private")
+    return 0
+
+
+def cmd_vault_link(project, vault=None, private=False):
     project = Path(project).expanduser().resolve()
     if not project.is_dir():
         print(f"VAULT_NOT_FOUND proyecto inexistente: {project}")
@@ -675,16 +773,12 @@ def cmd_vault_link(project, vault=None):
         print("VAULT_NOT_FOUND: no hay obsidian/00 - INICIO.md en los ancestros; corré --vault-init o pasá --vault")
         return 2
     notes = project / "docs" / "notas"
+    if private:
+        return vault_link_private(project, target_vault, notes, target_vault / "Proyectos" / project.name)
     seed = notes / "00 - Proyecto.md"
     if not seed.exists():
         notes.mkdir(parents=True, exist_ok=True)
-        # feature-state.py regenerates the auto block; this seed adds the manual frame.
-        seed.write_text(
-            f"# {project.name} — notas\n\n"
-            "<!-- notas:auto -->\n_Se completa solo con la primera mutación de estado "
-            "(o corré `python3 ai/scripts/feature-state.py sync-notes`)._\n<!-- /notas:auto -->\n\n"
-            "## Notas propias\n\n_Qué es este proyecto, contexto, links útiles — esto no se pisa._\n"
-        )
+        seed.write_text(project_notes_seed(project.name))
         print(f"VAULT_CREATED {seed}")
     link = target_vault / "Proyectos" / project.name
     if link.is_symlink():
@@ -716,7 +810,10 @@ def vault_menu():
     cmd_vault_init(target)
     project = input("¿Linkear un proyecto ahora? (path, Enter salta): ").strip()
     if project:
-        cmd_vault_link(project, str(Path(target).expanduser() / "obsidian"))
+        private = input(
+            "¿Privado? Las notas viven en el vault y quedan FUERA del git del proyecto [s/N]: "
+        ).strip().lower() in {"s", "si", "sí", "y", "yes"}
+        cmd_vault_link(project, str(Path(target).expanduser() / "obsidian"), private)
 
 
 # ------------------------------------------------------------------- plugins
@@ -879,6 +976,8 @@ def main():
     parser.add_argument("--vault-init", metavar="DIR", help="crea el vault Obsidian de la empresa en DIR/obsidian")
     parser.add_argument("--vault-link", metavar="PROYECTO", help="linkea docs/notas del proyecto al vault")
     parser.add_argument("--vault", metavar="DIR", help="vault explícito para --vault-link")
+    parser.add_argument("--private", action="store_true",
+                        help="con --vault-link: las notas viven en el vault y el repo queda con un symlink excluido de git")
     parser.add_argument("--company", metavar="NAME")
     args = parser.parse_args()
 
@@ -914,7 +1013,7 @@ def main():
     if args.vault_init:
         return cmd_vault_init(args.vault_init, args.company)
     if args.vault_link:
-        return cmd_vault_link(args.vault_link, args.vault)
+        return cmd_vault_link(args.vault_link, args.vault, args.private)
     if not sys.stdin.isatty():
         parser.print_help()
         return 2
