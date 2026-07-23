@@ -809,15 +809,46 @@ def _unique_decisions(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return list(keyed.values())
 
 
+def _dicts(seq: Any) -> list[dict[str, Any]]:
+    return [item for item in (seq or []) if isinstance(item, dict)]
+
+
+def _snake_key(key: str) -> str:
+    if not key.isidentifier() or key[0].isupper() or not any(ch.isupper() for ch in key):
+        return key
+    return "".join(f"_{ch.lower()}" if ch.isupper() else ch for ch in key)
+
+
+def _normalize_note_state(node: Any) -> Any:
+    """Best-effort camelCase→snake_case for legacy state files. Rendering only —
+    the state on disk is never written back through this."""
+    if isinstance(node, dict):
+        return {(_snake_key(key) if isinstance(key, str) else key): _normalize_note_state(value)
+                for key, value in node.items()}
+    if isinstance(node, list):
+        return [_normalize_note_state(item) for item in node]
+    return node
+
+
 def _note_packages(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Normalize packages for the notes renderer: legacy pre-schema states keyed them by id."""
+    """Normalize packages for the notes renderer: legacy states keyed them by id
+    (dict) or named fields in camelCase (id/ownershipPaths)."""
     packages = data.get("packages", [])
     if isinstance(packages, dict):
         packages = [
             {**value, "package_id": value.get("package_id", key)} if isinstance(value, dict) else {"package_id": key}
             for key, value in packages.items()
         ]
-    return [package for package in packages if isinstance(package, dict)]
+    normalized = []
+    for package in packages:
+        if not isinstance(package, dict):
+            continue
+        if "package_id" not in package and package.get("id"):
+            package = {**package, "package_id": package["id"]}
+        if "owned_paths" not in package and package.get("ownership_paths"):
+            package = {**package, "owned_paths": package["ownership_paths"]}
+        normalized.append(package)
+    return normalized
 
 
 def _pending_bits(data: dict[str, Any]) -> list[str]:
@@ -829,8 +860,11 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
     if step.get("next"):
         bits.append(f"→ `{step['next']}` — {step.get('reason', '')}")
     for blocker in data.get("blockers", []):
-        if not blocker.get("resolved_at"):
-            bits.append(f"⛔ bloqueo: {_short(blocker.get('reason', ''))}")
+        if isinstance(blocker, dict):
+            if not blocker.get("resolved_at"):
+                bits.append(f"⛔ bloqueo: {_short(blocker.get('reason', ''))}")
+        elif blocker:
+            bits.append(f"⛔ bloqueo: {_short(blocker)}")
     open_findings = sum(
         1
         for package in _note_packages(data)
@@ -950,27 +984,29 @@ def _package_body(fid: str, package: dict[str, Any]) -> str:
     if tasks:
         lines += ["", "## Tareas", ""]
         for task in tasks:
+            if not isinstance(task, dict):  # legacy states listed tasks as plain strings
+                task = {"id": task, "status": "planned"}
             mark = "x" if task.get("status") == "completed" else " "
             extra = f" · {', '.join(task.get('local_validations', []))}" if task.get("local_validations") else ""
             lines.append(f"- [{mark}] {task.get('id')} ({task.get('status')}){extra}")
-    findings = package.get("findings", [])
+    findings = [f for f in package.get("findings", []) if isinstance(f, dict)]
     if findings:
         lines += ["", "## Hallazgos", ""]
         for finding in findings:
             label = finding.get("category") or finding.get("summary") or ""
             lines.append(f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')} — {_short(label)}")
     trail = []
-    for review in package.get("reviews", []):
+    for review in _dicts(package.get("reviews")):
         trail.append(f"- review: {review.get('verdict')} ({len(review.get('findings', []))} hallazgos)")
-    for repair in package.get("repairs", []):
+    for repair in _dicts(package.get("repairs")):
         trail.append(f"- repair: {', '.join(repair.get('finding_ids', []))} → {len(repair.get('changed_files', []))} archivos")
-    for delta in package.get("delta_reviews", []):
+    for delta in _dicts(package.get("delta_reviews")):
         trail.append(f"- delta review: {delta.get('verdict')}")
-    for testing in package.get("testing", []):
+    for testing in _dicts(package.get("testing")):
         trail.append(f"- testing: {testing.get('status')}")
-    for qa in package.get("runtime_qa", []):
+    for qa in _dicts(package.get("runtime_qa")):
         trail.append(f"- runtime QA: {qa.get('status')}{' (waived)' if qa.get('waived') else ''}")
-    for gate in package.get("gates", []):
+    for gate in _dicts(package.get("gates")):
         trail.append(f"- gate `{gate.get('name')}`: {gate.get('status')}")
     if trail:
         lines += ["", "## Recorrido", ""] + trail
@@ -1006,7 +1042,7 @@ def render_notes(state_file: Path, notes_dir: str | None = None, project_name: s
         states = []
         for path in sorted(features_dir.glob("*.json")):
             try:
-                states.append(json.loads(path.read_text(encoding="utf-8")))
+                states.append(_normalize_note_state(json.loads(path.read_text(encoding="utf-8"))))
             except (OSError, json.JSONDecodeError):
                 continue
         narrative = collect_narrative(features_dir, out_dir)

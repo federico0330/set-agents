@@ -609,6 +609,15 @@ class HarnessTests(unittest.TestCase):
                     "PKG-B": "corrupto",
                 },
             }))
+            camel = state.parent / "camel-feat.json"
+            camel.write_text(json.dumps({
+                "featureId": "camel-feat", "phase": "PACKAGE_ACCEPTED", "schemaVersion": 2,
+                "blockers": ["migración pendiente de promoción"],
+                "packages": [{
+                    "id": "CAM-01", "status": "COMPLETE", "routingReason": "legacy camel",
+                    "ownershipPaths": ["src/**"], "tasks": ["tarea como string plano"],
+                }],
+            }))
             result = run("python3", str(FEATURE_STATE), "sync-notes", "--state-dir", str(root / "ai/state"))
             self.assertIn("NOTES_SYNCED", result.stdout)
             hub = (root / "docs/notas/00 - Proyecto.md").read_text()
@@ -616,7 +625,13 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("paquetes 1/2", hub)  # the corrupt entry degrades to a placeholder, not a crash
             package = (root / "docs/notas/features/legacy-feat/PKG-A.md").read_text()
             self.assertIn("viejo pero válido", package)
-            # The healthy feature still renders alongside the legacy one.
+            # camelCase legacy renders too: feature, package, string task, blocker.
+            self.assertIn("[[features/camel-feat|camel-feat]]", hub)
+            self.assertIn("bloqueo: migración pendiente", hub)
+            camel_pkg = (root / "docs/notas/features/camel-feat/CAM-01.md").read_text()
+            self.assertIn("legacy camel", camel_pkg)
+            self.assertIn("tarea como string plano", camel_pkg)
+            # The healthy feature still renders alongside the legacy ones.
             self.assertIn("[[features/feat-x|feat-x]]", hub)
 
     def test_log_decision_appends_and_renders_note(self):
