@@ -1,7 +1,7 @@
 ---
 description: "UX-UI-Designer \u2014 frontend design, design tokens, accessibility, error UX"
 mode: subagent
-model: anthropic/claude-haiku-4-5
+model: openai/gpt-5.4-fast
 temperature: 0.3
 steps: 14
 permission:

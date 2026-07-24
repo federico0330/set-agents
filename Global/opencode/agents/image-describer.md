@@ -1,7 +1,7 @@
 ---
 description: "Image describer \u2014 exact, literal visual transcription"
 mode: subagent
-model: anthropic/claude-sonnet-5
+model: openai/gpt-5.4-fast
 temperature: 0.1
 steps: 12
 permission:

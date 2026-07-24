@@ -1,7 +1,7 @@
 ---
 description: "Project bootstrapper \u2014 conservative project discovery and setup"
 mode: subagent
-model: anthropic/claude-haiku-4-5
+model: openai/gpt-5.4-fast
 temperature: 0.2
 steps: 14
 permission:

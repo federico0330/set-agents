@@ -174,19 +174,22 @@ class HarnessTests(unittest.TestCase):
         }
         self.assertEqual(go["debugger"]["opencode_model"], "openai/gpt-5.6-terra")
 
-    def test_repo_go_zen_routes_hot_path_to_anthropic_and_keeps_reviewers_apart(self):
+    def test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart(self):
         mc = self._import("models_config")
         rows = {
             row["role"]: row
             for row in mc.load_roles("go-zen", ROOT / "roles.tsv", ROOT / "models.toml")
         }
-        # Hot path (coord/analysis/implement) runs on the Claude subscription.
-        self.assertTrue(rows["orchestrator"]["opencode_model"].startswith("anthropic/"))
-        self.assertTrue(rows["implementer"]["opencode_model"].startswith("anthropic/"))
-        self.assertTrue(rows["product-analyst"]["opencode_model"].startswith("anthropic/"))
-        # Reviewers stay on a different provider family so the second opinion is real.
-        self.assertTrue(rows["package-reviewer"]["opencode_model"].startswith("openai/"))
-        self.assertTrue(rows["adversarial-judge"]["opencode_model"].startswith("openai/"))
+        # Hot path (coord/analysis/implement/docs) runs on low-latency -fast variants.
+        for role in ("orchestrator", "implementer", "product-analyst"):
+            self.assertTrue(rows[role]["opencode_model"].endswith("-fast"), role)
+        # Reviewers stay on the deep-reasoning family, distinct from the implementer's.
+        for role in ("package-reviewer", "adversarial-judge"):
+            self.assertEqual(rows[role]["opencode_model"], "openai/gpt-5.6-sol")
+            self.assertNotEqual(
+                mc.family("opencode_model", rows[role]["opencode_model"], {}),
+                mc.family("opencode_model", rows["implementer"]["opencode_model"], {}),
+            )
 
     def test_models_config_rejects_incomplete_area(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1047,7 +1050,7 @@ class HarnessTests(unittest.TestCase):
     def test_invalid_separation_graph_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             def judge_on_implementer_model(config):
-                config["areas"]["judge"]["opencode"]["go-zen"] = "anthropic/claude-sonnet-5"
+                config["areas"]["judge"]["opencode"]["go-zen"] = "openai/gpt-5.6-fast"
             models = self._repo_models_variant(td, judge_on_implementer_model)
             result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)

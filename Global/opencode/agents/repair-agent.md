@@ -1,7 +1,7 @@
 ---
 description: "Repair-Agent \u2014 consolidated repair of package findings"
 mode: subagent
-model: anthropic/claude-sonnet-5
+model: openai/gpt-5.6-fast
 temperature: 0.1
 steps: 24
 hidden: true
