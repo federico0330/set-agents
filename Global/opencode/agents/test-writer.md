@@ -1,7 +1,7 @@
 ---
 description: "Test-Writer \u2014 end-stage regression tests after package convergence"
 mode: subagent
-model: openai/gpt-5.6-terra
+model: anthropic/claude-sonnet-5
 temperature: 0.1
 steps: 20
 permission:

@@ -1,7 +1,7 @@
 ---
 description: "Implementer \u2014 bounded package work with local validation, no self-approval"
 mode: subagent
-model: openai/gpt-5.6-terra
+model: anthropic/claude-sonnet-5
 temperature: 0.1
 steps: 30
 permission:

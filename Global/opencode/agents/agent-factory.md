@@ -1,7 +1,7 @@
 ---
 description: "Agent factory \u2014 canonical role and capability authoring"
 mode: subagent
-model: openai/gpt-5.6-terra
+model: anthropic/claude-haiku-4-5
 temperature: 0.1
 steps: 14
 permission:

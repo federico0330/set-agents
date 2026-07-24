@@ -24,25 +24,25 @@ profile = "yolo"
 claude = "fable"
 codex = "gpt-5.6-terra"
 codex_effort = "high"
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.4", "local" = "openai/gpt-5.4" }
+opencode = { "go-zen" = "anthropic/claude-opus-4-8", "zen" = "openai/gpt-5.4", "local" = "openai/gpt-5.4" }
 
 [areas.analysis]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.4-mini", "local" = "openai/gpt-5.4" }
+opencode = { "go-zen" = "anthropic/claude-sonnet-5", "zen" = "openai/gpt-5.4-mini", "local" = "openai/gpt-5.4" }
 
 [areas.docs]
 claude = "sonnet"
 codex = "gpt-5.6-sol"
 codex_effort = "high"
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "opencode/glm-5.2", "local" = "openai/gpt-5.5" }
+opencode = { "go-zen" = "anthropic/claude-haiku-4-5", "zen" = "opencode/glm-5.2", "local" = "openai/gpt-5.5" }
 
 [areas.implement]
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "opencode/kimi-k2.7-code", "local" = "openai/gpt-5.4" }
+opencode = { "go-zen" = "anthropic/claude-sonnet-5", "zen" = "opencode/kimi-k2.7-code", "local" = "openai/gpt-5.4" }
 
 [areas.gate]
 claude = "haiku"

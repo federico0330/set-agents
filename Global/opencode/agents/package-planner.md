@@ -1,7 +1,7 @@
 ---
 description: "Package-Planner \u2014 coherent package decomposition after spec approval"
 mode: subagent
-model: openai/gpt-5.6-terra
+model: anthropic/claude-haiku-4-5
 temperature: 0.1
 steps: 16
 hidden: true

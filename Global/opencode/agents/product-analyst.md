@@ -1,7 +1,7 @@
 ---
 description: "Product-Analyst \u2014 turns intent into specs and acceptance criteria"
 mode: subagent
-model: openai/gpt-5.6-terra
+model: anthropic/claude-haiku-4-5
 temperature: 0.2
 steps: 14
 permission:
