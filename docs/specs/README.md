@@ -8,3 +8,5 @@
 | ID | Title | Status | Date |
 |---|---|---|---|
 | [001](001-harness-evolution/spec.md) | Package-based harness evolution | Shipped | 2026-07-08 |
+| [002](002-adaptive-pi-orchestration/spec.md) | Adaptive orchestration and Pi runtime | Superseded by [003](003-trusted-routing-pi-runtime/spec.md) | 2026-07-24 |
+| [003](003-trusted-routing-pi-runtime/spec.md) | Trusted routing and Pi runtime recovery | Approved | 2026-07-24 |

@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import dataclasses
+import hashlib
+import time
+from typing import Iterable
+
+
+class RoutingError(ValueError):
+    """A stable public reason code; never attach host/provider detail."""
+
+
+# Closed vocabularies: any value outside these sets is FACTS_INCOMPLETE, never a passthrough.
+TASK_CLASSES = {"inspection", "documentation", "mechanical", "implementation", "architecture", "security",
+                "money", "migration", "concurrency", "public-contract", "incident"}
+CRITICAL = {"architecture", "security", "money", "migration", "concurrency", "public-contract"}
+RISK_ORDER = {"low": 0, "medium": 1, "high": 2}
+OPERATIONS = {"inspection", "change"}
+
+
+def combined_risk(observed: str, requested: str) -> str:
+    """Caller claims can only raise risk; an observed high risk is never downgraded."""
+    if observed not in RISK_ORDER or requested not in RISK_ORDER:
+        raise RoutingError("FACTS_INCOMPLETE")
+    return observed if RISK_ORDER[observed] >= RISK_ORDER[requested] else requested
+
+
+def _fail(code: str) -> None:
+    raise RoutingError(code)
+
+
+def _sorted_strings(values: Iterable[str]) -> tuple[str, ...]:
+    if not isinstance(values, (list, tuple, set)) or not values or not all(isinstance(x, str) and x for x in values):
+        _fail("CATALOG_INVALID")
+    result = tuple(sorted(values, key=lambda value: value.encode("utf-8")))
+    if len(set(result)) != len(result):
+        _fail("CATALOG_INVALID")
+    return result
+
+
+def _lp(value: str) -> bytes:
+    raw = value.encode("utf-8")
+    return len(raw).to_bytes(4, "big") + raw
+
+
+def canonical_static_binding(catalog_version: int, provider: str, model: str, family: str, effort: str,
+                             tiers: Iterable[str], roles: Iterable[str], tools: Iterable[str], priority: int) -> bytes:
+    """Unambiguous, versioned UTF-8 encoding used by the static-id contract."""
+    if not isinstance(catalog_version, int) or not isinstance(priority, int):
+        _fail("CATALOG_INVALID")
+    fields = (str(catalog_version), provider, model, family, effort)
+    if not all(isinstance(x, str) and x for x in fields[1:]):
+        _fail("CATALOG_INVALID")
+    out = bytearray(b"routing-v1\0")
+    for field in fields:
+        out.extend(_lp(field))
+    for group in (tiers, roles, tools):
+        items = _sorted_strings(group)
+        out.extend(len(items).to_bytes(4, "big"))
+        for item in items:
+            out.extend(_lp(item))
+    out.extend(str(priority).encode("ascii"))
+    return bytes(out)
+
+
+@dataclasses.dataclass(frozen=True)
+class TaskRequest:
+    role: str
+    operation: str
+    task_class: str = "inspection"
+    risk: str = "low"
+    required_tools: tuple[str, ...] = ()
+    selected_runtime: str | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class _ObservedTaskFacts:
+    role: str | None; operation: str | None; task_class: str | None
+    read_write: str | None; write_started: bool | None; risk: str | None; criticality: str | None
+    affected_surfaces: tuple[str, ...] | None; required_tools: tuple[str, ...] | None
+    context_required: bool | None; context_present: bool | None; critical_coverage: bool | None
+    selected_runtime: str | None; facts_version: str | None; observed_at: float | None
+    ambiguous: bool = False
+    # This is intentionally non-serializable and is minted by the fact builder/composition only.
+    _scope: object | None = dataclasses.field(default=None, repr=False, compare=False)
+
+    def validate(self, roster: set[str], scope: object | None, now: float | None = None) -> tuple[bool, tuple[str, ...]]:
+        now = time.time() if now is None else now
+        fields = (self.role, self.operation, self.task_class, self.read_write, self.write_started, self.risk,
+                  self.criticality, self.affected_surfaces, self.required_tools, self.context_required,
+                  self.context_present, self.critical_coverage, self.selected_runtime, self.facts_version, self.observed_at)
+        valid = (all(value is not None for value in fields) and self.role in roster and self.read_write in {"read", "write"}
+                 and self.operation in OPERATIONS and self.task_class in TASK_CLASSES
+                 and self.risk in RISK_ORDER and (self.criticality == "" or self.criticality in CRITICAL)
+                 and self.selected_runtime in {"opencode", "claude-code", "codex", "pi"}
+                 and self.facts_version == "routing-v2" and isinstance(self.observed_at, (int, float)) and not isinstance(self.observed_at, bool)
+                 and self.observed_at <= now and now - self.observed_at <= 30 and not self.ambiguous
+                 and scope is not None and self._scope is scope)
+        return valid, () if valid else ("FACTS_INCOMPLETE",)
+
+
+@dataclasses.dataclass(frozen=True)
+class StaticRoute:
+    catalog_version: int; provider: str; model: str; family: str; effort: str
+    tiers: tuple[str, ...]; roles: tuple[str, ...]; tools: tuple[str, ...]; curated_priority: int; route_id: str
+
+    @staticmethod
+    def identifier(catalog_version, provider, model, family, effort, tiers, roles, tools, curated_priority, digest=hashlib.sha256):
+        return "rt1_" + digest(canonical_static_binding(catalog_version, provider, model, family, effort, tiers, roles, tools, curated_priority)).hexdigest()[:16]
+
+
+@dataclasses.dataclass(frozen=True)
+class CatalogSnapshot:
+    routes: tuple[StaticRoute, ...]
+    identities: frozenset[tuple[str, str, str, str, str, str]]
+    def identity_allowed(self, identity: tuple[str, str, str, str, str, str]) -> bool: return identity in self.identities
+
+
+@dataclasses.dataclass(frozen=True)
+class ImplementationIdentity:
+    provider: str; family: str; route_id: str; runtime: str; model: str; effort: str
+
+
+@dataclasses.dataclass(frozen=True)
+class RouteDecision:
+    route_id: str | None; runtime: str | None; provider: str | None; model: str | None; family: str | None; effort: str | None
+    execution_enabled: bool; reason_codes: tuple[str, ...] = (); exclusions: tuple[dict[str, str], ...] = ()
+    fallback_identity: tuple[str, str, str, str, str, str] | None = None
+    run_id: str | None = None
+    @property
+    def identity(self):
+        return None if None in (self.route_id, self.runtime, self.provider, self.model, self.family, self.effort) else (self.route_id, self.runtime, self.provider, self.model, self.family, self.effort)
+    def to_dict(self):
+        return dataclasses.asdict(self)

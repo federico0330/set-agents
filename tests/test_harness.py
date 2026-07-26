@@ -8,6 +8,7 @@ import time
 import tomllib
 import unittest
 import filecmp
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,8 +86,8 @@ class HarnessTests(unittest.TestCase):
             with self.subTest(script=str(script.relative_to(ROOT))):
                 run("bash", "-n", str(script))
 
-    def _bootstrap_env(self, td, tools):
-        """Fake HOME + stub PATH (stubs first, system dirs for bash/coreutils)."""
+    def _bootstrap_env(self, td, tools, *, isolated=False):
+        """Fake HOME; the named hermetic probe can additionally close PATH."""
         stubs = Path(td) / "stubs"
         stubs.mkdir(exist_ok=True)
         for tool in tools:
@@ -98,23 +99,31 @@ class HarnessTests(unittest.TestCase):
         python_link = stubs / "python3"
         if not python_link.exists():
             python_link.symlink_to(sys.executable)
+        if isolated:
+            # The installer itself needs these base utilities.  Link only their
+            # exact executables into the isolated PATH; deliberately omit all
+            # agent CLIs unless the scenario supplied a stub for them.
+            for name in ("git", "curl", "node", "npm", "uname", "grep", "head", "sed", "cut", "dirname"):
+                source = shutil.which(name)
+                if source and not (stubs / name).exists():
+                    (stubs / name).symlink_to(source)
         home = Path(td) / "home"
         home.mkdir(exist_ok=True)
-        return {"PATH": f"{stubs}:/usr/bin:/bin", "HOME": str(home)}, stubs
+        return {"PATH": str(stubs) if isolated else f"{stubs}:/usr/bin:/bin", "HOME": str(home)}, stubs
 
     def test_install_sh_dry_run_plans_missing_tools(self):
         with tempfile.TemporaryDirectory() as td:
             # Virgin machine: base deps come from /usr/bin, agent CLIs are absent.
-            env, _ = self._bootstrap_env(td, ())
-            result = run("bash", "install.sh", "--dry-run", env=env)
+            env, _ = self._bootstrap_env(td, (), isolated=True)
+            result = run("/bin/bash", "install.sh", "--dry-run", env=env)
             for cli in ("opencode", "claude", "codex"):
                 self.assertIn(f"BOOTSTRAP_PLAN {cli}", result.stdout)
                 self.assertIn(f"AUTH_NEEDED {cli}", result.stdout)
             self.assertIn("BOOTSTRAP_PLAN repo-config", result.stdout)
             self.assertIn("BOOTSTRAP_DONE", result.stdout)
             # Fully provisioned machine: everything is a skip, nothing planned.
-            env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex"))
-            result = run("bash", "install.sh", "--dry-run", env=env)
+            env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex"), isolated=True)
+            result = run("/bin/bash", "install.sh", "--dry-run", env=env)
             for cli in ("opencode", "claude", "codex"):
                 self.assertIn(f"BOOTSTRAP_SKIP {cli}", result.stdout)
                 self.assertNotIn(f"BOOTSTRAP_PLAN {cli}", result.stdout)
@@ -256,10 +265,16 @@ class HarnessTests(unittest.TestCase):
     def test_models_config_emit_roundtrip(self):
         with tempfile.TemporaryDirectory() as td:
             mc, models = self._models_fixture(td)
-            first = models.read_text()
-            second = mc.emit(mc.load_config(models))
-            self.assertEqual(first, second)
-            self.assertEqual(first, (self.FIXTURES / "models.toml").read_text())
+            # schema-1 remains accepted in memory; canonical emission is a
+            # deterministic schema-2 migration, not a byte-equality claim.
+            schema1 = (self.FIXTURES / "models.toml").read_text().replace("schema = 2", "schema = 1", 1)
+            models.write_text(schema1)
+            loaded = mc.load_config(models)
+            self.assertEqual(loaded["_source_schema"], 1)
+            emitted = mc.emit(loaded)
+            self.assertIn("schema = 2", emitted)
+            models.write_text(emitted)
+            self.assertEqual(emitted, mc.emit(mc.load_config(models)))
 
     # -------------------------------------------------------- setup-models
     def _setup_models(self, td, *args, check=False):

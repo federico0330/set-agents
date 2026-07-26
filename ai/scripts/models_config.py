@@ -11,6 +11,8 @@ import csv
 import json
 import re
 import tomllib
+import os
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +26,16 @@ READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
 AREA_FIELDS = ("claude", "codex", "codex_effort", "opencode")
+RUNTIMES = ("opencode", "claude-code", "codex", "pi")
+MODEL_TIERS = ("fast", "balanced", "frontier")
+ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
+ROUTING_DEFAULTS = {
+    "enabled_providers": ["openai-codex", "anthropic"], "xhigh_benchmarked": False,
+    "max_enabled": False, "fallback_limit": 1, "single_writer": True,
+    "sla": {"fast": {"checkpoint_minutes": 18, "cutoff_minutes": 20, "ceiling_minutes": 30}},
+    "budgets": {"direct_spawns": 0, "fast_spawns": 1, "scoped_spawns": 4,
+                "feature_spawns_per_package": 12, "incident_spawns": 2},
+}
 # Which subscription a resolved opencode model consumes, by provider prefix.
 # Extendable per repo via the optional [providers] table in models.toml.
 SUBSCRIPTION_BY_PREFIX = {
@@ -96,14 +108,15 @@ def load_roster(roles_path=None):
 def load_config(models_path=None):
     path = Path(models_path or ROOT / "models.toml")
     config = tomllib.loads(path.read_text())
-    if config.get("schema") != 1:
-        die("models.toml: unsupported schema (expected schema = 1)")
+    schema = config.get("schema")
+    if schema not in (1, 2):
+        die("models.toml: unsupported schema (expected schema = 1 or 2)")
     for section in ("subscriptions", "catalog", "session", "areas"):
         if not isinstance(config.get(section), dict) or not config[section]:
             die(f"models.toml: missing or empty [{section}]")
     for key in ("claude", "codex", "codex_effort"):
         values = config["catalog"].get(key)
-        if not values or not all(isinstance(item, str) for item in values):
+        if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
             die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
     small = config["session"].get("opencode_small_model")
     if not isinstance(small, dict) or set(small) != set(LANES):
@@ -119,7 +132,69 @@ def load_config(models_path=None):
             die(f"models.toml: [permissions] has unknown field {key}")
     if permissions.get("profile") not in (None, *PERMISSION_PROFILES):
         die("models.toml: [permissions].profile must be one of " + ", ".join(PERMISSION_PROFILES))
+    _normalize_schema2(config, schema)
     return config
+
+
+def _table(config, name, defaults, allowed):
+    value = config.get(name, {})
+    if not isinstance(value, dict):
+        die(f"models.toml: [{name}] must be a table")
+    unknown = set(value) - set(allowed)
+    if unknown:
+        die(f"models.toml: [{name}] has unknown field {sorted(unknown)[0]}")
+    config[name] = {**defaults, **value}
+
+
+def _normalize_schema2(config, source_schema):
+    """Normalize legacy input in memory; source files are never changed on load."""
+    _table(config, "runtime", {"primary": "opencode", "fallbacks": []}, ("primary", "fallbacks"))
+    runtime = config["runtime"]
+    if not isinstance(runtime["primary"], str) or runtime["primary"] not in RUNTIMES:
+        die("models.toml: [runtime].primary is invalid")
+    if not isinstance(runtime["fallbacks"], list) or not all(isinstance(item, str) and item in RUNTIMES for item in runtime["fallbacks"]):
+        die("models.toml: [runtime].fallbacks must be runtime IDs")
+    if len(runtime["fallbacks"]) != len(set(runtime["fallbacks"])) or runtime["primary"] in runtime["fallbacks"]:
+        die("models.toml: [runtime].fallbacks must be unique and exclude primary")
+    orch = config.setdefault("orchestrator", {})
+    if not isinstance(orch, dict):
+        die("models.toml: [orchestrator] must be a table")
+    if set(orch) - {"pi"}:
+        die("models.toml: [orchestrator] has unknown field")
+    pi = orch.get("pi", {})
+    if not isinstance(pi, dict) or set(pi) - {"model", "effort"}:
+        die("models.toml: [orchestrator.pi] has unknown field")
+    orch["pi"] = {"model": "gpt-5.6", "effort": "medium", **pi}
+    if orch["pi"]["model"] not in ("gpt-5.6", "gpt-5.6-sol") or orch["pi"]["effort"] != "medium":
+        die("models.toml: [orchestrator.pi] requires gpt-5.6|gpt-5.6-sol at medium effort")
+    # Authentication is an observed runtime fact, never inferred from a subscription flag.
+    # Configuration can only prove that the catalog is capable of resolving Sol.
+    if runtime["primary"] == "pi" and not ({"gpt-5.6", "gpt-5.6-sol"} & set(config["catalog"]["codex"])):
+        die("models.toml: Pi primary requires a catalog Sol parent")
+    _table(config, "routing", {k: v for k, v in ROUTING_DEFAULTS.items() if k not in ("sla", "budgets")},
+           ("enabled_providers", "xhigh_benchmarked", "max_enabled", "fallback_limit", "single_writer", "sla", "budgets"))
+    routing = config["routing"]
+    if not isinstance(routing.get("sla", {}), dict) or set(routing.get("sla", {})) - {"fast"}:
+        die("models.toml: [routing.sla] has unknown field")
+    if not isinstance(routing.get("budgets", {}), dict) or set(routing.get("budgets", {})) - set(ROUTING_DEFAULTS["budgets"]):
+        die("models.toml: [routing.budgets] has unknown field")
+    routing["sla"] = {**ROUTING_DEFAULTS["sla"], **routing.get("sla", {})}
+    routing["budgets"] = {**ROUTING_DEFAULTS["budgets"], **routing.get("budgets", {})}
+    if (not isinstance(routing["enabled_providers"], list) or not routing["enabled_providers"] or not all(isinstance(x, str) and x in ROUTING_PROVIDERS for x in routing["enabled_providers"])
+            or len(routing["enabled_providers"]) != len(set(routing["enabled_providers"]))
+            or not isinstance(routing["xhigh_benchmarked"], bool) or routing["max_enabled"] is not False
+            or not isinstance(routing["single_writer"], bool) or not isinstance(routing["fallback_limit"], int) or isinstance(routing["fallback_limit"], bool) or routing["fallback_limit"] != 1):
+        die("models.toml: invalid [routing] values")
+    fast = routing["sla"].get("fast")
+    if not isinstance(fast, dict) or set(fast) != {"checkpoint_minutes", "cutoff_minutes", "ceiling_minutes"}:
+        die("models.toml: [routing.sla.fast] is invalid")
+    if (not all(isinstance(fast[x], int) and not isinstance(fast[x], bool) for x in fast)
+            or [fast[x] for x in ("checkpoint_minutes", "cutoff_minutes", "ceiling_minutes")] != [18, 20, 30]):
+        die("models.toml: [routing.sla.fast] must be 18/20/30")
+    if (routing["budgets"] != ROUTING_DEFAULTS["budgets"] or not all(isinstance(v, int) and not isinstance(v, bool) for v in routing["budgets"].values())):
+        die("models.toml: [routing.budgets] is invalid")
+    # Keep this internal marker out of serialized configuration.
+    config["_source_schema"] = source_schema
 
 
 def permission_profile(models_path=None):
@@ -241,7 +316,7 @@ def _inline(mapping, keys):
 
 def emit(config):
     """Deterministic emitter for the fixed models.toml schema (load(emit(x)) == x)."""
-    lines = [EMIT_HEADER + "schema = 1", ""]
+    lines = [EMIT_HEADER + "schema = 2", ""]
     lines.append("[subscriptions]")
     for key in sorted(config["subscriptions"]):
         lines.append(f"{key} = {'true' if config['subscriptions'][key] else 'false'}")
@@ -268,6 +343,19 @@ def emit(config):
         lines.append("[permissions]")
         for key in sorted(config["permissions"]):
             lines.append(f"{key} = {_value(config['permissions'][key])}")
+    lines.extend(["", "[runtime]", f"primary = {_value(config['runtime']['primary'])}",
+                  f"fallbacks = {_value(config['runtime']['fallbacks'])}", "", "[orchestrator.pi]"])
+    lines.append(f"model = {_value(config['orchestrator']['pi']['model'])}")
+    lines.append(f"effort = {_value(config['orchestrator']['pi']['effort'])}")
+    lines.extend(["", "[routing]"])
+    for key in ("enabled_providers", "xhigh_benchmarked", "max_enabled", "fallback_limit", "single_writer"):
+        lines.append(f"{key} = {_value(config['routing'][key])}")
+    lines.extend(["", "[routing.sla.fast]"])
+    for key in ("checkpoint_minutes", "cutoff_minutes", "ceiling_minutes"):
+        lines.append(f"{key} = {config['routing']['sla']['fast'][key]}")
+    lines.extend(["", "[routing.budgets]"])
+    for key in ("direct_spawns", "fast_spawns", "scoped_spawns", "feature_spawns_per_package", "incident_spawns"):
+        lines.append(f"{key} = {config['routing']['budgets'][key]}")
     duties = [d for d in DUTY_ORDER if d in config["areas"]]
     duties += sorted(set(config["areas"]) - set(duties))
     for duty in duties:
@@ -289,3 +377,19 @@ def emit(config):
         if "opencode" in override:
             lines.append(f"opencode = {_inline(override['opencode'], LANES)}")
     return "\n".join(lines) + "\n"
+
+
+def emit_atomic(path, config):
+    """Write normalized schema 2 atomically; callers never observe a partial config."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(emit(config))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)

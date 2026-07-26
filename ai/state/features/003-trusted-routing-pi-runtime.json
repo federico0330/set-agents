@@ -1,0 +1,2114 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-01a",
+    "AC-02",
+    "AC-02a",
+    "AC-03",
+    "AC-03a",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-07a",
+    "AC-08",
+    "AC-09"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-24T18:04:57+00:00",
+    "hash": "433771847056d3ad87fea8cd5a009a39e5dad1daabd9c505ae680078bcf7ed77",
+    "path": "docs/specs/003-trusted-routing-pi-runtime/spec.md"
+  },
+  "blockers": [
+    {
+      "at": "2026-07-24T23:17:04+00:00",
+      "package_id": "P1R-trusted-routing",
+      "reason": "HUMAN_DECISION_REQUIRED: R1 delta leaves 1 critical, 8 high and 1 medium consolidated finding open; approved rollout allowed at most one consolidated repair and the focused delta review, so no further mutation/review cycle is authorized.",
+      "resolved_at": "2026-07-24T23:19:43+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "User explicitly authorized a second consolidated repair and focused delta review for DR-001..DR-010."
+    },
+    {
+      "at": "2026-07-24T23:42:37+00:00",
+      "package_id": "P1R-trusted-routing",
+      "reason": "HUMAN_DECISION_REQUIRED: R2 gates pass, but the independent delta reviewer instance is unavailable and the 12-spawn budget is exhausted; no self-approval is permitted. Re-authorize with a fresh review budget or accept the package only after an independent delta review.",
+      "resolved_at": "2026-07-24T23:45:19+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "User explicitly authorized a fresh independent delta-review budget after R2 gates passed but reviewer capacity was exhausted."
+    },
+    {
+      "at": "2026-07-24T23:54:16+00:00",
+      "package_id": "P1R-trusted-routing",
+      "reason": "HUMAN_DECISION_REQUIRED: independent final delta review leaves FD-001 critical, FD-002..FD-009 high and FD-010 medium open; R2 gates pass but contractual counterexamples remain.",
+      "resolved_at": "2026-07-25T02:06:33+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "User authorized R3 (third consolidated repair) with fresh budget: 1 repair batch + independent gates + 1 focused delta review; threat-model amendment approved (in-process/same-UID adversary out of scope; unsatisfiable halves of FD-001/FD-004/FD-006 become approved exceptions)."
+    },
+    {
+      "at": "2026-07-25T02:07:50+00:00",
+      "package_id": "P1R-trusted-routing",
+      "reason": "deep review budget exhausted",
+      "resolved_at": "2026-07-25T02:08:28+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "Same R3 authorization: deep-review budget extended 2->3 for the rehydration panel; prior block was budget arithmetic, not a new decision."
+    }
+  ],
+  "budgets": {
+    "max_deep_review_cycles": 3,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 16
+  },
+  "current_package_id": "P1R-trusted-routing",
+  "feature_id": "003-trusted-routing-pi-runtime",
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/003-trusted-routing-pi-runtime/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-24T18:04:57+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "package-planner",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "T-001",
+          "T-002",
+          "T-003",
+          "T-004",
+          "T-005"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:10:46+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "P1R context pack and hosted implementation routing accepted."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:10:46+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-001"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:10:46+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un \u00fanico implementador hospedado va a reemplazar el prototipo completo, incluyendo persistencia, CLI y regresiones, con validaci\u00f3n local por cada tarea.",
+        "purpose": "Implement T-001 through T-005 from the approved P1R context pack",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "PACKAGE_IMPLEMENTATION P1R; hosted openai/gpt-5.6-terra medium, ownership acotado, sin autoaprobaci\u00f3n ni P2/P3."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:11:09+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-001",
+        "validations": [
+          "trusted facts/catalog/static ID focused suite PASS"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-002"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-002",
+        "validations": [
+          "run identity and independent review focused suite PASS"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-003"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-003",
+        "validations": [
+          "SQLite lifecycle/concurrency/crash focused suite PASS"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-004"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-004",
+        "validations": [
+          "CLI envelope/simulation/legacy/retention focused suite PASS"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-005"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-005",
+        "validations": [
+          "focused+hermetic+setup_models+py_compile+verify reported PASS; independent rerun pending"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "T-001..T-005 implemented with local validations; independent gates required."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:21:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Una instancia independiente va a repetir todas las validaciones y comprobar que el paquete no sali\u00f3 de su ownership.",
+        "purpose": "Run deterministic P1R package gates independently",
+        "role": "gate-runner",
+        "spawns": 2,
+        "tech": "PACKAGE_GATES P1R; gate-runner read-only, baseline ef\u00edmero 51b84e3f, sin reparaci\u00f3n ni aprobaci\u00f3n."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:22:03+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "compile-and-focused-tests",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:44:13+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership-exact-tree",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:44:13+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:44:13+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "full-verify-and-gatespec",
+        "status": "fail"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:44:13+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Diagnose reproducible full verify timeout before review."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T18:44:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un diagn\u00f3stico independiente va a distinguir si la prueba est\u00e1 realmente colgada o si s\u00f3lo excedi\u00f3 la ventana corta, y \u00fanicamente corregir\u00e1 una causa comprobada.",
+        "purpose": "Diagnose full verify timeout at notes idempotency test and apply only a confirmed minimal repair",
+        "role": "debugger",
+        "spawns": 3,
+        "tech": "Instancia debugger en el ciclo de reparaci\u00f3n de gates: reproduce el test se\u00f1alado con tiempo amplio, mide el gate completo y aplica un arreglo m\u00ednimo s\u00f3lo si confirma una causa; consume el spawn 3 y parte del gate_failures=1 ya registrado."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:21:27+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Debugger proved artificial runner timeout; independent gate rerun with adequate window required."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:26:11+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Una validaci\u00f3n independiente va a repetir el chequeo completo con tiempo suficiente y confirmar el resultado sin modificar nada.",
+        "purpose": "Independently rerun full verify and GateSpec with a 120-second-or-greater execution window",
+        "role": "gate-runner",
+        "spawns": 4,
+        "tech": "Retry de PACKAGE_GATES con gate-runner read-only, ventana >=120 s y polling hasta exit; spawn 4, sin nuevo gate failure salvo error real."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:26:19+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "full-verify-and-gatespec",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:30:05+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "All deterministic package gates pass independently; begin required package and security review panel."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:30:06+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1R-R1",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:30:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente va a comprobar que el redise\u00f1o cumple cada criterio aprobado, se integra bien y no deja huecos de comportamiento o pruebas.",
+        "purpose": "Deep independent package review against approved P1R contract and exact baseline diff",
+        "role": "package-reviewer",
+        "spawns": 5,
+        "tech": "Panel P1R-R1, package-reviewer read-only sobre 51b84e3f..WORKTREE; hallazgos estructurados de correcci\u00f3n, datos, rendimiento e integraci\u00f3n; spawn 5, deep cycle 1."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:30:28+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "En paralelo, un auditor de seguridad va a intentar encontrar formas concretas de eludir las fronteras de confianza, romper la atomicidad o filtrar informaci\u00f3n.",
+        "purpose": "Independent defensive security review of trust boundaries, SQLite lifecycle and privacy behavior",
+        "role": "security-auditor",
+        "spawns": 6,
+        "tech": "Panel P1R-R1, security-auditor read-only sobre contrato aprobado y 51b84e3f..WORKTREE; hallazgos explotables archivo/l\u00ednea/verificaci\u00f3n; spawn 6."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:30:30+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 10,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:46:45+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 8,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:46:46+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1R-R1",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:46:55+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un \u00fanico equipo de reparaci\u00f3n va a rehacer las fronteras defectuosas de punta a punta \u2014permiso, hechos, autenticaci\u00f3n, SQLite, cat\u00e1logo, CLI y pruebas\u2014 y va a demostrar cada cierre con el ataque original.",
+        "purpose": "Consolidated repair of all P1R-R1 package and security findings with attack-replay tests",
+        "role": "repair-agent",
+        "spawns": 7,
+        "tech": "PACKAGE_REPAIR batch 1: repair-agent agrupa PKG-001..010 y SEC-001..008 por causa ra\u00edz, ownership acotado, trazabilidad finding\u2192files\u2192verification, sin auto-resolver ni expandir P2/P3; spawn 7."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T22:47:19+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "PKG-001",
+          "PKG-002",
+          "PKG-003",
+          "PKG-004",
+          "PKG-005",
+          "PKG-006",
+          "PKG-007",
+          "PKG-008",
+          "PKG-009",
+          "PKG-010",
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007",
+          "SEC-008"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:00:43+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una instancia independiente va a repetir la suite reparada y verificar que el cambio siga dentro del paquete antes de entregarlo al revisor delta.",
+        "purpose": "Independently verify consolidated repair R1 and exact-tree ownership before delta review",
+        "role": "gate-runner",
+        "spawns": 8,
+        "tech": "PACKAGE_REPAIR post-R1 gate-runner read-only: focused, all GateSpecs, verify >=120 s, diff and alternate-index ownership against 51b84e3f; spawn 8."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:00:51+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "post-repair-full-verification",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:06:07+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor distinto va a volver a ejecutar los ataques originales y comprobar que cada cierre sea real, sin reabrir una revisi\u00f3n general.",
+        "purpose": "Focused independent delta review of consolidated repair R1 against all P1R-R1 findings",
+        "role": "delta-reviewer",
+        "spawns": 9,
+        "tech": "DELTA_REVIEW R1: delta-reviewer read-only decide resolved|open por PKG-001..010/SEC-001..008, reproduce ataques y revisa regresiones del delta; spawn 9, deep cycle 2/2."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:06:23+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "block",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: R1 delta leaves 1 critical, 8 high and 1 medium consolidated finding open; approved rollout allowed at most one consolidated repair and the focused delta review, so no further mutation/review cycle is authorized."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:17:04+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "User explicitly authorized a second consolidated repair and focused delta review for DR-001..DR-010."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:43+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Rehydrate the authorized R2 workflow from the blocked delta findings."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "All original implementation tasks remain complete; prior R1 gates are preserved solely to reach review-state rehydration."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Rehydrate the completed R1 delta verdict as the authorized R2 repair input."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:45+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1R-R1-DELTA-REHYDRATED",
+        "roles": [
+          "delta-reviewer"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:46+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "role": "delta-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:47+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1R-R1-DELTA-REHYDRATED",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:19:47+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un \u00fanico reparador hospedado va a cerrar ahora las diez cadenas pendientes desde la capa m\u00e1s profunda, con pruebas que demuestren cada frontera; no alcanza con mantener verdes los tests anteriores.",
+        "purpose": "Second explicitly authorized consolidated repair of DR-001 through DR-010 with boundary-level proofs",
+        "role": "repair-agent",
+        "spawns": 10,
+        "tech": "PACKAGE_REPAIR R2, spawn 10/12: remove constructible authorization/facts seams, exact probes/catalog, validate-before-mutate SQLite, complete lifecycle/rollups/compaction/CLI and production-shaped AC tests; no P2/P3, no self-approval."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:20:11+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un repair-agent va a corregir los diez hallazgos delta en dos bloques acotados y verificables, preservando P2/P3 pausados.",
+        "purpose": "Second bounded repair for DR-001..DR-010 after explicit user authorization",
+        "role": "repair-agent",
+        "spawns": 11,
+        "tech": "PACKAGE_REPAIR R2: bounded trust/catalog block plus SQLite/lifecycle/CLI block; only final repair slot before independent gate and reused delta reviewer; spawn 11/12, no contract weakening."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:25:29+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "DR-001",
+          "DR-002",
+          "DR-003",
+          "DR-004",
+          "DR-005",
+          "DR-006",
+          "DR-007",
+          "DR-008",
+          "DR-009",
+          "DR-010"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:37:04+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una \u00faltima validaci\u00f3n independiente va a repetir R2 y comprobar ownership exacto antes del delta reviewer.",
+        "purpose": "Independent gates and exact-tree ownership verification for second repair R2",
+        "role": "gate-runner",
+        "spawns": 12,
+        "tech": "Spawn 12/12 final: gate-runner read-only executes focused/all GateSpecs/verify/CLI and alternate-index ownership from 51b84e3f; no more spawns after this."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:37:11+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "r2-final-verification",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:42:08+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: R2 gates pass, but the independent delta reviewer instance is unavailable and the 12-spawn budget is exhausted; no self-approval is permitted. Re-authorize with a fresh review budget or accept the package only after an independent delta review."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:42:37+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "User explicitly authorized a fresh independent delta-review budget after R2 gates passed but reviewer capacity was exhausted."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:45:19+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor delta independiente va a validar R2 antes de aceptar P1R.",
+        "purpose": "Fresh independent delta review budget authorized by user after R2 gates",
+        "role": "delta-reviewer",
+        "spawns": 13,
+        "tech": "Fresh review budget 13/13 authorized by user; delta-reviewer read-only only, no code mutation or self-approval."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:46:06+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "block",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: independent final delta review leaves FD-001 critical, FD-002..FD-009 high and FD-010 medium open; R2 gates pass but contractual counterexamples remain."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-24T23:54:16+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "User authorized R3 (third consolidated repair) with fresh budget: 1 repair batch + independent gates + 1 focused delta review; threat-model amendment approved (in-process/same-UID adversary out of scope; unsatisfiable halves of FD-001/FD-004/FD-006 become approved exceptions)."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:06:33+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Rehydrate authorized R3 workflow; original tasks remain complete."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:07:50+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "R2 gates preserved solely to reach review-state rehydration."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:07:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Rehydrate final delta verdict (FD-001..FD-010) as authorized R3 repair input."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:07:50+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "reason": "deep review budget exhausted"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:07:50+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "Same R3 authorization: deep-review budget extended 2->3 for the rehydration panel; prior block was budget arithmetic, not a new decision."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:28+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Rehydrate authorized R3 workflow; original tasks remain complete."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:28+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "R2 gates preserved solely to reach review-state rehydration."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:28+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Rehydrate final delta verdict (FD-001..FD-010) as authorized R3 repair input."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:29+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1R-FD-REHYDRATED",
+        "roles": [
+          "delta-reviewer"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:29+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "role": "delta-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:41+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1R-FD-REHYDRATED",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:41+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un unico reparador va a cerrar los diez pendientes: primero hara que la deteccion de herramientas autenticadas funcione de verdad, despues endurecera la base de datos y la auditoria, y dejara pruebas de choque, concurrencia y privacidad.",
+        "purpose": "Third authorized consolidated repair of FD-001..FD-010 under amended threat model",
+        "role": "repair-agent",
+        "spawns": 14,
+        "tech": "PACKAGE_REPAIR R3, spawn 14/16 (Claude Fable in-session): FD-003 per-pair probe parsers with graceful degradation; FD-005 canonical DDL equality; FD-002 conservative risk max; FD-007 rejection audit + lifecycle CHECKs (SCHEMA bump); FD-008 counters + transactional compaction; FD-010 generic non-default-arg exclusion; feasible halves of FD-001/004/006 (sealed composition, recomputed binding, pwd root); infeasible halves -> approved exceptions."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:08:42+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "FD-001",
+          "FD-002",
+          "FD-003",
+          "FD-004",
+          "FD-005",
+          "FD-006",
+          "FD-007",
+          "FD-008",
+          "FD-009",
+          "FD-010"
+        ]
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:21:49+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una instancia independiente va a repetir todas las validaciones con tiempo suficiente y comprobar que la reparacion no toco nada fuera del paquete.",
+        "purpose": "Independent gates and exact-tree ownership verification for third repair R3",
+        "role": "gate-runner",
+        "spawns": 15,
+        "tech": "DELTA_REVIEW R3 gate-runner read-only, spawn 15/16: focused suite, named regressions, setup_models, py_compile, all GateSpecs incl. new v2:routing-unit, verify.sh >=120s window, CLI explain 0 / conflict 2, git diff --check, ownership vs 51b84e3f."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:21:58+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente distinto va a reproducir cada uno de los diez pendientes y decidir si la reparacion es real, sin poder tocar codigo.",
+        "purpose": "Final independent focused delta review of R3 against FD-001..FD-010 under the amended contract",
+        "role": "delta-reviewer",
+        "spawns": 16,
+        "tech": "DELTA_REVIEW R3 delta-reviewer read-only, spawn 16/16 (last of authorized budget): decide resolved|open per FD-001..FD-010 against the R3-amended contract (decision r3-threat-model-amendment); approved exceptions apply to the recorded residuals only."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:52:31+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "r3-final-verification",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T02:52:47+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T03:01:30+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests -p 'test_routing.py'",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T03:01:53+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T03:01:53+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-25T03:01:53+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 3,
+    "human_questions_after_approval": 0,
+    "package_reviews": 3,
+    "repair_batches": 3,
+    "task_deep_reviews": 0
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-01a",
+        "AC-02",
+        "AC-02a",
+        "AC-03",
+        "AC-03a",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-07a",
+        "AC-08",
+        "AC-09"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 3,
+        "gate_failures": 1,
+        "repair_batches": 3,
+        "spawns": 16,
+        "subdivisions": 0
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/003-trusted-routing-pi-runtime/context/P1R-trusted-routing.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-24T23:17:04+00:00",
+          "closed_findings": [
+            "SEC-003",
+            "SEC-007"
+          ],
+          "new_or_reopened_findings": [
+            "DR-001",
+            "DR-002",
+            "DR-003",
+            "DR-004",
+            "DR-005",
+            "DR-006",
+            "DR-007",
+            "DR-008",
+            "DR-009",
+            "DR-010"
+          ],
+          "reason": "HUMAN_DECISION_REQUIRED: R1 delta leaves 1 critical, 8 high and 1 medium consolidated finding open; approved rollout allowed at most one consolidated repair and the focused delta review, so no further mutation/review cycle is authorized.",
+          "requires_full_review": false,
+          "verdict": "blocked"
+        },
+        {
+          "at": "2026-07-24T23:54:16+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [
+            "FD-001",
+            "FD-002",
+            "FD-003",
+            "FD-004",
+            "FD-005",
+            "FD-006",
+            "FD-007",
+            "FD-008",
+            "FD-009",
+            "FD-010"
+          ],
+          "reason": "HUMAN_DECISION_REQUIRED: independent final delta review leaves FD-001 critical, FD-002..FD-009 high and FD-010 medium open; R2 gates pass but contractual counterexamples remain.",
+          "requires_full_review": false,
+          "verdict": "blocked"
+        },
+        {
+          "at": "2026-07-25T03:01:30+00:00",
+          "closed_findings": [
+            "FD-001",
+            "FD-002",
+            "FD-003",
+            "FD-004",
+            "FD-005",
+            "FD-006",
+            "FD-007",
+            "FD-008",
+            "FD-009",
+            "FD-010"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "R3 independent focused delta review under amended contract: 6 resolved, 4 resolved with residual exactly inside the approved exceptions (r3-threat-model-amendment). Non-blocking backlog notes: N-1 unhashable required_tools element raises TypeError instead of FACTS_INCOMPLETE (service.py:106, fail-closed in practice); N-2 _compose_for_tests(root=None) still targets production store (routing.py:29, unused by suite); N-3 explain wall-time ~14.5s from live probes; N-4 verify.sh py_compile misses routing_core/*.py; N-5 DDL normalization lowercases literals (excluded adversary).",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "51b84e3f8782789ac532d0c0e50167cf917a7eda..WORKTREE",
+      "findings": [
+        {
+          "acceptance_criterion": "AC-03,AC-03a,AC-05,AC-07",
+          "category": "data-integrity",
+          "evidence": "authorize accepts caller-forged RouteDecision, role and weak run ID; implementation_identity trusts literal writer and reconstructs identity incorrectly.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "PKG-001",
+          "line": "75-127",
+          "repair_attempts": 1,
+          "required_outcome": "Provenance-bound opaque permit; exact run ID and roster-derived role class; recompute static binding and snapshot identity; simulation cannot authorize.",
+          "severity": "critical",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-06",
+          "category": "data-integrity",
+          "evidence": "mkdir follows symlink ancestors before validation; broken routing.db symlink bypasses exists and SQLite creates outside managed root.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "PKG-002",
+          "line": "20-52",
+          "repair_attempts": 1,
+          "required_outcome": "Validate no-follow before mutation; descriptor-relative creation; positive local-FS probe; root/DB/WAL/SHM identity/mode validation.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-02a,AC-09",
+          "category": "integration",
+          "evidence": "Production defaults four pairs authenticated; allowed_probe unused/incomplete; missing binaries still yield executable Anthropic decision.",
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "PKG-003",
+          "line": "32-45",
+          "repair_attempts": 1,
+          "required_outcome": "Fresh exact closed-argv auth/model probes each invocation; missing/timeout/ambiguous/nonzero makes only the pair unavailable; remove auth defaults.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-01a",
+          "category": "correctness",
+          "evidence": "Facts accept arbitrary version, replay for 300s, executable conflicts, and ignore additive risk/tools constraints.",
+          "file": "ai/scripts/routing_core/domain.py",
+          "id": "PKG-004",
+          "line": "49-59",
+          "repair_attempts": 1,
+          "required_outcome": "One-use invocation-scoped validated facts; reject stale/replay/ambiguous/conflict; caller claims can only raise constraints.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-06,AC-08",
+          "category": "data-integrity",
+          "evidence": "Existing DB is mutated with tables/salt before schema check; no integrity/exact structural validation; unrelated DB is adopted.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "PKG-005",
+          "line": "45-70",
+          "repair_attempts": 1,
+          "required_outcome": "Separate absent initialization from byte-preserving existing-state validation; atomic new schema/meta; corrupt/mismatch fail closed unchanged.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-07,AC-07a,AC-08",
+          "category": "data-integrity",
+          "evidence": "Incomplete schema/state machine; invalid partial/terminal transitions accepted; no atomic event or rollup; terminal persistence failure absent.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "PKG-006",
+          "line": "54-120",
+          "repair_attempts": 1,
+          "required_outcome": "Constrained lifecycle with complete identities; each BEGIN IMMEDIATE transition atomically writes dispatch, allowlisted event and rollup.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-02,AC-02a,AC-04,AC-09",
+          "category": "correctness",
+          "evidence": "Catalog schema/encoding differ from contract, trusts forbidden runtimes, tolerates invalid structure, and covers only 11 of 27 roles.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "PKG-007",
+          "line": "7-38",
+          "repair_attempts": 1,
+          "required_outcome": "Exact static schema and length-prefixed binding; reject malformed/duplicate rows; derive runtime compatibility from roster/models/adapters; full roster coverage.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-08",
+          "category": "scalability",
+          "evidence": "No compaction/lifetime/per-route percentiles; seconds-vs-ms cutoff bug; 10001 rows remain; scan/temp sort and no indexes.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "PKG-008",
+          "line": "64-65,130-136",
+          "repair_attempts": 1,
+          "required_outcome": "Transactional 90d/10000 compaction, insertion-time lifetime counters, exact nearest-rank percentiles and aligned indexes.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-01 through AC-09",
+          "category": "testing",
+          "evidence": "Seven implementation-shaped tests omit production probes, forgery, concurrency/crash, filesystem, corruption, rollup and 10001-event matrices; one asserts executable conflicts.",
+          "file": "tests/test_routing.py",
+          "id": "PKG-009",
+          "line": "30-80",
+          "repair_attempts": 1,
+          "required_outcome": "Production-shaped full AC matrix and execution of every immutable GateSpec including negative env/cwd/shell cases.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-05",
+          "category": "integration",
+          "evidence": "Rotated legacy regex is wrong; reason codes not allowlisted; raw config text and human diagnostics leak; conflicting CLI modes accepted.",
+          "file": "ai/scripts/routing.py",
+          "id": "PKG-010",
+          "line": "22-43",
+          "repair_attempts": 1,
+          "required_outcome": "Exact regex, closed redacted envelopes, stderr diagnostics and mutually exclusive CLI modes with stable 0/1/2 exits.",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-02a,AC-03,AC-03a,AC-07",
+          "category": "security",
+          "evidence": "Forged RouteDecision/role/run ID can create durable writer identity without snapshot/auth/facts.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "SEC-001",
+          "line": "75",
+          "repair_attempts": 1,
+          "required_outcome": "Opaque internal permit, derived run/role, atomic identity revalidation and durable rejection audit.",
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-01a,AC-02a",
+          "category": "security",
+          "evidence": "Facts/inventory/root are public caller-controlled and reusable; no origin capability or actual probe.",
+          "file": "ai/scripts/routing_core/domain.py",
+          "id": "SEC-002",
+          "line": "31",
+          "repair_attempts": 1,
+          "required_outcome": "Fresh internal one-use observation scope and exact pair-scoped probes; production composition cannot accept forged inventory.",
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-05",
+          "category": "security",
+          "evidence": "Explain uses synthetic auth and returns executable RouteDecision while sharing mutating store capability.",
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-003",
+          "line": "32",
+          "repair_attempts": 1,
+          "required_outcome": "Capability-less simulation returning Explanation only; serialized output can never authorize or create state.",
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-06,AC-07",
+          "category": "security",
+          "evidence": "Caller/env can redirect root; ancestor and broken DB symlinks are followed before validation; no FS/identity/sidecar checks.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "SEC-004",
+          "line": "16",
+          "repair_attempts": 1,
+          "required_outcome": "Fixed managed root, validate-before-mutate no-follow descriptor traversal, supported local FS and stable 0700/0600 identities.",
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-03,AC-03a,AC-06,AC-07a",
+          "category": "security",
+          "evidence": "Schema/meta mutation precedes validation; no integrity/exact schema checks; forged terminal-success row can become reviewer authority.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "SEC-005",
+          "line": "54",
+          "repair_attempts": 1,
+          "required_outcome": "Exclusive atomic new DB init; byte-preserving verified open; exact constraints and identity validation.",
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-02,AC-02a",
+          "category": "security",
+          "evidence": "Unbound runtimes field can rebind unchanged route ID to unaudited runtime using caller inventory.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "SEC-006",
+          "line": "19",
+          "repair_attempts": 1,
+          "required_outcome": "Runtime excluded/rejected in TOML and derived from audited roster/model/adapters; revalidate on authorization.",
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-05",
+          "category": "security",
+          "evidence": "Missing/malformed config escapes with traceback, username and internal paths instead of stable JSON envelope.",
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-007",
+          "line": "61",
+          "repair_attempts": 1,
+          "required_outcome": "Exhaustive boundary mapper to allowlisted redacted code; no traceback/path/raw exception.",
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-07,AC-08",
+          "category": "security",
+          "evidence": "Lifecycle success/failure/replay leaves no event/rollup; no detection or forensic trail.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "SEC-008",
+          "line": "75",
+          "repair_attempts": 1,
+          "required_outcome": "Atomic allowlisted success audit and independent post-rollback rejection audit with privacy and degradation controls.",
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed"
+        },
+        {
+          "acceptance_criterion": "AC-03,AC-03a,AC-07",
+          "addresses": "PKG-001,SEC-001",
+          "category": "security",
+          "evidence": "AuthorizationPermit remains caller-constructible and store accepts it without issuer provenance.",
+          "file": "ai/scripts/routing_core/domain.py",
+          "id": "DR-001",
+          "line": "123-137",
+          "repair_attempts": 1,
+          "required_outcome": "Non-constructible service-issued single-use permit; roster-derived class and store-level provenance validation.",
+          "severity": "critical",
+          "status": "closed",
+          "suggested_scope": "domain.py,service.py,store.py,frontier tests"
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-01a",
+          "addresses": "PKG-004,SEC-002",
+          "category": "security",
+          "evidence": "Facts builder remains public, scope is service-lived and facts are not consumed; conflicts remain executable.",
+          "file": "ai/scripts/routing_core/service.py",
+          "id": "DR-002",
+          "line": "18-35",
+          "repair_attempts": 1,
+          "required_outcome": "Internal invocation-scoped consumed facts; invalid/conflict/replay disables execution.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "facts builder,service,facts matrix"
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-02a,AC-09",
+          "addresses": "PKG-003",
+          "category": "integration",
+          "evidence": "Probe parsing uses substrings and composition retains injectable auth/model inventory.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "DR-003",
+          "line": "18-33",
+          "repair_attempts": 1,
+          "required_outcome": "Exact closed probes and parsing; no production observation injection or authentication borrowing.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "probe adapter,production composition"
+        },
+        {
+          "acceptance_criterion": "AC-06,AC-07",
+          "addresses": "PKG-002,SEC-004",
+          "category": "security",
+          "evidence": "Production root remains selectable and storage lacks positive filesystem proof and complete descriptor-relative identity validation.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "DR-004",
+          "line": "31-67,119-131",
+          "repair_attempts": 1,
+          "required_outcome": "Fixed production root, positive local-FS proof and complete no-follow descriptor-relative validation.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "routing composition,store opening"
+        },
+        {
+          "acceptance_criterion": "AC-03a,AC-06,AC-07a,AC-08",
+          "addresses": "PKG-005,SEC-005",
+          "category": "stability",
+          "evidence": "WAL pragma mutates before validation; validation checks table names/meta but not exact columns,constraints,indexes or identity.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "DR-005",
+          "line": "89-131,196-202",
+          "repair_attempts": 1,
+          "required_outcome": "Validate full existing database bytes/schema/constraints/indexes before any mutation; invalid state byte-identical.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "SQLite init,validation,open"
+        },
+        {
+          "acceptance_criterion": "AC-02,AC-02a,AC-04,AC-09",
+          "addresses": "PKG-007,SEC-006",
+          "category": "security",
+          "evidence": "Runtime compatibility is hardcoded and ignores resolved models/inventory; authorization lacks fresh auth/model revalidation.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "DR-006",
+          "line": "36-62",
+          "repair_attempts": 1,
+          "required_outcome": "Closed catalog plus canonical model/runtime derivation and fresh authorization revalidation.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "loader,snapshot,inventory"
+        },
+        {
+          "acceptance_criterion": "AC-07,AC-07a,AC-08",
+          "addresses": "PKG-006,SEC-008",
+          "category": "correctness",
+          "evidence": "Rejected lifecycle operations are unaudited and events/rollups can record selected identity after fallback instead of actual.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "DR-007",
+          "line": "93-108,137-202",
+          "repair_attempts": 1,
+          "required_outcome": "Constrained state machine and atomic correct actual identity audit/rollup for success and rejection.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "schema,transitions,audit"
+        },
+        {
+          "acceptance_criterion": "AC-08",
+          "addresses": "PKG-008",
+          "category": "scalability",
+          "evidence": "No automatic compaction after insert; counters incomplete; report materializes all events in Python.",
+          "file": "ai/scripts/routing_core/store.py",
+          "id": "DR-008",
+          "line": "137-142,203-229",
+          "repair_attempts": 1,
+          "required_outcome": "Automatic indexed 90d/10k compaction, complete counters and bounded SQLite percentile queries.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "events,rollups,compaction,reporting,indexes"
+        },
+        {
+          "acceptance_criterion": "AC-01 through AC-09",
+          "addresses": "PKG-009",
+          "category": "testing",
+          "evidence": "Seven tests and two GateSpecs omit the production AC and negative boundary matrix.",
+          "file": "tests/test_routing.py",
+          "id": "DR-009",
+          "line": "14-86",
+          "repair_attempts": 1,
+          "required_outcome": "Complete production-shaped AC matrix and sealed GateSpec executor negative cases.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "routing tests,gates"
+        },
+        {
+          "acceptance_criterion": "AC-05",
+          "addresses": "PKG-010",
+          "category": "integration",
+          "evidence": "Valid explain returns exit1, human diagnostics use stdout, mode exclusion and legacy no-follow remain incomplete.",
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "DR-010",
+          "line": "41-81,1040-1047",
+          "repair_attempts": 1,
+          "required_outcome": "Exact 0/1/2 behavior, stderr diagnostics, total mode exclusion and no-follow legacy scan.",
+          "severity": "medium",
+          "status": "closed",
+          "suggested_scope": "routing facade,CLI"
+        },
+        {
+          "acceptance_criterion": "AC-03,AC-03a,AC-07",
+          "category": "security",
+          "evidence": "Snapshot/roster/inventory and permit authority remain caller-injectable; arbitrary identity persisted.",
+          "file": "ai/scripts/routing_core/domain.py:85-99; service.py:35-50; store.py:179-183",
+          "id": "FD-001",
+          "line": "ai/scripts/routing_core/domain.py:85-99; service.py:35-50; store.py:179-183",
+          "repair_attempts": 1,
+          "required_outcome": "Seal composition internally, recompute binding, non-forgeable single-use permit.",
+          "severity": "critical",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-01a",
+          "category": "security",
+          "evidence": "Replay is blocked but observed high risk can still be downgraded by a low-risk request.",
+          "file": "ai/scripts/routing_core/domain.py:72-82; service.py:52-66",
+          "id": "FD-002",
+          "line": "ai/scripts/routing_core/domain.py:72-82; service.py:52-66",
+          "repair_attempts": 1,
+          "required_outcome": "Validate full fact matrix and conservatively combine caller constraints; unsafe conflicts disable execution.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-01,AC-02a,AC-09",
+          "category": "integration",
+          "evidence": "Closed argv exists but parsers treat all outputs as model JSON and do not validate exact Codex/Claude/OpenCode semantics.",
+          "file": "ai/scripts/routing_core/catalog.py:19-45",
+          "id": "FD-003",
+          "line": "ai/scripts/routing_core/catalog.py:19-45",
+          "repair_attempts": 1,
+          "required_outcome": "Pair-specific parsers for auth state, provider key and exact model without borrowing.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-06,AC-07",
+          "category": "security",
+          "evidence": "Root remains Path.home and filesystem support is optimistic; pathname traversal lacks root/component revalidation.",
+          "file": "ai/scripts/routing_core/store.py:22-26,41-68,152-164",
+          "id": "FD-004",
+          "line": "ai/scripts/routing_core/store.py:22-26,41-68,152-164",
+          "repair_attempts": 1,
+          "required_outcome": "Trusted fixed root, positive local-FS classification and descriptor-relative validation of root/DB/WAL/SHM.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-03a,AC-06,AC-07a,AC-08",
+          "category": "stability",
+          "evidence": "RO validation checks names/substrings only; schema missing role_class constraint is accepted before RW/WAL.",
+          "file": "ai/scripts/routing_core/store.py:122-150,152-166",
+          "id": "FD-005",
+          "line": "ai/scripts/routing_core/store.py:122-150,152-166",
+          "repair_attempts": 1,
+          "required_outcome": "Validate exact columns/types/PK/CHECK/index/meta in RO before mutation.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-02,AC-02a,AC-04,AC-09",
+          "category": "security",
+          "evidence": "Snapshot ignores inventory and resolved role models, hardcodes runtimes and reuses cached map for authorization.",
+          "file": "ai/scripts/routing_core/catalog.py:47-76; service.py:35-39,68-88",
+          "id": "FD-006",
+          "line": "ai/scripts/routing_core/catalog.py:47-76; service.py:35-39,68-88",
+          "repair_attempts": 1,
+          "required_outcome": "Intersect canonical role/model resolution with fresh inventory and re-probe before authorization.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-07,AC-07a,AC-08",
+          "category": "correctness",
+          "evidence": "State/identity constraints remain incomplete and rejected fallback is not audited.",
+          "file": "ai/scripts/routing_core/store.py:107-117,203-240",
+          "id": "FD-007",
+          "line": "ai/scripts/routing_core/store.py:107-117,203-240",
+          "repair_attempts": 1,
+          "required_outcome": "Complete lifecycle constraints and atomic/independent audit for every rejection and transition.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-08",
+          "category": "scalability",
+          "evidence": "Rollups omit exclusion/consumed/outcome counters and rejection insertion does not compact; 10001 rows retained.",
+          "file": "ai/scripts/routing_core/store.py:172-177,198-201,242-275",
+          "id": "FD-008",
+          "line": "ai/scripts/routing_core/store.py:172-177,198-201,242-275",
+          "repair_attempts": 1,
+          "required_outcome": "Complete one-time counters and automatic bounded compaction/reporting.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-01..AC-09",
+          "category": "testing",
+          "evidence": "Focused suite has 9 tests and two GateSpecs; required concurrency/crash/retention/privacy/CLI matrices are absent.",
+          "file": "ai/scripts/routing_core/gates.py:14-34; tests/test_routing.py:35-117",
+          "id": "FD-009",
+          "line": "ai/scripts/routing_core/gates.py:14-34; tests/test_routing.py:35-117",
+          "repair_attempts": 1,
+          "required_outcome": "Production-shaped matrix plus sealed compile/unit/verify GateSpecs and negative env/cwd/shell cases.",
+          "severity": "high",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        },
+        {
+          "acceptance_criterion": "AC-05",
+          "category": "integration",
+          "evidence": "Mode validation omits routing modifiers such as --yes; explain with --yes exits 0 instead of 2.",
+          "file": "ai/scripts/set_agents_app.py:1040-1054",
+          "id": "FD-010",
+          "line": "ai/scripts/set_agents_app.py:1040-1054",
+          "repair_attempts": 1,
+          "required_outcome": "Reject every non-json argument outside routing mode and preserve stable exits.",
+          "severity": "medium",
+          "status": "closed",
+          "suggested_scope": "See focused delta scope in final review."
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-24T18:44:13+00:00",
+          "evidence": "py_compile exit0; routing 7/7; named hermetic 2/2; setup_models PASS; negative gate test PASS",
+          "name": "compile-and-focused-tests",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T18:44:13+00:00",
+          "evidence": "baseline 51b84e3f vs temp current tree; 14 changed paths; OWNERSHIP_PASS; no out_of_scope/read_only violations",
+          "name": "ownership-exact-tree",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T18:44:13+00:00",
+          "evidence": "git diff --check exit0",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T22:30:05+00:00",
+          "evidence": "Independent retry: ./ai/scripts/verify.sh exit0, 105 tests in 86.487s, VERIFY_PASS; exact GateSpec argv exit0, 105 tests in 72.894s, VERIFY_PASS; git diff --check exit0",
+          "name": "full-verify-and-gatespec",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T23:06:07+00:00",
+          "evidence": "R1 independent: focused 7/7; hermetic 2/2; setup PASS; verify exit0 105 tests 87.987s VERIFY_PASS; GateSpecs PASS; diff PASS; exact alternate-index ownership 14 paths in scope, zero violations.",
+          "name": "post-repair-full-verification",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T23:42:08+00:00",
+          "evidence": "R2 independent: exact py_compile PASS, unittest 107 PASS, setup PASS, verify.sh VERIFY_PASS, GateSpec negative coverage PASS, CLI explain 0/conflict 2, git diff --check PASS; pytest not installed and not a declared gate; no new ownership violation.",
+          "name": "r2-final-verification",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-25T02:52:47+00:00",
+          "evidence": "R3 independent: focused 19/19 OK 15.2s; harness regressions 2/2; setup_models PASS; py_compile PASS; GateSpec v2:routing-unit 19/19; verify.sh 117 tests VERIFY_PASS 57.7s; CLI explain exit0/json + --yes conflict exit2; git diff --check exit0; ownership: no NEW unauthorized paths (adr/0005+design.md amendment user-authorized; 002 read-only preexisting from R2).",
+          "name": "r3-final-verification",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Trusted routing-v2: immutable catalog, trusted facts, private SQLite lifecycle, and simulated operator visibility",
+      "owned_paths": [
+        "ai/catalogs/routes.v1.toml",
+        "ai/scripts/routing_core/**",
+        "ai/scripts/routing.py",
+        "ai/scripts/models_config.py",
+        "ai/scripts/setup_models.py",
+        "models.toml",
+        "tests/test_routing.py",
+        "tests/test_harness.py",
+        "docs/specs/003-trusted-routing-pi-runtime/context/P1R-trusted-routing.md",
+        "docs/specs/003-trusted-routing-pi-runtime/evidence/P1R-*"
+      ],
+      "package_id": "P1R-trusted-routing",
+      "read_only_paths": [
+        "roles.tsv",
+        "tests/fixtures/models.toml",
+        "ai/scripts/verify.sh",
+        "PROYECTO/ai/scripts/feature-state.py",
+        "PROYECTO/ai/scripts/check-owned-paths.py",
+        "docs/specs/003-trusted-routing-pi-runtime/{spec,acceptance,design,plan,tasks}.md",
+        "docs/adr/0005-trusted-routing-sqlite-lifecycle.md",
+        "docs/specs/002-adaptive-pi-orchestration/context/P1-routing-core.md",
+        "docs/specs/002-adaptive-pi-orchestration/findings/P1-R1.md"
+      ],
+      "repairs": [
+        {
+          "at": "2026-07-24T23:00:43+00:00",
+          "changed_files": [
+            "ai/catalogs/routes.v1.toml",
+            "ai/scripts/routing_core/domain.py",
+            "ai/scripts/routing_core/catalog.py",
+            "ai/scripts/routing_core/service.py",
+            "ai/scripts/routing_core/store.py",
+            "ai/scripts/routing.py",
+            "ai/scripts/set_agents_app.py",
+            "tests/test_routing.py",
+            "docs/specs/003-trusted-routing-pi-runtime/evidence/P1R-repair-R1.md"
+          ],
+          "finding_ids": [
+            "PKG-001",
+            "PKG-002",
+            "PKG-003",
+            "PKG-004",
+            "PKG-005",
+            "PKG-006",
+            "PKG-007",
+            "PKG-008",
+            "PKG-009",
+            "PKG-010",
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007",
+            "SEC-008"
+          ],
+          "verification": [
+            "routing focused 7/7 PASS",
+            "named hermetic 2/2 PASS",
+            "setup_models check PASS",
+            "py_compile PASS",
+            "focused GateSpec PASS",
+            "verify.sh VERIFY_PASS",
+            "git diff --check PASS"
+          ]
+        },
+        {
+          "at": "2026-07-24T23:37:04+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/service.py",
+            "ai/scripts/routing_core/catalog.py",
+            "ai/scripts/routing_core/store.py",
+            "ai/scripts/routing_core/gates.py",
+            "ai/scripts/routing.py",
+            "ai/scripts/set_agents_app.py",
+            "tests/test_routing.py",
+            "docs/specs/003-trusted-routing-pi-runtime/evidence/P1R-repair-R2.md"
+          ],
+          "finding_ids": [
+            "DR-001",
+            "DR-002",
+            "DR-003",
+            "DR-004",
+            "DR-005",
+            "DR-006",
+            "DR-007",
+            "DR-008",
+            "DR-009",
+            "DR-010"
+          ],
+          "verification": [
+            "routing tests 9 passed",
+            "hermetic tests pass",
+            "setup_models check pass",
+            "py_compile pass",
+            "GateSpec focused pass",
+            "verify.sh 107 tests VERIFY_PASS",
+            "CLI explain 0/conflict 2",
+            "git diff --check pass"
+          ]
+        },
+        {
+          "at": "2026-07-25T02:21:49+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/domain.py",
+            "ai/scripts/routing_core/service.py",
+            "ai/scripts/routing_core/catalog.py",
+            "ai/scripts/routing_core/store.py",
+            "ai/scripts/routing_core/gates.py",
+            "ai/scripts/routing.py",
+            "ai/scripts/set_agents_app.py",
+            "tests/test_routing.py",
+            "docs/specs/003-trusted-routing-pi-runtime/evidence/P1R-repair-R3.md"
+          ],
+          "finding_ids": [
+            "FD-001",
+            "FD-002",
+            "FD-003",
+            "FD-004",
+            "FD-005",
+            "FD-006",
+            "FD-007",
+            "FD-008",
+            "FD-009",
+            "FD-010"
+          ],
+          "verification": [
+            "routing focused 19/19 PASS",
+            "harness regressions 2/2 PASS",
+            "setup_models --check PASS",
+            "py_compile PASS",
+            "verify.sh 117 tests VERIFY_PASS"
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-24T22:46:55+00:00",
+          "panel_id": "P1R-R1",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-24T22:30:15+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-24T22:46:45+00:00",
+              "evidence": "P1R-R1 exact baseline review; 1 critical, 8 high, 1 medium; probes cover forgery, auth absence, symlinks, schema mutation, lifecycle, retention and query plan.",
+              "findings": [
+                "PKG-001",
+                "PKG-002",
+                "PKG-003",
+                "PKG-004",
+                "PKG-005",
+                "PKG-006",
+                "PKG-007",
+                "PKG-008",
+                "PKG-009",
+                "PKG-010"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-24T22:46:46+00:00",
+              "evidence": "P1R-R1 defensive audit; 6 high and 2 medium; concrete attack paths cover provenance, simulated permits, auth, storage, schema, catalog, error leakage and audit gaps.",
+              "findings": [
+                "SEC-001",
+                "SEC-002",
+                "SEC-003",
+                "SEC-004",
+                "SEC-005",
+                "SEC-006",
+                "SEC-007",
+                "SEC-008"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        },
+        {
+          "completed_at": "2026-07-24T23:19:47+00:00",
+          "panel_id": "P1R-R1-DELTA-REHYDRATED",
+          "roles": [
+            "delta-reviewer"
+          ],
+          "started_at": "2026-07-24T23:19:46+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-24T23:19:47+00:00",
+              "evidence": "Administrative carry-forward of the completed R1 delta: SEC-003/SEC-007 closed; DR-001..DR-010 remain open. No new review or spawn.",
+              "findings": [],
+              "role": "delta-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        },
+        {
+          "completed_at": "2026-07-25T02:08:41+00:00",
+          "panel_id": "P1R-FD-REHYDRATED",
+          "roles": [
+            "delta-reviewer"
+          ],
+          "started_at": "2026-07-25T02:08:29+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-25T02:08:41+00:00",
+              "evidence": "Administrative carry-forward of the final independent delta review: FD-001..FD-010 open; no new review or spawn.",
+              "findings": [],
+              "role": "delta-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-24T22:46:55+00:00",
+          "evidence": "P1R-R1 complete: package-reviewer 10 findings and security-auditor 8 findings; overlapping chains consolidated for one repair batch.",
+          "findings": [
+            "PKG-001",
+            "PKG-002",
+            "PKG-003",
+            "PKG-004",
+            "PKG-005",
+            "PKG-006",
+            "PKG-007",
+            "PKG-008",
+            "PKG-009",
+            "PKG-010",
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007",
+            "SEC-008"
+          ],
+          "panel_id": "P1R-R1",
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-24T23:19:47+00:00",
+          "evidence": "User authorized R2 against the already-reviewed DR-001..DR-010 set.",
+          "findings": [
+            "DR-001",
+            "DR-002",
+            "DR-003",
+            "DR-004",
+            "DR-005",
+            "DR-006",
+            "DR-007",
+            "DR-008",
+            "DR-009",
+            "DR-010"
+          ],
+          "panel_id": "P1R-R1-DELTA-REHYDRATED",
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-25T02:08:41+00:00",
+          "evidence": "R3 authorized: repair FD-001..FD-010 under the amended threat model (decision r3-threat-model-amendment).",
+          "findings": [
+            "FD-001",
+            "FD-002",
+            "FD-003",
+            "FD-004",
+            "FD-005",
+            "FD-006",
+            "FD-007",
+            "FD-008",
+            "FD-009",
+            "FD-010"
+          ],
+          "panel_id": "P1R-FD-REHYDRATED",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "untrusted request/catalog/auth/identity claims",
+        "SQLite concurrency, crash recovery, and duplicate dispatch",
+        "private filesystem, symlink, corruption, and legacy-state handling",
+        "privacy/redaction and incompatible CLI/config behavior"
+      ],
+      "routing_reason": "Hosted implementation required for security-critical trust boundaries, SQLite atomic lifecycle, crash/concurrency behavior, and observable CLI/persistence contracts.",
+      "runtime_qa": [
+        {
+          "at": "2026-07-25T03:01:53+00:00",
+          "browser": "",
+          "checks": [
+            "set_agents_app.py --route-explain documentation --json -> exit 0, one-line schema_version=2 envelope, live pair probes",
+            "set_agents_app.py --route-explain documentation --json --yes -> exit 2 ROUTING_INPUT_INVALID",
+            "set_agents_app.py --routing-report -> ok=false ROUTING_UNAVAILABLE exit 1 (intentional fail-closed: production DB schema_version=2 pre-dates SCHEMA=3; operator must delete ~/.local/state/set-agentes/routing-v2 to re-enable)"
+          ],
+          "evidence": "Observable runtime verified live on the real machine by the independent delta-reviewer: real probe composition (~14.5s wall), full authorized->dispatched->terminal_success cycle against a fresh store, catalog mutation after composition correctly yields AUTHORIZATION_INVALID.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": "openai/gpt-5.6-terra",
+      "selected_role": "implementer",
+      "shared_paths": [
+        "ai/scripts/set_agents_app.py",
+        "ai/state/features/003-trusted-routing-pi-runtime.json",
+        "ai/state/narrative-log.jsonl",
+        "docs/adr/README.md",
+        "docs/specs/README.md"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "T-001",
+          "local_validations": [
+            "trusted facts/catalog/static ID focused suite PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-002",
+          "local_validations": [
+            "run identity and independent review focused suite PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-003",
+          "local_validations": [
+            "SQLite lifecycle/concurrency/crash focused suite PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-004",
+          "local_validations": [
+            "CLI envelope/simulation/legacy/retention focused suite PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-005",
+          "local_validations": [
+            "focused+hermetic+setup_models+py_compile+verify reported PASS; independent rerun pending"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-25T03:01:53+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests -p 'test_routing.py'",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "R3 regression net: 19 routing tests (crash SIGKILL, concurrent lock, retention 10k/90d, DB-bytes privacy, CLI matrix, hermetic probe parsers, percentiles) + verify.sh 117 tests VERIFY_PASS, run independently by gate-runner and re-run by delta-reviewer (15.1s).",
+          "status": "pass"
+        }
+      ]
+    }
+  ],
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 77,
+  "schema_version": 1,
+  "updated_at": "2026-07-25T03:01:53+00:00"
+}

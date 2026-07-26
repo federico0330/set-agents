@@ -213,7 +213,7 @@ def wizard(config, roster, profile, roles_path, models_out):
             except ModelsError as exc:
                 print(f"NO GUARDADO: {exc}")
                 continue
-            atomic_write(models_out, models_config.emit(config))
+            models_config.emit_atomic(models_out, config)
             print(f"MODELS_WRITTEN {models_out}")
             if input("¿Correr ./build.sh --check ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
                 if subprocess.run([str(ROOT / "build.sh"), "--check"], check=False).returncode != 0:
@@ -296,7 +296,7 @@ def main():
             return wizard(config, roster, profile, roles_path, output)
 
         validate(config, roles_path)
-        atomic_write(output, models_config.emit(config))
+        models_config.emit_atomic(output, config)
         print(f"MODELS_WRITTEN {output}")
         if not plumbing:
             try:

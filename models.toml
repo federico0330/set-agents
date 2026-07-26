@@ -1,7 +1,7 @@
 # models.toml — model routing source of truth (subscriptions, areas, role overrides).
 # Edit by hand or via ./setup-models.sh; the wizard rewrites this file
 # deterministically and does not preserve standalone comments.
-schema = 1
+schema = 2
 
 [subscriptions]
 anthropic = true
@@ -19,6 +19,33 @@ opencode_small_model = { "go-zen" = "opencode/north-mini-code-free", "zen" = "op
 
 [permissions]
 profile = "yolo"
+
+[runtime]
+primary = "opencode"
+fallbacks = []
+
+[orchestrator.pi]
+model = "gpt-5.6"
+effort = "medium"
+
+[routing]
+enabled_providers = ["openai-codex", "anthropic"]
+xhigh_benchmarked = false
+max_enabled = false
+fallback_limit = 1
+single_writer = true
+
+[routing.sla.fast]
+checkpoint_minutes = 18
+cutoff_minutes = 20
+ceiling_minutes = 30
+
+[routing.budgets]
+direct_spawns = 0
+fast_spawns = 1
+scoped_spawns = 4
+feature_spawns_per_package = 12
+incident_spawns = 2
 
 [areas.coord]
 claude = "fable"

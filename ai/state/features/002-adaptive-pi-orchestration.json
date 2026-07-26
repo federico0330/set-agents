@@ -1,0 +1,1575 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12",
+    "AC-13",
+    "AC-14",
+    "AC-15"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-24T15:04:41+00:00",
+    "hash": "77fed4274cc4ab3dee8df172dc53fd599f50d4464662f53d8ad011660726846a",
+    "path": "docs/specs/002-adaptive-pi-orchestration/spec.md"
+  },
+  "blockers": [
+    {
+      "at": "2026-07-24T15:57:02+00:00",
+      "package_id": "P1-routing-core",
+      "reason": "HUMAN_DECISION_REQUIRED: P1 exhausted two repair batches and final delta review still has high/medium findings P1-DR2-001..008. Authorize a third repair cycle or change acceptance scope.",
+      "resolved_at": "2026-07-24T15:59:02+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "User explicitly authorized a third P1 repair cycle for P1-DR2-001..008"
+    },
+    {
+      "at": "2026-07-24T16:16:04+00:00",
+      "package_id": "P1-routing-core",
+      "reason": "HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation."
+    }
+  ],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12
+  },
+  "current_package_id": "P1-routing-core",
+  "feature_id": "002-adaptive-pi-orchestration",
+  "final_state": "BLOCKED",
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/002-adaptive-pi-orchestration/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-24T15:04:41+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "package-planner",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "P1-T1",
+          "P1-T2",
+          "P1-T3",
+          "P1-T4",
+          "P1-T5"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:04:41+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Approved P1 package contract"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:04:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T1"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:04:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un \u00fanico implementador construye configuraci\u00f3n, router, telemetr\u00eda y CLI con pruebas focalizadas.",
+        "purpose": "Implement P1 routing core within assigned ownership",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "PACKAGE_IMPLEMENTATION P1; ownership exclusivo de seis paths, modelo frontier/high, sin autoaprobaci\u00f3n."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:04:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T1",
+        "validations": [
+          "focused tests, py_compile, setup_models check, CLI smoke"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T2"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T2",
+        "validations": [
+          "focused tests, py_compile, setup_models check, CLI smoke"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T3"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T3",
+        "validations": [
+          "focused tests, py_compile, setup_models check, CLI smoke"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T4"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T4",
+        "validations": [
+          "focused tests, py_compile, setup_models check, CLI smoke"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T5"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T5",
+        "validations": [
+          "focused tests, py_compile, setup_models check, CLI smoke"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:11:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "P1 implementation and focused validations complete"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:09+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-routing-tests",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-compile",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-models-check",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-cli-smoke",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "integrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:17+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "All P1 package gates passed; diff integrated in shared working tree"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:17+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1-R1",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:39+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una revisi\u00f3n independiente contrasta P1 completo contra el contrato aprobado y sus gates.",
+        "purpose": "Independent deep review of complete P1 diff",
+        "role": "package-reviewer",
+        "spawns": 2,
+        "tech": "PACKAGE_REVIEW panel P1-R1; correctness/integration/test gaps, read-only, familia independiente."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:39+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una segunda revisi\u00f3n busca bypasses, filtraciones y fallas de permisos en router, gates y telemetr\u00eda.",
+        "purpose": "Independent security and privacy review of P1 routing/telemetry/gates",
+        "role": "security-auditor",
+        "spawns": 3,
+        "tech": "PACKAGE_REVIEW panel P1-R1 security lane; allowlists, HMAC, filesystem permissions, input validation, read-only."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:12:39+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 12,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:19:43+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 7,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:19:43+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1-R1",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:19:43+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Una \u00fanica reparaci\u00f3n agrupada endurece cat\u00e1logo, gates, fallback y telemetr\u00eda sin ampliar el alcance.",
+        "purpose": "Consolidated repair of all P1-R1 findings",
+        "role": "repair-agent",
+        "spawns": 4,
+        "tech": "PACKAGE_REPAIR batch 1; P1-R1.md es source of findings, mismos owned paths, finding-specific tests, delta review obligatorio."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:20:23+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P1-R1-001",
+          "P1-R1-002",
+          "P1-R1-003",
+          "P1-R1-004",
+          "P1-R1-005",
+          "P1-R1-006",
+          "P1-R1-007",
+          "P1-R1-008",
+          "P1-R1-009",
+          "P1-R1-010",
+          "P1-R1-011",
+          "P1-R1-012",
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:29:16+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una mirada nueva comprueba que las correcciones cerraron los problemas sin agregar regresiones.",
+        "purpose": "Focused read-only review of P1 repair delta",
+        "role": "delta-reviewer",
+        "spawns": 5,
+        "tech": "DELTA_REVIEW de P1-R1; contraste finding\u2192change\u2192verification, read-only, sin reabrir fuera del delta salvo regresi\u00f3n directa."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:29:34+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:36:00+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un \u00faltimo lote corrige \u00fanicamente los nueve bypasses que la revisi\u00f3n pudo reproducir.",
+        "purpose": "Second consolidated repair for P1 delta findings",
+        "role": "repair-agent",
+        "spawns": 6,
+        "tech": "PACKAGE_REPAIR batch 2; P1-DR1-001..009, pruebas negativas obligatorias, mismos owned paths, sin autoaprobaci\u00f3n."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:36:23+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "La validaci\u00f3n local encontr\u00f3 tres fallas concretas; el mismo lote vuelve a corregirlas antes de registrarse.",
+        "purpose": "Retry second P1 repair after local negative probes failed",
+        "role": "repair-agent",
+        "spawns": 7,
+        "tech": "PACKAGE_REPAIR batch 2 retry; cat\u00e1logo app/validator mismatch, Sol alias y bool-as-int reproducidos; nuevos tests deben fallar antes y pasar despu\u00e9s."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:40:12+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Una reparaci\u00f3n m\u00ednima cierra las dos obligaciones de telemetr\u00eda que el retry dej\u00f3 expl\u00edcitamente pendientes.",
+        "purpose": "Close final P1 telemetry semantics within repair batch 2",
+        "role": "repair-agent",
+        "spawns": 8,
+        "tech": "PACKAGE_REPAIR batch 2 final retry; append O(1) amortizado y fallback realmente consumido, con migraci\u00f3n/rotaci\u00f3n y tests."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:42:35+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P1-DR1-001",
+          "P1-DR1-002",
+          "P1-DR1-003",
+          "P1-DR1-004",
+          "P1-DR1-005",
+          "P1-DR1-006",
+          "P1-DR1-007",
+          "P1-DR1-008",
+          "P1-DR1-009"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:47:31+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor nuevo intenta romper otra vez el router, los gates, el fallback y la telemetr\u00eda.",
+        "purpose": "Second fresh focused delta review of P1 repair batch 2",
+        "role": "delta-reviewer",
+        "spawns": 9,
+        "tech": "DELTA_REVIEW 2; P1-DR1-001..009, read-only, probes adversariales y presupuesto final de reparaci\u00f3n ya consumido."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:47:40+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:56:24+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: P1 exhausted two repair batches and final delta review still has high/medium findings P1-DR2-001..008. Authorize a third repair cycle or change acceptance scope."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:57:02+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "User explicitly authorized a third P1 repair cycle for P1-DR2-001..008"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T15:59:02+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:00:41+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Resume P1 for explicitly authorized third repair cycle"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:00:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un \u00fanico especialista corrige los ocho defectos reproducidos sin tocar Pi ni ampliar el alcance.",
+        "purpose": "User-authorized third consolidated P1 repair",
+        "role": "repair-agent",
+        "spawns": 10,
+        "tech": "PACKAGE_IMPLEMENTATION exception cycle 3; P1-DR2-001..008, owned P1 paths, hosted model, finding-specific regressions, no self-approval."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:00:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P1-T5",
+        "validations": [
+          "third repair cycle: routing tests 20/20 pass",
+          "third repair cycle: py_compile, models check, CLI smokes, diff check pass"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:06:48+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Authorized third repair completed with focused validations"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:06:48+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-routing-tests-r3",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:00+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-compile-r3",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:00+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-models-r3",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:00+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-cli-r3",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:00+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-diff-r3",
+        "status": "pass"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:00+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "P1 third-cycle package gates passed; global integration failures deferred to P3"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:00+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1-R2",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:21+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una revisi\u00f3n funcional independiente contrasta el P1 completo con el contrato y los ocho defectos reparados.",
+        "purpose": "Final independent full review after authorized P1 repair",
+        "role": "package-reviewer",
+        "spawns": 11,
+        "tech": "PACKAGE_REVIEW P1-R2; correctness/integration/tests, read-only, closure evidence for P1-DR2."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:21+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una revisi\u00f3n de seguridad intenta reproducir escapes, carreras, filtraciones y downgrade.",
+        "purpose": "Final independent security review after authorized P1 repair",
+        "role": "security-auditor",
+        "spawns": 12,
+        "tech": "PACKAGE_REVIEW P1-R2 security lane; filesystem/no-follow/crash consistency/reviewer independence, read-only."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:07:21+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 8,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:16:03+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "role": "security-auditor",
+        "verdict": "blocked"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:16:03+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P1-R2",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:16:03+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation."
+      },
+      "package_id": "P1-routing-core",
+      "timestamp": "2026-07-24T16:16:04+00:00",
+      "to": "BLOCKED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 2,
+    "human_questions_after_approval": 0,
+    "package_reviews": 2,
+    "repair_batches": 2,
+    "task_deep_reviews": 0
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12",
+        "AC-13"
+      ],
+      "approved_exceptions": [
+        {
+          "approved_by": "user",
+          "path": "P1-DR2-001..008",
+          "reason": "Explicit authorization for third repair cycle",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 2,
+        "repair_batches": 2,
+        "spawns": 12,
+        "subdivisions": 0
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/002-adaptive-pi-orchestration/context/P1-routing-core.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-24T15:36:00+00:00",
+          "closed_findings": [
+            "P1-R1-004"
+          ],
+          "new_or_reopened_findings": [
+            "P1-DR1-001",
+            "P1-DR1-002",
+            "P1-DR1-003",
+            "P1-DR1-004",
+            "P1-DR1-005",
+            "P1-DR1-006",
+            "P1-DR1-007",
+            "P1-DR1-008",
+            "P1-DR1-009"
+          ],
+          "reason": "Focused probes reproduced bypasses within repaired surfaces; second consolidated repair required, no full review.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-24T15:56:24+00:00",
+          "closed_findings": [
+            "P1-DR1-003",
+            "P1-DR1-006"
+          ],
+          "new_or_reopened_findings": [
+            "P1-DR2-001",
+            "P1-DR2-002",
+            "P1-DR2-003",
+            "P1-DR2-004",
+            "P1-DR2-005",
+            "P1-DR2-006",
+            "P1-DR2-007",
+            "P1-DR2-008"
+          ],
+          "reason": "Final delta review reproduced blocking defects after two repair batches; human decision required.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "working-tree:66164c2..P1-routing-core",
+      "findings": [
+        {
+          "category": "correctness",
+          "id": "P1-R1-001",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "catalog authentication and identifiers are fabricated"
+        },
+        {
+          "category": "correctness",
+          "id": "P1-R1-002",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "envelope unknown and conflicting fields can downgrade work"
+        },
+        {
+          "category": "integration",
+          "id": "P1-R1-003",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Sol alias and Pi parent eligibility inconsistent"
+        },
+        {
+          "category": "correctness",
+          "id": "P1-R1-004",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "xhigh benchmark flag is unused"
+        },
+        {
+          "category": "correctness",
+          "id": "P1-R1-005",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "reviewer provider preference and exclusion reasons missing"
+        },
+        {
+          "category": "security",
+          "id": "P1-R1-006",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "gate definitions and lane plans are not sealed"
+        },
+        {
+          "category": "data-integrity",
+          "id": "P1-R1-007",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "schema bool versus integer types are not exact"
+        },
+        {
+          "category": "security",
+          "id": "P1-R1-008",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "telemetry values accept raw sensitive strings"
+        },
+        {
+          "category": "data-integrity",
+          "id": "P1-R1-009",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "fallback authorization is stateless and replayable"
+        },
+        {
+          "category": "scalability",
+          "id": "P1-R1-010",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "rotation and reporting violate retention and metric contracts"
+        },
+        {
+          "category": "integration",
+          "id": "P1-R1-011",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "CLI exit codes and corrupt reports are unstable"
+        },
+        {
+          "category": "testing",
+          "id": "P1-R1-012",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "AC-05 through AC-13 negative coverage incomplete"
+        },
+        {
+          "category": "security",
+          "id": "SEC-001",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "untrusted catalog spoofing"
+        },
+        {
+          "category": "security",
+          "id": "SEC-002",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "caller-controlled downgrade"
+        },
+        {
+          "category": "security",
+          "id": "SEC-003",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "gate PATH and cwd resolution"
+        },
+        {
+          "category": "security",
+          "id": "SEC-004",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "fallback replay and missing durable authorization"
+        },
+        {
+          "category": "security",
+          "id": "SEC-005",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "telemetry symlink and permissions"
+        },
+        {
+          "category": "security",
+          "id": "SEC-006",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "telemetry value leakage"
+        },
+        {
+          "category": "security",
+          "id": "SEC-007",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "salt and rotation races"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR1-001",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "sealed catalog and observed authentication remain bypassable"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR1-002",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "TaskEnvelope strict typing and ambiguity escalation incomplete"
+        },
+        {
+          "category": "integration",
+          "id": "P1-DR1-003",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Sol alias and Pi parent eligibility derivation incomplete"
+        },
+        {
+          "category": "correctness",
+          "id": "P1-DR1-004",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "cold ranking quota and reviewer provider trust incomplete"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR1-005",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "GateSpec cwd and lane enforcement incomplete"
+        },
+        {
+          "category": "correctness",
+          "id": "P1-DR1-006",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "schema bool-as-int and unknown provider validation incomplete"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR1-007",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "telemetry filesystem values bounds rotation and reporting incomplete"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR1-008",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "stateless fallback authorization remains and ledger filesystem checks incomplete"
+        },
+        {
+          "category": "integration",
+          "id": "P1-DR1-009",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "CLI exit mapping and negative regression coverage incomplete"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR2-001",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "open",
+          "summary": "route_id canonical binding remains mutable"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR2-002",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "open",
+          "summary": "harness observations can still be omitted to downgrade work"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR2-003",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "open",
+          "summary": "implementer provider and family are not jointly trusted"
+        },
+        {
+          "category": "correctness",
+          "id": "P1-DR2-004",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "populated ranking includes quota and cost"
+        },
+        {
+          "category": "integration",
+          "id": "P1-DR2-005",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "published GateSpec executes successfully"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR2-006",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "ExecutionState path and atomic durability probes pass"
+        },
+        {
+          "category": "security",
+          "id": "P1-DR2-007",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "open",
+          "summary": "telemetry ancestor symlink remains accepted"
+        },
+        {
+          "category": "data-integrity",
+          "id": "P1-DR2-008",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "open",
+          "summary": "corrupt event and rotation crash recovery remain unsafe"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-24T15:12:10+00:00",
+          "evidence": "python3 -m unittest discover -s tests -p test_routing.py -v: 4/4 pass",
+          "name": "p1-routing-tests",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T15:12:10+00:00",
+          "evidence": "py_compile all P1 Python files: pass",
+          "name": "p1-compile",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T15:12:10+00:00",
+          "evidence": "setup_models.py --check: MODELS_CHECK_PASS",
+          "name": "p1-models-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T15:12:10+00:00",
+          "evidence": "route-explain and routing-report JSON envelopes exit 0",
+          "name": "p1-cli-smoke",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T15:12:10+00:00",
+          "evidence": "git diff --check: pass",
+          "name": "p1-diff-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T16:07:00+00:00",
+          "evidence": "python3 -m unittest discover -s tests -p test_routing.py -v: 20/20 PASS",
+          "name": "p1-routing-tests-r3",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T16:07:00+00:00",
+          "evidence": "py_compile all P1 Python files: PASS",
+          "name": "p1-compile-r3",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T16:07:00+00:00",
+          "evidence": "setup_models.py --check: PASS",
+          "name": "p1-models-r3",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T16:07:00+00:00",
+          "evidence": "route explain no-auth exit1, invalid exit2, report exit0: stable JSON envelopes",
+          "name": "p1-cli-r3",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-24T16:07:00+00:00",
+          "evidence": "git diff --check: PASS",
+          "name": "p1-diff-r3",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Schema-2 configuration, deterministic routing, proportional flows, telemetry, CLI, and native gates",
+      "owned_paths": [
+        "models.toml",
+        "ai/scripts/models_config.py",
+        "ai/scripts/setup_models.py",
+        "ai/scripts/routing.py",
+        "ai/scripts/set_agents_app.py",
+        "tests/test_routing.py"
+      ],
+      "package_id": "P1-routing-core",
+      "read_only_paths": [
+        "roles.tsv",
+        "ai/scripts/generate.py",
+        "ai/scripts/install.py",
+        "tests/test_harness.py"
+      ],
+      "repairs": [
+        {
+          "at": "2026-07-24T15:29:16+00:00",
+          "changed_files": [
+            "models.toml",
+            "ai/scripts/models_config.py",
+            "ai/scripts/setup_models.py",
+            "ai/scripts/routing.py",
+            "ai/scripts/set_agents_app.py",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "P1-R1-001",
+            "P1-R1-002",
+            "P1-R1-003",
+            "P1-R1-004",
+            "P1-R1-005",
+            "P1-R1-006",
+            "P1-R1-007",
+            "P1-R1-008",
+            "P1-R1-009",
+            "P1-R1-010",
+            "P1-R1-011",
+            "P1-R1-012",
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007"
+          ],
+          "verification": [
+            "python3 -m unittest discover -s tests -p test_routing.py -v: 8/8 PASS",
+            "python3 -m py_compile owned Python files: PASS",
+            "python3 ai/scripts/setup_models.py --check: PASS",
+            "CLI invalid JSON exit 2 and route/report smoke: PASS",
+            "git diff --check: PASS"
+          ]
+        },
+        {
+          "at": "2026-07-24T15:47:31+00:00",
+          "changed_files": [
+            "models.toml",
+            "ai/scripts/models_config.py",
+            "ai/scripts/setup_models.py",
+            "ai/scripts/routing.py",
+            "ai/scripts/set_agents_app.py",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "P1-DR1-001",
+            "P1-DR1-002",
+            "P1-DR1-003",
+            "P1-DR1-004",
+            "P1-DR1-005",
+            "P1-DR1-006",
+            "P1-DR1-007",
+            "P1-DR1-008",
+            "P1-DR1-009"
+          ],
+          "verification": [
+            "python3 -m unittest discover -s tests -p test_routing.py -v: 15/15 PASS",
+            "python3 -m py_compile all P1 Python files: PASS",
+            "python3 ai/scripts/setup_models.py --check: PASS",
+            "route-explain no-auth exit1 and invalid class exit2 with JSON envelopes: PASS",
+            "git diff --check: PASS"
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-24T15:19:43+00:00",
+          "panel_id": "P1-R1",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-24T15:12:39+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-24T15:19:43+00:00",
+              "evidence": "P1-R1 complete review",
+              "findings": [
+                "P1-R1-001",
+                "P1-R1-002",
+                "P1-R1-003",
+                "P1-R1-004",
+                "P1-R1-005",
+                "P1-R1-006",
+                "P1-R1-007",
+                "P1-R1-008",
+                "P1-R1-009",
+                "P1-R1-010",
+                "P1-R1-011",
+                "P1-R1-012"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-24T15:19:43+00:00",
+              "evidence": "P1-R1 security review",
+              "findings": [
+                "SEC-001",
+                "SEC-002",
+                "SEC-003",
+                "SEC-004",
+                "SEC-005",
+                "SEC-006",
+                "SEC-007"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        },
+        {
+          "completed_at": "2026-07-24T16:16:03+00:00",
+          "panel_id": "P1-R2",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-24T16:07:21+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-24T16:16:03+00:00",
+              "evidence": "P1-R2 direct probes; 20/20 tests pass but five high findings reproducible",
+              "findings": [
+                "P1-DR2-001",
+                "P1-DR2-002",
+                "P1-DR2-003",
+                "P1-DR2-004",
+                "P1-DR2-005",
+                "P1-DR2-006",
+                "P1-DR2-007",
+                "P1-DR2-008"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-24T16:16:03+00:00",
+              "evidence": "Agent turn blocked by provider cybersecurity content filter; no findings asserted",
+              "findings": [],
+              "role": "security-auditor",
+              "verdict": "blocked"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-24T15:19:43+00:00",
+          "evidence": "P1-R1 consolidated repair required",
+          "findings": [
+            "P1-R1-001",
+            "P1-R1-002",
+            "P1-R1-003",
+            "P1-R1-004",
+            "P1-R1-005",
+            "P1-R1-006",
+            "P1-R1-007",
+            "P1-R1-008",
+            "P1-R1-009",
+            "P1-R1-010",
+            "P1-R1-011",
+            "P1-R1-012",
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007"
+          ],
+          "panel_id": "P1-R1",
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-24T16:16:03+00:00",
+          "evidence": "P1-R2: package review repair_required; security subreview blocked by provider; five high findings open",
+          "findings": [
+            "P1-DR2-001",
+            "P1-DR2-002",
+            "P1-DR2-003",
+            "P1-DR2-007",
+            "P1-DR2-008"
+          ],
+          "panel_id": "P1-R2",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "public-configuration-contract",
+        "allowlisted-command-execution",
+        "telemetry-privacy",
+        "reviewer-independence"
+      ],
+      "routing_reason": "Critical routing contract requires hosted frontier implementation",
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": "openai/gpt-5.6-sol",
+      "selected_role": "implementer",
+      "shared_paths": [
+        "ai/scripts/set_agents_app.py"
+      ],
+      "status": "repair_required",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "P1-T1",
+          "local_validations": [
+            "focused tests, py_compile, setup_models check, CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "P1-T2",
+          "local_validations": [
+            "focused tests, py_compile, setup_models check, CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "P1-T3",
+          "local_validations": [
+            "focused tests, py_compile, setup_models check, CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "P1-T4",
+          "local_validations": [
+            "focused tests, py_compile, setup_models check, CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "P1-T5",
+          "local_validations": [
+            "focused tests, py_compile, setup_models check, CLI smoke",
+            "third repair cycle: routing tests 20/20 pass",
+            "third repair cycle: py_compile, models check, CLI smokes, diff check pass"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": []
+    }
+  ],
+  "phase": "BLOCKED",
+  "revision": 57,
+  "schema_version": 1,
+  "updated_at": "2026-07-24T16:16:04+00:00"
+}

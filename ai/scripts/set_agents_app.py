@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config
+import routing
 
 # SET_AGENTS_ROOT/SET_AGENTS_STATE are test seams; real runs never set them.
 ROOT = Path(os.environ.get("SET_AGENTS_ROOT") or Path(__file__).resolve().parents[2])
@@ -26,6 +27,58 @@ STATE_DIR = Path(os.environ.get("SET_AGENTS_STATE") or Path.home() / ".local/sta
 APP_CONFIG = STATE_DIR / "config.toml"
 MANAGED_MCP = models_config.MANAGED_MCP
 HARNESS_CLIS = ("opencode", "claude", "codex")
+
+
+def routing_catalog(simulation=False):
+    """Compose trusted v2 inputs; callers never supply a catalog or route ID."""
+    config = models_config.load_config(ROOT / "models.toml")
+    roster = models_config.load_roster(ROOT / "roles.tsv")
+    # No optimistic defaults: each real invocation gets a fresh exact probe.
+    return routing.compose(config, roster, simulate=simulation), config
+
+
+def _routing_output(payload, human):
+    if not human:
+        print(json.dumps(payload, sort_keys=True))
+        return
+    print(f"{payload['command']}: {'OK' if payload['ok'] else 'NO DISPONIBLE'}", file=sys.stderr)
+    for key, value in payload["data"].items() if isinstance(payload["data"], dict) else []:
+        print(f"{key}: {value}", file=sys.stderr)
+    if payload["reason_codes"]: print("reason_codes: " + ", ".join(payload["reason_codes"]), file=sys.stderr)
+
+
+def cmd_route_explain(task_class, human=False):
+    if task_class not in routing.TASK_CLASSES:
+        _routing_output(routing.cli_envelope(False, "route-explain", {}, (), ("TASK_CLASS_INVALID",)), human); return 2
+    try:
+        service, _config = routing_catalog(simulation=True)
+        role = "architect" if task_class in routing.CRITICAL else ("debugger" if task_class == "incident" else "product-analyst")
+        runtime = "codex" if task_class in routing.CRITICAL else "claude-code"
+        request = routing.TaskRequest(role=role, operation="inspection" if task_class == "inspection" else "change", task_class=task_class, selected_runtime=runtime)
+        facts = service._observe_for_invocation(role=role, operation=request.operation, task_class=task_class,
+            read_write="read" if task_class == "inspection" else "write", write_started=False,
+            risk="high" if task_class in routing.CRITICAL else "low", criticality=task_class if task_class in routing.CRITICAL else "",
+            affected_surfaces=(), required_tools=("read",), context_required=True, context_present=True,
+            critical_coverage=True, selected_runtime=runtime)
+        decision = service.route(request, facts)
+        # Explain is a successful simulation even when execution would be unavailable.
+        _routing_output(routing.cli_envelope(True, "route-explain", decision.to_dict(), (), decision.reason_codes), human)
+        return 0
+    except models_config.ModelsError:
+        _routing_output(routing.cli_envelope(False, "route-explain", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    except (routing.RoutingError, OSError):
+        _routing_output(routing.cli_envelope(False, "route-explain", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
+
+
+def cmd_routing_report(human=False):
+    try:
+        report = routing.RoutingStore().report()
+    except (OSError, routing.RoutingError):
+        report = {"retained_events": 0, "p50_ms": None, "p90_ms": None, "reason_codes": ["ROUTING_UNAVAILABLE"]}
+    reasons = tuple(report.get("reason_codes", ()))
+    warnings = routing.legacy_warnings(STATE_DIR)
+    _routing_output(routing.cli_envelope(not reasons, "routing-report", report, warnings, reasons), human)
+    return 1 if reasons else 0
 
 
 def use_color():
@@ -956,6 +1009,9 @@ def main():
         epilog="Primera vez: leé README.md — explica qué vas a ver según tu sistema operativo.",
     )
     parser.add_argument("--status", action="store_true", help="estado en una línea (APP_STATUS ...)")
+    parser.add_argument("--route-explain", metavar="TASK_CLASS")
+    parser.add_argument("--routing-report", action="store_true")
+    parser.add_argument("--json", action="store_true", help="salida JSON para comandos de observabilidad")
     parser.add_argument("--check-update", action="store_true")
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--yes", action="store_true")
@@ -980,6 +1036,23 @@ def main():
                         help="con --vault-link: las notas viven en el vault y el repo queda con un symlink excluido de git")
     parser.add_argument("--company", metavar="NAME")
     args = parser.parse_args()
+
+    routing_human = sys.stdout.isatty() and not args.json
+    # Routing observability modes are total: JSON is a rendering modifier, but
+    # no other argument — operational command or modifier — may be silently
+    # combined with an explain/report. Comparing every parsed argument against
+    # its parser default keeps this exhaustive when new flags are added.
+    routing_mode = bool(args.route_explain or args.routing_report)
+    _routing_args = {"json", "route_explain", "routing_report"}
+    other_mode = any(value != parser.get_default(name)
+                     for name, value in vars(args).items() if name not in _routing_args)
+    if (args.route_explain and args.routing_report) or (routing_mode and other_mode):
+        _routing_output(routing.cli_envelope(False, "routing", {}, (), ("ROUTING_INPUT_INVALID",)), routing_human)
+        return 2
+    if args.route_explain:
+        return cmd_route_explain(args.route_explain, human=routing_human)
+    if args.routing_report:
+        return cmd_routing_report(human=routing_human)
 
     if args.status:
         return cmd_status(human=sys.stdout.isatty())
