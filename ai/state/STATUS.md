@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-07-25T03:02:31+00:00
+Actualizado: 2026-07-26T14:58:34+00:00
 
 ## Features
 
@@ -10,12 +10,17 @@ Actualizado: 2026-07-25T03:02:31+00:00
 |---|---|---|---|---|---|---|---|---|---|---|
 | 002-adaptive-pi-orchestration | feature | BLOCKED | P1-routing-core (repair_required) | 0/1 | 12/12 | 2/2 | 5 | HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. | - | 2026-07-24T16:16:04+00:00 block |
 | 003-trusted-routing-pi-runtime | feature | PACKAGE_ACCEPTED | P1R-trusted-routing (accepted) | 1/1 | 16/16 | 3/3 | 0 | - | INTEGRATION | 2026-07-25T03:01:53+00:00 accept-package |
+| 004-adaptive-dispatch | feature | PACKAGE_PLANNING | - | 0/0 | 0/12 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-07-26T14:58:25+00:00 init |
 
 ## Quick-fixes recientes
 
 - _sin quick-fixes registrados_
 
 ## Bitácora (últimos 15)
+
+[2026-07-26T14:58:25+00:00] orchestrator · done
+Cliente: El cliente aprobo el contrato del despacho adaptativo tras dos rondas de challenge independiente: el arnes va a elegir modelo por tarea (nivel rapido/balanceado/frontera) en OpenCode ya, y con eleccion dinamica real en Pi si el estudio de viabilidad da bien.
+Ingeniería: USER_APPROVAL contract 1.1.0 (2 challenge rounds: needs-rework -> approve-with-edits, all edits applied). AM-1/AM-2 amendments to 003 logged. Packages P1-dispatch-core -> P2-opencode-lane -> P3-pi-lane(gated T-300). Mode feature budgets.
 
 [2026-07-25T03:02:30+00:00] P1R-trusted-routing · orchestrator · done
 Cliente: El paquete de ruteo confiable quedo aceptado: la deteccion de herramientas autenticadas ahora funciona de verdad, la base de datos se valida completa antes de tocarla, cada rechazo queda auditado, y hay pruebas de choque, concurrencia y privacidad. Dos revisores independientes lo verificaron. Queda un paso manual: borrar la base vieja para reactivar el ruteo persistente.
@@ -72,8 +77,4 @@ Ingeniería: PACKAGE_REPAIR R2, spawn 10/12: remove constructible authorization/
 [2026-07-24T23:16:06+00:00] P1R-trusted-routing · delta-reviewer · done
 Cliente: La revisión delta confirmó que sólo 2 de 18 hallazgos cerraron; 16 siguen abiertos aunque los tests pasen, por lo que P1R no puede aceptarse.
 Ingeniería: Delta R1 verdict=repair_required; SEC-003/007 resolved; DR-001 critical, DR-002..009 high, DR-010 medium. Sin regresión nueva, pero outcomes originales incompletos. Ciclo profundo final.
-
-[2026-07-24T23:14:20+00:00] P1R-trusted-routing · delta-reviewer · blocked
-Cliente: El análisis delta se completó, pero la entrega detallada fue rechazada por el filtro; se solicita al mismo revisor una versión defensiva resumida.
-Ingeniería: La instancia produjo checkpoint con múltiples findings abiertos, pero el final fue filtrado por contenido operativo. Reintento de presentación, sin nuevos probes ni nuevo spawn.
 
