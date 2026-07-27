@@ -39,6 +39,21 @@ permission:
     "app-runner": allow
     "runtime-verifier": allow
     "package-gate-runner": allow
+    "debugger@balanced": allow
+    "debugger@fast": allow
+    "debugger@frontier": allow
+    "delta-reviewer@balanced": allow
+    "delta-reviewer@fast": allow
+    "delta-reviewer@frontier": allow
+    "implementer@balanced": allow
+    "implementer@fast": allow
+    "implementer@frontier": allow
+    "package-reviewer@balanced": allow
+    "package-reviewer@fast": allow
+    "package-reviewer@frontier": allow
+    "security-auditor@balanced": allow
+    "security-auditor@fast": allow
+    "security-auditor@frontier": allow
   bash:
     "*": deny
     "git status*": allow
@@ -93,6 +108,8 @@ permission:
     "curl localhost*": allow
     "curl 127.0.0.1*": allow
     "python3 ai/scripts/feature-state.py *": allow
+    "python3 ai/scripts/set_agents_app.py --route*": allow
+    "python3 ai/scripts/set_agents_app.py --routing*": allow
     "* > *": deny
     "*>*": deny
     "* >> *": deny
@@ -266,6 +283,77 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
    that wasn't declared, that is itself a finding to record, not a silent addition to the panel.
 6. For each package, delegate implementation to `implementer`, `frontend-engineer`, `refactor-specialist`, or
    `integrator` as appropriate. Workers run local validation per task but never deep-audit or approve themselves.
+   `implementer`, `debugger`, `package-reviewer`, `delta-reviewer`, and `security-auditor` are **tiered
+   roles**: before spawning one of them, follow the decide→spawn protocol below.
+
+### Tiered dispatch — decide→spawn protocol (contract 004, AC-07)
+
+For the five tiered roles above, the model is chosen PER TASK by the routing brain (P1), not baked into a
+static agent — you consume that decision and spawn the OpenCode variant it honors:
+
+1. **Decide.** Before delegating, run
+   `python3 ai/scripts/set_agents_app.py --route-decide <descriptor-file|-> --json` with a descriptor
+   carrying `role`, `task_class`, optional `risk` (raise-only), `feature_id`/`package_id` (default to the
+   active feature/package), and — for a review role — `review_of_run_id`. Always read both `ok` AND the
+   envelope's `reason_codes` — the branching below depends on the EXACT reason code(s), never on the exit
+   code alone (several distinct outcomes share the same exit code).
+2. **Match by MODEL, never by tier alone.** `data.tier` is a hint, not the identity. The single source of
+   truth for the match is the emitted variant file itself, never a hardcoded prose table in this doctrine:
+   when `data.provider == "openai-codex"`, spawn the `<role>@<tier>` variant whose emitted `model:` line
+   equals `openai/<data.model>` verbatim. The model→tier binding lives exactly once, in `models.toml`'s
+   `[roles.<role>.tiers.<tier>]` tables, kept truthful by the build-time coherence gate
+   (`generate.py::check_variant_catalog_coherence`) — re-tiering the catalog must never require editing
+   this doctrine.
+3. **Branch on the decision outcome.** Exactly two shapes are a legitimate, honest degrade to the BASE
+   agent; the benign reviewer shape spawns the base reviewer by design; every other non-ok decision HALTS.
+   Never collapse this into a catch-all "anything else / non-zero exit → degraded mode" — that would
+   silently rewrite a HARD ROUTING DENIAL (a spoofed/replayed `review_of_run_id`, an unverifiable
+   authorization) into an unconditional base-agent spawn, discarding the routing brain's
+   enforcement/audit signal and breaking the independence/replay guarantees `--route-decide` exists to
+   provide.
+   a. **Legitimate degrade — the lane cannot honor an otherwise-honest decision:**
+      - **Off-lane model.** `ok=true`, `data.execution_enabled=true`, but `data.provider != "openai-codex"`
+        (e.g. an anthropic fallback like `haiku`/`sonnet`/`opus` — a model this lane genuinely cannot
+        spawn). The routing brain DID authorize a run; it is simply not one OpenCode can dispatch. Close it
+        as abandoned (`python3 ai/scripts/set_agents_app.py --route-terminal <run_id> failure`), then spawn
+        the BASE static agent `<role>`.
+      - **Router/probe unavailable.** `reason_codes == ["ROUTING_UNAVAILABLE"]` (or the CLI call itself
+        failed to produce a usable decision: crash, timeout, malformed output). No run was ever authorized
+        here, so there is nothing to close: spawn the BASE agent `<role>` directly. Do not retry the decide
+        call in a loop — one attempt, then degrade.
+      Narrate both as an explicit, honest degrade naming the concrete reason (`off-lane: <data.model>` or
+      `ROUTING_UNAVAILABLE`) — never a bare "degraded mode" with no reason attached.
+   b. **Benign non-executable review** — `reason_codes == ["REVIEW_IDENTITY_UNVERIFIED"]` (see step 4 below):
+      not a degrade, the designed shape for "no verified writer run offered yet" — spawn the BASE reviewer.
+   c. **HARD DENIAL — HALT, never a silent base spawn.** Every other non-ok decision, including but not
+      limited to `AUTHORIZATION_REPLAY`, `REVIEWER_INDEPENDENCE_UNAVAILABLE`, `REVIEW_IDENTITY_INVALID`,
+      `AUTHORIZATION_INVALID`, `NO_ELIGIBLE_ROUTE`, `PROVIDER_UNAUTHENTICATED`, `CATALOG_INVALID`,
+      `STATE_CONFLICT`, `FACTS_INCOMPLETE`, or `CONTEXT_UNRESOLVED` — and, as a fail-closed default, any
+      decision that is not literally one of the (a)/(b) shapes above, even a reason not named here. These
+      are the routing brain actively REFUSING the request, not a lane limitation: do not spawn anything for
+      this role/task on this decision. Stop and raise `HUMAN_DECISION_REQUIRED`, quoting the exact
+      `reason_codes` — never a generic "degraded" — so the blocker is legible and actionable.
+      **`REVIEW_IDENTITY_INVALID` vs `REVIEW_IDENTITY_UNVERIFIED`**: UNVERIFIED (3b) means no
+      `review_of_run_id` was offered — benign, spawn the base reviewer. INVALID means one WAS offered and
+      the routing brain rejected it (wrong role, not a real terminal writer, forged/stale/replayed id) — a
+      hard denial (3c): halt, never degrade.
+4. **Reviewers** (`package-reviewer`, `delta-reviewer`, `security-auditor`) are routed to a variant ONLY
+   with a verified `review_of_run_id` — sourced from the package's recorded writer run in state, or from
+   `python3 ai/scripts/set_agents_app.py --routing-recent-writers` when context was compacted and the id was
+   lost. Never guess or fabricate a `review_of_run_id`: omitting it yields the benign
+   `REVIEW_IDENTITY_UNVERIFIED` (3b, spawn the base reviewer); submitting a wrong one risks the hard-denial
+   `REVIEW_IDENTITY_INVALID` (3c, halt) — when in doubt, omit rather than guess.
+5. **Worker death.** If a spawned instance dies or is lost without reaching a terminal state, close its run
+   the same way as an off-lane degrade: `python3 ai/scripts/set_agents_app.py --route-terminal <run_id>
+   failure`, then continue per your retry budget (Spawn economy above).
+6. **Narrate the decision.** The opening narration block (`record-spawn`) and its `Ingeniería:` line must
+   name the decision's `route_id`/`run_id` alongside the exact outcome: which variant matched, which
+   legitimate-degrade reason fired (3a), or — for a hard denial (3c) — the precise `reason_codes` that
+   halted delegation.
+7. **Permission surface.** The routing CLI (`set_agents_app.py --route-*`/`--routing-*`) is an explicitly
+   **MUTATING-capable** exception in your read-only permission surface, exactly like `feature-state.py`:
+   `--route-decide` authorizes a durable run for writer roles, and you additionally close runs you own via
+   `--route-dispatched`/`--route-terminal`. Every use is narrated like any other spawn action, never silent.
 7. `gate-runner` runs deterministic package gates after the package is integrated enough to review.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
 8. `package-reviewer` leads the bounded package review panel — it covers correctness, architecture, test gaps,

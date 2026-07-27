@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-07-27T10:01:45+00:00
+Actualizado: 2026-07-27T10:15:12+00:00
 
 ## Features
 
@@ -10,13 +10,17 @@ Actualizado: 2026-07-27T10:01:45+00:00
 |---|---|---|---|---|---|---|---|---|---|---|
 | 002-adaptive-pi-orchestration | feature | BLOCKED | P1-routing-core (repair_required) | 0/1 | 12/12 | 2/2 | 5 | HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. | - | 2026-07-24T16:16:04+00:00 block |
 | 003-trusted-routing-pi-runtime | feature | PACKAGE_ACCEPTED | P1R-trusted-routing (accepted) | 1/1 | 16/16 | 3/3 | 0 | - | INTEGRATION | 2026-07-25T03:01:53+00:00 accept-package |
-| 004-adaptive-dispatch | feature | PACKAGE_ACCEPTED | P1-dispatch-core (accepted) | 1/1 | 7/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-27T10:01:27+00:00 accept-package |
+| 004-adaptive-dispatch | feature | PACKAGE_IMPLEMENTATION | P2-opencode-lane (package_implementation) | 1/2 | 8/12 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-07-27T10:15:12+00:00 record-spawn |
 
 ## Quick-fixes recientes
 
 - _sin quick-fixes registrados_
 
 ## Bitácora (últimos 15)
+
+[2026-07-27T10:15:12+00:00] P2-opencode-lane · implementer · started
+Cliente: Un implementador va a construir el carril que te deja elegir modelo por tarea al delegar en OpenCode: crea las variantes por nivel (rapido/balanceado/frontera) de los cinco roles caros, un chequeo que garantiza que cada variante coincide con el catalogo, y la doctrina para que el orquestador elija la variante segun la decision del ruteo (y degrade con seguridad si no puede).
+Ingeniería: PACKAGE_IMPLEMENTATION P2-opencode-lane spawn 1/12 (Claude in-session implementer): T-201 per-role tier tables (models.toml/models_config, activate MODEL_TIERS, lane+subscription validated), T-202 generate.py <role>@<tier> emission + task allowlist + validate() set + build-time variant<->catalog coherence gate + prune verification, T-203 orchestrator decide->variant doctrine + degraded mode + reviewer run_id sourcing + coord permission surface (coord_policy.py SAFE + oc_permissions), T-204 hermetic lane lifecycle + worker-death + variant/prune/coherence tests. Baseline 71abca1.
 
 [2026-07-27T10:01:45+00:00] P1-dispatch-core · orchestrator · done
 Cliente: El cerebro del despacho adaptativo quedo aceptado: el arnes ya elige nivel (rapido/balanceado/frontera) y modelo por tarea, con una consulta que pasa de 14 segundos a menos de uno, y cada despacho de escritura queda autorizado y auditado. Tres revisores independientes encontraron 18 detalles y todos se cerraron.
@@ -73,8 +77,4 @@ Ingeniería: PACKAGE_REPAIR R3, spawn 14/16 (Claude Fable in-session): FD-003 pe
 [2026-07-25T02:07:43+00:00] P1R-trusted-routing · orchestrator · started
 Cliente: El cliente autorizo una tercera y ultima ronda de reparacion con presupuesto nuevo: tres instancias mas (reparador, verificador y revisor independiente).
 Ingeniería: User-authorized fresh budget for R3: max_spawns_per_package 13->16 (repair-agent, gate-runner, delta-reviewer). Direct state edit because the harness exposes no budget command; traceable here and in r3-threat-model-amendment.
-
-[2026-07-24T23:54:28+00:00] P1R-trusted-routing · delta-reviewer · done
-Cliente: La revisión independiente final confirmó que R2 mejora el comportamiento, pero deja abiertos los diez outcomes FD-001..FD-010; P1R no puede aceptarse.
-Ingeniería: Final delta verdict=repair_required: FD-001 critical, FD-002..FD-009 high, FD-010 medium. Gates pass but counterexamples remain; no scope creep/full review required.
 

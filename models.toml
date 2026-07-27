@@ -128,17 +128,61 @@ opencode = { "go-zen" = "opencode/nemotron-3-ultra-free", "zen" = "opencode/nemo
 codex_effort = "high"
 opencode = { "zen" = "openai/gpt-5.4" }
 
+# Per-role OpenCode-lane tier tables (contract 004 / AC-06). These are the ONLY
+# consumers of MODEL_TIERS: the tier table IS the declaration of the OpenCode-lane
+# row per (role, tier); generate.py's build-time coherence gate requires every
+# declared model here to project to EXACTLY ONE routes.v1.toml row (openai-codex
+# provider, matching tier, role-compatible) — see models_config.load_role_tiers.
+# The three lanes carry the same model on purpose: only the openai-codex family
+# projects from the OpenCode namespace, so lane variance would only ever produce
+# a coherence-gate failure, not a real choice.
+[roles.debugger.tiers.fast]
+opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "local" = "openai/gpt-5.6-luna" }
+
+[roles.debugger.tiers.balanced]
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "local" = "openai/gpt-5.6-sol" }
+
+[roles.debugger.tiers.frontier]
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
+
+[roles.delta-reviewer.tiers.fast]
+opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "local" = "openai/gpt-5.6-luna" }
+
+[roles.delta-reviewer.tiers.balanced]
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "local" = "openai/gpt-5.6-sol" }
+
+[roles.delta-reviewer.tiers.frontier]
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
+
 [roles.frontend-engineer]
 opencode = { "go-zen" = "openai/gpt-5.3-codex-spark", "local" = "openai/gpt-5.4-mini" }
 
 [roles.image-describer]
 opencode = { "local" = "openai/gpt-5.4-mini" }
 
+[roles.implementer.tiers.fast]
+opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "local" = "openai/gpt-5.6-luna" }
+
+[roles.implementer.tiers.balanced]
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "local" = "openai/gpt-5.6-sol" }
+
+[roles.implementer.tiers.frontier]
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
+
 [roles.local-gate-runner]
 opencode = { "go-zen" = "opencode/deepseek-v4-flash-free" }
 
 [roles.package-planner]
 codex = "gpt-5.6-terra"
+
+[roles.package-reviewer.tiers.fast]
+opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "local" = "openai/gpt-5.6-luna" }
+
+[roles.package-reviewer.tiers.balanced]
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "local" = "openai/gpt-5.6-sol" }
+
+[roles.package-reviewer.tiers.frontier]
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
 
 [roles.product-analyst]
 codex = "gpt-5.6-terra"
@@ -157,6 +201,15 @@ opencode = { "go-zen" = "openai/gpt-5.3-codex-spark", "local" = "openai/gpt-5.4-
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
+
+[roles.security-auditor.tiers.fast]
+opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "local" = "openai/gpt-5.6-luna" }
+
+[roles.security-auditor.tiers.balanced]
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "local" = "openai/gpt-5.6-sol" }
+
+[roles.security-auditor.tiers.frontier]
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
 
 [roles.test-writer]
 opencode = { "zen" = "opencode/deepseek-v4-flash-free", "local" = "openai/gpt-5.4-mini" }

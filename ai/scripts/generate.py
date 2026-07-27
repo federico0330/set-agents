@@ -113,7 +113,7 @@ def oc_hidden(role):
     }
 
 
-def oc_permissions(capability, roles, role=None, yolo=False):
+def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
     safe = [
         '    "git status*": allow', '    "git diff*": allow', '    "git log*": allow',
         '    "git show*": allow', '    "rg*": allow', '    "bat*": allow', '    "eza*": allow',
@@ -190,14 +190,27 @@ def oc_permissions(capability, roles, role=None, yolo=False):
             for path in sorted((CANON / "opencode-agents").glob("*.md"))
             if path.stem in ORCHESTRATOR_TASK_ALLOW
         ]
+        # Tier variants (contract 004 T-202): additive OpenCode-only `<role>@<tier>`
+        # agents for the roles models.toml declares tiered. Not a roster entry and not
+        # under Global/_canonical/opencode-agents, so neither loop above sees them —
+        # without this, "*": deny blocks every tiered spawn.
+        lines += [f'    "{name}": allow' for name in sorted(variant_names)]
         # The state CLI is the orchestrator's sanctioned mutation channel: it only
         # writes validated, atomic JSON under ai/state/ and enforces the physical
         # budgets. Allowing the full subcommand surface (init, record-spawn,
         # transition, ...) is what lets the orchestrator follow its own doctrine
         # without a permission prompt per delegation. Shell composition is still
         # caught by hard_denies below.
+        # The routing CLI (contract 004 T-203) is a second, narrower sanctioned mutation
+        # channel: `--route-decide` authorizes a writer run, and the orchestrator ALSO
+        # closes runs it owns (`--route-dispatched`/`--route-terminal`, e.g. the
+        # model-mismatch and worker-death doctrines below) — documented here as an
+        # explicitly MUTATING-capable coord exception, narrated on use like every spawn.
         lines += ["  bash:", '    "*": deny', *safe,
-                  '    "python3 ai/scripts/feature-state.py *": allow', *hard_denies]
+                  '    "python3 ai/scripts/feature-state.py *": allow',
+                  '    "python3 ai/scripts/set_agents_app.py --route*": allow',
+                  '    "python3 ai/scripts/set_agents_app.py --routing*": allow',
+                  *hard_denies]
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]
     elif capability == "gate-ro":
@@ -282,23 +295,48 @@ def yolofy(node):
     return node
 
 
-def generate(out, profile, roles_path=None, models_path=None):
+def _roster_filtered_role_tiers(roles, role_tiers):
+    """PKG-N02: variant EMISSION is always driven by `roles` (the active roster); the
+    EXPECTATION (`variant_names`/`variant_expected`) must be built from that same
+    roster-filtered set, never straight off `models_config.load_role_tiers`'s raw
+    result — otherwise a tiered role absent from the active roster silently produces
+    an expected-but-never-emitted variant, surfacing later as an opaque "generated
+    role set mismatch" instead of a targeted diagnostic. Fails closed: a tiers table
+    for a role outside the roster is a stale/mistaken models.toml entry, named
+    explicitly, never silently dropped or silently honored."""
+    roster_names = {row["role"] for row in roles}
+    orphaned = sorted(set(role_tiers) - roster_names)
+    if orphaned:
+        die(
+            f"models.toml declares [roles.<role>.tiers] for role(s) {orphaned} not present "
+            f"in the active roster (roles.tsv) — remove the stale tier table or add the "
+            f"role to roles.tsv"
+        )
+    return role_tiers
+
+
+def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     roles = load_roles(profile, roles_path, models_path)
+    config = models_config.load_config(models_path)
+    role_tiers = _roster_filtered_role_tiers(roles, models_config.load_role_tiers(config, profile))
+    variant_names = sorted(f"{role}@{tier}" for role, tiers in role_tiers.items() for tier in tiers)
     yolo = models_config.permission_profile(models_path) == "yolo"
     if out.exists():
         shutil.rmtree(out)
     for harness in ("opencode", "claude-code", "codex"):
         (out / harness).mkdir(parents=True)
 
+    bodies = {}
     for row in roles:
         body = (CANON / "agents" / f"{row['role']}.md").read_text()
+        bodies[row["role"]] = body
         desc = description(body)
         oc = "\n".join([
             "---", f"description: {json.dumps(desc)}", f"mode: {row['mode']}",
             f"model: {row['opencode_model']}", f"temperature: {row['temperature']}",
             f"steps: {oc_steps(row['role'], row['capability'], row['duty'])}",
             ("hidden: true" if oc_hidden(row["role"]) else ""),
-            oc_permissions(row["capability"], roles, row["role"], yolo), "---", "", body,
+            oc_permissions(row["capability"], roles, row["role"], yolo, variant_names), "---", "", body,
         ])
         if row["role"] == "orchestrator":
             oc += (
@@ -340,6 +378,29 @@ def generate(out, profile, roles_path=None, models_path=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(codex)
 
+    # Tier variants (contract 004 T-202): additive, OpenCode-ONLY `<role>@<tier>` agents
+    # for the roles models.toml declares tiered (models_config.load_role_tiers). Same
+    # prompt body, same permissions, same step budget as the base agent — the ONLY line
+    # that differs is `model:`. The base agent above is unchanged and keeps being
+    # emitted for every harness; Claude Code and Codex never receive a variant.
+    for row in roles:
+        tiers = role_tiers.get(row["role"])
+        if not tiers:
+            continue
+        body = bodies[row["role"]]
+        desc = description(body)
+        for tier in models_config.MODEL_TIERS:
+            oc = "\n".join([
+                "---", f"description: {json.dumps(desc)}", f"mode: {row['mode']}",
+                f"model: {tiers[tier]}", f"temperature: {row['temperature']}",
+                f"steps: {oc_steps(row['role'], row['capability'], row['duty'])}",
+                ("hidden: true" if oc_hidden(row["role"]) else ""),
+                oc_permissions(row["capability"], roles, row["role"], yolo, variant_names), "---", "", body,
+            ])
+            oc = oc.replace("\n\npermission:", "\npermission:")
+            path = out / "opencode/agents" / f"{row['role']}@{tier}.md"
+            path.write_text(oc)
+
     copy_tree(CANON / "opencode-agents", out / "opencode/agents")
 
     for harness in ("opencode", "claude-code"):
@@ -378,11 +439,63 @@ def generate(out, profile, roles_path=None, models_path=None):
         shutil.copy2(ROOT / "ai/scripts/release_gate.py", hooks / "release_gate.py")
     shutil.copy2(ROOT / "ai/scripts/release_gate.py", out / "claude-code/hooks/release_gate.py")
     write_indexes(out)
-    validate(out, roles)
+    validate(out, roles, role_tiers, routes_path)
 
 
-def validate(out, roles=None):
-    roles = roles or load_roles(models_config.active_profile())
+def _opencode_projected_route(model):
+    """Pure, offline projection (contract 004 T-202): `openai/<M>` projects to the
+    catalog identity (provider=openai-codex, model=<M>) — the only routes.v1.toml
+    provider reachable from the OpenCode lane (anthropic runs through claude-code,
+    not OpenCode). Any other prefix (the `opencode/*` zen aggregator included) never
+    projects. No live probes: this is a static lookup over the full catalog, never a
+    runtime/subscription/availability check."""
+    prefix, sep, rest = model.partition("/")
+    if not sep or prefix != "openai" or not rest:
+        return None
+    return ("openai-codex", rest)
+
+
+def _load_routes(routes_path):
+    path = Path(routes_path)
+    data = tomllib.loads(path.read_text())
+    routes = data.get("routes")
+    if not isinstance(routes, list):
+        die(f"{path}: missing [[routes]]")
+    return routes
+
+
+def check_variant_catalog_coherence(role_tiers, routes_path):
+    """Build-time gate (AC-06): each declared (role, tier) variant model must equal the
+    model of EXACTLY ONE routes.v1.toml row that shares its tier, is opencode-reachable
+    (see _opencode_projected_route), and lists the role — under a full-inventory
+    assumption (no probing). Zero or ambiguous matches fail the build."""
+    routes = _load_routes(routes_path)
+    for role, tiers in role_tiers.items():
+        for tier, model in tiers.items():
+            projected = _opencode_projected_route(model)
+            matches = [
+                row for row in routes
+                if projected is not None
+                and row.get("provider") == projected[0]
+                and row.get("model") == projected[1]
+                and row.get("tier") == tier
+                and role in (row.get("roles") or ())
+            ]
+            if len(matches) != 1:
+                die(
+                    f"variant coherence: {role}@{tier} model {model!r} projects to "
+                    f"{len(matches)} catalog rows (expected exactly 1, full-inventory, "
+                    f"offline projection over {Path(routes_path).name})"
+                )
+
+
+def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=None):
+    profile = models_config.active_profile()
+    roles = roles or load_roles(profile, models_path=models_path)
+    if role_tiers is None:
+        role_tiers = models_config.load_role_tiers(models_config.load_config(models_path), profile)
+    role_tiers = _roster_filtered_role_tiers(roles, role_tiers)
+    routes_path = routes_path or (ROOT / "ai/catalogs/routes.v1.toml")
     json.loads((out / "opencode/opencode.json").read_text())
     json.loads((out / "claude-code/settings.overlay.json").read_text())
     for path in (out / "codex/agents").glob("*.toml"):
@@ -396,16 +509,21 @@ def validate(out, roles=None):
             if not text.startswith("---\n") or "\n---\n" not in text[4:]:
                 die(f"{path}: invalid frontmatter")
     expected = {r["role"] for r in roles}
+    variant_expected = {f"{role}@{tier}" for role, tiers in role_tiers.items() for tier in tiers}
     opencode_only = {p.stem for p in (CANON / "opencode-agents").glob("*.md")}
     for harness, suffix in (("opencode", ".md"), ("claude-code", ".md"), ("codex", ".toml")):
         actual = {p.stem for p in (out / harness / "agents").glob(f"*{suffix}")}
-        harness_expected = expected | opencode_only if harness == "opencode" else expected
+        harness_expected = expected | opencode_only | variant_expected if harness == "opencode" else expected
         if actual != harness_expected:
             die(f"{harness}: generated role set mismatch")
     orchestrator = (out / "opencode/agents/orchestrator.md").read_text()
     for role in ORCHESTRATOR_TASK_ALLOW:
         if f'    "{role}": allow' not in orchestrator:
             die(f"orchestrator cannot delegate required role: {role}")
+    for name in variant_expected:
+        if f'    "{name}": allow' not in orchestrator:
+            die(f"orchestrator cannot delegate required tier variant: {name}")
+    check_variant_catalog_coherence(role_tiers, routes_path)
 
 
 def main():
@@ -414,10 +532,11 @@ def main():
     parser.add_argument("--profile")
     parser.add_argument("--roles")
     parser.add_argument("--models")
+    parser.add_argument("--routes")
     args = parser.parse_args()
     profile = args.profile or models_config.active_profile()
     try:
-        generate(Path(args.output), profile, args.roles, args.models)
+        generate(Path(args.output), profile, args.roles, args.models, args.routes)
     except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
         print(f"CHECK_FAILED: {exc}", file=sys.stderr)
         return 2

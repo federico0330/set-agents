@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-07-27T10:01:45+00:00
+Actualizado: 2026-07-27T10:15:12+00:00
 
 [2026-07-26T14:58:25+00:00] orchestrator · done
 Cliente: El cliente aprobo el contrato del despacho adaptativo tras dos rondas de challenge independiente: el arnes va a elegir modelo por tarea (nivel rapido/balanceado/frontera) en OpenCode ya, y con eleccion dinamica real en Pi si el estudio de viabilidad da bien.
@@ -39,3 +39,7 @@ Ingeniería: DELTA_REVIEW R1 delta-reviewer read-only spawn 7/12: decide resolve
 [2026-07-27T10:01:45+00:00] P1-dispatch-core · orchestrator · done
 Cliente: El cerebro del despacho adaptativo quedo aceptado: el arnes ya elige nivel (rapido/balanceado/frontera) y modelo por tarea, con una consulta que pasa de 14 segundos a menos de uno, y cada despacho de escritura queda autorizado y auditado. Tres revisores independientes encontraron 18 detalles y todos se cerraron.
 Ingeniería: P1-dispatch-core PACKAGE_ACCEPTED: impl (T-100..T-105) + P1-R1 consolidated repair (18 findings from 2 package-reviewers + 1 security-auditor) + independent gates + delta-review pass. Tests 29->48, verify.sh 146 VERIFY_PASS. Core AM-1/AM-2 confirmed sound by all reviewers. Next: P2-opencode-lane (tier variants + orchestrator decide->spawn doctrine).
+
+[2026-07-27T10:15:12+00:00] P2-opencode-lane · implementer · started
+Cliente: Un implementador va a construir el carril que te deja elegir modelo por tarea al delegar en OpenCode: crea las variantes por nivel (rapido/balanceado/frontera) de los cinco roles caros, un chequeo que garantiza que cada variante coincide con el catalogo, y la doctrina para que el orquestador elija la variante segun la decision del ruteo (y degrade con seguridad si no puede).
+Ingeniería: PACKAGE_IMPLEMENTATION P2-opencode-lane spawn 1/12 (Claude in-session implementer): T-201 per-role tier tables (models.toml/models_config, activate MODEL_TIERS, lane+subscription validated), T-202 generate.py <role>@<tier> emission + task allowlist + validate() set + build-time variant<->catalog coherence gate + prune verification, T-203 orchestrator decide->variant doctrine + degraded mode + reviewer run_id sourcing + coord permission surface (coord_policy.py SAFE + oc_permissions), T-204 hermetic lane lifecycle + worker-death + variant/prune/coherence tests. Baseline 71abca1.

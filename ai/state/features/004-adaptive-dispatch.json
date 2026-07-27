@@ -30,7 +30,7 @@
     "max_repairs_per_finding": 2,
     "max_spawns_per_package": 12
   },
-  "current_package_id": "P1-dispatch-core",
+  "current_package_id": "P2-opencode-lane",
   "feature_id": "004-adaptive-dispatch",
   "final_state": null,
   "global_gates": [],
@@ -492,13 +492,382 @@
       "package_id": "P1-dispatch-core",
       "timestamp": "2026-07-27T10:01:27+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1-dispatch-core accepted; begin next approved package P2-opencode-lane."
+      },
+      "package_id": null,
+      "timestamp": "2026-07-27T10:14:39+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "T-201",
+          "T-202",
+          "T-203",
+          "T-204"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:14:52+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Context pack accepted; baseline 71abca1e87d057f33ef9278d954e01ae46d6a94d."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:15:01+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un implementador va a construir el carril que te deja elegir modelo por tarea al delegar en OpenCode: crea las variantes por nivel (rapido/balanceado/frontera) de los cinco roles caros, un chequeo que garantiza que cada variante coincide con el catalogo, y la doctrina para que el orquestador elija la variante segun la decision del ruteo (y degrade con seguridad si no puede).",
+        "purpose": "Implement T-201..T-204 of P2-opencode-lane from the approved context pack",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "PACKAGE_IMPLEMENTATION P2-opencode-lane spawn 1/12 (Claude in-session implementer): T-201 per-role tier tables (models.toml/models_config, activate MODEL_TIERS, lane+subscription validated), T-202 generate.py <role>@<tier> emission + task allowlist + validate() set + build-time variant<->catalog coherence gate + prune verification, T-203 orchestrator decide->variant doctrine + degraded mode + reviewer run_id sourcing + coord permission surface (coord_policy.py SAFE + oc_permissions), T-204 hermetic lane lifecycle + worker-death + variant/prune/coherence tests. Baseline 71abca1."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:15:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-201",
+        "validations": [
+          "Per-role tier tables [roles.<role>.tiers.<tier>] for 5 roles; MODEL_TIERS/TIER_FIELD active; load_role_tiers lane+subscription validated; resolve_role ignores tiers; emit() round-trips tiers; base agents unchanged"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:35:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-202",
+        "validations": [
+          "generate.py emits additive OpenCode-only <role>@<tier>.md (identical body/perms/steps, model per tier); orchestrator task-allowlist extended; validate() per-harness set equality exact; pure-offline check_variant_catalog_coherence in validate(); install prune covers variants unchanged; build --check CHECK_PASS"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:35:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-203",
+        "validations": [
+          "orchestrator.md decide->spawn doctrine (match by decided model; mismatch/unavailable -> degraded base; worker-death; run_id in narration; reviewer review_of_run_id from state/recent-writers); coord_policy.py SAFE + oc_permissions coord-ro gain --route-decide; routing CLI documented mutating-capable"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:35:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-204",
+        "validations": [
+          "test_harness.py +5: variant emission, prune-of-removed-variant, hermetic decide->dispatched->terminal lifecycle, worker-death closure, negative coherence x2; 150/150 OK; verify.sh VERIFY_PASS"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:35:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "T-201..T-204 implemented with local validations (150 tests, VERIFY_PASS); independent gates required."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:35:12+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Una instancia independiente va a repetir todas las validaciones del paquete y comprobar que no se salio de su alcance ni rompio nada existente.",
+        "purpose": "Independent deterministic gates for P2-opencode-lane",
+        "role": "gate-runner",
+        "spawns": 2,
+        "tech": "PACKAGE_GATES P2-opencode-lane gate-runner read-only spawn 2/12: unittest discover (harness+routing), build.sh --check incl coherence gate, py_compile incl routing_core, verify.sh drift check, git diff --check, live --route-decide->variant mapping, ownership vs 71abca1."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:35:21+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p2-package-gates",
+        "status": "pass"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:42:44+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:42:53+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Gates pass; package integrated in working tree; open P2-R1 review panel."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:42:53+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P2-R1",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:43:02+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente va a comprobar que las variantes por nivel y la doctrina cumplen cada criterio aprobado sin romper el nucleo de ruteo ni los agentes existentes.",
+        "purpose": "Deep independent package review of P2-opencode-lane against contract 1.1.0 (AC-06/07/08)",
+        "role": "package-reviewer",
+        "spawns": 3,
+        "tech": "Panel P2-R1 package-reviewer read-only over 71abca1..WORKTREE spawn 3/12: AC-06 variant emission+coherence gate correctness, AC-07 doctrine completeness, AC-08 lifecycle, tier-table/projection fidelity, generate.py set-equality regression, no core/base-agent regressions, structured findings."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:43:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "En paralelo, un auditor va a intentar abusar de la eleccion de variante, del gate de coherencia y de los permisos del coordinador para conseguir un spawn o un modelo que no corresponde.",
+        "purpose": "Independent security review of tier variants, coherence gate, coord permission surface, degraded-mode doctrine",
+        "role": "security-auditor",
+        "spawns": 4,
+        "tech": "Panel P2-R1 security-auditor read-only spawn 4/12: variant-name spoofing/allowlist bypass, coherence gate evasion (projection ambiguity/offline assumption), coord --route-decide/--route-terminal permission scope, degraded-mode as downgrade attack, run_id/review identity abuse, secret redaction; R3 threat model applies."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:43:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:53:37+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:53:37+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P2-R1",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:53:50+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un reparador va a cerrar tres detalles antes de aceptar: que el orquestador nunca trate un rechazo de seguridad del ruteo como si fuera un simple 'este carril no puede', que la eleccion de variante tenga una unica fuente de verdad, y que un error de configuracion de un rol de al mensaje claro.",
+        "purpose": "Consolidated repair R1 of P2-R1 findings SEC-A01, PKG-N01, PKG-N02",
+        "role": "repair-agent",
+        "spawns": 5,
+        "tech": "PACKAGE_REPAIR R1 repair-agent (Claude in-session) spawn 5/12: SEC-A01 orchestrator.md degraded-mode must branch on route-decide reason taxonomy (only ok=true off-lane + ROUTING_UNAVAILABLE degrade to base; hard denials AUTHORIZATION_REPLAY/REVIEWER_INDEPENDENCE_UNAVAILABLE/REVIEW_IDENTITY_INVALID/AUTHORIZATION_INVALID/NO_ELIGIBLE_ROUTE/PROVIDER_UNAUTHENTICATED halt/HUMAN_DECISION_REQUIRED); PKG-N01 reframe decided-model->variant to match emitted variant model (single source of truth) + keep build-time coherence; PKG-N02 intersect load_role_tiers with roster or targeted error. Doctrine text tests + regression net; no core mutation."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T10:54:48+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-A01",
+          "PKG-N01",
+          "PKG-N02"
+        ]
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T11:52:50+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una validacion independiente repite todas las pruebas del paquete reparado antes de entregarlo al revisor final.",
+        "purpose": "Independent gates for consolidated repair R1 before delta review",
+        "role": "gate-runner",
+        "spawns": 6,
+        "tech": "DELTA_REVIEW R1 gate-runner read-only spawn 6/12: unittest 152, build.sh --check incl coherence, py_compile incl routing_core, verify.sh drift, git diff --check, ownership vs 71abca1, doctrine propagation to 3 harnesses."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T11:53:02+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "r1-post-repair-verification",
+        "status": "pass"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:01:08+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:01:08+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests -v",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:04:56+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:04:56+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:05:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P2-opencode-lane accepted; verify.sh VERIFY_PASS 152 tests; integrating to main."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:07:02+00:00",
+      "to": "INTEGRATION"
     }
   ],
   "metrics": {
-    "delta_reviews": 1,
+    "delta_reviews": 2,
     "human_questions_after_approval": 0,
-    "package_reviews": 1,
-    "repair_batches": 1,
+    "package_reviews": 2,
+    "repair_batches": 2,
     "task_deep_reviews": 0
   },
   "mode": "feature",
@@ -927,10 +1296,265 @@
           "status": "pass"
         }
       ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 6,
+        "subdivisions": 0
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/004-adaptive-dispatch/context/P2-opencode-lane.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-27T12:01:08+00:00",
+          "closed_findings": [
+            "SEC-A01",
+            "PKG-N01",
+            "PKG-N02"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Independent delta R1: all 3 resolved via own checks. SEC-A01 doctrine fail-closed by construction (only off-lane ok=true + ROUTING_UNAVAILABLE degrade to base; REVIEW_IDENTITY_UNVERIFIED benign; every other non-ok HALTs HUMAN_DECISION_REQUIRED quoting reason; INVALID vs UNVERIFIED disambiguated; reason strings cross-checked against live taxonomy, none missing/misclassified, fail-closed default catches unnamed). PKG-N01 prose map gone from canonical+3 artifacts, match by emitted model: single source of truth; skipped build assertion confirmed non-tautological-gap. PKG-N02 _roster_filtered_role_tiers fails closed naming role, emission+expectation share source. No new regressions; core untouched; 5 base models byte-unchanged; 15 variants identical-except-model; tests additive 152. requires_full_review false.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "71abca1e87d057f33ef9278d954e01ae46d6a94d..WORKTREE",
+      "findings": [
+        {
+          "category": "correctness",
+          "file": "Global/_canonical/agents/orchestrator.md",
+          "id": "PKG-N01",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "decided-model->variant-name map is unguarded prose (third leg); can drift from catalog/models.toml on future re-tiering; reframe to spawn variant whose emitted model==data.model (single source of truth)"
+        },
+        {
+          "category": "correctness",
+          "file": "ai/scripts/generate.py",
+          "id": "PKG-N02",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "variant_expected from load_role_tiers not intersected with roster; a tiered role absent from roster yields opaque generated-role-set-mismatch (fails closed); intersect or emit targeted error"
+        },
+        {
+          "category": "security",
+          "file": "Global/_canonical/agents/orchestrator.md",
+          "id": "SEC-A01",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "degraded-mode catch-all conflates benign lane model-mismatch (ok=true non-openai-codex) with HARD denials (AUTHORIZATION_REPLAY, REVIEWER_INDEPENDENCE_UNAVAILABLE, REVIEW_IDENTITY_INVALID, AUTHORIZATION_INVALID); doctrine must branch on reason taxonomy: only ok=true-off-lane and ROUTING_UNAVAILABLE may degrade to base; hard denials must halt/HUMAN_DECISION_REQUIRED, never silent base spawn"
+        },
+        {
+          "category": "security",
+          "file": "ai/scripts/coord_policy.py",
+          "id": "SEC-A02",
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "accepted",
+          "summary": "coord gains ability to terminal/abandon ANY open run (no caller-ownership check); intended blast radius under same-UID out-of-scope threat model + mandatory narration; ratified, not repaired"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-27T10:42:44+00:00",
+          "evidence": "Independent 9-gate pass: unittest 150/150; build.sh --check CHECK_PASS (incl coherence gate); py_compile clean; verify.sh VERIFY_PASS (drift clean); git diff --check clean; ownership clean (read-only paths untouched); coherence gate pure-offline + fails on bad model exit2 no repo mutation; --route-decide implementer->fast/luna maps implementer@fast; 15 variants present bodies/perms/steps identical to base.",
+          "name": "p2-package-gates",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-27T12:01:08+00:00",
+          "evidence": "Independent R1 re-gate: unittest 152/152; build.sh --check CHECK_PASS (incl coherence+roster gates); py_compile clean; verify.sh VERIFY_PASS drift clean; git diff --check clean; ownership clean (read-only paths untouched); doctrine reason-taxonomy branching propagated to all 3 harness orchestrator artifacts, old luna->@fast prose gone; +2 locking tests non-vacuous.",
+          "name": "r1-post-repair-verification",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Tiered OpenCode agent variants <role>@<tier> consumed by the orchestrator per --route-decide; build-time variant\u2194catalog coherence gate; degraded-mode doctrine",
+      "owned_paths": [
+        "models.toml",
+        "ai/scripts/models_config.py",
+        "ai/scripts/generate.py",
+        "ai/scripts/install.py",
+        "Global/_canonical/agents/orchestrator.md",
+        "ai/scripts/coord_policy.py",
+        "tests/test_harness.py",
+        "docs/specs/004-adaptive-dispatch/context/P2-opencode-lane.md",
+        "docs/specs/004-adaptive-dispatch/evidence/P2-*",
+        "Global/opencode/agents/**",
+        "Global/claude-code/agents/orchestrator.md",
+        "Global/codex/**"
+      ],
+      "package_id": "P2-opencode-lane",
+      "read_only_paths": [
+        "ai/catalogs/routes.v1.toml",
+        "ai/scripts/routing_core/**",
+        "ai/scripts/set_agents_app.py",
+        "roles.tsv"
+      ],
+      "repairs": [
+        {
+          "at": "2026-07-27T11:52:50+00:00",
+          "changed_files": [
+            "Global/_canonical/agents/orchestrator.md",
+            "ai/scripts/generate.py",
+            "tests/test_harness.py",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/agents/orchestrator.toml",
+            "docs/specs/004-adaptive-dispatch/evidence/P2-repair-R1.md"
+          ],
+          "finding_ids": [
+            "SEC-A01",
+            "PKG-N01",
+            "PKG-N02"
+          ],
+          "verification": [
+            "unittest 152/152 (was 150, +2 doctrine/roster tests, 0 weakened)",
+            "build.sh --check CHECK_PASS; build.sh propagated doctrine to 3 harnesses",
+            "py_compile clean; verify.sh VERIFY_PASS drift clean; git diff --check clean"
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-27T10:53:50+00:00",
+          "panel_id": "P2-R1",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-27T10:43:02+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-27T10:53:37+00:00",
+              "evidence": "Verdict approve; core sound (150/150 independently). 2 low findings for orchestrator to consolidate: unguarded prose model->variant leg; validate() variant_expected not roster-intersected.",
+              "findings": [
+                "PKG-N01",
+                "PKG-N02"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-27T10:53:37+00:00",
+              "evidence": "Verdict approve; no exploitable escalation. SEC-A01 doctrine correctness gap (hard denials silently degraded) to repair; SEC-A02 coord blast radius accepted by threat model (ratified via decision).",
+              "findings": [
+                "SEC-A01",
+                "SEC-A02"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-27T10:53:50+00:00",
+          "evidence": "P2-R1: both reviewers approve (core sound, 150/150 independent, coherence gate proven fail-closed, no core/base regressions). Consolidated 3 actionable findings for one repair batch: SEC-A01 (doctrine: hard-denial vs benign-mismatch branching), PKG-N01 (single-source-of-truth model->variant), PKG-N02 (roster intersection). SEC-A02 accepted via decision.",
+          "findings": [
+            "PKG-N01",
+            "PKG-N02",
+            "SEC-A01",
+            "SEC-A02"
+          ],
+          "panel_id": "P2-R1",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": "Build-pipeline + orchestrator-doctrine work touching permission surfaces; in-session Claude implementer for speed per user's slow-external-runtime constraint, independent gates+panel after.",
+      "runtime_qa": [
+        {
+          "at": "2026-07-27T12:04:56+00:00",
+          "browser": "",
+          "checks": [
+            "Live --route-decide writer implementer mechanical/low -> openai-codex/gpt-5.6-luna/tier fast, run_id issued -> maps to implementer@fast variant (emitted model openai/gpt-5.6-luna)",
+            "Full lifecycle via CLI: decide->dispatched(ok)->terminal success(ok) exit 0; --routing-report shows per_route counters + retained_events",
+            "Worker-death doctrine: decide->terminal failure closes run (ok) -> abandoned",
+            "SEC-A01 hardened path live: reviewer security-auditor without verified review_of_run_id/context -> ok:false exit 1 fail-closed, no traceback (not degraded to silent base spawn)"
+          ],
+          "evidence": "Observable CLI behavior verified live against real routing surface with temp SET_AGENTS_ROUTING_TEST_ROOT (prod state untouched, temp cleaned): adaptive tier->model selection working (task-class->tier->variant), full lifecycle, worker-death closure, and fail-closed reviewer rejection all confirmed.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": "claude-in-session",
+      "selected_role": "implementer",
+      "shared_paths": [
+        "ai/state/features/004-adaptive-dispatch.json"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "T-201",
+          "local_validations": [
+            "Per-role tier tables [roles.<role>.tiers.<tier>] for 5 roles; MODEL_TIERS/TIER_FIELD active; load_role_tiers lane+subscription validated; resolve_role ignores tiers; emit() round-trips tiers; base agents unchanged"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-202",
+          "local_validations": [
+            "generate.py emits additive OpenCode-only <role>@<tier>.md (identical body/perms/steps, model per tier); orchestrator task-allowlist extended; validate() per-harness set equality exact; pure-offline check_variant_catalog_coherence in validate(); install prune covers variants unchanged; build --check CHECK_PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-203",
+          "local_validations": [
+            "orchestrator.md decide->spawn doctrine (match by decided model; mismatch/unavailable -> degraded base; worker-death; run_id in narration; reviewer review_of_run_id from state/recent-writers); coord_policy.py SAFE + oc_permissions coord-ro gain --route-decide; routing CLI documented mutating-capable"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-204",
+          "local_validations": [
+            "test_harness.py +5: variant emission, prune-of-removed-variant, hermetic decide->dispatched->terminal lifecycle, worker-death closure, negative coherence x2; 150/150 OK; verify.sh VERIFY_PASS"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-27T12:04:56+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests -v",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "R1 regression net: 152 tests (harness 104 incl new doctrine-branching + roster-orphan tests, routing 48 unchanged) + verify.sh VERIFY_PASS drift clean; independently re-run by gate-runner and reproduced by delta-reviewer; no test weakened/removed.",
+          "status": "pass"
+        }
+      ]
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 34,
+  "phase": "INTEGRATION",
+  "revision": 62,
   "schema_version": 1,
-  "updated_at": "2026-07-27T10:01:27+00:00"
+  "updated_at": "2026-07-27T12:07:02+00:00"
 }

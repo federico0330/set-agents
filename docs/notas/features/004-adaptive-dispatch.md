@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_ACCEPTED` · modo: feature · revisión 34
+- fase: `PACKAGE_IMPLEMENTATION` · modo: feature · revisión 38
 - spec: `docs/specs/004-adaptive-dispatch/spec.md` (hash `fe543d780deb`)
 
 ## Criterios de aceptación
@@ -28,31 +28,34 @@
 ## Paquetes
 
 - [[features/004-adaptive-dispatch/P1-dispatch-core|P1-dispatch-core]] — accepted · Tiered catalog, risk-aware selection, dispatch CLI, probe cache (AM-1/AM-2)
+- [[features/004-adaptive-dispatch/P2-opencode-lane|P2-opencode-lane]] — package_implementation · Tiered OpenCode agent variants <role>@<tier> consumed by the orchestrator per --route-dec…
 
 ## Approach y decisiones
 
 - ruteo P1-dispatch-core: Security-critical trust boundary work on the routing core itself; in-session Claude implementer per user instruction, i…
-- [2026-07-27] package-reviewer: Panel P1-R1, package-reviewer read-only over 03939b1..WORKTREE, spawn 3/12: AC-00..AC-05 conformance, 003 invariant regressions, AM-1/AM-2 fidelity, tier semantics, structured fin…
+- ruteo P2-opencode-lane: Build-pipeline + orchestrator-doctrine work touching permission surfaces; in-session Claude implementer for speed per u…
 - [2026-07-27] security-auditor: Panel P1-R1, security-auditor read-only, spawn 4/12: descriptor abuse/tier downgrade, cache poisoning/staleness, abandoned-state abuse, envelope redaction, R3 threat model applies.
 - [2026-07-27] repair-agent: PACKAGE_REPAIR R1, repair-agent (Claude in-session) spawn 5/12: reason->exit table (PKG-N01/SEC-002), single-UPDATE abandon+audit (PKG-N02/SEC-A/B), abandoned DDL CHECK+timestamp …
 - [2026-07-27] gate-runner: DELTA_REVIEW R1 gate-runner read-only spawn 6/12: focused 48, harness 2, setup, py_compile incl routing_core, GateSpecs, verify.sh >=300s, CLI matrix, git diff --check, ownership …
 - [2026-07-27] delta-reviewer: DELTA_REVIEW R1 delta-reviewer read-only spawn 7/12: decide resolved|open per PKG-N01..N11/SEC-A01..A03 against contract 1.1.0; reproduce each attack; check delta regressions; ver…
 - [2026-07-27] orchestrator: P1-dispatch-core PACKAGE_ACCEPTED: impl (T-100..T-105) + P1-R1 consolidated repair (18 findings from 2 package-reviewers + 1 security-auditor) + independent gates + delta-review p…
+- [2026-07-27] implementer: PACKAGE_IMPLEMENTATION P2-opencode-lane spawn 1/12 (Claude in-session implementer): T-201 per-role tier tables (models.toml/models_config, activate MODEL_TIERS, lane+subscription …
 - decisión: [[decisiones/2026-07-26 am1-hybrid-facts|AM-1: derivacion hibrida de facts con risk raise-only (enmienda a 003)]]
 - decisión: [[decisiones/2026-07-26 am2-probe-cache-fresh-selected|AM-2: cache de probes filtering-only + re-probe fresco del seleccionado (enmienda a 003/ADR-0005)]]
 - decisión: [[decisiones/2026-07-26 scope-cheap-tier-and-pi-spike|Alcance 004: tier barato sin opencode/* y P3 condicionado a spike]]
 
 ## Qué falta
 
-- → `INTEGRATION` — all packages accepted
+- → `PACKAGE_IMPLEMENTATION` — continue local implementation
+- tareas pendientes en P2-opencode-lane: T-201, T-202, T-203, T-204
 
 ## Presupuestos
 
-- spawns: 7 (máx 12/paquete) · deep review máx 2 ciclos
+- spawns: 8 (máx 12/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/004-adaptive-dispatch/bitacora.md`
 
-_Actualizado: 2026-07-27T10:01:27+00:00_
+_Actualizado: 2026-07-27T10:15:12+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

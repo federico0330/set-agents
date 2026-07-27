@@ -25,6 +25,13 @@ SAFE = [
     # writes only atomic JSON under ai/state/. FORBIDDEN_SYNTAX still blocks any
     # shell composition around it.
     r"python3 ai/scripts/feature-state\.py \S+",
+    # Second sanctioned mutation channel (contract 004 T-203): the routing CLI.
+    # `--route-decide` is itself a mutating command for writer roles (it authorizes a
+    # durable run) and is deliberately documented here as such rather than labeled
+    # read-only; the coord ALSO closes runs it owns via `--route-dispatched`/
+    # `--route-terminal` (model-mismatch and worker-death doctrine below), narrated on
+    # use like every other spawn. FORBIDDEN_SYNTAX still blocks shell composition.
+    r"python3 ai/scripts/set_agents_app\.py --rout(e|ing)-\S+",
 ]
 
 FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")

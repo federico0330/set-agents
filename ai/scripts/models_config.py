@@ -26,6 +26,10 @@ READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
 AREA_FIELDS = ("claude", "codex", "codex_effort", "opencode")
+# The one role-override field that is NOT an area field: a lane-aware tier table
+# consumed only by load_role_tiers, never by resolve_role's base merge. Areas never
+# declare it — only [roles.<role>] may.
+TIER_FIELD = "tiers"
 RUNTIMES = ("opencode", "claude-code", "codex", "pi")
 MODEL_TIERS = ("fast", "balanced", "frontier")
 ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
@@ -227,8 +231,10 @@ def resolve_role(row, config, profile):
     if area is None:
         die(f"{row['role']}: no [areas.{row['duty']}] in models.toml")
     override = config["roles"].get(row["role"], {})
-    for source, label in ((area, f"areas.{row['duty']}"), (override, f"roles.{row['role']}")):
+    for source, label, allow_tiers in ((area, f"areas.{row['duty']}", False), (override, f"roles.{row['role']}", True)):
         for key in source:
+            if key == TIER_FIELD and allow_tiers:
+                continue
             if key not in AREA_FIELDS:
                 die(f"models.toml: [{label}] has unknown field {key}")
     lanes = {**area.get("opencode", {}), **override.get("opencode", {})}
@@ -287,6 +293,67 @@ def load_roles(profile, roles_path=None, models_path=None):
     if not any(r["duty"] == "judge" for r in roles):
         die("adversarial judge is required")
     return roles
+
+
+def load_role_tiers(config, profile):
+    """Per-role, OpenCode-lane tier tables: {role: {tier: opencode_model}}.
+
+    A role with no [roles.<role>.tiers] table is absent from the result (base-only,
+    one emitted agent). A role WITH a tiers table must cover the full closed
+    vocabulary — fast, balanced, frontier — no partial fan-out. Each [roles.<role>.
+    tiers.<tier>] declares exactly one field, `opencode`, a lane map covering every
+    LANE (or an explicit "default" fallback). Every resolved model passes the SAME
+    validation any other role's opencode_model passes: OPENCODE_MODEL_RE + an active
+    subscription (subscription_of) — never a codex/claude catalog-list membership
+    check, since tiers are an OpenCode-only surface with no claude/codex twin.
+    """
+    if profile not in LANES:
+        die(f"unsupported profile: {profile}")
+    subscriptions = config["subscriptions"]
+    result = {}
+    for role, override in config.get("roles", {}).items():
+        if not isinstance(override, dict) or TIER_FIELD not in override:
+            continue
+        tiers = override[TIER_FIELD]
+        if not isinstance(tiers, dict):
+            die(f"models.toml: [roles.{role}.{TIER_FIELD}] must be a table")
+        unknown = set(tiers) - set(MODEL_TIERS)
+        if unknown:
+            die(f"models.toml: [roles.{role}.{TIER_FIELD}] has unknown tier {sorted(unknown)[0]}")
+        missing = set(MODEL_TIERS) - set(tiers)
+        if missing:
+            die(f"models.toml: [roles.{role}.{TIER_FIELD}] missing tier {sorted(missing)[0]}")
+        resolved = {}
+        for tier in MODEL_TIERS:
+            label = f"roles.{role}.{TIER_FIELD}.{tier}"
+            table = tiers[tier]
+            if not isinstance(table, dict) or set(table) != {"opencode"}:
+                die(f"models.toml: [{label}] must declare exactly 'opencode'")
+            lane_map = table["opencode"]
+            if not isinstance(lane_map, dict):
+                die(f"models.toml: [{label}.opencode] must be a table")
+            lane_unknown = set(lane_map) - set(LANES) - {"default"}
+            if lane_unknown:
+                die(f"models.toml: [{label}.opencode] has unknown lane {sorted(lane_unknown)[0]}")
+            if profile in lane_map:
+                model = lane_map[profile]
+            elif "default" in lane_map:
+                model = lane_map["default"]
+            else:
+                die(f"models.toml: [{label}.opencode] missing lane {profile} and no default")
+            if not isinstance(model, str) or not model:
+                die(f"models.toml: [{label}.opencode] lane {profile} must be a non-empty string")
+            if not OPENCODE_MODEL_RE.fullmatch(model):
+                die(f"{role}: invalid OpenCode tier model id for tier {tier}")
+            subscription = subscription_of(model, config)
+            if not subscriptions.get(subscription):
+                die(
+                    f"{role}: tier {tier} model {model} needs the '{subscription}' subscription, "
+                    "which is inactive in models.toml — reassign it (./setup-models.sh) or re-enable the subscription"
+                )
+            resolved[tier] = model
+        result[role] = resolved
+    return result
 
 
 def small_model(profile, models_path=None):
@@ -376,6 +443,14 @@ def emit(config):
                 lines.append(f"{field} = {_value(override[field])}")
         if "opencode" in override:
             lines.append(f"opencode = {_inline(override['opencode'], LANES)}")
+        if TIER_FIELD in override:
+            tiers = override[TIER_FIELD]
+            for tier in MODEL_TIERS:
+                if tier not in tiers:
+                    continue
+                lines.append("")
+                lines.append(f"[roles.{role}.{TIER_FIELD}.{tier}]")
+                lines.append(f"opencode = {_inline(tiers[tier]['opencode'], (*LANES, 'default'))}")
     return "\n".join(lines) + "\n"
 
 

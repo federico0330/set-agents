@@ -852,6 +852,13 @@ class HarnessTests(unittest.TestCase):
             "python3 ai/scripts/feature-state.py status feat-x",
             "python3 ai/scripts/feature-state.py record-spawn PKG-01 implementer --state-file ai/state/features/feat-x.json",
             "python3 ai/scripts/feature-state.py init feat-x docs/specs/feat-x/spec.md abc123 --mode scoped",
+            # The routing CLI (contract 004 T-203) is the coord's second sanctioned
+            # mutation channel: decide/dispatched/terminal/report/open-runs/recent-writers.
+            "python3 ai/scripts/set_agents_app.py --route-decide - --json",
+            "python3 ai/scripts/set_agents_app.py --route-dispatched run1_abc --json",
+            "python3 ai/scripts/set_agents_app.py --route-terminal run1_abc failure --json",
+            "python3 ai/scripts/set_agents_app.py --routing-report --json",
+            "python3 ai/scripts/set_agents_app.py --routing-recent-writers --json",
         ]
         denied = [
             "echo x > file", "printf x | tee file", "sed -i s/a/b/ file",
@@ -864,6 +871,12 @@ class HarnessTests(unittest.TestCase):
             "python3 ai/scripts/feature-state.py status feat-x > owned",
             "python3 ai/scripts/feature-state.py status feat-x && git push",
             "python3 other/feature-state.py status feat-x",
+            # Shell composition around the routing CLI stays blocked too, and unrelated
+            # set_agents_app.py subcommands (e.g. mcp management) are never allowlisted.
+            "python3 ai/scripts/set_agents_app.py --route-decide - --json > owned",
+            "python3 ai/scripts/set_agents_app.py --route-decide - --json && git push",
+            "python3 other/set_agents_app.py --route-decide -",
+            "python3 ai/scripts/set_agents_app.py --mcp-add supabase",
         ]
         for command in allowed:
             self.assertEqual(run("python3", "ai/scripts/coord_policy.py", command, check=False).returncode, 0, command)
@@ -1089,6 +1102,226 @@ class HarnessTests(unittest.TestCase):
             result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("gpt-5.6-terra", result.stderr)
+
+    # --------------------------------------------------- contract 004 / P2-opencode-lane
+
+    TIERED_ROLES = ("security-auditor", "package-reviewer", "delta-reviewer", "implementer", "debugger")
+    TIERS = ("fast", "balanced", "frontier")
+
+    def test_tier_variants_emitted_identical_to_base_and_orchestrator_can_delegate_them(self):
+        # AC-06: staging contains <role>@fast/@balanced/@frontier for the five tiered
+        # roles — same prompt body/permissions/steps as the base agent, only `model:`
+        # differs — the orchestrator's task allowlist includes them, and Claude
+        # Code/Codex never receive a variant (additive, OpenCode-only).
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(out))
+            orchestrator = (out / "opencode/agents/orchestrator.md").read_text()
+
+            def strip_model(text):
+                return re.sub(r"^model: .*$", "model: X", text, flags=re.MULTILINE)
+
+            for role in self.TIERED_ROLES:
+                base = (out / "opencode/agents" / f"{role}.md").read_text()
+                tier_models = []
+                for tier in self.TIERS:
+                    variant_path = out / "opencode/agents" / f"{role}@{tier}.md"
+                    self.assertTrue(variant_path.exists(), f"{role}@{tier} missing")
+                    variant = variant_path.read_text()
+                    self.assertEqual(strip_model(base), strip_model(variant), f"{role}@{tier} diverges from base")
+                    tier_models.append(re.search(r"^model: (.+)$", variant, re.MULTILINE).group(1))
+                    self.assertIn(f'    "{role}@{tier}": allow', orchestrator)
+                # fast/balanced/frontier are distinct models by construction (luna/sol/terra).
+                self.assertEqual(len(set(tier_models)), 3, f"{role} tier models must be pairwise distinct")
+            # Claude Code and Codex are base-only: no `@tier` artifact ever lands there.
+            for harness, suffix in (("claude-code", ".md"), ("codex", ".toml")):
+                names = {p.stem for p in (out / harness / "agents").glob(f"*{suffix}")}
+                self.assertFalse(any("@" in n for n in names), harness)
+            # A role with no tier table (e.g. orchestrator itself) emits exactly one
+            # OpenCode agent — no fan-out.
+            self.assertEqual(list((out / "opencode/agents").glob("orchestrator@*.md")), [])
+
+    def test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy(self):
+        # SEC-A01 (repair R1): the tiered-dispatch doctrine must never collapse a hard
+        # routing denial into a silent base-agent spawn. It branches on the actual
+        # --route-decide outcome: legitimate degrade ONLY for an off-lane model
+        # (execution_enabled with a non-openai-codex provider) or ROUTING_UNAVAILABLE;
+        # every hard denial (AUTHORIZATION_REPLAY, REVIEWER_INDEPENDENCE_UNAVAILABLE,
+        # REVIEW_IDENTITY_INVALID, ...) HALTs with HUMAN_DECISION_REQUIRED naming the
+        # exact reason code; REVIEW_IDENTITY_UNVERIFIED stays the distinct benign shape
+        # (spawn the base reviewer, not a "degrade"). Checked across all three
+        # generated harnesses, since generate.py copies the canonical body verbatim.
+        run("./build.sh")
+        for text in (
+            (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (ROOT / "Global/codex/agents/orchestrator.toml").read_text(encoding="utf-8"),
+        ):
+            self.assertIn("HARD DENIAL", text)
+            self.assertIn("HUMAN_DECISION_REQUIRED", text)
+            self.assertIn("AUTHORIZATION_REPLAY", text)
+            self.assertIn("REVIEWER_INDEPENDENCE_UNAVAILABLE", text)
+            self.assertIn("REVIEW_IDENTITY_INVALID", text)
+            self.assertIn("REVIEW_IDENTITY_UNVERIFIED", text)
+            self.assertIn("PROVIDER_UNAUTHENTICATED", text)
+            self.assertIn("NO_ELIGIBLE_ROUTE", text)
+            self.assertIn("ROUTING_UNAVAILABLE", text)
+            self.assertIn('data.provider != "openai-codex"', text)
+            # The match is against the emitted variant's own `model:` line, never a
+            # hardcoded prose model->tier table (PKG-N01) that could drift from
+            # models.toml on a future re-tiering.
+            self.assertNotIn("`gpt-5.6-luna` (→ `@fast`)", text)
+            self.assertNotIn("`gpt-5.6-sol` (→ `@balanced`)", text)
+            self.assertNotIn("`gpt-5.6-terra` (→ `@frontier`)", text)
+
+    def test_generate_dies_on_tier_table_for_role_outside_roster(self):
+        # PKG-N02 (repair R1): variant EMISSION (roster-filtered, generate()'s per-role
+        # loop) and variant EXPECTATION (variant_names/variant_expected) must always be
+        # built from the SAME roster-filtered role set. A [roles.<role>.tiers] table for
+        # a role the active roster doesn't carry must fail closed with a diagnostic
+        # naming the offending role, never silently produce an expected-but-never-
+        # emitted variant (which would otherwise surface later as an opaque "generated
+        # role set mismatch").
+        gen = self._import("generate")
+        roles = [{"role": "implementer"}, {"role": "debugger"}]
+        tier_table = {"fast": "openai/gpt-5.6-luna", "balanced": "openai/gpt-5.6-sol", "frontier": "openai/gpt-5.6-terra"}
+        role_tiers = {"implementer": dict(tier_table), "ghost-role": dict(tier_table)}
+        with self.assertRaises(ValueError) as ctx:
+            gen._roster_filtered_role_tiers(roles, role_tiers)
+        self.assertIn("ghost-role", str(ctx.exception))
+        # A role_tiers set that IS a subset of the roster passes through unchanged.
+        clean = {"implementer": dict(tier_table)}
+        self.assertEqual(gen._roster_filtered_role_tiers(roles, clean), clean)
+
+    def test_install_prunes_tier_variant_removed_from_models_toml(self):
+        # Mirrors test_install_prunes_orphaned_managed_files_but_keeps_user_files, but
+        # for a real removed tier table: dropping [roles.debugger.tiers] must prune the
+        # three debugger@* variants on the next install while the other four tiered
+        # roles' variants (and the base debugger agent) survive untouched.
+        with tempfile.TemporaryDirectory() as td, \
+             tempfile.TemporaryDirectory() as staging_full, \
+             tempfile.TemporaryDirectory() as staging_reduced:
+            home = Path(td)
+            (home / ".claude").mkdir()
+            (home / ".config/opencode").mkdir(parents=True)
+            (home / ".codex").mkdir()
+            run("./build.sh", "--output", staging_full)
+            run("python3", "ai/scripts/install.py", "--staging", staging_full, "--home", str(home))
+            agents = home / ".config/opencode/agents"
+            for tier in self.TIERS:
+                self.assertTrue((agents / f"debugger@{tier}.md").exists())
+
+            def drop_debugger_tiers(config):
+                del config["roles"]["debugger"]["tiers"]
+            models = self._repo_models_variant(td, drop_debugger_tiers)
+            run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", staging_reduced, "--models", str(models))
+            result = run("python3", "ai/scripts/install.py", "--staging", staging_reduced, "--home", str(home))
+            self.assertIn("PRUNED_ORPHANS=", result.stdout)
+            for tier in self.TIERS:
+                self.assertFalse((agents / f"debugger@{tier}.md").exists(), f"debugger@{tier} must be pruned")
+            self.assertTrue((agents / "debugger.md").exists(), "base agent must survive")
+            for tier in self.TIERS:
+                self.assertTrue((agents / f"implementer@{tier}.md").exists(), "untouched role's variants must survive")
+
+    def _routing_probe_stubs(self, td):
+        """Minimal stubs so a writer `--route-decide` completes hermetically (AM-2: a
+        fresh-selected probe is mandatory for writer authorization even when the probe
+        cache is cold). Mirrors test_routing.py's fixture; kept local since this test
+        lives in a separate module."""
+        bins = Path(td) / "bin"
+        bins.mkdir()
+        scripts = {
+            "codex": '#!/bin/sh\necho "Logged in using ChatGPT" 1>&2\n',
+            "claude": "#!/bin/sh\necho '{\"loggedIn\": true}'\n",
+            "opencode": (
+                '#!/bin/sh\n'
+                'if [ "$1" = "auth" ]; then printf "\\342\\227\\217  OpenAI oauth\\n"; exit 0; fi\n'
+                'if [ "$2" = "openai" ]; then echo "openai/gpt-5.6-sol"; exit 0; fi\n'
+                'echo "Error: Provider not found: $2"; exit 0\n'
+            ),
+        }
+        for name, body in scripts.items():
+            path = bins / name
+            path.write_text(body)
+            path.chmod(0o755)
+        return bins
+
+    def test_route_lane_lifecycle_hermetic_and_worker_death_closure(self):
+        # AC-08: decide(writer)->dispatched->terminal via the CLI against a temp
+        # routing root exits 0 and --routing-report shows the route's counters; the
+        # worker-death doctrine (a spawn that died without reaching terminal) closes
+        # via `--route-terminal <id> failure` from `authorized` straight to `abandoned`,
+        # and the report/open-runs surfaces reflect it.
+        with tempfile.TemporaryDirectory() as td:
+            bins = self._routing_probe_stubs(td)
+            env = {
+                "SET_AGENTS_ROUTING_TEST_ROOT": str(Path(td) / "routing-root"),
+                "PATH": f"{bins}:{os.environ['PATH']}",
+            }
+            descriptor = Path(td) / "descriptor.json"
+            descriptor.write_text(json.dumps(
+                {"role": "implementer", "task_class": "mechanical", "selected_runtime": "codex"}
+            ))
+
+            decide = run("python3", "ai/scripts/set_agents_app.py", "--route-decide", str(descriptor), "--json", env=env)
+            self.assertEqual(decide.returncode, 0, decide.stderr)
+            data = json.loads(decide.stdout)["data"]
+            self.assertTrue(data["execution_enabled"])
+            self.assertEqual(data["tier"], "fast")
+            run_id = data["run_id"]
+            self.assertTrue(run_id.startswith("run1_"))
+
+            dispatched = run("python3", "ai/scripts/set_agents_app.py", "--route-dispatched", run_id, "--json", env=env)
+            self.assertEqual(dispatched.returncode, 0, dispatched.stderr)
+            self.assertEqual(json.loads(dispatched.stdout)["data"]["state"], "dispatched")
+
+            terminal = run("python3", "ai/scripts/set_agents_app.py", "--route-terminal", run_id, "success", "--json", env=env)
+            self.assertEqual(terminal.returncode, 0, terminal.stderr)
+            self.assertEqual(json.loads(terminal.stdout)["data"]["state"], "terminal_success")
+
+            report = run("python3", "ai/scripts/set_agents_app.py", "--routing-report", "--json", env=env)
+            self.assertEqual(report.returncode, 0, report.stderr)
+            self.assertGreaterEqual(json.loads(report.stdout)["data"]["retained_events"], 1)
+
+            # Worker death: a second writer run never reaches `dispatched` — the
+            # orchestrator applies the same closure the model-mismatch doctrine uses.
+            second = run("python3", "ai/scripts/set_agents_app.py", "--route-decide", str(descriptor), "--json", env=env)
+            second_run = json.loads(second.stdout)["data"]["run_id"]
+            died = run("python3", "ai/scripts/set_agents_app.py", "--route-terminal", second_run, "failure", "--json", env=env)
+            self.assertEqual(died.returncode, 0, died.stderr)
+            self.assertEqual(json.loads(died.stdout)["data"]["state"], "abandoned")
+
+            open_runs = run("python3", "ai/scripts/set_agents_app.py", "--routing-open-runs", "--json", env=env)
+            self.assertEqual(json.loads(open_runs.stdout)["data"]["open_runs"], [])
+
+    def test_variant_coherence_gate_fails_build_on_unprojectable_tier_model(self):
+        # AC-06 negative case: a tier-table model that projects to zero catalog rows
+        # under the pure offline projection (here: the go-zen area's own `-fast`
+        # convenience alias, which deliberately does not exist in the catalog) must
+        # fail the build — never a silently-generated, non-honorable variant.
+        with tempfile.TemporaryDirectory() as td:
+            def unprojectable_openai(config):
+                config["roles"]["debugger"]["tiers"]["fast"]["opencode"] = {
+                    lane: "openai/gpt-5.6-fast" for lane in ("go-zen", "zen", "local")
+                }
+            models = self._repo_models_variant(td, unprojectable_openai)
+            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
+                         "--output", str(Path(td) / "out"), "--models", str(models), check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("variant coherence", result.stderr)
+            self.assertIn("debugger@fast", result.stderr)
+
+        with tempfile.TemporaryDirectory() as td:
+            def zen_aggregator_namespace(config):
+                config["roles"]["implementer"]["tiers"]["balanced"]["opencode"] = {
+                    lane: "opencode/kimi-k2.7-code" for lane in ("go-zen", "zen", "local")
+                }
+            models = self._repo_models_variant(td, zen_aggregator_namespace)
+            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
+                         "--output", str(Path(td) / "out"), "--models", str(models), check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("variant coherence", result.stderr)
+            self.assertIn("implementer@balanced", result.stderr)
 
     def test_roles_tsv_with_model_columns_rejected_with_hint(self):
         legacy_header = "\t".join([
