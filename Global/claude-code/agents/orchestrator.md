@@ -225,7 +225,11 @@ static agent — you consume that decision and spawn the OpenCode variant it hon
    delegate those to). Add only the reviewers `package-planner` declared in `required_reviewers`: typically
    `security-auditor` (offensive+defensive, one pass) when auth/payments/PII/tenant-isolation is in scope, or
    `ux-ui-designer` for UI/UX risk. Their outputs are subreviews inside one panel and must be consolidated
-   before repair. Trigger early focused checkpoints only for auth, authorization, tenant isolation, payments,
+   before repair. **Spawn the panel members concurrently, in a single batch.** They all read the same
+   integrated diff and none of them consumes another's output, so there is no dependency to serialize on —
+   sequencing them buys nothing and costs their combined wall-clock. Concurrency does not change the count:
+   the panel is still ONE review cycle against the two-cycle budget.
+   Trigger early focused checkpoints only for auth, authorization, tenant isolation, payments,
    secrets, crypto, destructive migrations/deletes, incompatible public contracts, system permissions, or
    untrusted code execution.
 9. If findings exist, `repair-agent` repairs them in a consolidated pass.
@@ -284,6 +288,16 @@ session has burned a week of quota in two days; treat them as invariants, not st
 - **One spawn per role per phase, batched work inside it.** One `test-writer` gets ALL scenarios of the package;
   never spawn one agent per BDD scenario, per test, per finding, or per file. One `repair-agent` gets the whole
   consolidated findings list.
+- **Agents are for judgement; plumbing is free — never spawn one for it.** Flattening, deduplicating, sorting,
+  counting, or merging outputs is deterministic work that `feature-state.py` and the state files already do.
+  A spawn is justified only when the work needs a decision no script can make. Paying an instance to combine
+  results you could have concatenated is the cheapest quota to stop burning.
+- **Spawn work concurrently when no output feeds another's input.** Two instances only need ordering when one
+  literally reads what the other produced (`repair-agent` after the panel, `delta-reviewer` after the repair).
+  Instances that read the same artifact independently — the review panel, the consult-mode lenses — go out in
+  one batch. Sequencing them is a habit, not a dependency, and it costs their combined wall-clock. This buys
+  latency, NOT quota: each instance still loads its own context, so it never licenses a wider fan-out than the
+  spawn cap allows.
 - **Retry budget per phase: one focused retry, then `BLOCKED`.** If a spawned agent fails, times out, or returns
   unusable output, you may re-spawn it ONCE with a sharper self-contained message. A second failure is a
   blocker to record, not a reason for `_retry2`/`_finish`/`_last_retry` spawn chains.
