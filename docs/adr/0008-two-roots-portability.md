@@ -273,15 +273,14 @@ return None
   (`legacy_warnings`, `routing.py:45-56`) and is the right place for a diagnosis that is not a decision.
 - **A scaffolded directory with `ai/state/features/` and NO `.git` resolves normally** — the state marker
   alone suffices; this is explicitly NOT a degrade case (AC-08, AC-09 case 4).
-- **Harness-internal propagation.** `set_agents_spawn.py:285-291` (`_run_app_cli`) invokes the app CLI with
-  `cwd=ROOT` — the HARNESS — and it is the caller of `--route-decide` on the Pi lane (`:343`, `:357-378`).
-  With `cwd` pinned to the harness, a discovered `PROJECT_ROOT` would silently become the harness itself.
-  Resolution: **`set_agents_app.py` exports `SET_AGENTS_PROJECT=<resolved PROJECT_ROOT>` into its own
-  `os.environ` once, after a successful resolution and only then**; `_run_app_cli` copies
-  `dict(os.environ)` (`:286`), so every child inherits the correct project while `cwd=ROOT` keeps harness-
-  relative paths working. This requires zero edits to `set_agents_spawn.py`, which is NOT in P1's owned
-  paths. (Alternative, if P1's ownership is ever extended: pass `--project` explicitly in `_run_app_cli`'s
-  argument list. Same effect, wider blast radius, so it is the fallback and not the choice.)
+- **Harness-internal propagation.** A child process cannot mutate its parent's environment, so exporting
+  `SET_AGENTS_PROJECT` from `set_agents_app.py` cannot propagate a discovered root back to the Pi spawner.
+  `set_agents_spawn.py` therefore receives the narrow approved exception: `_run_app_cli(..., cwd=...)`
+  accepts an optional cwd (defaulting to `ROOT` for existing callers), and `route_and_spawn` resolves one
+  `routing_cwd` from `spawn_cwd` or its process cwd. It passes that same value to `--route-decide`,
+  `--route-dispatched`, and every normal or best-effort `--route-terminal` close. `APP_CLI` remains an
+  absolute harness path; Pi itself still executes with the original `spawn_cwd`. This is the minimal change
+  that makes the lifecycle's persisted `dispatches.project_key` belong to the user project.
 
 ### D6 — SEC-A02 re-anchored, with a trust-level change
 
@@ -678,8 +677,8 @@ MUST hold (any violation is a package-review blocker):
 7. The literal `set-agents` never enters the allowlist.
 8. `tests/test_harness.py:1637` and the JSON substitution path keep passing unchanged.
 9. `install.py`'s manifest semantics, backup/rollback flow, and pruning fence (`:195-211`) are untouched.
-10. `set_agents_spawn.py` is NOT edited (not in P1's ownership); the spawner inherits `PROJECT_ROOT` via the
-    exported `SET_AGENTS_PROJECT` (D5).
+10. `set_agents_spawn.py` changes only by D5's explicit routing-cwd propagation; no store, allowlist,
+    metric-rollup, doctor-envelope, or read-only guard behavior changes.
 11. Sequencing: T-108/T-109 (scaffold + harness self-scaffold) land BEFORE T-107's migration is runnable;
     the migration refuses to run without `<HARNESS_HOME>/ai/state/project.json`.
 12. No opportunistic refactors; no public API/data-contract change beyond the ones enumerated in D1–D10.

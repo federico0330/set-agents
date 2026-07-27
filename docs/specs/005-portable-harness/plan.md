@@ -21,11 +21,11 @@ budgets, same as 004.
 | T-107 | `project_key` column on `dispatches` + SCHEMA 4→5 DDL/CHECKs; migration: live-DB backup, single-transaction (`BEGIN EXCLUSIVE`/`COMMIT`), backfill every pre-existing row (incl. non-terminal) with the harness's own `project_key`; re-derive `dispatches_review` index scope; document `metric_rollups` staying global and the backward-incompatibility consequence (pre-005 checkout + schema-5 DB ⇒ `ROUTING_UNAVAILABLE` via existing `store.py:150` check) | AC-05 |
 | T-108 | `set-agents --scaffold [DIR]` (P1 portion only): `ai/state/features/` + generic-script copy (`feature-state.py`, `check-owned-paths.py`) + persistent project-id file; idempotent create-if-missing; NO vault dependency | AC-06 |
 | T-109 | Harness self-scaffold: `SET-AGENTES/ai/scripts/{feature-state.py,check-owned-paths.py}` become tracked copies of the `PROYECTO/ai/scripts/` templates; drift check added inside `build.sh --check`'s empty branch, explicitly scoped apart from `check-drift.sh` and `verify.sh`'s `Global/**` diff | AC-07 |
-| T-110 | Degrade-honest doctrine extended: no marker in `[start]+ancestors` ⇒ base agent; explicit non-degrade clarification for a state-dir-only (no `.git`) project | AC-08 |
+| T-110 | Degrade-honest doctrine extended: no marker in `[start]+ancestors` ⇒ base agent; explicit non-degrade clarification for a state-dir-only (no `.git`) project; Pi lifecycle forwards one user routing cwd to decide/dispatched/terminal while preserving Pi's execution cwd | AC-08 |
 | T-111 | Guest E2E hermetic test (executed by gate-runner/package-reviewer, never implementer-self-attested): fully isolated temp tree (clone, fake `$HOME`, scaffolded project); matrix = non-default clone dir name, `$HOME` without `~/.local/bin` on PATH (absolute script path invoked directly), `HARNESS_HOME` with a space, non-git scaffolded project, `verify.sh` green from the guest clone; asserts exit code + JSON envelope + concrete `project_key` per case | AC-09 |
 
 Ownership: `ai/scripts/install.py`, `ai/scripts/generate.py`, `ai/scripts/coord_policy.py`,
-`ai/scripts/set_agents_app.py` (routing zones + P1 scaffold command), `ai/scripts/routing_core/store.py`,
+`ai/scripts/set_agents_app.py` (routing zones + P1 scaffold command), `ai/scripts/set_agents_spawn.py` (Pi routing-cwd propagation), `ai/scripts/routing_core/store.py`,
 `ai/scripts/bootstrap_project.py`, `ai/scripts/sync-project.sh`, `build.sh`, `ai/scripts/verify.sh`,
 `Global/_canonical/agents/orchestrator.md`, `docs/adr/0008-*.md`, `tests/test_harness.py`,
 `tests/test_routing.py`.

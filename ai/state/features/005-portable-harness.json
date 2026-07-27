@@ -5,7 +5,24 @@
     "hash": "e821373ff2e805df",
     "path": "docs/specs/005-portable-harness/spec.md"
   },
-  "blockers": [],
+  "blockers": [
+    {
+      "at": "2026-07-27T17:13:02+00:00",
+      "package_id": "P1-portable-core",
+      "reason": "HUMAN_DECISION_REQUIRED: AC-05/ADR D5 requires Pi lifecycle to receive PROJECT_ROOT, but P1 approved ownership explicitly excludes ai/scripts/set_agents_spawn.py. Delta proof shows child environment exports cannot propagate to parent spawner; authorize scope expansion to change the spawner, or revise acceptance/deferral.",
+      "resolved_at": "2026-07-27T17:18:22+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "Ampliaci\u00f3n P1 autorizada: ai/scripts/set_agents_spawn.py se modifica s\u00f3lo para propagar el cwd del proyecto al lifecycle Pi; AC-09 exige evidencia SQLite de dispatches.project_key."
+    },
+    {
+      "at": "2026-07-27T17:43:30+00:00",
+      "package_id": "P1-portable-core",
+      "reason": "HUMAN_DECISION_REQUIRED: AC-09 guest E2E does not terminate. Reproduced twice as timeout exit 124 (`timeout 90 python3 -m unittest -v tests.test_harness.HarnessTests.test_guest_copy_scaffolds_and_verifies_portably`) and verify.sh likewise stalls in the nested guest test; tracing did not identify a child process before hard-stop. P1-DLT-001/002 implementation and 181-test suite pass, but P1 cannot be accepted without a conclusive verify.sh.",
+      "resolved_at": "2026-07-27T17:48:26+00:00",
+      "resolved_by": "user",
+      "resolved_reason": "User authorizes expanded AC-09 diagnosis: instrument nested guest subprocesses, identify the blocking process, apply the minimal evidence-backed repair, and rerun independent gates."
+    }
+  ],
   "budgets": {
     "max_deep_review_cycles": 2,
     "max_gate_failures_per_package": 3,
@@ -15,7 +32,6 @@
   },
   "current_package_id": "P1-portable-core",
   "feature_id": "005-portable-harness",
-  "final_state": null,
   "global_gates": [],
   "history": [
     {
@@ -67,13 +83,880 @@
       "package_id": "P1-portable-core",
       "timestamp": "2026-07-27T15:25:51+00:00",
       "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Construimos el n\u00facleo port\u00e1til: instalaci\u00f3n sin rutas pegadas, detecci\u00f3n del proyecto real, identidad persistente y migraci\u00f3n segura del ruteo. La prueba de invitado queda para una validaci\u00f3n independiente.",
+        "purpose": "Implement T-101..T-110 and the test coverage needed for P1 portable core; T-111 remains independently executed.",
+        "role": "implementer",
+        "spawns": 2,
+        "tech": "PACKAGE_IMPLEMENTATION for P1 after AC-00. Ownership is limited to the approved P1 paths; implementer cannot approve its own work. T-111 hermetic guest E2E is reserved for independent gate/review per separation of duties."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T15:54:01+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Una validaci\u00f3n independiente va a probar el sistema como si fuera otra persona y otra computadora: instalaci\u00f3n en carpeta con espacios, proyecto nuevo sin Git y separaci\u00f3n total entre proyectos.",
+        "purpose": "Independent P1 gates and T-111 hermetic guest proof; verify schema migration and project isolation.",
+        "role": "gate-runner",
+        "spawns": 3,
+        "tech": "PACKAGE_GATES after implementer checkpoint. Gate-runner is independent and owns no product edits; executes T-111 plus full/focused suites, build/verify/diff/ownership checks and specifically tests the identified migration/cross-project coverage gap."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:07:08+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Un agente va a corregir los tres desajustes encontrados: la verificaci\u00f3n del clon, la identidad del harness y la declaraci\u00f3n de archivos generados. Despu\u00e9s se repite la prueba independiente.",
+        "purpose": "Consolidated repair of three independent P1 gate findings: literal placeholder invariant, harness identity bootstrap, and ownership metadata.",
+        "role": "repair-agent",
+        "spawns": 4,
+        "tech": "Consolidated PACKAGE_REPAIR after deterministic gate failures. Scope: preserve placeholders while enabling installed baking; ensure the harness has a persistent project identity without unsafe implicit reidentification; bring generated artifacts under approved ownership or generation discipline. No unrelated changes."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:19:57+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "P1 implementation was completed and independently gated; synchronize durable phase before review."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:40:59+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "P1 implementation complete; record independent gate evidence."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:41:20+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-independent-gates",
+        "status": "pass"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:41:20+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:41:36+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Synchronize task evidence recorded after implementation before closing gates."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:41:48+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-100"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:41:59+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-100",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:03+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-101"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-101",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:08+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-102"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:10+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-102",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-103"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-103",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:16+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-104"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:17+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-104",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-105"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-105",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:21+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-106"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:22+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-106",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-107"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-107",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:27+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-108"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:28+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-108",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:29+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-109"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:30+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-109",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-110"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:33+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-110",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:34+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-111"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-111",
+        "validations": [
+          "Implemented and independently gated in P1 evidence."
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "All P1 tasks now carry completion evidence; rerun gate phase before independent review."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:42:51+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:43:06+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Independent gates passed; start full package review and mandatory security audit."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:43:07+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una revisi\u00f3n independiente revisa que el paquete completo cumpla exactamente lo acordado, incluyendo el clon invitado y la migraci\u00f3n.",
+        "purpose": "Independent deep review of complete P1 diff against ADR-0008 and AC-01..09.",
+        "role": "package-reviewer",
+        "spawns": 5,
+        "tech": "PACKAGE_REVIEW independent functional/data review. Read-only; assess the complete P1 diff, tests, schema migration, portability and ownership against contract."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:43:19+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una auditor\u00eda de seguridad revisa que abrir un proyecto ajeno no permita leer archivos indebidos ni mezclar informaci\u00f3n de proyectos.",
+        "purpose": "Mandatory SEC-A02 security audit of project-root re-anchoring and routing isolation.",
+        "role": "security-auditor",
+        "spawns": 6,
+        "tech": "Mandatory security review for external-project content trust boundary: O_NOFOLLOW, caps/validation, traversal, project-key scoping and command allowlist."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:43:21+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 8,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:53:25+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un agente corrige en un solo paquete los problemas de aislamiento entre proyectos, validaci\u00f3n de archivos externos, scaffold y prueba invitada. Despu\u00e9s una revisi\u00f3n de delta comprobar\u00e1 cada correcci\u00f3n.",
+        "purpose": "Consolidated repair of P1-REV-001..008 from package/security review cycle 1.",
+        "role": "repair-agent",
+        "spawns": 7,
+        "tech": "PACKAGE_REPAIR cycle 1. Ownership limited to P1 paths. Fix all eight findings with regressions; no scope expansion. Must preserve AC contracts, use project_key in every lifecycle mutation, and make untrusted project data fail closed/degrade."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T16:53:34+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P1-REV-001",
+          "P1-REV-002",
+          "P1-REV-003",
+          "P1-REV-004",
+          "P1-REV-005",
+          "P1-REV-006",
+          "P1-REV-007",
+          "P1-REV-008"
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:04:38+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente comprueba punto por punto que los ocho problemas detectados quedaron cerrados, sin introducir otros nuevos.",
+        "purpose": "Read-only delta review of repairs for P1-REV-001..008 and SEC-A02 FIFO finding.",
+        "role": "delta-reviewer",
+        "spawns": 8,
+        "tech": "Focused DELTA_REVIEW after one consolidated repair. Reproduce all original attacks/failures, inspect only repair delta and verify no new scope/security regression."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:04:51+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:12:51+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: AC-05/ADR D5 requires Pi lifecycle to receive PROJECT_ROOT, but P1 approved ownership explicitly excludes ai/scripts/set_agents_spawn.py. Delta proof shows child environment exports cannot propagate to parent spawner; authorize scope expansion to change the spawner, or revise acceptance/deferral."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:13:02+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "Ampliaci\u00f3n P1 autorizada: ai/scripts/set_agents_spawn.py se modifica s\u00f3lo para propagar el cwd del proyecto al lifecycle Pi; AC-09 exige evidencia SQLite de dispatches.project_key."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:18:22+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:18:22+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Vamos a cerrar el \u00faltimo desv\u00edo del ruteo Pi: al trabajar dentro de tu proyecto, sus tres pasos usar\u00e1n siempre ese proyecto y la prueba invitada comprobar\u00e1 la identidad guardada realmente en la base.",
+        "purpose": "Repair P1-DLT-001/002 with explicit Pi routing cwd propagation, regression coverage, guest SQLite identity proof, and ADR/spec/plan correction.",
+        "role": "implementer",
+        "spawns": 9,
+        "tech": "P1 was reopened from HUMAN_DECISION_REQUIRED under explicit user authorization. The approved exception is exactly ai/scripts/set_agents_spawn.py: add optional cwd to the lifecycle CLI helper and thread one routing_cwd through decide/dispatched/terminal including exception close. Update D5/spec/plan and test the persisted dispatches.project_key without altering store, allowlist, metric_rollups, or Pi read-only guards."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:18:39+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Execute the user-authorized minimal DLT-001/002 repair and its regressions."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:19:08+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Implementation delta complete; rerun independent P1 gates, guest E2E, ownership, and full verification."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:26:15+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Una validaci\u00f3n independiente repetir\u00e1 el recorrido completo como proyecto invitado y verificar\u00e1 que no se mezclen identidades entre proyectos.",
+        "purpose": "Independent gates for P1-DLT-001/002: lifecycle/SQLite and guest E2E, full suites, build/verify, diff and ownership.",
+        "role": "gate-runner",
+        "spawns": 10,
+        "tech": "PACKAGE_GATES: gate-runner is read-only and independent of the implementer. It must rerun the non-conclusive guest focal plus full unittest discovery, py_compile, build --check, verify.sh, diff --check, and check-owned-paths; explicitly prove cross-project isolation in the new Pi cwd lifecycle."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:26:15+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-dlt-independent-gates",
+        "status": "blocked"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:33:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:33:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Diagnose and minimally repair the deterministic AC-09 guest E2E timeout discovered by independent gate."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:37:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "La prueba invitada tarda m\u00e1s de lo permitido. Un diagn\u00f3stico acotado va a identificar qu\u00e9 paso se queda esperando y corregir \u00fanicamente esa causa, sin aflojar la prueba.",
+        "purpose": "Debug deterministic AC-09 guest E2E timeout; identify root cause, apply minimal correction with regression, then rerun focused check.",
+        "role": "debugger",
+        "spawns": 11,
+        "tech": "debugging-loop: timeout 90 on the guest test is reproducible. Debugger owns only the affected implementation/test/docs paths and must prove root cause before editing; no test weakening, no unrelated refactor. One spawn remains for independent delta/security review."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:37:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: AC-09 guest E2E does not terminate. Reproduced twice as timeout exit 124 (`timeout 90 python3 -m unittest -v tests.test_harness.HarnessTests.test_guest_copy_scaffolds_and_verifies_portably`) and verify.sh likewise stalls in the nested guest test; tracing did not identify a child process before hard-stop. P1-DLT-001/002 implementation and 181-test suite pass, but P1 cannot be accepted without a conclusive verify.sh."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:43:30+00:00",
+      "to": "BLOCKED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "reopen",
+      "from": "BLOCKED",
+      "metadata": {
+        "authorized_by": "user",
+        "reason": "User authorizes expanded AC-09 diagnosis: instrument nested guest subprocesses, identify the blocking process, apply the minimal evidence-backed repair, and rerun independent gates."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:48:26+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Con tu autorizaci\u00f3n, se ampl\u00eda el diagn\u00f3stico para mirar el proceso invitado por dentro y encontrar exactamente qu\u00e9 espera antes de corregirlo.",
+        "purpose": "Expanded AC-09 diagnosis authorized by user: instrument guest child process tree and repair only the demonstrated blocking cause.",
+        "role": "debugger",
+        "spawns": 12,
+        "tech": "Expanded debugging scope after explicit user authorization. This is the 12th and final P1 instantiation budget: debugger may instrument subprocess execution with bounded diagnostics, identify the exact waiter, and make the minimal repair; subsequent independent delta/gate work will reuse existing agents without creating another state instantiation."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:48:35+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Expanded diagnosis begins under renewed user authorization."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:48:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Minimal AC-09 timeout repair complete; rerun independent delta gate and review."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:55:36+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p1-dlt-independent-gates",
+        "status": "pass"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:57:30+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "All DLT-001/002 and AC-09 gate evidence is green; record final focused independent review."
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:57:30+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:57:30+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "./ai/scripts/verify.sh",
+          "python3 -m unittest discover -s tests -v",
+          "python3 ai/scripts/check-owned-paths.py (delta-scoped)"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:57:30+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:57:30+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:58:10+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P1-DLT-001",
+          "P1-DLT-002"
+        ]
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:58:17+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:58:24+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "./ai/scripts/verify.sh",
+          "python3 -m unittest discover -s tests -v",
+          "delta-scoped ownership check"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:58:30+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:58:36+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-portable-core",
+      "timestamp": "2026-07-27T17:58:36+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
-    "delta_reviews": 0,
+    "delta_reviews": 2,
     "human_questions_after_approval": 0,
-    "package_reviews": 0,
-    "repair_batches": 0,
+    "package_reviews": 2,
+    "repair_batches": 2,
     "task_deep_reviews": 0
   },
   "mode": "feature",
@@ -91,21 +974,151 @@
         "AC-08",
         "AC-09"
       ],
-      "approved_exceptions": [],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/set_agents_spawn.py",
+          "reason": "Human-approved P1 delta scope: explicit project cwd propagation for Pi lifecycle only.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/005-portable-harness/spec.md",
+          "reason": "User-authorized P1 delta requires correcting the contract wording for explicit Pi lifecycle cwd propagation.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/005-portable-harness/plan.md",
+          "reason": "User-authorized P1 delta requires recording the minimal spawner ownership exception and gates.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/005-portable-harness/acceptance.md",
+          "reason": "AC-09 evidence wording is strengthened to require persisted dispatches.project_key proof.",
+          "status": "approved"
+        }
+      ],
       "attempts": {
-        "deep_review_cycles": 0,
-        "repair_batches": 0,
-        "spawns": 1,
+        "deep_review_cycles": 2,
+        "repair_batches": 2,
+        "spawns": 12,
         "subdivisions": 0
       },
       "complexity": "high",
       "context_pack": "docs/specs/005-portable-harness/context/P1-portable-core.md",
-      "delta_reviews": [],
+      "delta_reviews": [
+        {
+          "at": "2026-07-27T17:12:51+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [
+            "P1-DLT-001",
+            "P1-DLT-002"
+          ],
+          "reason": "P1-DLT-001 requires changing set_agents_spawn.py, explicitly excluded from P1 ownership; human scope decision required.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-27T17:58:24+00:00",
+          "closed_findings": [
+            "P1-DLT-001",
+            "P1-DLT-002"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Independent delta review accepted the lifecycle cwd propagation, persisted guest project key evidence, and bounded guest verify mode.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
       "dependencies": [],
-      "diff_ref": null,
-      "findings": [],
-      "gates": [],
-      "integrated": false,
+      "diff_ref": "HEAD",
+      "findings": [
+        {
+          "id": "P1-REV-001",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Lifecycle run-id operations lack project-key scoping"
+        },
+        {
+          "id": "P1-REV-002",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Malformed untrusted feature JSON can crash route decide"
+        },
+        {
+          "id": "P1-REV-003",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Git-only project root lacks path-hash identity fallback"
+        },
+        {
+          "id": "P1-REV-004",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Scaffold silently accepts differing generic scripts"
+        },
+        {
+          "id": "P1-REV-005",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Pi lifecycle does not propagate user project root"
+        },
+        {
+          "id": "P1-REV-006",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Guest E2E does not prove install and absolute route invocation"
+        },
+        {
+          "id": "P1-REV-007",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "Schema-4 degrade lacks migration-required warning"
+        },
+        {
+          "id": "P1-REV-008",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "Corrupt project identity returns input error rather than stable degrade"
+        },
+        {
+          "id": "P1-DLT-001",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Pi lifecycle caller does not propagate user project root"
+        },
+        {
+          "id": "P1-DLT-002",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "Guest E2E does not observe dispatch project_key"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-27T16:41:20+00:00",
+          "evidence": "After consolidated repair: guest isolated verify PASS; schema4\u21925 CLI migration PASS; py_compile, build --check, focused tests, ownership and diff check PASS.",
+          "name": "p1-independent-gates",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-27T17:57:30+00:00",
+          "evidence": "Independent delta review: guest AC-09 22.189s PASS; full verify PASS (181 tests); cwd lifecycle/guards and delta-scoped ownership PASS.",
+          "name": "p1-dlt-independent-gates",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
       "objective": "Make the 004 adaptive router reachable and correctly scoped from any project on any machine: two-roots doctrine, install-time-only path baking, allowlist matcher fix, self-inclusive project discovery, SEC-A02 re-anchoring, persisted project id + project_key (SCHEMA 4->5), P1 scaffold, harness self-scaffold, extended honest degrade, hermetic guest proof.",
       "owned_paths": [
         "ai/scripts/install.py",
@@ -118,11 +1131,23 @@
         "build.sh",
         "ai/scripts/verify.sh",
         "Global/_canonical/agents/orchestrator.md",
+        "Global/claude-code/hooks/coord_policy.py",
+        "Global/claude-code/agents/orchestrator.md",
+        "Global/codex/agents/orchestrator.toml",
+        "Global/opencode/agents/orchestrator.md",
         "docs/adr/0008-two-roots-portability.md",
         "tests/test_harness.py",
         "tests/test_routing.py",
         "ai/scripts/feature-state.py",
-        "ai/scripts/check-owned-paths.py"
+        "ai/scripts/check-owned-paths.py",
+        "ai/state/project.json",
+        "ai/state/features/005-portable-harness.json",
+        "ai/state/STATUS.md",
+        "ai/state/narrative-log.jsonl",
+        "docs/notas/00 - Proyecto.md",
+        "docs/notas/features/005-portable-harness.md",
+        "docs/notas/features/005-portable-harness/**",
+        "docs/specs/005-portable-harness/bitacora.md"
       ],
       "package_id": "P1-portable-core",
       "read_only_paths": [
@@ -131,98 +1156,231 @@
         "models.toml",
         "PROYECTO/ai/scripts/feature-state.py"
       ],
-      "repairs": [],
+      "repairs": [
+        {
+          "at": "2026-07-27T17:04:38+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/store.py",
+            "ai/scripts/set_agents_app.py",
+            "tests/test_routing.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "P1-REV-001",
+            "P1-REV-002",
+            "P1-REV-003",
+            "P1-REV-004",
+            "P1-REV-005",
+            "P1-REV-006",
+            "P1-REV-007",
+            "P1-REV-008"
+          ],
+          "verification": [
+            "Focused routing, scaffold, guest AC-09, py_compile and diff checks passed."
+          ]
+        },
+        {
+          "at": "2026-07-27T17:58:17+00:00",
+          "changed_files": [
+            "ai/scripts/set_agents_spawn.py",
+            "ai/scripts/verify.sh",
+            "tests/test_routing.py",
+            "tests/test_harness.py",
+            "docs/adr/0008-two-roots-portability.md",
+            "docs/specs/005-portable-harness/spec.md",
+            "docs/specs/005-portable-harness/plan.md",
+            "docs/specs/005-portable-harness/acceptance.md"
+          ],
+          "finding_ids": [
+            "P1-DLT-001",
+            "P1-DLT-002"
+          ],
+          "verification": [
+            "Independent delta review passed explicit cwd lifecycle, guest SQLite project key, full verify, and ownership."
+          ]
+        }
+      ],
       "review_panels": [],
-      "reviews": [],
+      "reviews": [
+        {
+          "at": "2026-07-27T16:53:25+00:00",
+          "evidence": "Independent package review plus SEC-A02 audit; detailed narrative captured in state.",
+          "findings": [
+            "P1-REV-001",
+            "P1-REV-002",
+            "P1-REV-003",
+            "P1-REV-004",
+            "P1-REV-005",
+            "P1-REV-006",
+            "P1-REV-007",
+            "P1-REV-008"
+          ],
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-27T17:57:30+00:00",
+          "evidence": "Focused independent delta review accepted P1-DLT-001/002 and AC-09 timeout repair; no new findings.",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
       "risks": [
         "high"
       ],
       "routing_reason": null,
-      "runtime_qa": [],
+      "runtime_qa": [
+        {
+          "at": "2026-07-27T17:57:30+00:00",
+          "browser": "",
+          "checks": [
+            "Hermetic guest clone, install, non-git project routing, persisted dispatches.project_key, and guest verify markers."
+          ],
+          "evidence": "AC-09 scripted runtime proof PASS; no browser MCP required because the runtime surface is CLI/SQLite, not a browser UI.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        },
+        {
+          "at": "2026-07-27T17:58:36+00:00",
+          "browser": "",
+          "checks": [
+            "Hermetic guest clone, install, non-git routing, persisted SQLite dispatch project key, and guest verify markers."
+          ],
+          "evidence": "Independent scripted CLI and SQLite runtime proof passed.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
       "runtime_surface": true,
       "selected_model": null,
       "selected_role": null,
       "shared_paths": [],
-      "status": "planned",
+      "status": "accepted",
       "tasks": [
         {
           "blockers": [],
           "id": "T-100",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-101",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-102",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-103",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-104",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-105",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-106",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-107",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-108",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-109",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-110",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "T-111",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "Implemented and independently gated in P1 evidence."
+          ],
+          "status": "completed"
         }
       ],
-      "testing": []
+      "testing": [
+        {
+          "at": "2026-07-27T17:57:30+00:00",
+          "commands": [
+            "./ai/scripts/verify.sh",
+            "python3 -m unittest discover -s tests -v",
+            "python3 ai/scripts/check-owned-paths.py (delta-scoped)"
+          ],
+          "evidence": "verify.sh PASS with normal 181-test discovery; direct guest AC-09 PASS in 22.189s; ownership delta PASS.",
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-27T17:58:30+00:00",
+          "commands": [
+            "./ai/scripts/verify.sh",
+            "python3 -m unittest discover -s tests -v",
+            "delta-scoped ownership check"
+          ],
+          "evidence": "Independent evidence: full verify pass, normal discovery 181 tests, guest AC-09 22.189s, ownership pass.",
+          "status": "pass"
+        }
+      ]
     }
   ],
-  "phase": "PACKAGE_PLANNING",
-  "revision": 2,
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 71,
   "schema_version": 1,
-  "updated_at": "2026-07-27T15:25:51+00:00"
+  "updated_at": "2026-07-27T17:58:36+00:00"
 }

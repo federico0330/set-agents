@@ -8,11 +8,16 @@ import sqlite3
 import stat
 import sys
 import time
+import datetime as dt
 from pathlib import Path
 from .domain import ImplementationIdentity, RoutingError
 
-SCHEMA = 4
+SCHEMA = 5
 _RUN = re.compile(r"^run1_[0-9a-f]{32}$")
+_PROJECT_KEY = re.compile(r"^proj1_[0-9a-f]{32}$")
+NIL_PROJECT_KEY = "proj1_00000000000000000000000000000000"
+_TEST_PROJECT_KEY = "proj1_11111111111111111111111111111111"
+PROJECT_KEY_COLUMN = "project_key TEXT NOT NULL DEFAULT 'proj1_00000000000000000000000000000000' CHECK(project_key GLOB 'proj1_[0-9a-f]*' AND length(project_key)=38)"
 _IDENTITY = ("route_id", "runtime", "provider", "model", "family", "effort")
 _EVENT_TYPES = {"authorized", "dispatched", "partial", "fallback", "terminal", "rejected", "abandoned"}
 _OUTCOMES = {"success", "failure", "none"}
@@ -20,7 +25,7 @@ _OUTCOMES = {"success", "failure", "none"}
 
 class RoutingStore:
     """Private POSIX SQLite adapter; root injection is test composition only."""
-    def __init__(self, root: Path | None = None, filesystem_supported: bool = True):
+    def __init__(self, root: Path | None = None, filesystem_supported: bool = True, project_key: str | None = None):
         self._test_root = root is not None
         # The production root comes from the account database, not $HOME, so the
         # environment cannot redirect where durable authorizations live.
@@ -29,11 +34,14 @@ class RoutingStore:
         self.db_path = self.root / "routing.db"
         self.filesystem_supported = filesystem_supported
         self._issuer = None
+        self.project_key = project_key or (_TEST_PROJECT_KEY if self._test_root else NIL_PROJECT_KEY)
+        if not _PROJECT_KEY.fullmatch(self.project_key):
+            raise RoutingError("ROUTING_UNAVAILABLE")
 
     @classmethod
-    def _for_tests(cls, root: Path, filesystem_supported: bool = True):
+    def _for_tests(cls, root: Path, filesystem_supported: bool = True, project_key: str | None = None):
         """Private test composition seam; production has no caller-selected root."""
-        return cls(root, filesystem_supported)
+        return cls(root, filesystem_supported, project_key)
 
     def _bind_issuer(self, issuer):
         if self._issuer is not None: raise RoutingError("AUTHORIZATION_INVALID")
@@ -125,7 +133,7 @@ CREATE TABLE dispatches (
  fallback_route_id TEXT, fallback_runtime TEXT, fallback_provider TEXT, fallback_model TEXT, fallback_family TEXT, fallback_effort TEXT,
  actual_route_id TEXT, actual_runtime TEXT, actual_provider TEXT, actual_model TEXT, actual_family TEXT, actual_effort TEXT,
  state TEXT NOT NULL CHECK(state IN ('authorized','dispatched','terminal_success','terminal_failure','abandoned')), partial_write INTEGER NOT NULL DEFAULT 0 CHECK(partial_write IN (0,1)), fallback_window_open INTEGER NOT NULL CHECK(fallback_window_open IN (0,1)), fallback_consumed INTEGER NOT NULL DEFAULT 0 CHECK(fallback_consumed IN (0,1)),
- authorized_at INTEGER NOT NULL, dispatched_at INTEGER, partial_write_at INTEGER, fallback_consumed_at INTEGER, terminal_at INTEGER, updated_at INTEGER NOT NULL,
+     authorized_at INTEGER NOT NULL, dispatched_at INTEGER, partial_write_at INTEGER, fallback_consumed_at INTEGER, terminal_at INTEGER, updated_at INTEGER NOT NULL, """ + PROJECT_KEY_COLUMN + """,
  CHECK((fallback_route_id IS NULL AND fallback_runtime IS NULL AND fallback_provider IS NULL AND fallback_model IS NULL AND fallback_family IS NULL AND fallback_effort IS NULL) OR (fallback_route_id IS NOT NULL AND fallback_runtime IS NOT NULL AND fallback_provider IS NOT NULL AND fallback_model IS NOT NULL AND fallback_family IS NOT NULL AND fallback_effort IS NOT NULL)),
  CHECK((actual_route_id IS NULL AND actual_runtime IS NULL AND actual_provider IS NULL AND actual_model IS NULL AND actual_family IS NULL AND actual_effort IS NULL) OR (actual_route_id IS NOT NULL AND actual_runtime IS NOT NULL AND actual_provider IS NOT NULL AND actual_model IS NOT NULL AND actual_family IS NOT NULL AND actual_effort IS NOT NULL)),
  CHECK(state IN ('authorized','abandoned') OR actual_route_id IS NOT NULL),
@@ -139,7 +147,7 @@ CREATE TABLE dispatches (
  CHECK(fallback_consumed=0 OR fallback_route_id IS NOT NULL));
 CREATE TABLE events (event_id INTEGER PRIMARY KEY, occurred_at INTEGER NOT NULL, event_type TEXT NOT NULL, route_id TEXT, runtime TEXT, provider TEXT, model TEXT, family TEXT, outcome TEXT NOT NULL, reason_family TEXT NOT NULL, latency_ms INTEGER, latency_bucket TEXT NOT NULL);
 CREATE TABLE metric_rollups (route_key TEXT NOT NULL, runtime TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL, outcome TEXT NOT NULL, reason_family TEXT NOT NULL, latency_bucket TEXT NOT NULL, lifetime_count INTEGER NOT NULL, lifetime_latency_sum_ms INTEGER NOT NULL, compacted_count INTEGER NOT NULL, exclusion_count INTEGER NOT NULL, fallback_offered_count INTEGER NOT NULL, fallback_consumed_count INTEGER NOT NULL, fallback_success_count INTEGER NOT NULL, fallback_failure_count INTEGER NOT NULL, PRIMARY KEY(route_key,runtime,provider,model,family,outcome,reason_family,latency_bucket));
-CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX events_route_retention ON events(route_id,occurred_at,event_id); CREATE INDEX dispatches_review ON dispatches(role,state,terminal_at);
+ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX events_route_retention ON events(route_id,occurred_at,event_id); CREATE INDEX dispatches_review ON dispatches(project_key,role,state,terminal_at);
 """)
         c.execute("INSERT INTO meta VALUES('schema_version',?)", (str(SCHEMA),)); c.execute("INSERT INTO meta VALUES('installation_hmac_salt',?)", (secrets.token_hex(32),))
 
@@ -186,6 +194,24 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
             raise RoutingError("ROUTING_UNAVAILABLE") from exc
         if self._file_fingerprint(self.db_path, True) != before: raise RoutingError("ROUTING_UNAVAILABLE")
 
+    def migration_required(self) -> bool:
+        """True only for a securely opened legacy schema-4 database.
+
+        This is deliberately informational: normal routing still refuses the old
+        schema and never writes or attempts an automatic migration.
+        """
+        try:
+            self._safe_dir(create=False)
+            self._file_fingerprint(self.db_path, True)
+            c = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True,
+                                isolation_level=None, timeout=0)
+            try:
+                return dict(c.execute("SELECT key,value FROM meta")).get("schema_version") == "4"
+            finally:
+                c.close()
+        except (OSError, sqlite3.Error, RoutingError):
+            return False
+
     def _connect(self):
         self._safe_dir(create=True)
         existed=self._existing_valid()
@@ -201,6 +227,70 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
             return c
         except RoutingError: raise
         except (OSError, sqlite3.Error) as exc: raise RoutingError("ROUTING_UNAVAILABLE") from exc
+
+    def migrate_from_v4(self, harness_project_key: str) -> tuple[int, Path]:
+        """Explicit, backup-first schema 4 -> 5 migration; never called by normal routing."""
+        if not _PROJECT_KEY.fullmatch(harness_project_key) or harness_project_key == NIL_PROJECT_KEY:
+            raise RoutingError("ROUTING_UNAVAILABLE")
+        self._safe_dir(create=False)
+        self._file_fingerprint(self.db_path, True)
+        try:
+            source = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, isolation_level=None, timeout=0)
+            schema = dict(source.execute("SELECT key,value FROM meta"))
+            if schema.get("schema_version") != "4":
+                raise RoutingError("ROUTING_UNAVAILABLE")
+            rows = int(source.execute("SELECT COUNT(*) FROM dispatches").fetchone()[0])
+            backup_dir = self.root / "backups"
+            old = os.umask(0o077)
+            try:
+                backup_dir.mkdir(mode=0o700, exist_ok=True)
+            finally:
+                os.umask(old)
+            stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup = backup_dir / f"routing-v4-{stamp}.db"
+            destination = sqlite3.connect(backup)
+            try:
+                source.backup(destination)
+            finally:
+                destination.close()
+            os.chmod(backup, 0o600)
+            check = sqlite3.connect(f"file:{backup}?mode=ro", uri=True)
+            try:
+                if check.execute("PRAGMA integrity_check").fetchone() != ("ok",):
+                    raise RoutingError("ROUTING_UNAVAILABLE")
+                if dict(check.execute("SELECT key,value FROM meta")).get("schema_version") != "4":
+                    raise RoutingError("ROUTING_UNAVAILABLE")
+                if int(check.execute("SELECT COUNT(*) FROM dispatches").fetchone()[0]) != rows:
+                    raise RoutingError("ROUTING_UNAVAILABLE")
+            finally:
+                check.close(); source.close()
+            c = sqlite3.connect(f"file:{self.db_path}?mode=rw", uri=True, isolation_level=None, timeout=0)
+            try:
+                self._configure(c)
+                c.execute("BEGIN EXCLUSIVE")
+                if dict(c.execute("SELECT key,value FROM meta")).get("schema_version") != "4":
+                    raise RoutingError("ROUTING_UNAVAILABLE")
+                c.execute("ALTER TABLE dispatches ADD COLUMN " + PROJECT_KEY_COLUMN)
+                c.execute("UPDATE dispatches SET project_key = ?", (harness_project_key,))
+                c.execute("DROP INDEX dispatches_review")
+                c.execute("CREATE INDEX dispatches_review ON dispatches(project_key,role,state,terminal_at)")
+                c.execute("UPDATE meta SET value='5' WHERE key='schema_version'")
+                sql = {name: " ".join(text.split()).lower() for name, text in
+                       c.execute("SELECT name,sql FROM sqlite_master WHERE type IN ('table','index') AND sql IS NOT NULL")}
+                if sql != self._canonical_schema_sql():
+                    raise RoutingError("ROUTING_UNAVAILABLE")
+                c.execute("COMMIT")
+            except Exception:
+                try: c.execute("ROLLBACK")
+                except sqlite3.Error: pass
+                raise
+            finally:
+                c.close()
+            return rows, backup
+        except RoutingError:
+            raise
+        except (OSError, sqlite3.Error) as exc:
+            raise RoutingError("ROUTING_UNAVAILABLE") from exc
 
     @staticmethod
     def _now(): return int(time.time() * 1000)
@@ -229,7 +319,7 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
         c=self._connect()
         try:
             now=self._now(); c.execute("BEGIN IMMEDIATE")
-            values=(run_id,role,role_class,*identity,*(fallback or (None,)*6),*(None,)*6,"authorized",0,1,0,now,None,None,None,None,now)
+            values=(run_id,role,role_class,*identity,*(fallback or (None,)*6),*(None,)*6,"authorized",0,1,0,now,None,None,None,None,now,self.project_key)
             c.execute("INSERT INTO dispatches VALUES(" + ",".join("?" for _ in values) + ")", values)
             self._event(c,"authorized",identity,fallback=fallback is not None); c.execute("COMMIT")
         except sqlite3.IntegrityError as exc:
@@ -253,7 +343,7 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
     def _transition(self, run_id, sql, params, event, outcome="none", latency=None):
         c=self._connect(); row=None
         try:
-            c.execute("BEGIN IMMEDIATE"); row=c.execute("SELECT actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort,fallback_consumed FROM dispatches WHERE run_id=?",(run_id,)).fetchone(); result=c.execute(sql,params)
+            c.execute("BEGIN IMMEDIATE"); row=c.execute("SELECT actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort,fallback_consumed FROM dispatches WHERE run_id=? AND project_key=?",(run_id,self.project_key)).fetchone(); result=c.execute(sql,params)
             if not row or result.rowcount != 1:
                 c.execute("ROLLBACK"); self._rejection_event(tuple(row[6:12]) if row else None,"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
             # The audited identity is the actual dispatched identity when one exists (post-fallback runs
@@ -271,20 +361,20 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
         finally:c.close()
 
     def mark_dispatched(self, run_id):
-        now=self._now(); self._transition(run_id,"UPDATE dispatches SET state='dispatched',fallback_window_open=0,actual_route_id=selected_route_id,actual_runtime=selected_runtime,actual_provider=selected_provider,actual_model=selected_model,actual_family=selected_family,actual_effort=selected_effort,dispatched_at=?,updated_at=? WHERE run_id=? AND state='authorized' AND fallback_window_open=1 AND partial_write=0",(now,now,run_id),"dispatched")
+        now=self._now(); self._transition(run_id,"UPDATE dispatches SET state='dispatched',fallback_window_open=0,actual_route_id=selected_route_id,actual_runtime=selected_runtime,actual_provider=selected_provider,actual_model=selected_model,actual_family=selected_family,actual_effort=selected_effort,dispatched_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='authorized' AND fallback_window_open=1 AND partial_write=0",(now,now,run_id,self.project_key),"dispatched")
     def mark_partial(self, run_id):
-        now=self._now(); self._transition(run_id,"UPDATE dispatches SET partial_write=1,partial_write_at=?,updated_at=? WHERE run_id=? AND state='dispatched' AND partial_write=0",(now,now,run_id),"partial")
+        now=self._now(); self._transition(run_id,"UPDATE dispatches SET partial_write=1,partial_write_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='dispatched' AND partial_write=0",(now,now,run_id,self.project_key),"partial")
     def terminal(self, run_id, outcome, latency_ms=None):
         if outcome not in {"success","failure"}: raise RoutingError("AUTHORIZATION_INVALID")
-        now=self._now(); self._transition(run_id,"UPDATE dispatches SET state=?,fallback_window_open=0,terminal_at=?,updated_at=? WHERE run_id=? AND state='dispatched'",(f"terminal_{outcome}",now,now,run_id),"terminal",outcome,latency_ms)
+        now=self._now(); self._transition(run_id,"UPDATE dispatches SET state=?,fallback_window_open=0,terminal_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='dispatched'",(f"terminal_{outcome}",now,now,run_id,self.project_key),"terminal",outcome,latency_ms)
     def consume_fallback(self, run_id):
         c=self._connect()
         try:
-            now=self._now(); c.execute("BEGIN IMMEDIATE"); row=c.execute("SELECT fallback_route_id,fallback_runtime,fallback_provider,fallback_model,fallback_family,fallback_effort,selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort FROM dispatches WHERE run_id=? AND state='authorized' AND fallback_window_open=1 AND fallback_consumed=0 AND partial_write=0",(run_id,)).fetchone()
+            now=self._now(); c.execute("BEGIN IMMEDIATE"); row=c.execute("SELECT fallback_route_id,fallback_runtime,fallback_provider,fallback_model,fallback_family,fallback_effort,selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort FROM dispatches WHERE run_id=? AND project_key=? AND state='authorized' AND fallback_window_open=1 AND fallback_consumed=0 AND partial_write=0",(run_id,self.project_key)).fetchone()
             if not row or any(item is None for item in row[:6]):
                 # Every rejected lifecycle operation leaves an independent post-rollback audit trail.
                 c.execute("ROLLBACK"); self._rejection_event(tuple(row[6:12]) if row else None,"FALLBACK_DENIED"); raise RoutingError("FALLBACK_DENIED")
-            changed=c.execute("UPDATE dispatches SET state='dispatched',fallback_window_open=0,fallback_consumed=1,actual_route_id=?,actual_runtime=?,actual_provider=?,actual_model=?,actual_family=?,actual_effort=?,fallback_consumed_at=?,dispatched_at=?,updated_at=? WHERE run_id=? AND state='authorized'",(*row[:6],now,now,now,run_id))
+            changed=c.execute("UPDATE dispatches SET state='dispatched',fallback_window_open=0,fallback_consumed=1,actual_route_id=?,actual_runtime=?,actual_provider=?,actual_model=?,actual_family=?,actual_effort=?,fallback_consumed_at=?,dispatched_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='authorized'",(*row[:6],now,now,now,run_id,self.project_key))
             if changed.rowcount != 1: c.execute("ROLLBACK"); self._rejection_event(tuple(row[6:12]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
             self._event(c,"fallback",tuple(row[:6])); c.execute("COMMIT"); return tuple(row[:6])
         except RoutingError:raise
@@ -295,8 +385,8 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
         c=self._connect()
         try:
             now=self._now(); c.execute("BEGIN IMMEDIATE")
-            row=c.execute("SELECT selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort FROM dispatches WHERE run_id=? AND state='authorized'",(run_id,)).fetchone()
-            changed=c.execute("UPDATE dispatches SET state='abandoned',fallback_window_open=0,updated_at=? WHERE run_id=? AND state='authorized'",(now,run_id))
+            row=c.execute("SELECT selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort FROM dispatches WHERE run_id=? AND project_key=? AND state='authorized'",(run_id,self.project_key)).fetchone()
+            changed=c.execute("UPDATE dispatches SET state='abandoned',fallback_window_open=0,updated_at=? WHERE run_id=? AND project_key=? AND state='authorized'",(now,run_id,self.project_key))
             if not row or changed.rowcount != 1:
                 c.execute("ROLLBACK"); self._rejection_event(tuple(row) if row else None,"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
             self._event(c,"abandoned",tuple(row),"failure"); c.execute("COMMIT")
@@ -323,11 +413,11 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
             now=self._now(); c.execute("BEGIN IMMEDIATE")
             row=c.execute("SELECT state,actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,"
                           "selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort,"
-                          "fallback_consumed FROM dispatches WHERE run_id=?",(run_id,)).fetchone()
+                          "fallback_consumed FROM dispatches WHERE run_id=? AND project_key=?",(run_id,self.project_key)).fetchone()
             state = row[0] if row else None
             if state == "dispatched":
                 changed=c.execute("UPDATE dispatches SET state=?,fallback_window_open=0,terminal_at=?,updated_at=? "
-                                  "WHERE run_id=? AND state='dispatched'",(f"terminal_{outcome}",now,now,run_id))
+                                  "WHERE run_id=? AND project_key=? AND state='dispatched'",(f"terminal_{outcome}",now,now,run_id,self.project_key))
                 if changed.rowcount != 1:
                     c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
                 identity = tuple(row[1:7]) if all(row[1:7]) else tuple(row[7:13])
@@ -335,7 +425,7 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
                 return f"terminal_{outcome}"
             if state == "authorized" and outcome == "failure":
                 changed=c.execute("UPDATE dispatches SET state='abandoned',fallback_window_open=0,updated_at=? "
-                                  "WHERE run_id=? AND state='authorized'",(now,run_id))
+                                  "WHERE run_id=? AND project_key=? AND state='authorized'",(now,run_id,self.project_key))
                 if changed.rowcount != 1:
                     c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
                 self._event(c,"abandoned",tuple(row[7:13]),"failure"); c.execute("COMMIT")
@@ -367,13 +457,13 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
         c=self._connect()
         try:
             return [{"run_id":r[0],"terminal_at":r[1]} for r in
-                    c.execute("SELECT run_id,terminal_at FROM dispatches WHERE role_class='writer' AND state='terminal_success' ORDER BY terminal_at DESC,run_id LIMIT ?",(int(limit),))]
+                    c.execute("SELECT run_id,terminal_at FROM dispatches WHERE project_key=? AND role_class='writer' AND state='terminal_success' ORDER BY terminal_at DESC,run_id LIMIT ?",(self.project_key,int(limit)))]
         finally:c.close()
 
     def implementation_identity(self, run_id):
         c=self._connect()
         try:
-            row=c.execute("SELECT role_class,actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,state FROM dispatches WHERE run_id=?",(run_id,)).fetchone()
+            row=c.execute("SELECT role_class,actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,state FROM dispatches WHERE run_id=? AND project_key=?",(run_id,self.project_key)).fetchone()
             if not row or row[0] != "writer" or row[-1] != "terminal_success" or any(value is None for value in row[1:-1]): raise RoutingError("REVIEW_IDENTITY_INVALID")
             return ImplementationIdentity(row[3],row[5],row[1],row[2],row[4],row[6])
         finally:c.close()

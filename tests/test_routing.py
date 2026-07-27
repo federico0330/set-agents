@@ -359,7 +359,7 @@ class RoutingTests(unittest.TestCase):
 
     def test_route_and_spawn_sequences_decide_dispatch_spawn_terminal(self):
         calls=[]
-        def fake_cli(args,env=None,timeout=60):
+        def fake_cli(args,env=None,timeout=60,cwd=None):
             calls.append(args)
             if args[0]=="--route-decide":
                 payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"0"*32,
@@ -374,8 +374,54 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual([c[0] for c in calls],["--route-decide","--route-dispatched","--route-terminal"])
         self.assertEqual(calls[2][1],"run1_"+"0"*32); self.assertEqual(calls[2][2],"success")
 
+    def test_route_and_spawn_keeps_the_full_lifecycle_in_the_user_project(self):
+        """P1 delta: every lifecycle mutation discovers the same user PROJECT_ROOT."""
+        calls=[]
+        def fake_cli(args, env=None, timeout=60, cwd=None):
+            calls.append((args, cwd))
+            payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"9"*32,
+                                           "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]} \
+                if args[0] == "--route-decide" else {"ok":True,"data":{},"reason_codes":[]}
+            return types.SimpleNamespace(stdout=json.dumps(payload)+"\n", returncode=0)
+        with tempfile.TemporaryDirectory() as td:
+            project=Path(td)/"user-project"; nested=project/"src"/"feature"
+            nested.mkdir(parents=True)
+            with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
+                 mock.patch.object(set_agents_spawn,"spawn",return_value=("success",{})):
+                result=set_agents_spawn.route_and_spawn("implementer","documentation","do it", spawn_cwd=nested)
+        self.assertEqual(result["status"],"success")
+        self.assertEqual([args[0] for args, _ in calls], ["--route-decide","--route-dispatched","--route-terminal"])
+        self.assertTrue(all(cwd == nested.resolve() for _, cwd in calls))
+
+    def test_route_and_spawn_persists_the_user_project_key_through_the_real_lifecycle(self):
+        """P1 delta: real CLI lifecycle data is scoped to the user's nested project."""
+        with tempfile.TemporaryDirectory() as td:
+            sandbox=Path(td); project=sandbox/"user-project"; nested=project/"src"/"feature"
+            (project/"ai/state/features").mkdir(parents=True); nested.mkdir(parents=True)
+            identity="proj1_" + "c" * 32
+            (project/"ai/state/project.json").write_text(json.dumps({"schema":1,"project_key":identity,"created_at":"2026-07-27T00:00:00Z"}))
+            home=sandbox/"home"; auth=home/".pi/agent"; auth.mkdir(parents=True)
+            (auth/"auth.json").write_text(json.dumps({"openai-codex": {}}))
+            bins=sandbox/"bin"; bins.mkdir()
+            pnpm=bins/"pnpm"
+            pnpm.write_text("#!/bin/sh\nprintf 'provider model\\nopenai-codex gpt-5.6-sol\\n'\n")
+            pnpm.chmod(0o755)
+            env={"HOME":str(home), "PATH":f"{bins}:{os.environ['PATH']}"}
+            with mock.patch.dict(os.environ, env, clear=False), \
+                 mock.patch.object(set_agents_spawn,"spawn",return_value=("success",{})) as spawn_mock:
+                result=set_agents_spawn.route_and_spawn(
+                    "implementer", "mechanical", "do it", routing_test_root=str(sandbox/"routing"), spawn_cwd=nested,
+                )
+            self.assertEqual(result["status"], "success", result)
+            self.assertEqual(spawn_mock.call_args.kwargs["cwd"], nested)
+            with sqlite3.connect(f"file:{sandbox / 'routing/routing.db'}?mode=ro", uri=True) as connection:
+                self.assertEqual(
+                    connection.execute("SELECT project_key,state FROM dispatches WHERE run_id=?", (result["run_id"],)).fetchone(),
+                    (identity, "terminal_success"),
+                )
+
     def test_route_and_spawn_refuses_non_executable_decision_without_spawning(self):
-        def fake_cli(args,env=None,timeout=60):
+        def fake_cli(args,env=None,timeout=60,cwd=None):
             self.assertEqual(args[0],"--route-decide")  # never reaches dispatch/spawn
             payload={"ok":True,"data":{"execution_enabled":False},"reason_codes":["REVIEW_IDENTITY_UNVERIFIED"]}
             return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
@@ -385,7 +431,7 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(result["status"],"refused"); spawn_mock.assert_not_called()
 
     def test_route_and_spawn_closes_run_as_failure_when_the_child_crashes(self):
-        def fake_cli(args,env=None,timeout=60):
+        def fake_cli(args,env=None,timeout=60,cwd=None):
             if args[0]=="--route-decide":
                 payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"1"*32,
                                           "provider":"anthropic","model":"haiku"},"reason_codes":[]}
@@ -405,7 +451,7 @@ class RoutingTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             set_agents_spawn.route_and_spawn("implementer","documentation","do it",
                                              guard_tools=set_agents_spawn.GUARD_TOOLS_CODE_RW)
-        def fake_cli(args,env=None,timeout=60):
+        def fake_cli(args,env=None,timeout=60,cwd=None):
             if args[0]=="--route-decide":
                 payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"4"*32,
                                           "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]}
@@ -422,14 +468,14 @@ class RoutingTests(unittest.TestCase):
         # AFTER authorization must never leave the run open -- a best-effort
         # --route-terminal failure close is attempted and the child is never spawned.
         terminal_calls=[]
-        def fake_cli(args,env=None,timeout=60):
+        def fake_cli(args,env=None,timeout=60,cwd=None):
             if args[0]=="--route-decide":
                 payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"2"*32,
                                           "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]}
                 return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
             if args[0]=="--route-dispatched":
                 raise subprocess.TimeoutExpired(cmd="route-dispatched",timeout=60)
-            terminal_calls.append(args)
+            terminal_calls.append((args, cwd))
             return types.SimpleNamespace(stdout=json.dumps({"ok":True,"data":{},"reason_codes":[]})+"\n",returncode=0)
         with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
              mock.patch.object(set_agents_spawn,"spawn") as spawn_mock:
@@ -438,7 +484,8 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(result["status"],"failure"); self.assertEqual(result["run_id"],"run1_"+"2"*32)
         self.assertEqual(result["reason"],"ORCHESTRATION_EXCEPTION")
         self.assertEqual(len(terminal_calls),1)
-        self.assertEqual(terminal_calls[0][0],"--route-terminal"); self.assertEqual(terminal_calls[0][2],"failure")
+        self.assertEqual(terminal_calls[0][0][0],"--route-terminal"); self.assertEqual(terminal_calls[0][0][2],"failure")
+        self.assertEqual(terminal_calls[0][1], Path.cwd().resolve())
 
     def test_route_and_spawn_survives_a_terminal_cli_exception_after_a_successful_spawn(self):
         # SEC-A03/PKG-N01: even once the child spawn genuinely succeeded, an exception
@@ -446,7 +493,7 @@ class RoutingTests(unittest.TestCase):
         # function catches it, best-effort retries the close, and reports failure rather
         # than silently claiming success for a run whose terminal state is now uncertain.
         calls=[]
-        def fake_cli(args,env=None,timeout=60):
+        def fake_cli(args,env=None,timeout=60,cwd=None):
             calls.append(args[0])
             if args[0]=="--route-decide":
                 payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"5"*32,
@@ -1043,6 +1090,167 @@ class RoutingTests(unittest.TestCase):
     def _cli_run(self, args, env, input_text=None):
         return subprocess.run([sys.executable,"ai/scripts/set_agents_app.py",*args],
                               cwd=ROOT,text=True,capture_output=True,env=env,input=input_text)
+
+    def test_routing_migrate_uses_harness_identity_and_test_store(self):
+        """The explicit schema-4 migration is testable and backfills the harness key."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "routing-root"
+            store = routing.RoutingStore._for_tests(root)
+            store._safe_dir(create=True)
+            fd = os.open(store.db_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            os.close(fd)
+            connection = sqlite3.connect(f"file:{store.db_path}?mode=rw", uri=True, isolation_level=None)
+            try:
+                store._configure(connection)
+                # Frozen schema-4 fixture: this is the exact pre-005 dispatches
+                # layout, including the index that migration must replace.
+                connection.executescript("""
+BEGIN EXCLUSIVE;
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE dispatches (
+ run_id TEXT PRIMARY KEY CHECK(run_id GLOB 'run1_[0-9a-f]*' AND length(run_id)=37), role TEXT NOT NULL, role_class TEXT NOT NULL CHECK(role_class='writer'),
+ selected_route_id TEXT NOT NULL, selected_runtime TEXT NOT NULL, selected_provider TEXT NOT NULL, selected_model TEXT NOT NULL, selected_family TEXT NOT NULL, selected_effort TEXT NOT NULL,
+ fallback_route_id TEXT, fallback_runtime TEXT, fallback_provider TEXT, fallback_model TEXT, fallback_family TEXT, fallback_effort TEXT,
+ actual_route_id TEXT, actual_runtime TEXT, actual_provider TEXT, actual_model TEXT, actual_family TEXT, actual_effort TEXT,
+ state TEXT NOT NULL CHECK(state IN ('authorized','dispatched','terminal_success','terminal_failure','abandoned')), partial_write INTEGER NOT NULL DEFAULT 0 CHECK(partial_write IN (0,1)), fallback_window_open INTEGER NOT NULL CHECK(fallback_window_open IN (0,1)), fallback_consumed INTEGER NOT NULL DEFAULT 0 CHECK(fallback_consumed IN (0,1)),
+ authorized_at INTEGER NOT NULL, dispatched_at INTEGER, partial_write_at INTEGER, fallback_consumed_at INTEGER, terminal_at INTEGER, updated_at INTEGER NOT NULL,
+ CHECK((fallback_route_id IS NULL AND fallback_runtime IS NULL AND fallback_provider IS NULL AND fallback_model IS NULL AND fallback_family IS NULL AND fallback_effort IS NULL) OR (fallback_route_id IS NOT NULL AND fallback_runtime IS NOT NULL AND fallback_provider IS NOT NULL AND fallback_model IS NOT NULL AND fallback_family IS NOT NULL AND fallback_effort IS NOT NULL)),
+ CHECK((actual_route_id IS NULL AND actual_runtime IS NULL AND actual_provider IS NULL AND actual_model IS NULL AND actual_family IS NULL AND actual_effort IS NULL) OR (actual_route_id IS NOT NULL AND actual_runtime IS NOT NULL AND actual_provider IS NOT NULL AND actual_model IS NOT NULL AND actual_family IS NOT NULL AND actual_effort IS NOT NULL)),
+ CHECK(state IN ('authorized','abandoned') OR actual_route_id IS NOT NULL),
+ -- N03: abandoned is a never-dispatched close — it can never carry an actual (dispatched)
+ -- identity. Its close timestamp is `updated_at` (documented here): `terminal_at`'s ordering
+ -- CHECK below requires dispatched_at, which a never-dispatched row never has.
+ CHECK(state<>'abandoned' OR (actual_route_id IS NULL AND actual_runtime IS NULL AND actual_provider IS NULL AND actual_model IS NULL AND actual_family IS NULL AND actual_effort IS NULL)),
+ CHECK(state NOT IN ('terminal_success','terminal_failure','abandoned') OR fallback_window_open=0),
+ CHECK(dispatched_at IS NULL OR dispatched_at>=authorized_at),
+ CHECK(terminal_at IS NULL OR (dispatched_at IS NOT NULL AND terminal_at>=dispatched_at)),
+ CHECK(fallback_consumed=0 OR fallback_route_id IS NOT NULL));
+CREATE TABLE events (event_id INTEGER PRIMARY KEY, occurred_at INTEGER NOT NULL, event_type TEXT NOT NULL, route_id TEXT, runtime TEXT, provider TEXT, model TEXT, family TEXT, outcome TEXT NOT NULL, reason_family TEXT NOT NULL, latency_ms INTEGER, latency_bucket TEXT NOT NULL);
+CREATE TABLE metric_rollups (route_key TEXT NOT NULL, runtime TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL, outcome TEXT NOT NULL, reason_family TEXT NOT NULL, latency_bucket TEXT NOT NULL, lifetime_count INTEGER NOT NULL, lifetime_latency_sum_ms INTEGER NOT NULL, compacted_count INTEGER NOT NULL, exclusion_count INTEGER NOT NULL, fallback_offered_count INTEGER NOT NULL, fallback_consumed_count INTEGER NOT NULL, fallback_success_count INTEGER NOT NULL, fallback_failure_count INTEGER NOT NULL, PRIMARY KEY(route_key,runtime,provider,model,family,outcome,reason_family,latency_bucket));
+CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX events_route_retention ON events(route_id,occurred_at,event_id); CREATE INDEX dispatches_review ON dispatches(role,state,terminal_at);
+""")
+                connection.execute("INSERT INTO meta VALUES('schema_version','4')")
+                connection.execute("INSERT INTO meta VALUES('installation_hmac_salt','a' || printf('%063d', 0))")
+                connection.execute("INSERT INTO dispatches VALUES(" + ",".join("?" for _ in range(31)) + ")", (
+                    "run1_" + "a" * 32, "implementer", "writer", "r", "codex", "openai-codex", "gpt-5.6-sol", "gpt-5.6", "high",
+                    None, None, None, None, None, None, None, None, None, None, None, None,
+                    "authorized", 0, 1, 0, 1, None, None, None, None, 1,
+                ))
+                connection.execute("COMMIT")
+            finally:
+                connection.close()
+            identity = json.loads((ROOT / "ai/state/project.json").read_text())["project_key"]
+            result = self._cli_run(["--routing-migrate"], self._cli_env(root))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertRegex(result.stdout, r"ROUTING_MIGRATE_OK from=4 to=5 rows=1 backup=.+")
+            migrated = sqlite3.connect(f"file:{store.db_path}?mode=ro", uri=True)
+            try:
+                self.assertEqual(dict(migrated.execute("SELECT key,value FROM meta"))["schema_version"], "5")
+                self.assertEqual(migrated.execute("SELECT project_key FROM dispatches").fetchone(), (identity,))
+            finally:
+                migrated.close()
+            self.assertEqual(len(list((root / "backups").glob("routing-v4-*.db"))), 1)
+            routing.RoutingStore._for_tests(root, project_key=identity)._validate_existing_readonly()
+
+    def test_project_scoped_lifecycle_cannot_mutate_a_foreign_run(self):
+        """P1-REV-001: opaque run ids are never a cross-project write capability."""
+        project_b = "proj1_" + "b" * 32
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "routing", inventory={("codex", "openai-codex"): {"gpt-5.6-sol"}})
+            decision = svc.route(
+                routing.TaskRequest("implementer", "change", "mechanical", selected_runtime="codex"),
+                self.observed(svc, "implementer", "codex", task_class="mechanical", context_required=False),
+            )
+            foreign = routing.RoutingStore._for_tests(Path(td) / "routing", project_key=project_b)
+            for operation, error in (
+                (lambda: foreign.mark_dispatched(decision.run_id), "STATE_CONFLICT"),
+                (lambda: foreign.consume_fallback(decision.run_id), "FALLBACK_DENIED"),
+                (lambda: foreign.abandon(decision.run_id), "STATE_CONFLICT"),
+                (lambda: foreign.close_run(decision.run_id, "failure"), "STATE_CONFLICT"),
+            ):
+                with self.assertRaisesRegex(routing.RoutingError, error):
+                    operation()
+            self.assertEqual(svc.store.open_runs()[0]["state"], "authorized")
+
+            svc.store.mark_dispatched(decision.run_id)
+            for operation in (
+                lambda: foreign.mark_partial(decision.run_id),
+                lambda: foreign.terminal(decision.run_id, "failure"),
+                lambda: foreign.close_run(decision.run_id, "success"),
+            ):
+                with self.assertRaisesRegex(routing.RoutingError, "STATE_CONFLICT"):
+                    operation()
+            self.assertEqual(svc.store.open_runs()[0]["state"], "dispatched")
+            svc.store.terminal(decision.run_id, "success")
+            self.assertEqual(foreign.recent_writers(), [])
+            with self.assertRaisesRegex(routing.RoutingError, "REVIEW_IDENTITY_INVALID"):
+                foreign.implementation_identity(decision.run_id)
+
+    def test_project_identity_fallback_corruption_and_nonregular_files_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".git").mkdir()
+            # A Git-only project has no state directory and deliberately uses the
+            # normalized path hash rather than rejecting routing outright.
+            self.assertRegex(set_agents_app.project_key_for(root), r"^proj1_[0-9a-f]{32}$")
+            identity = root / "ai/state/project.json"
+            identity.parent.mkdir(parents=True)
+            identity.write_text("{not json")
+            with self.assertRaises(set_agents_app.ProjectIdentityError):
+                set_agents_app.project_key_for(root)
+            identity.unlink()
+            os.mkfifo(identity)
+            started = time.monotonic()
+            self.assertIsNone(set_agents_app._safe_read(identity, limit=1024))
+            self.assertLess(time.monotonic() - started, 1.0)
+
+    def test_malformed_project_feature_documents_degrade_without_traceback(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            features = root / "ai/state/features"
+            features.mkdir(parents=True)
+            (features / "bad.json").write_text(json.dumps({"feature_id": "bad", "packages": {"not": "a list"}}))
+            (features / "also-bad.json").write_text(json.dumps({"feature_id": "also-bad", "packages": ["not-a-dict"]}))
+            old_root, old_project = set_agents_app.ROOT, set_agents_app.PROJECT_ROOT
+            set_agents_app.ROOT = root
+            set_agents_app.PROJECT_ROOT = root
+            try:
+                self.assertIsNone(set_agents_app._load_feature_doc(features / "bad.json"))
+                self.assertEqual(set_agents_app._resolve_context_pack("bad", None), (False, "bad", None))
+                self.assertEqual(set_agents_app._resolve_context_pack(None, None), (None, None, None))
+            finally:
+                set_agents_app.ROOT, set_agents_app.PROJECT_ROOT = old_root, old_project
+
+    def test_schema_four_warning_is_informational_and_never_auto_migrates(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project = root / "git-only"
+            project.mkdir(); (project / ".git").mkdir()
+            routing_root = root / "routing"
+            store = routing.RoutingStore._for_tests(routing_root)
+            store._safe_dir(create=True)
+            fd = os.open(store.db_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            os.close(fd)
+            conn = sqlite3.connect(store.db_path)
+            try:
+                conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+                conn.execute("INSERT INTO meta VALUES('schema_version','4')")
+                conn.commit()
+            finally:
+                conn.close()
+            env = self._cli_env(routing_root)
+            result = subprocess.run(
+                [sys.executable, "ai/scripts/set_agents_app.py", "--routing-report", "--project", str(project), "--json"],
+                cwd=ROOT, text=True, capture_output=True, env=env,
+            )
+            self.assertEqual(result.returncode, 1, result.stderr)
+            envelope = json.loads(result.stdout)
+            self.assertIn("ROUTING_SCHEMA_MIGRATION_REQUIRED", envelope["warnings"])
+            check = sqlite3.connect(store.db_path)
+            try:
+                self.assertEqual(dict(check.execute("SELECT key,value FROM meta"))["schema_version"], "4")
+            finally:
+                check.close()
 
     def test_route_decide_cli_hermetic_matrix(self):
         # N04/F01/F02/F07: a fully hermetic decide->dispatched->terminal(->abandoned) cycle

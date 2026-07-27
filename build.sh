@@ -56,6 +56,20 @@ args=(python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING")
 
 case "$MODE" in
   check)
+    drift=0
+    for name in feature-state.py check-owned-paths.py; do
+      source="$ROOT/PROYECTO/ai/scripts/$name"
+      target="$ROOT/ai/scripts/$name"
+      if [ ! -e "$source" ] || [ ! -e "$target" ]; then
+        echo "SELF_SCAFFOLD_DRIFT file=ai/scripts/$name template=PROYECTO/ai/scripts/$name reason=missing"
+        drift=1
+      elif ! cmp -s "$source" "$target"; then
+        echo "SELF_SCAFFOLD_DRIFT file=ai/scripts/$name template=PROYECTO/ai/scripts/$name reason=differs"
+        drift=1
+      fi
+    done
+    [ "$drift" -eq 0 ] || exit 1
+    echo "SELF_SCAFFOLD_SYNC_OK files=2"
     ;;
   diff)
     diff -ruN "$ROOT/Global/opencode" "$STAGING/opencode" || true

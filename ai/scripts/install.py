@@ -56,6 +56,33 @@ def deep_merge(base, overlay):
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PLACEHOLDER = b"__SET_AGENTS_ROOT__"
+_UNSAFE_ROOT = re.compile(r"[;|<>`&$\"'\\\\*?\[\]\r\n\x00-\x1f\x7f-\x9f]")
+
+
+def validate_repo_root():
+    """Reject paths which cannot be represented safely in installed policy files."""
+    root = str(REPO_ROOT)
+    match = _UNSAFE_ROOT.search(root)
+    if match:
+        char = match.group(0)
+        print(
+            f"INSTALL_ABORTED_UNSAFE_ROOT root={root} offending={char!r}@offset={match.start()}\n"
+            "  The harness path must not contain shell, quoting, or glob metacharacters.\n"
+            "  Move or rename the clone (a SPACE is fine) and re-run ./build.sh --install.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+
+def substitute_root(data: bytes, *, json_escaped: bool = False) -> bytes:
+    """Bake HARNESS_HOME into an installed artifact without decoding its bytes."""
+    replacement = json.dumps(str(REPO_ROOT))[1:].encode("utf-8") if json_escaped else str(REPO_ROOT).encode("utf-8")
+    # json.dumps()[1:] is deliberately wrong for an ordinary string; retain only its
+    # interior, matching the historical JSON merge replacement exactly.
+    if json_escaped:
+        replacement = json.dumps(str(REPO_ROOT))[1:-1].encode("utf-8")
+    return data.replace(PLACEHOLDER, replacement)
 
 
 def merged_json(current, overlay, union_lists=False):
@@ -68,8 +95,7 @@ def merged_json(current, overlay, union_lists=False):
                 result[key] = sorted(set(base.get(key, [])) | set(value))
     # Tracked templates stay machine-independent; the live config gets this repo's
     # root, JSON-escaped so a clone path with quotes/backslashes can't break the file.
-    escaped_root = json.dumps(str(REPO_ROOT))[1:-1]
-    return (json.dumps(result, indent=2) + "\n").replace("__SET_AGENTS_ROOT__", escaped_root)
+    return substitute_root((json.dumps(result, indent=2) + "\n").encode(), json_escaped=True).decode()
 
 
 def managed_files():
@@ -78,7 +104,8 @@ def managed_files():
         for relative in (staging / harness / "managed-files.txt").read_text().splitlines():
             if not relative or (harness, relative) in SPECIAL or relative == "managed-files.txt":
                 continue
-            result.append((staging / harness / relative, target / relative))
+            source = staging / harness / relative
+            result.append((source, target / relative))
     return result
 
 
@@ -228,6 +255,7 @@ def prune_empty_dirs(directory):
             current = parent
 
 
+validate_repo_root()
 files = managed_files()
 specials = effective_specials()
 legacy = []
@@ -254,7 +282,7 @@ if args.preview:
     changes = 0
     for source, target in files:
         before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
-        after = source.read_text(errors="replace").splitlines(True)
+        after = substitute_root(source.read_bytes()).decode(errors="replace").splitlines(True)
         if before != after:
             changes += 1
             print("".join(difflib.unified_diff(before, after, fromfile=str(target), tofile=str(target) + " (managed)")), end="")
@@ -314,7 +342,7 @@ def rollback():
 
 try:
     for source, target in files:
-        atomic_write(target, source.read_bytes(), source.stat().st_mode & 0o777)
+        atomic_write(target, substitute_root(source.read_bytes()), source.stat().st_mode & 0o777)
     for content, target in specials:
         atomic_write(target, content)
     for path in legacy:
@@ -350,6 +378,8 @@ try:
         for name in ("engram", "context7", "playwright", "brave-cdp"):
             if codex_config.get("mcp_servers", {}).get(name, {}).get("enabled", False) is not False:
                 raise RuntimeError(f"Codex {name} MCP smoke check failed")
+    if any(PLACEHOLDER in path.read_bytes() for _, path in files if path.exists()):
+        raise RuntimeError("Installed managed file retains SET_AGENTS_ROOT placeholder")
     if os.environ.get("SET_AGENTS_FORCE_SMOKE_FAIL") == "1":
         raise RuntimeError("forced smoke failure")
     # Only after every smoke check passes: record what we manage now, so the next run can

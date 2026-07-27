@@ -208,8 +208,8 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
         # explicitly MUTATING-capable coord exception, narrated on use like every spawn.
         lines += ["  bash:", '    "*": deny', *safe,
                   '    "python3 ai/scripts/feature-state.py *": allow',
-                  '    "python3 ai/scripts/set_agents_app.py --route*": allow',
-                  '    "python3 ai/scripts/set_agents_app.py --routing*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing*": allow',
                   *hard_denies]
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]

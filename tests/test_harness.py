@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -852,13 +853,6 @@ class HarnessTests(unittest.TestCase):
             "python3 ai/scripts/feature-state.py status feat-x",
             "python3 ai/scripts/feature-state.py record-spawn PKG-01 implementer --state-file ai/state/features/feat-x.json",
             "python3 ai/scripts/feature-state.py init feat-x docs/specs/feat-x/spec.md abc123 --mode scoped",
-            # The routing CLI (contract 004 T-203) is the coord's second sanctioned
-            # mutation channel: decide/dispatched/terminal/report/open-runs/recent-writers.
-            "python3 ai/scripts/set_agents_app.py --route-decide - --json",
-            "python3 ai/scripts/set_agents_app.py --route-dispatched run1_abc --json",
-            "python3 ai/scripts/set_agents_app.py --route-terminal run1_abc failure --json",
-            "python3 ai/scripts/set_agents_app.py --routing-report --json",
-            "python3 ai/scripts/set_agents_app.py --routing-recent-writers --json",
         ]
         denied = [
             "echo x > file", "printf x | tee file", "sed -i s/a/b/ file",
@@ -877,11 +871,110 @@ class HarnessTests(unittest.TestCase):
             "python3 ai/scripts/set_agents_app.py --route-decide - --json && git push",
             "python3 other/set_agents_app.py --route-decide -",
             "python3 ai/scripts/set_agents_app.py --mcp-add supabase",
+            # The tracked policy deliberately contains an unsubstituted placeholder;
+            # it cannot authorize a local relative harness path before install.
+            "python3 ai/scripts/set_agents_app.py --route-decide - --json",
         ]
         for command in allowed:
             self.assertEqual(run("python3", "ai/scripts/coord_policy.py", command, check=False).returncode, 0, command)
         for command in denied:
             self.assertEqual(run("python3", "ai/scripts/coord_policy.py", command, check=False).returncode, 2, command)
+        with tempfile.TemporaryDirectory(prefix="policy space ") as td:
+            installed = Path(td) / "coord_policy.py"
+            baked_root = "/tmp/harness with space"
+            installed.write_text((ROOT / "ai/scripts/coord_policy.py").read_text().replace("__SET_AGENTS_ROOT__", baked_root))
+            cli = f'python3 "{baked_root}/ai/scripts/set_agents_app.py"'
+            for command in (f"{cli} --route-decide - --json", f"{cli} --routing-recent-writers --json"):
+                self.assertEqual(run("python3", str(installed), command, check=False).returncode, 0, command)
+
+    def test_guest_copy_scaffolds_and_verifies_portably(self):
+        """AC-09: an installed, space-named guest routes from a non-Git project."""
+        if os.environ.get("SET_AGENTS_GUEST_VERIFY") == "1":
+            self.skipTest("the guest verify already exercises this outer regression")
+        with tempfile.TemporaryDirectory(prefix="set-agents-guest-") as td:
+            sandbox = Path(td)
+            guest = sandbox / "portable harness"
+            home = sandbox / "home"
+            project = sandbox / "project without git"
+            tmpdir = sandbox / "tmp"
+            # Retain the copied checkout metadata: several existing installer
+            # regressions deliberately inspect historical managed files at HEAD.
+            shutil.copytree(ROOT, guest, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+            home.mkdir()
+            tmpdir.mkdir()
+            bins = sandbox / "bin"
+            bins.mkdir()
+            for name, body in {
+                "codex": '#!/bin/sh\necho "Logged in using ChatGPT" 1>&2\n',
+                "claude": '#!/bin/sh\necho \'{"loggedIn": true}\'\n',
+                "opencode": ('#!/bin/sh\n'
+                             'if [ "$1" = "auth" ]; then printf "\\342\\227\\217  OpenAI oauth\\n"; exit 0; fi\n'
+                             'if [ "$2" = "openai" ]; then echo "openai/gpt-5.6-sol"; exit 0; fi\n'
+                             'echo "Error: Provider not found: $2"\n'),
+            }.items():
+                path = bins / name
+                path.write_text(body)
+                path.chmod(0o755)
+            env = {
+                "HOME": str(home),
+                "TMPDIR": str(tmpdir),
+                "SET_AGENTS_GUEST_VERIFY": "1",
+                # The fake HOME deliberately contributes no ~/.local/bin entry.
+                "PATH": os.pathsep.join((str(bins), str(Path(sys.executable).parent), "/usr/bin", "/bin")),
+            }
+            scaffold = subprocess.run(
+                [sys.executable, str(guest / "ai/scripts/set_agents_app.py"), "--scaffold", str(project)],
+                cwd=project.parent, text=True, capture_output=True, env={**os.environ, **env}, check=False,
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stderr)
+            identity = json.loads((project / "ai/state/project.json").read_text())
+            self.assertRegex(identity["project_key"], r"^proj1_[0-9a-f]{32}$")
+            installed = subprocess.run(
+                ["bash", str(guest / "build.sh"), "--install", "--yes"],
+                cwd=guest, text=True, capture_output=True, env={**os.environ, **env}, check=False,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
+            self.assertTrue((home / ".claude/hooks/coord_policy.py").is_file())
+            descriptor = {"role": "implementer", "task_class": "mechanical", "selected_runtime": "codex"}
+            decided = subprocess.run(
+                [sys.executable, str(guest / "ai/scripts/set_agents_app.py"), "--project", str(project),
+                 "--route-decide", "-", "--json"],
+                cwd=project, text=True, capture_output=True, input=json.dumps(descriptor),
+                env={**os.environ, **env, "SET_AGENTS_ROUTING_TEST_ROOT": str(sandbox / "routing")}, check=False,
+            )
+            self.assertEqual(decided.returncode, 0, decided.stdout + decided.stderr)
+            envelope = json.loads(decided.stdout)
+            self.assertTrue(envelope["ok"])
+            self.assertTrue(envelope["data"]["execution_enabled"])
+            self.assertEqual(envelope["schema_version"], 2)
+            self.assertEqual(json.loads((project / "ai/state/project.json").read_text())["project_key"], identity["project_key"])
+            routing_db = sandbox / "routing/routing.db"
+            with sqlite3.connect(f"file:{routing_db}?mode=ro", uri=True) as connection:
+                self.assertEqual(
+                    connection.execute("SELECT project_key FROM dispatches WHERE run_id=?", (envelope["data"]["run_id"],)).fetchone(),
+                    (identity["project_key"],),
+                )
+            verified = subprocess.run(
+                ["bash", str(guest / "ai/scripts/verify.sh")],
+                cwd=guest, text=True, capture_output=True, env={**os.environ, **env}, timeout=90, check=False,
+            )
+            self.assertEqual(verified.returncode, 0, verified.stdout + verified.stderr)
+            self.assertIn("GLOBAL_PORTABILITY_OK", verified.stdout)
+            self.assertIn("VERIFY_PASS", verified.stdout)
+
+    def test_scaffold_refuses_a_diverged_generic_script_without_false_success(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td) / "project"
+            first = run("python3", "ai/scripts/set_agents_app.py", "--scaffold", str(project), check=False)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            script = project / "ai/scripts/feature-state.py"
+            script.write_text("#!/usr/bin/env python3\n# local divergence\n")
+            second = run("python3", "ai/scripts/set_agents_app.py", "--scaffold", str(project), check=False)
+            self.assertEqual(second.returncode, 1, second.stdout + second.stderr)
+            self.assertIn("SCAFFOLD_CONFLICT path=ai/scripts/feature-state.py reason=differs", second.stdout)
+            self.assertIn("SCAFFOLD_CONFLICTS n=1", second.stdout)
+            self.assertNotIn("SCAFFOLD_OK", second.stdout)
+            self.assertIn("local divergence", script.read_text())
 
     def test_oc_steps_meet_role_floors(self):
         # Regression guard for the mid-task cutoff pain: step budgets are a circuit

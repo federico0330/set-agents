@@ -282,11 +282,11 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     return "success", {"model": target_id, "usage": last_assistant.get("usage") or {}}
 
 
-def _run_app_cli(args, env=None, timeout=60):
+def _run_app_cli(args, env=None, timeout=60, cwd=ROOT):
     full_env = dict(os.environ)
     if env:
         full_env.update(env)
-    return subprocess.run([sys.executable, str(APP_CLI), *args], cwd=ROOT, stdin=subprocess.DEVNULL,
+    return subprocess.run([sys.executable, str(APP_CLI), *args], cwd=cwd, stdin=subprocess.DEVNULL,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                           timeout=timeout, check=False, env=full_env)
 
@@ -323,6 +323,9 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
     authorized run is never left open just because the orchestration code around it
     misbehaved.
     """
+    # The routing CLI discovers PROJECT_ROOT from its cwd. Keep this separate from
+    # Pi's execution cwd: the latter intentionally retains the caller's exact value.
+    routing_cwd = Path(spawn_cwd).resolve() if spawn_cwd is not None else Path.cwd().resolve()
     descriptor = {"role": role, "task_class": task_class, "selected_runtime": "pi"}
     if risk:
         descriptor["risk"] = risk
@@ -340,7 +343,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
     finally:
         handle.close()
     try:
-        decide = _run_app_cli(["--route-decide", descriptor_path, "--json"], env=env)
+        decide = _run_app_cli(["--route-decide", descriptor_path, "--json"], env=env, cwd=routing_cwd)
     finally:
         try:
             os.unlink(descriptor_path)
@@ -354,9 +357,9 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
                "decide_exit_code": decide.returncode}
     run_id, provider, model = data.get("run_id"), data.get("provider"), data.get("model")
     try:
-        dispatched = _run_app_cli(["--route-dispatched", run_id, "--json"], env=env)
+        dispatched = _run_app_cli(["--route-dispatched", run_id, "--json"], env=env, cwd=routing_cwd)
         if dispatched.returncode != 0:
-            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env)
+            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env, cwd=routing_cwd)
             return {"status": "failure", "run_id": run_id, "reason": "DISPATCH_FAILED"}
         started = time.time()
         role_prompt = (Path(prompt_root) if prompt_root else CANON_AGENTS) / f"{role}.md"
@@ -367,6 +370,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         terminal_outcome = "success" if outcome == "success" else "failure"
         terminal = _run_app_cli(
             ["--route-terminal", run_id, terminal_outcome, "--latency-ms", str(latency_ms), "--json"], env=env,
+            cwd=routing_cwd,
         )
     except Exception as exc:  # noqa: BLE001 - SEC-A03/PKG-N01: no orphaned authorized run
         # Any exception past authorization (a lifecycle-CLI subprocess surprise or
@@ -375,7 +379,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         # as failure without a durable close; a caller that observes this reason should
         # treat `run_id` as needing a manual audit, but the process here never crashes.
         try:
-            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env)
+            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env, cwd=routing_cwd)
         except Exception:  # noqa: BLE001
             pass
         return {"status": "failure", "run_id": run_id, "reason": "ORCHESTRATION_EXCEPTION",

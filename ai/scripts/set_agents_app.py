@@ -8,17 +8,20 @@ catalog, MCP servers, and Claude Code plugins.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import tomllib
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+import unicodedata
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config
@@ -35,12 +38,132 @@ ROUTING_TEST_ROOT = os.environ.get("SET_AGENTS_ROUTING_TEST_ROOT")
 APP_CONFIG = STATE_DIR / "config.toml"
 MANAGED_MCP = models_config.MANAGED_MCP
 HARNESS_CLIS = ("opencode", "claude", "codex")
+PROJECT_ROOT: Path | None = None
+PROJECT_KEY: str | None = None
+ROUTING_WARNINGS: tuple[str, ...] = ()
+_PROJECT_KEY_RE = re.compile(r"^proj1_[0-9a-f]{32}$")
+_MAX_FEATURE_BYTES = 1024 * 1024
+_MAX_FEATURE_FILES = 256
 
 
 def _routing_store():
     """F07: the one seam a hermetic CLI test uses to drive decide/dispatched/terminal/abandoned
     against a temp root. Never set by real runs (see the module-level seam note above)."""
-    return routing.RoutingStore._for_tests(Path(ROUTING_TEST_ROOT)) if ROUTING_TEST_ROOT else routing.RoutingStore()
+    key = PROJECT_KEY
+    return (routing.RoutingStore._for_tests(Path(ROUTING_TEST_ROOT), project_key=key)
+            if ROUTING_TEST_ROOT else routing.RoutingStore(project_key=key))
+
+
+def _real_directory(path: Path) -> bool:
+    try:
+        mode = path.lstat().st_mode
+    except OSError:
+        return False
+    return stat.S_ISDIR(mode) and not stat.S_ISLNK(mode)
+
+
+def _has_project_marker(path: Path) -> bool:
+    return _real_directory(path / "ai") and _real_directory(path / "ai/state") and _real_directory(path / "ai/state/features") or (path / ".git").exists()
+
+
+def find_project_root(start: Path) -> Path | None:
+    """Nearest marker wins; filesystem root is never a project confinement boundary."""
+    try:
+        begin = start.resolve()
+    except OSError:
+        return None
+    for candidate in (begin, *begin.parents):
+        if candidate == candidate.parent:
+            break
+        if _has_project_marker(candidate):
+            return candidate
+    return None
+
+
+def resolve_project_root(start: Path, explicit: str | None = None) -> Path | None:
+    requested = explicit if explicit is not None else os.environ.get("SET_AGENTS_PROJECT")
+    if requested is not None:
+        try:
+            candidate = Path(requested).resolve()
+        except OSError as exc:
+            raise ValueError("invalid project") from exc
+        if candidate == candidate.parent or not candidate.is_dir() or not _has_project_marker(candidate):
+            raise ValueError("invalid project")
+        return candidate
+    return find_project_root(start)
+
+
+def _casefold_project_path(path: Path) -> str:
+    value = unicodedata.normalize("NFC", os.path.realpath(path))
+    parent, name = os.path.split(value)
+    try:
+        swapped = "".join(char.swapcase() for char in name)
+        if swapped != name and os.lstat(value).st_ino == os.lstat(os.path.join(parent, swapped)).st_ino:
+            return value.lower()
+    except OSError:
+        pass
+    if sys.platform in {"darwin", "win32"}:
+        return value.lower()
+    return value
+
+
+def _safe_read(path: Path, *, limit: int) -> bytes | None:
+    try:
+        # A project directory is untrusted.  Reject every non-regular object before
+        # opening it (in particular FIFOs, which would otherwise block this CLI), then
+        # repeat the regular-file check on the descriptor we actually opened.
+        before = path.lstat()
+        if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+            return None
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+        with os.fdopen(fd, "rb") as handle:
+            opened = os.fstat(handle.fileno())
+            if not stat.S_ISREG(opened.st_mode):
+                return None
+            data = handle.read(limit + 1)
+    except OSError:
+        return None
+    return data if len(data) <= limit else None
+
+
+class ProjectIdentityError(ValueError):
+    """A present identity is malformed or unsafe; never replace it with a path hash."""
+
+
+def project_key_for(root: Path, *, require_persisted: bool = False) -> str:
+    """Read a persistent project identity, or use the documented Git-only fallback.
+
+    A missing state tree is normal for a Git-only project.  A present, unusable
+    identity is not: falling back in that case would silently split its history.
+    """
+    state = root / "ai/state"
+    identity = state / "project.json"
+    try:
+        identity.lstat()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise ProjectIdentityError("invalid project identity") from exc
+    else:
+        raw = _safe_read(identity, limit=_MAX_FEATURE_BYTES)
+        try:
+            doc = json.loads(raw.decode("utf-8")) if raw is not None else None
+        except (UnicodeDecodeError, ValueError):
+            doc = None
+        if (not isinstance(doc, dict) or doc.get("schema") != 1 or not _PROJECT_KEY_RE.fullmatch(doc.get("project_key", ""))
+                or not isinstance(doc.get("created_at"), str)):
+            raise ProjectIdentityError("invalid project identity")
+        return doc["project_key"]
+    if require_persisted:
+        raise ValueError("missing project identity")
+    digest = hashlib.sha256(b"set-agents-project-v1\0" + _casefold_project_path(root).encode("utf-8", "surrogateescape")).hexdigest()[:32]
+    return "proj1_" + digest
+
+
+def _project_root_or_harness() -> Path:
+    # Direct helper calls in legacy unit tests have no CLI resolution; production
+    # routes always set PROJECT_ROOT in main before accessing project data.
+    return PROJECT_ROOT or ROOT
 
 
 def routing_catalog(simulation=False):
@@ -52,6 +175,9 @@ def routing_catalog(simulation=False):
 
 
 def _routing_output(payload, human):
+    if ROUTING_WARNINGS:
+        payload = dict(payload)
+        payload["warnings"] = list(dict.fromkeys((*payload.get("warnings", ()), *ROUTING_WARNINGS)))
     if not human:
         print(json.dumps(payload, sort_keys=True))
         return
@@ -130,22 +256,35 @@ _TERMINAL_PACKAGE_STATUS = {"accepted", "done", "blocked", "cancelled"}
 
 
 def _load_feature_doc(path):
+    raw = _safe_read(path, limit=_MAX_FEATURE_BYTES)
     try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        doc = json.loads(raw.decode("utf-8")) if raw is not None else None
+    except (UnicodeDecodeError, ValueError):
         return None
-    return doc if isinstance(doc, dict) else None
+    if not isinstance(doc, dict):
+        return None
+    # Only this small structural subset is consumed.  Rejecting a malformed
+    # document up-front keeps every later traversal total and data-only.
+    if not isinstance(doc.get("packages", []), list):
+        return None
+    if any(not isinstance(package, dict) for package in doc["packages"]):
+        return None
+    return doc
+
+
+def _safe_state_id(value):
+    return value if isinstance(value, str) and len(value) <= 64 and _SAFE_STATE_ID.fullmatch(value) else None
 
 
 def _validate_context_pack_path(pack):
     """SEC-A02: a foreign/malformed feature-state.json must never crash route-decide nor
-    escape the repo. Non-str, empty, absolute, or traversal-outside-ROOT all degrade to 'no
+    escape the project. Project content is untrusted data, never instructions. Non-str, empty, absolute, or traversal-outside-PROJECT_ROOT all degrade to 'no
     pack' — never a bare `ROOT / pack` (an absolute right-hand side silently DISCARDS ROOT
     under pathlib's own semantics, which would let a crafted state file probe arbitrary
     filesystem paths)."""
     if not isinstance(pack, str) or not pack or os.path.isabs(pack):
         return None
-    root = ROOT.resolve()
+    root = _project_root_or_harness().resolve()
     candidate = (root / pack).resolve()
     try:
         if os.path.commonpath([str(candidate), str(root)]) != str(root):
@@ -158,7 +297,11 @@ def _validate_context_pack_path(pack):
 def _package_context_ok(doc, package_id):
     """Existence AND freshness (F03b): a pack older than the package's own last recorded
     mutation (falling back to the feature doc's) is stale and reports False, conservatively."""
-    for package in doc.get("packages", []):
+    if not isinstance(doc, dict) or not isinstance(doc.get("packages", []), list):
+        return False
+    for package in doc["packages"]:
+        if not isinstance(package, dict):
+            return False
         if package.get("package_id") != package_id:
             continue
         path = _validate_context_pack_path(package.get("context_pack"))
@@ -191,7 +334,10 @@ def _resolve_context_pack(feature_id, package_id):
     contract 004 AC-03's "no resolvable package ⇒ context flags false" applies to the
     EXPLICIT-id case; the ambiguous DEFAULT case is a distinct signal).
     """
-    state_dir = ROOT / "ai/state/features"
+    root = _project_root_or_harness()
+    state_dir = root / "ai/state/features"
+    if not (_real_directory(root / "ai") and _real_directory(root / "ai/state") and _real_directory(state_dir)):
+        return None, None, None
     if feature_id:
         if not _SAFE_STATE_ID.fullmatch(feature_id):
             return False, feature_id, package_id
@@ -199,7 +345,7 @@ def _resolve_context_pack(feature_id, package_id):
         doc = _load_feature_doc(state_dir / f"{feature_id}.json")
         if doc is None or doc.get("feature_id") != feature_id:
             return False, feature_id, package_id
-        target = package_id if (package_id and _SAFE_STATE_ID.fullmatch(package_id)) else doc.get("current_package_id")
+        target = _safe_state_id(package_id) if package_id else _safe_state_id(doc.get("current_package_id"))
         # F03a: naming a BLOCKED/DONE feature can never flip CONTEXT_MISSING — the same
         # non-terminal filter used by default resolution applies here too. `target` is still
         # resolved above so the audit payload always shows the effective package_id.
@@ -212,20 +358,25 @@ def _resolve_context_pack(feature_id, package_id):
     # its current package while another is still mid-repair).
     candidates = []
     try:
-        for candidate_path in sorted(state_dir.glob("*.json")):
+        entries = sorted(state_dir.glob("*.json"))
+        if len(entries) > _MAX_FEATURE_FILES:
+            return None, None, None
+        for candidate_path in entries:
             doc = _load_feature_doc(candidate_path)
             if doc is None or doc.get("phase") in _TERMINAL_FEATURE_PHASES:
                 continue
-            current = doc.get("current_package_id")
-            package = next((p for p in doc.get("packages", []) if p.get("package_id") == current), None)
-            if package is not None and package.get("status") not in _TERMINAL_PACKAGE_STATUS:
+            current = _safe_state_id(doc.get("current_package_id"))
+            if current is None:
+                continue
+            package = next((p for p in doc["packages"] if p.get("package_id") == current), None)
+            if package is not None and isinstance(package, dict) and package.get("status") not in _TERMINAL_PACKAGE_STATUS:
                 candidates.append((doc, current))
     except OSError:
         return None, None, None
     if len(candidates) != 1:
         return None, None, None  # CONTEXT_UNRESOLVED at the caller, distinct from NO_ELIGIBLE_ROUTE
     doc, target = candidates[0]
-    return _package_context_ok(doc, target), doc.get("feature_id"), target
+    return _package_context_ok(doc, target), _safe_state_id(doc.get("feature_id")), target
 
 
 def cmd_route_decide(source, human=False, fresh=False):
@@ -1217,6 +1368,98 @@ def plugins_menu():
 
 # ---------------------------------------------------------------------- menu
 
+def cmd_scaffold(target: str | None) -> int:
+    """Create only the P1 project marker, generic state helpers, and stable identity."""
+    root = Path(target or os.getcwd()).resolve()
+    created: list[str] = []
+    conflicts: list[str] = []
+    skips: list[str] = []
+    features = root / "ai/state/features"
+    if not features.exists():
+        features.mkdir(parents=True)
+        created.append("ai/state/features")
+    elif not _real_directory(features):
+        print("SCAFFOLD_CONFLICT path=ai/state/features reason=not_directory")
+        print("SCAFFOLD_CONFLICTS n=1")
+        return 1
+    else:
+        skips.append("ai/state/features")
+    template_dir = ROOT / "PROYECTO/ai/scripts"
+    for name in ("feature-state.py", "check-owned-paths.py"):
+        source, destination = template_dir / name, root / "ai/scripts" / name
+        if not source.is_file():
+            conflicts.append(f"ai/scripts/{name}")
+            print(f"SCAFFOLD_CONFLICT path=ai/scripts/{name} reason=template_missing")
+            continue
+        try:
+            destination.lstat()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            conflicts.append(f"ai/scripts/{name}")
+            print(f"SCAFFOLD_CONFLICT path=ai/scripts/{name} reason=unreadable")
+            continue
+        else:
+            existing = _safe_read(destination, limit=_MAX_FEATURE_BYTES)
+            source_bytes = source.read_bytes()
+            if existing != source_bytes:
+                conflicts.append(f"ai/scripts/{name}")
+                print(f"SCAFFOLD_CONFLICT path=ai/scripts/{name} reason=differs")
+            else:
+                skips.append(f"ai/scripts/{name}")
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+        destination.chmod(0o755)
+        created.append(f"ai/scripts/{name}")
+    identity = root / "ai/state/project.json"
+    try:
+        identity.lstat()
+    except FileNotFoundError:
+        identity_exists = False
+    except OSError:
+        identity_exists = True
+    else:
+        identity_exists = True
+    if identity_exists:
+        try:
+            key = project_key_for(root, require_persisted=True)
+        except ValueError:
+            conflicts.append("ai/state/project.json")
+            print("SCAFFOLD_CONFLICT path=ai/state/project.json reason=invalid_identity")
+            key = None
+        else:
+            skips.append("ai/state/project.json")
+    else:
+        key = "proj1_" + secrets.token_hex(16)
+        payload = {"schema": 1, "project_key": key, "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
+        identity.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
+        identity.chmod(0o644)
+        created.append("ai/state/project.json")
+    if conflicts:
+        print(f"SCAFFOLD_CONFLICTS n={len(conflicts)}")
+        return 1
+    for path in created:
+        print(f"SCAFFOLD_CREATED path={path}")
+    for path in skips:
+        print(f"SCAFFOLD_SKIP path={path}")
+    print(f"SCAFFOLD_OK project={root} project_key={key}")
+    return 0
+
+
+def cmd_routing_migrate() -> int:
+    try:
+        key = project_key_for(ROOT, require_persisted=True)
+        # Production keeps ADR-0005's fixed store root. The existing seam is
+        # used only by hermetic tests, so migration can be exercised safely.
+        rows, backup = _routing_store().migrate_from_v4(key)
+    except (ValueError, routing.RoutingError, OSError):
+        print("ROUTING_MIGRATE_FAILED", file=sys.stderr)
+        return 2
+    print(f"ROUTING_MIGRATE_OK from=4 to=5 rows={rows} backup={backup}")
+    return 0
+
+
 def run_tty(command):
     """Foreground child with inherited TTY: sudo/login prompts must reach the user."""
     return subprocess.run(command, check=False).returncode
@@ -1304,6 +1547,9 @@ def main():
     parser.add_argument("--route-terminal", nargs=2, metavar=("RUN_ID", "OUTCOME"))
     parser.add_argument("--routing-open-runs", action="store_true")
     parser.add_argument("--routing-recent-writers", action="store_true")
+    parser.add_argument("--routing-migrate", action="store_true", help="migra explícitamente la DB de routing schema-4 a schema-5")
+    parser.add_argument("--project", metavar="DIR", help="ancla explícita del proyecto para ruteo")
+    parser.add_argument("--scaffold", nargs="?", metavar="DIR", const="", help="crea el estado portable mínimo del proyecto")
     parser.add_argument("--fresh-probes", action="store_true", help="con --route-decide: saltea el cache de probes")
     parser.add_argument("--latency-ms", type=int, default=None, help="con --route-terminal: latencia observada")
     parser.add_argument("--json", action="store_true", help="salida JSON para comandos de observabilidad")
@@ -1343,11 +1589,11 @@ def main():
     # straight through every mode check into the interactive menu/help instead of failing closed.
     _mode_flags = (args.route_explain is not None, args.routing_report, args.route_decide is not None,
                    args.route_dispatched is not None, args.route_terminal is not None,
-                   args.routing_open_runs, args.routing_recent_writers)
+                   args.routing_open_runs, args.routing_recent_writers, args.routing_migrate)
     routing_mode = any(_mode_flags)
     _routing_args = {"json", "route_explain", "routing_report", "route_decide", "route_dispatched",
                      "route_terminal", "routing_open_runs", "routing_recent_writers",
-                     "fresh_probes", "latency_ms"}
+                     "routing_migrate", "fresh_probes", "latency_ms", "project"}
     other_mode = any(value != parser.get_default(name)
                      for name, value in vars(args).items() if name not in _routing_args)
     modifier_misuse = (args.fresh_probes and args.route_decide is None) or \
@@ -1355,6 +1601,31 @@ def main():
     if (sum(_mode_flags) > 1) or (routing_mode and other_mode) or modifier_misuse:
         _routing_output(routing.cli_envelope(False, "routing", {}, (), ("ROUTING_INPUT_INVALID",)), routing_human)
         return 2
+    if args.scaffold is not None:
+        return cmd_scaffold(args.scaffold or None)
+    global PROJECT_ROOT, PROJECT_KEY, ROUTING_WARNINGS
+    if routing_mode and not args.routing_migrate:
+        try:
+            PROJECT_ROOT = resolve_project_root(Path.cwd(), args.project)
+            if PROJECT_ROOT is None:
+                if args.route_decide is not None:
+                    _routing_output(routing.cli_envelope(False, "route-decide", {}, ("PROJECT_ROOT_UNRESOLVED",), ("ROUTING_UNAVAILABLE",)), routing_human)
+                else:
+                    _routing_output(routing.cli_envelope(False, "routing", {}, ("PROJECT_ROOT_UNRESOLVED",), ("ROUTING_UNAVAILABLE",)), routing_human)
+                return 1
+            PROJECT_KEY = project_key_for(PROJECT_ROOT)
+            os.environ["SET_AGENTS_PROJECT"] = str(PROJECT_ROOT)
+            # Schema migration is operator-driven.  The probe is read-only and
+            # merely adds a stable diagnosis to the normal fail-closed envelope.
+            ROUTING_WARNINGS = (("ROUTING_SCHEMA_MIGRATION_REQUIRED",)
+                                if _routing_store().migration_required() else ())
+        except ProjectIdentityError:
+            _routing_output(routing.cli_envelope(False, "routing", {}, ("PROJECT_IDENTITY_INVALID",),
+                                                  ("ROUTING_UNAVAILABLE",)), routing_human)
+            return 1
+        except ValueError:
+            _routing_output(routing.cli_envelope(False, "routing", {}, (), ("ROUTING_INPUT_INVALID",)), routing_human)
+            return 2
     if args.route_explain is not None:
         return cmd_route_explain(args.route_explain, human=routing_human)
     if args.routing_report:
@@ -1369,6 +1640,8 @@ def main():
         return cmd_routing_open_runs(human=routing_human)
     if args.routing_recent_writers:
         return cmd_routing_recent_writers(human=routing_human)
+    if args.routing_migrate:
+        return cmd_routing_migrate()
     if args.doctor:
         return cmd_doctor(args.harness, human=routing_human)
 

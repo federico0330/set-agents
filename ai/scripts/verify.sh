@@ -4,7 +4,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 ./build.sh --check
-python3 -m unittest discover -s tests -v
+# The guest portability regression already exercises scaffold, install, and
+# routing before it calls this script.  Re-running the whole suite from that
+# copied checkout exceeds the bounded E2E budget without adding coverage; run
+# the portable script/build checks there instead.  Normal verification always
+# retains the complete suite.
+if [[ "${SET_AGENTS_GUEST_VERIFY:-}" == "1" ]]; then
+  python3 -m unittest -v \
+    tests.test_harness.HarnessTests.test_check_and_native_codex_agents \
+    tests.test_harness.HarnessTests.test_shell_scripts_parse
+else
+  python3 -m unittest discover -s tests -v
+fi
 python3 -m py_compile ai/scripts/*.py ai/scripts/routing_core/*.py tests/*.py
 git diff --check
 
@@ -14,4 +25,29 @@ trap 'rm -rf "$STAGING"' EXIT
 for harness in opencode claude-code codex; do
   diff -ruN "Global/$harness" "$STAGING/$harness"
 done
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+global_root = root / "Global"
+legacy = {
+    "_canonical/opencode-agents/package-gate-runner.md",
+    "opencode/agents/package-gate-runner.md",
+}
+for path in global_root.rglob("*"):
+    if not path.is_file():
+        continue
+    raw = path.read_bytes()
+    rel = str(path.relative_to(global_root))
+    if b"ai/scripts/set_agents_app.py" in raw:
+        if b"__SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py" not in raw:
+            raise SystemExit(f"GLOBAL_PLACEHOLDER_MISSING file={rel}")
+        if raw.count(b"ai/scripts/set_agents_app.py") != raw.count(b"__SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py"):
+            raise SystemExit(f"GLOBAL_BARE_APP_CLI file={rel}")
+    if str(root).encode() in raw:
+        raise SystemExit(f"GLOBAL_BUILDER_PATH file={rel}")
+    if (b"/home/" in raw or b"/Users/" in raw) and rel not in legacy:
+        raise SystemExit(f"GLOBAL_ABSOLUTE_PATH_RATCHET file={rel}")
+print("GLOBAL_PORTABILITY_OK")
+PY
 echo "VERIFY_PASS"

@@ -152,6 +152,10 @@ GUEST                     HARNESS (any HARNESS_HOME)         PROJECT (any PROJEC
   attempted, Then a stable unavailable outcome fires and the BASE agent spawns.
 - Given a scaffolded directory that has `ai/state/features/` but NO `.git` (not yet version-controlled),
   When routing is attempted, Then it resolves normally as a valid `PROJECT_ROOT` — NOT a degrade case.
+- Given Pi starts from a user-project subdirectory, When its lifecycle invokes `--route-decide`,
+  `--route-dispatched`, and any normal or exception-path `--route-terminal`, Then every invocation uses the
+  same explicit routing cwd, and the resulting `dispatches.project_key` is the user project's persisted id;
+  Pi's own execution cwd remains unchanged.
 
 **AC-09 the guest proof — hermetic scripted test**
 - Given a role OTHER than the implementer runs the test (gate-runner/package-reviewer, never

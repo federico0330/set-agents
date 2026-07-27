@@ -156,7 +156,7 @@ For the five tiered roles above, the model is chosen PER TASK by the routing bra
 static agent — you consume that decision and spawn the OpenCode variant it honors:
 
 1. **Decide.** Before delegating, run
-   `python3 ai/scripts/set_agents_app.py --route-decide <descriptor-file|-> --json` with a descriptor
+   `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-decide <descriptor-file|-> --json` with a descriptor
    carrying `role`, `task_class`, optional `risk` (raise-only), `feature_id`/`package_id` (default to the
    active feature/package), and — for a review role — `review_of_run_id`. Always read both `ok` AND the
    envelope's `reason_codes` — the branching below depends on the EXACT reason code(s), never on the exit
@@ -179,7 +179,7 @@ static agent — you consume that decision and spawn the OpenCode variant it hon
       - **Off-lane model.** `ok=true`, `data.execution_enabled=true`, but `data.provider != "openai-codex"`
         (e.g. an anthropic fallback like `haiku`/`sonnet`/`opus` — a model this lane genuinely cannot
         spawn). The routing brain DID authorize a run; it is simply not one OpenCode can dispatch. Close it
-        as abandoned (`python3 ai/scripts/set_agents_app.py --route-terminal <run_id> failure`), then spawn
+        as abandoned (`python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> failure`), then spawn
         the BASE static agent `<role>`.
       - **Router/probe unavailable.** `reason_codes == ["ROUTING_UNAVAILABLE"]` (or the CLI call itself
         failed to produce a usable decision: crash, timeout, malformed output). No run was ever authorized
@@ -203,12 +203,12 @@ static agent — you consume that decision and spawn the OpenCode variant it hon
       hard denial (3c): halt, never degrade.
 4. **Reviewers** (`package-reviewer`, `delta-reviewer`, `security-auditor`) are routed to a variant ONLY
    with a verified `review_of_run_id` — sourced from the package's recorded writer run in state, or from
-   `python3 ai/scripts/set_agents_app.py --routing-recent-writers` when context was compacted and the id was
+   `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing-recent-writers` when context was compacted and the id was
    lost. Never guess or fabricate a `review_of_run_id`: omitting it yields the benign
    `REVIEW_IDENTITY_UNVERIFIED` (3b, spawn the base reviewer); submitting a wrong one risks the hard-denial
    `REVIEW_IDENTITY_INVALID` (3c, halt) — when in doubt, omit rather than guess.
 5. **Worker death.** If a spawned instance dies or is lost without reaching a terminal state, close its run
-   the same way as an off-lane degrade: `python3 ai/scripts/set_agents_app.py --route-terminal <run_id>
+   the same way as an off-lane degrade: `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id>
    failure`, then continue per your retry budget (Spawn economy above).
 6. **Narrate the decision.** The opening narration block (`record-spawn`) and its `Ingeniería:` line must
    name the decision's `route_id`/`run_id` alongside the exact outcome: which variant matched, which

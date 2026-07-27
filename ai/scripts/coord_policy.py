@@ -5,6 +5,11 @@ import re
 import shlex
 import sys
 
+# Keep the full marker in source artifacts. install.py replaces this exact byte
+# sequence only when writing the installed policy, while verify.sh can prove the
+# tracked Global/** tree never baked a builder-specific root.
+APP_CLI = "__SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py"
+
 SAFE = [
     r"git (status|diff|log|show)(\s|$)",
     r"(rg|bat|eza|fd)(\s|$)",
@@ -25,13 +30,13 @@ SAFE = [
     # writes only atomic JSON under ai/state/. FORBIDDEN_SYNTAX still blocks any
     # shell composition around it.
     r"python3 ai/scripts/feature-state\.py \S+",
-    # Second sanctioned mutation channel (contract 004 T-203): the routing CLI.
-    # `--route-decide` is itself a mutating command for writer roles (it authorizes a
-    # durable run) and is deliberately documented here as such rather than labeled
-    # read-only; the coord ALSO closes runs it owns via `--route-dispatched`/
-    # `--route-terminal` (model-mismatch and worker-death doctrine below), narrated on
-    # use like every other spawn. FORBIDDEN_SYNTAX still blocks shell composition.
-    r"python3 ai/scripts/set_agents_app\.py --rout(e|ing)-\S+",
+]
+
+# Exact argv comparison keeps a baked path with spaces auditable without turning it
+# into a permissive raw-string/glob rule.  The tracked copy intentionally matches no
+# local invocation until install.py substitutes HARNESS_HOME.
+SAFE_ARGV = [
+    ({"python3", "python"}, APP_CLI, re.compile(r"--rout(e|ing)-\S+")),
 ]
 
 FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")
@@ -52,14 +57,23 @@ def always_denied(command: str) -> bool:
     return bool(ALWAYS_DENY.search(command.strip()))
 
 
+def _argv_allowed(argv: list[str]) -> bool:
+    if len(argv) < 3:
+        return False
+    return any(argv[0] in interpreters and argv[1] == script and flag.fullmatch(argv[2])
+               for interpreters, script, flag in SAFE_ARGV)
+
+
 def allowed(command: str) -> bool:
     command = command.strip()
     if not command or "\n" in command or FORBIDDEN_SYNTAX.search(command) or FORBIDDEN_OPTIONS.search(command):
         return False
     try:
-        shlex.split(command)
+        argv = shlex.split(command)
     except ValueError:
         return False
+    if _argv_allowed(argv):
+        return True
     return any(re.fullmatch(pattern + r".*", command) for pattern in SAFE)
 
 
