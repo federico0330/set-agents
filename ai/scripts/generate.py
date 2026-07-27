@@ -489,6 +489,22 @@ def check_variant_catalog_coherence(role_tiers, routes_path):
                 )
 
 
+def validate_pi_target(roles):
+    """AC-10 (contract 004 T-302, ADR-0007): pi gets NO generated agent tree — the
+    architecture's deliberate deviation is that pi's role artifact IS the canonical
+    prompt every other harness already derives from (`Global/_canonical/agents/<role>.md`,
+    read verbatim by `ai/scripts/set_agents_spawn.py` via `--append-system-prompt`), so
+    'semantically equivalent role artifacts' reduces to: every role the spawner can
+    address has that canonical prompt on disk. `load_roles` already enforces this for
+    the three generated harnesses; this re-asserts it explicitly so a 'pi target' verify
+    surface exists, per AC-10, without duplicating a generated tree that would only ever
+    re-copy the same file `install.py` never needs to manage (there is no per-user pi
+    settings surface this repo owns — see docs/adr/0007-pi-lane.md)."""
+    for row in roles:
+        if not (CANON / "agents" / f"{row['role']}.md").is_file():
+            die(f"pi target: {row['role']}: missing canonical prompt")
+
+
 def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=None):
     profile = models_config.active_profile()
     roles = roles or load_roles(profile, models_path=models_path)
@@ -524,6 +540,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
         if f'    "{name}": allow' not in orchestrator:
             die(f"orchestrator cannot delegate required tier variant: {name}")
     check_variant_catalog_coherence(role_tiers, routes_path)
+    validate_pi_target(roles)
 
 
 def main():

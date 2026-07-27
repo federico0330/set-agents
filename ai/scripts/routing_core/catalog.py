@@ -15,6 +15,46 @@ from .domain import CatalogSnapshot, RoutingError, StaticRoute, _sorted_strings
 # the invalidation key covers uid and the canonical catalog/routing config.
 PROBE_CACHE_TTL = 300.0
 
+# ADR-0007 (P3-pi-lane, T-301/T-305): pi is invoked through an EXACT pinned version, never
+# the bare `pi` on PATH (the managed `~/.local/bin/pi` wrapper only soft-pins by release
+# age via PNPM_CONFIG_MINIMUM_RELEASE_AGE) — the probe below and the T-303 spawner share
+# this ONE invocation builder, so the audited pair and the executed child are provably the
+# same binary. Bump PI_PINNED_VERSION deliberately (code review), never silently.
+PI_PACKAGE = "@earendil-works/pi-coding-agent"
+PI_PINNED_VERSION = "0.81.1"
+
+# PKG-N02 (repair R1): `set_agents_app.py --doctor --harness pi` already allows 60s
+# (DOCTOR_TIMEOUT_SECONDS in set_agents_spawn.py) for a cold `pnpm dlx` resolution on the
+# FIRST invocation of the pinned version in a given pnpm store. `probe_inventory`'s own
+# default timeout (20s, chosen for the other three runtimes' fast local CLI probes) was
+# never raised to match, so a genuinely cold store could silently time out the pi probe
+# and produce a false PROVIDER_UNAUTHENTICATED until the store warmed — this floor closes
+# that gap for the pi pairs specifically, without slowing down the other (already-fast)
+# probes that share the same `timeout` parameter.
+PI_PROBE_MIN_TIMEOUT_SECONDS = 60.0
+
+
+def pi_pinned_argv(*args: str) -> tuple[str, ...]:
+    """Exact-version-pinned `pi` invocation shared by the probe (here) and set_agents_spawn.
+
+    Deliberately NO `--` separator before `args`: live QA (2026-07-27) found `pnpm dlx
+    --package <pkg> pi -- <args>` forwards that `--` VERBATIM into pi's own argument
+    parser instead of stripping it — `pi --version`/`pi --list-models` tolerate the stray
+    token (both short-circuit on the first recognized early-exit flag regardless of what
+    else is on the line), which silently masked the bug for the probe/doctor calls, but a
+    real spawn invocation (`--model ... --print ...`) fails hard with `Unknown option: --`.
+    `pnpm dlx --package <pkg> <bin> <args...>` (no separator) is the correct form."""
+    return ("pnpm", "dlx", "--package", f"{PI_PACKAGE}@{PI_PINNED_VERSION}", "pi", *args)
+
+
+# T-305: catalog model id -> Pi canonical model id. openai-codex is IDENTITY (spike-verified
+# live, 2026-07-27: catalog `gpt-5.6-luna|sol|terra` == Pi's raw id, zero translation).
+# anthropic short catalog names need this curated map (spike-verified against a live
+# `pi --list-models`, aligned with the harness's own Claude tiers: auditors=opus-4.8,
+# implement=sonnet-5, mechanical=haiku-4.5) — the ONLY translation P3 needs, user-adjustable
+# if Pi's catalog names move.
+PI_MODEL_MAP = {"anthropic": {"opus": "claude-opus-4-8", "sonnet": "claude-sonnet-5", "haiku": "claude-haiku-4-5"}}
+
 # The audited pair table is the single source of runtime/provider compatibility:
 # a pair absent here can never authenticate, list models, or appear in identities.
 _PAIR_COMMANDS = {
@@ -22,6 +62,8 @@ _PAIR_COMMANDS = {
     ("claude-code", "anthropic"): (("claude", "auth", "status", "--json"),),
     ("opencode", "openai-codex"): (("opencode", "auth", "list", "--pure"), ("opencode", "models", "openai", "--pure")),
     ("opencode", "anthropic"): (("opencode", "auth", "list", "--pure"), ("opencode", "models", "anthropic", "--pure")),
+    ("pi", "openai-codex"): (pi_pinned_argv("--list-models"),),
+    ("pi", "anthropic"): (pi_pinned_argv("--list-models"),),
 }
 # Catalog provider -> provider key as the opencode CLI prints it.
 _OPENCODE_PROVIDER_KEYS = {"openai-codex": "openai", "anthropic": "anthropic"}
@@ -85,6 +127,41 @@ def _parse_opencode_models(stdout: str, provider_key: str) -> set[str]:
         if model:
             models.add(model)
     return models
+
+
+def _parse_pi_models(stdout: str, provider: str) -> set[str]:
+    """`pi --list-models` prints a `provider  model  ...` column table (header row first,
+    columns whitespace-separated); only rows whose first column matches `provider` are
+    read. openai-codex ids are catalog-IDENTITY (returned verbatim, spike-verified);
+    anthropic raw ids are translated through PI_MODEL_MAP so callers intersect against the
+    SAME short-name vocabulary every other pair uses — a raw Pi id never leaks through
+    untranslated. An unrecognized header shape fails closed (PROVIDER_UNAUTHENTICATED),
+    same discipline as the opencode parsers above."""
+    lines = _clean_lines(stdout)
+    if not lines or lines[0].split()[:2] != ["provider", "model"]:
+        raise RoutingError("PROVIDER_UNAUTHENTICATED")
+    raw = {parts[1] for line in lines[1:] if len(parts := line.split()) >= 2 and parts[0] == provider}
+    if provider == "openai-codex":
+        return raw
+    return {short for short, canonical in PI_MODEL_MAP.get(provider, {}).items() if canonical in raw}
+
+
+def pi_auth_provider_keys() -> frozenset[str]:
+    """Read-only key-SET of `~/.pi/agent/auth.json` (spike Q2): provider NAMES only, never
+    token values, never logged. Any surprise (missing file, symlink, foreign shape, bad
+    JSON) is an empty set, fail-closed — this never raises and the caller never sees a
+    credential value, only whether a provider name is present as a key."""
+    path = Path.home() / ".pi/agent/auth.json"
+    try:
+        st = path.lstat()
+        if _stat.S_ISLNK(st.st_mode) or not _stat.S_ISREG(st.st_mode):
+            return frozenset()
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return frozenset()
+    if not isinstance(doc, dict):
+        return frozenset()
+    return frozenset(key for key in doc if isinstance(key, str))
 
 
 def _cache_key(config: dict) -> str:
@@ -183,11 +260,14 @@ def _probe_pairs(config: dict, pairs, timeout: float, ran=None) -> dict[tuple[st
         if not allowed:
             continue
         completed, failed = [], False
+        # PKG-N02: only the pi pairs get the cold-pnpm floor; every other pair keeps the
+        # caller's own timeout unchanged.
+        pair_timeout = max(timeout, PI_PROBE_MIN_TIMEOUT_SECONDS) if runtime == "pi" else timeout
         for argv in commands:
             if argv not in ran:
                 try:
                     ran[argv] = subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                               text=True, timeout=timeout, check=False, env=probe_env)
+                                               text=True, timeout=pair_timeout, check=False, env=probe_env)
                 except (OSError, subprocess.TimeoutExpired):
                     ran[argv] = None
             if ran[argv] is None:
@@ -202,6 +282,13 @@ def _probe_pairs(config: dict, pairs, timeout: float, ran=None) -> dict[tuple[st
                 models = allowed if _parse_codex_login(completed[0].stdout, completed[0].stderr) else set()
             elif runtime == "claude-code":
                 models = allowed if _parse_claude_auth(completed[0].stdout) else set()
+            elif runtime == "pi":
+                # Belt-and-suspenders (T-305, spike Q2): the auth.json key-set is a cheap,
+                # non-subprocess signal alongside the naturally fail-closed column-parse
+                # below (an unauthenticated provider simply has no rows in --list-models).
+                if provider not in pi_auth_provider_keys():
+                    continue
+                models = allowed & _parse_pi_models(completed[0].stdout, provider)
             else:
                 provider_key = _OPENCODE_PROVIDER_KEYS[provider]
                 credentials = _parse_opencode_auth(completed[0].stdout)

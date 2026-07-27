@@ -30,7 +30,7 @@
     "max_repairs_per_finding": 2,
     "max_spawns_per_package": 12
   },
-  "current_package_id": "P2-opencode-lane",
+  "current_package_id": "P3-pi-lane",
   "feature_id": "004-adaptive-dispatch",
   "final_state": null,
   "global_gates": [],
@@ -861,13 +861,415 @@
       "package_id": "P2-opencode-lane",
       "timestamp": "2026-07-27T12:07:02+00:00",
       "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Correction: P2 was moved to INTEGRATION prematurely (integration=commit conflated with feature-level INTEGRATION phase). Feature has remaining package P3-pi-lane; reverting to PACKAGE_ACCEPTED to plan P3. INTEGRATION is reserved for after ALL packages are accepted, before DONE."
+      },
+      "package_id": "P2-opencode-lane",
+      "timestamp": "2026-07-27T12:07:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P2 accepted+installed; T-300 spike FEASIBLE + proven live; begin P3-pi-lane."
+      },
+      "package_id": null,
+      "timestamp": "2026-07-27T12:31:42+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "T-301",
+          "T-302",
+          "T-303",
+          "T-304",
+          "T-305"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T12:31:57+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Context pack accepted; baseline ced2caa; mechanism proven live in T-300."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T12:31:57+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un implementador va a construir el ultimo tramo: que el arnes pueda delegar tareas al motor Pi eligiendo el modelo exacto de CUALQUIER proveedor por tarea (no solo dentro de una familia), con una instalacion controlada de Pi, un chequeo de salud, y candados para que esos agentes no se desmadren. Es lo que ningun otro runtime permite y ya lo probamos funcionando en vivo.",
+        "purpose": "Implement T-301..T-305 of P3-pi-lane from the approved context pack",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "PACKAGE_IMPLEMENTATION P3-pi-lane spawn 1/12 (Claude in-session): T-301 ADR-0007 + managed pinned pi install + doctor --harness pi; T-302 minimal pi target generate/install; T-303 set_agents_spawn.py CLI-subprocess spawner (pi --model provider/model --print --mode json --no-session, lifecycle incl crash=>failure, decided-model verification); T-304 spawn guards as flags (fresh ctx, --no-extensions depth-0, read-only until green); T-305 (pi,openai-codex)+(pi,anthropic) probe pairs + parsers (pi --list-models + auth.json key-set, positives-only) + PI_SIMULATION_ONLY flip (service.py:132 gated on doctor green) + model-id map (openai-codex identity; anthropic opus->claude-opus-4-8/sonnet->claude-sonnet-5/haiku->claude-haiku-4-5). Baseline ced2caa. Pi authenticated (anthropic+openai-codex)."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T12:32:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-301",
+        "validations": [
+          "ADR-0007 written (CLI-subprocess vs SDK w/ live proof, guards-as-flags, model-id map, flip conditions); managed pinned pi install (PI_PINNED_VERSION/pi_pinned_argv) + --doctor --harness pi (version+auth key-set+list-models, no token dump)"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:13:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-302",
+        "validations": [
+          "minimal pi target: validate_pi_target in generate.py; no generated pi tree; spawner passes canonical role prompt via --append-system-prompt; fresh-context/no-delegation/depth-0"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:13:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-303",
+        "validations": [
+          "set_agents_spawn.py CLI-subprocess spawner: spawn/route_and_spawn/doctor; JSON stream parse agent_start->agent_settled; decided-model verification via message.model; crash(exit!=0/missing settled)=>failure; P1 lifecycle integration. Live: openai-codex full success"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:13:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-304",
+        "validations": [
+          "guards as flags + per-guard tests: --no-session fresh ctx, --no-extensions depth-0 (live: zero delegation tool at widest tier), read-only allowlist until green (live: read-only child could not write when asked)"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:13:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-305",
+        "validations": [
+          "(pi,openai-codex)+(pi,anthropic) pairs + _parse_pi_models + pi_auth_provider_keys (positives-only); PI_MODEL_MAP (openai-codex identity; anthropic opus->claude-opus-4-8/sonnet->claude-sonnet-5/haiku->claude-haiku-4-5); PI_SIMULATION_ONLY flip service.py:132 gated on doctor; overview.md updated. Live-QA fixed real -- separator bug"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:13:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "T-301..T-305 implemented; live QA both providers; 165 tests VERIFY_PASS; independent gates required."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:13:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Una instancia independiente repite todas las validaciones del ultimo tramo y comprueba que no rompio nada ni se salio de su alcance.",
+        "purpose": "Independent deterministic gates for P3-pi-lane",
+        "role": "gate-runner",
+        "spawns": 2,
+        "tech": "PACKAGE_GATES P3-pi-lane gate-runner read-only spawn 2/12: unittest 165, build.sh --check, py_compile incl set_agents_spawn+routing_core, verify.sh drift, git diff --check, ownership vs ced2caa, doctor pi green, openai-codex live decide->spawn->terminal ONLY (Claude quota exhausted -> anthropic via hermetic tests+evidence, no live re-run)."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:14:18+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "p3-package-gates",
+        "status": "pass"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:23:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:23:40+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Gates pass; package integrated in working tree; open P3-R1 review panel."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:23:40+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P3-R1",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:23:40+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente comprueba que el carril Pi cumple cada criterio aprobado, que el flip de ejecucion es seguro, y que ningun test se debilito.",
+        "purpose": "Deep independent package review of P3-pi-lane against contract 1.1.0 (AC-09..13)",
+        "role": "package-reviewer",
+        "spawns": 3,
+        "tech": "Panel P3-R1 package-reviewer read-only over ced2caa..WORKTREE spawn 3/12: AC-09/10/11/11g/12/13 conformance, spawner lifecycle correctness (crash=>failure, decided-model verification), flip safety+fail-closed, probe parser fidelity, model-id map, the 1 deleted test (behavior-change vs weakening), no P1/P2 regressions."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:24:07+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "En paralelo, un auditor intenta hacer que un agente Pi escape sus candados, delegue, corra un modelo no autorizado, o filtre credenciales.",
+        "purpose": "Independent security review of Pi spawner, guards, doctor, and PI_SIMULATION_ONLY flip",
+        "role": "security-auditor",
+        "spawns": 4,
+        "tech": "Panel P3-R1 security-auditor read-only spawn 4/12: guard bypass (--no-extensions/--no-session/read-only allowlist), depth-0/no-delegation escape, decided-model spoof (message.model verification bypass), flip abuse (execute against unverified pi), auth.json token redaction in doctor/probes, crash=>failure integrity, command-injection in pi argv/--append-system-prompt. R3 threat model applies."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:24:07+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 4,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:30:28+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 4,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:30:28+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "P3-R1",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:30:45+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un reparador cierra los detalles de seguridad antes de aceptar: el mas importante evita que una tarea maliciosa disfrazada de opcion le saque los candados al agente Pi; los demas endurecen el aislamiento y el cierre limpio de cada tarea.",
+        "purpose": "Consolidated repair R1 of P3-R1 findings SEC-A01/A02/A04/A05 + PKG-N01/N02",
+        "role": "repair-agent",
+        "spawns": 5,
+        "tech": "PACKAGE_REPAIR R1 repair-agent (Claude in-session) spawn 5/12: SEC-A01 HIGH neutralize untrusted task-as-flag (fail closed TASK_LOOKS_LIKE_FLAG or stdin) + hostile-task test; SEC-A02 gate GUARD_TOOLS_CODE_RW behind bash-sandbox story (read-only until green) + --no-context-files unconditional; PKG-N01/SEC-A03 wrap dispatch->spawn->terminal try/finally (no orphan run); SEC-A04 detect modelFallbackMessage->mismatch; SEC-A05 redact raw pi stderr from persisted envelope; PKG-N02 align probe timeout w/ doctor cold-pnpm. No core mutation; regression net strengthened."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:30:55+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-A01",
+          "SEC-A02",
+          "SEC-A04",
+          "SEC-A05",
+          "PKG-N01",
+          "PKG-N02"
+        ]
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:54:21+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una validacion independiente repite todas las pruebas del tramo reparado antes del revisor final.",
+        "purpose": "Independent gates for consolidated repair R1 before delta review",
+        "role": "gate-runner",
+        "spawns": 6,
+        "tech": "DELTA_REVIEW R1 gate-runner read-only spawn 6/12: unittest 172, build.sh --check, py_compile, verify.sh drift, git diff --check, ownership vs ced2caa, SEC-A01 hostile-task refusal live openai-codex only."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:54:31+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor distinto reproduce cada arreglo de seguridad y comprueba que sea real, sin reabrir la revision general.",
+        "purpose": "Focused independent delta review of consolidated repair R1 against P3-R1 findings",
+        "role": "delta-reviewer",
+        "spawns": 7,
+        "tech": "DELTA_REVIEW R1 delta-reviewer read-only spawn 7/12: resolved|open per SEC-A01/A02/A04/A05/PKG-N01/N02; reproduce SEC-A01 hostile-task neutralization; check delta regressions; core AM-1/AM-2 + flip untouched."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T13:54:32+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "r1-post-repair-verification",
+        "status": "pass"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T14:01:23+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T14:01:23+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests -v",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T14:01:38+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T14:01:38+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T14:01:38+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
-    "delta_reviews": 2,
+    "delta_reviews": 3,
     "human_questions_after_approval": 0,
-    "package_reviews": 2,
-    "repair_batches": 2,
+    "package_reviews": 3,
+    "repair_batches": 3,
     "task_deep_reviews": 0
   },
   "mode": "feature",
@@ -1551,10 +1953,330 @@
           "status": "pass"
         }
       ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-09g",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-11g",
+        "AC-12",
+        "AC-13"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 7,
+        "subdivisions": 0
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/004-adaptive-dispatch/context/P3-pi-lane.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-27T14:01:23+00:00",
+          "closed_findings": [
+            "SEC-A01",
+            "SEC-A02",
+            "SEC-A04",
+            "SEC-A05",
+            "PKG-N01",
+            "PKG-N02"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Independent delta R1: all 6 resolved via own PoCs. SEC-A01 truly closed (task.lstrip().startswith('-') before argv/subprocess; refuses --tools=/-x/--offline/-- and whitespace variants; list-form argv, no shell). SEC-A02 code-rw unreachable from route_and_spawn/main, --no-extensions+--no-context-files unconditional (depth-0 restored). PKG-N01/SEC-A03 dispatch->spawn->terminal try/except best-effort close. SEC-A04 stderr fallback-marker scan. SEC-A05 _redact at all persisted sites. PKG-N02 pi-pair timeout floor 60s. No regressions; service.py/install.py untouched by repair; flip fail-closed holds; 172 additive. requires_full_review false. Info-only: dash-leading tasks fail closed = intended conservative behavior.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "ced2caa..WORKTREE",
+      "findings": [
+        {
+          "category": "integration",
+          "file": "ai/scripts/set_agents_spawn.py",
+          "id": "PKG-N01",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "route_and_spawn --route-dispatched/--route-terminal via _run_app_cli not wrapped in try/finally; exception (TimeoutExpired/OSError) leaves authorized run OPEN (orphan); wrap so any exception forces --route-terminal failure"
+        },
+        {
+          "category": "scalability",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "PKG-N02",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "probe_inventory default timeout 20s vs doctor 60s cold-pnpm; cold pnpm dlx resolution can time out pi probe -> silent PROVIDER_UNAUTHENTICATED until warm; align timeout or document warm-store precondition"
+        },
+        {
+          "category": "correctness",
+          "file": "ai/scripts/install.py",
+          "id": "PKG-N03",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "accepted",
+          "summary": "AC-10 literal pi-target deviation (install.py unchanged; validate_pi_target + --no-extensions instead); pre-approved in context pack + ADR-0007; orchestrator confirms"
+        },
+        {
+          "category": "correctness",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "PKG-N04",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "accepted",
+          "summary": "AC-09 managed-dir realized as pnpm content-addressed store (pnpm dlx --package @pkg@0.81.1); rollback=one-line PI_PINNED_VERSION revert; pre-approved ADR-0007; orchestrator confirms"
+        },
+        {
+          "category": "security",
+          "file": "ai/scripts/set_agents_spawn.py",
+          "id": "SEC-A01",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "argument injection: untrusted task is trailing positional with NO -- barrier (pi rejects --); task=\"--tools=bash,edit,write\" (single equals-token) could override read-only guard last-wins; neutralize task starting with - (fail closed TASK_LOOKS_LIKE_FLAG) or feed via stdin/sentinel + test hostile task refuses"
+        },
+        {
+          "category": "security",
+          "file": "ai/scripts/set_agents_spawn.py",
+          "id": "SEC-A02",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "GUARD_TOOLS_CODE_RW adds bash => child can re-invoke pi via bash and self-delegate, bypassing --no-extensions depth-0; gate code-rw behind a bash-sandbox story (keep read-only until green) + set --no-context-files unconditionally for caller-passed spawn_cwd"
+        },
+        {
+          "category": "security",
+          "file": "ai/scripts/set_agents_spawn.py",
+          "id": "SEC-A04",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "model-fallback not detected: check trusts message.model even under silent SDK modelFallbackMessage; scan events for fallback marker and treat as mismatch/failure"
+        },
+        {
+          "category": "security",
+          "file": "ai/scripts/set_agents_spawn.py",
+          "id": "SEC-A05",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "raw pi stderr slice echoed into failure detail/persisted envelope; child inherits full os.environ; redact/omit raw stderr or filter known secret shapes"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-27T13:23:39+00:00",
+          "evidence": "Independent 10-gate pass: unittest 165 (net +12 test_routing; 1 deleted+replaced=strengthening, flagged for panel); build.sh --check CHECK_PASS; py_compile clean; verify.sh VERIFY_PASS drift clean; git diff --check clean; ownership clean (install.py unchanged, read-only untouched); service.py flip narrow+gated+fail-closed (unauth pi->PROVIDER_UNAUTHENTICATED); doctor pi green (v0.81.1, anthropic+openai-codex, list-models ok, no token leak); live openai-codex decide->spawn->terminal success on decided gpt-5.6-luna $0.003; guards --no-session/--no-extensions unconditional + read-only default tools.",
+          "name": "p3-package-gates",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-27T14:01:23+00:00",
+          "evidence": "Independent R1 re-gate: unittest 172/172; build.sh --check CHECK_PASS; py_compile clean; verify.sh VERIFY_PASS drift clean; git diff --check clean; ownership clean (service.py/install.py/read-only untouched by repair); SEC-A01 live-refused (hostile task never starts subprocess); --no-context-files unconditional; code-rw unreachable from routed path; orphan-run try/except close confirmed; 7 new tests non-vacuous.",
+          "name": "r1-post-repair-verification",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Pi as fourth executable runtime: true cross-provider per-spawn model selection via pi --model CLI subprocess, consuming --route-decide; managed pinned install + doctor; probe pairs + PI_SIMULATION_ONLY flip",
+      "owned_paths": [
+        "docs/adr/0007-pi-lane.md",
+        "ai/scripts/set_agents_spawn.py",
+        "ai/scripts/routing_core/catalog.py",
+        "ai/scripts/routing_core/service.py",
+        "ai/scripts/models_config.py",
+        "models.toml",
+        "ai/scripts/generate.py",
+        "ai/scripts/install.py",
+        "ai/scripts/set_agents_app.py",
+        "tests/test_routing.py",
+        "tests/test_harness.py",
+        "docs/architecture/overview.md",
+        "docs/specs/004-adaptive-dispatch/context/P3-pi-lane.md",
+        "docs/specs/004-adaptive-dispatch/evidence/P3-*"
+      ],
+      "package_id": "P3-pi-lane",
+      "read_only_paths": [
+        "ai/catalogs/routes.v1.toml",
+        "roles.tsv",
+        "Global/_canonical/agents/**"
+      ],
+      "repairs": [
+        {
+          "at": "2026-07-27T13:54:21+00:00",
+          "changed_files": [
+            "ai/scripts/set_agents_spawn.py",
+            "ai/scripts/routing_core/catalog.py",
+            "tests/test_routing.py",
+            "docs/adr/0007-pi-lane.md",
+            "docs/architecture/overview.md",
+            "docs/specs/004-adaptive-dispatch/evidence/P3-repair-R1.md"
+          ],
+          "finding_ids": [
+            "SEC-A01",
+            "SEC-A02",
+            "SEC-A04",
+            "SEC-A05",
+            "PKG-N01",
+            "PKG-N02"
+          ],
+          "verification": [
+            "unittest 172 (was 165, +7, 0 weakened)",
+            "SEC-A01 confirmed real live (task '--offline' consumed by pi parser) + fail-closed fix verified live openai-codex",
+            "build.sh --check CHECK_PASS; py_compile clean; verify.sh VERIFY_PASS drift clean; git diff --check clean; service.py untouched"
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-27T13:30:45+00:00",
+          "panel_id": "P3-R1",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-27T13:23:40+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-27T13:30:28+00:00",
+              "evidence": "Verdict approve; core sound (165 independent). Flip fail-closed (unverified pi->PROVIDER_UNAUTHENTICATED, fresh re-probe before writer auth). Deleted test LEGITIMATE (behavior-change, stronger replacement). Findings for consolidation: orphan-run on lifecycle-CLI exception; probe timeout vs doctor; AC-09/10 literal deviations (info, pre-approved).",
+              "findings": [
+                "PKG-N01",
+                "PKG-N02",
+                "PKG-N03",
+                "PKG-N04"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-27T13:30:28+00:00",
+              "evidence": "Verdict repair_required (SEC-A01 HIGH). Flip cannot execute against unverified pi: SOUND (writer auth => AM-2 fresh re-probe, cache poisoning stopped at durable authorization). No shell injection. But untrusted task-as-flag argument injection is real.",
+              "findings": [
+                "SEC-A01",
+                "SEC-A02",
+                "SEC-A04",
+                "SEC-A05"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-27T13:30:45+00:00",
+          "evidence": "P3-R1: package-reviewer approve (core sound, flip fail-closed confirmed, deleted test legitimate stronger replacement); security-auditor repair_required (SEC-A01 HIGH argv-injection). Consolidated repair: SEC-A01 (task-as-flag neutralization), SEC-A02 (gate code-rw + --no-context-files), PKG-N01/SEC-A03 (lifecycle try/finally no orphan), SEC-A04 (model-fallback detect), SEC-A05 (stderr redaction), PKG-N02 (probe timeout). PKG-N03/N04 accepted via decision.",
+          "findings": [
+            "PKG-N01",
+            "PKG-N02",
+            "PKG-N03",
+            "PKG-N04",
+            "SEC-A01",
+            "SEC-A02",
+            "SEC-A04",
+            "SEC-A05"
+          ],
+          "panel_id": "P3-R1",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": "New runtime axis (4th executable runtime, live model selection); in-session Claude implementer, independent gates+panel+live QA after; mechanism proven live in spike.",
+      "runtime_qa": [
+        {
+          "at": "2026-07-27T14:01:38+00:00",
+          "browser": "",
+          "checks": [
+            "doctor --harness pi GREEN: pinned 0.81.1, providers [anthropic, openai-codex] authenticated, list-models OK, no token leak (key-set only)",
+            "Live openai-codex full lifecycle: route_and_spawn(implementer, mechanical) decide->dispatched->terminal success, spawned pi ran on DECIDED model openai-codex/gpt-5.6-luna (message.model verified), cost ~$0.003",
+            "Live anthropic decide->dispatch->spawn: decided-model verification passed before real Claude quota-exhaustion terminal failure (PI_TURN_ERROR handled; mechanism proven, failure was quota not bug)",
+            "SEC-A01 live: hostile task '--offline'/'--tools=...' refused TASK_LOOKS_LIKE_FLAG before any subprocess; crash=>failure shapes (unknown provider, timeout) close run; guards --no-session/--no-extensions/--no-context-files unconditional; read-only child could not write when asked"
+          ],
+          "evidence": "Live Pi routing verified against real authenticated Pi (both providers); true cross-provider per-spawn model selection working end-to-end; fail-closed on unverified pi, hostile task, and crash. Anthropic live-spawn consumed real Claude Pro/Max extra-usage quota (billed per token) and exhausted it - mechanism confirmed, not re-run.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": "claude-in-session",
+      "selected_role": "implementer",
+      "shared_paths": [
+        "ai/state/features/004-adaptive-dispatch.json"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "T-301",
+          "local_validations": [
+            "ADR-0007 written (CLI-subprocess vs SDK w/ live proof, guards-as-flags, model-id map, flip conditions); managed pinned pi install (PI_PINNED_VERSION/pi_pinned_argv) + --doctor --harness pi (version+auth key-set+list-models, no token dump)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-302",
+          "local_validations": [
+            "minimal pi target: validate_pi_target in generate.py; no generated pi tree; spawner passes canonical role prompt via --append-system-prompt; fresh-context/no-delegation/depth-0"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-303",
+          "local_validations": [
+            "set_agents_spawn.py CLI-subprocess spawner: spawn/route_and_spawn/doctor; JSON stream parse agent_start->agent_settled; decided-model verification via message.model; crash(exit!=0/missing settled)=>failure; P1 lifecycle integration. Live: openai-codex full success"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-304",
+          "local_validations": [
+            "guards as flags + per-guard tests: --no-session fresh ctx, --no-extensions depth-0 (live: zero delegation tool at widest tier), read-only allowlist until green (live: read-only child could not write when asked)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-305",
+          "local_validations": [
+            "(pi,openai-codex)+(pi,anthropic) pairs + _parse_pi_models + pi_auth_provider_keys (positives-only); PI_MODEL_MAP (openai-codex identity; anthropic opus->claude-opus-4-8/sonnet->claude-sonnet-5/haiku->claude-haiku-4-5); PI_SIMULATION_ONLY flip service.py:132 gated on doctor; overview.md updated. Live-QA fixed real -- separator bug"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-27T14:01:38+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests -v",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "R1 regression net: 172 tests (routing pi probe pairs/parser/model-map/flip-fail-closed/spawner guards/lifecycle/redaction/fallback; harness) + verify.sh VERIFY_PASS; independently re-run by gate-runner and reproduced by delta-reviewer; +7 repair tests, none weakened.",
+          "status": "pass"
+        }
+      ]
     }
   ],
-  "phase": "INTEGRATION",
-  "revision": 62,
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 92,
   "schema_version": 1,
-  "updated_at": "2026-07-27T12:07:02+00:00"
+  "updated_at": "2026-07-27T14:01:38+00:00"
 }

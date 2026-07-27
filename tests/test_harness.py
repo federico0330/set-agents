@@ -1323,6 +1323,16 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("variant coherence", result.stderr)
             self.assertIn("implementer@balanced", result.stderr)
 
+    def test_pi_target_validate_requires_canonical_prompt_per_role(self):
+        # AC-10/ADR-0007: pi gets no generated tree — its "role artifact" IS the
+        # canonical prompt every other harness already derives from, so the pi-target
+        # verify surface (generate.validate_pi_target, wired into generate.validate())
+        # reduces to: every addressable role has that file on disk.
+        generate = self._import("generate")
+        generate.validate_pi_target([{"role": "implementer"}])  # real role: does not raise
+        with self.assertRaisesRegex(ValueError, "pi target"):
+            generate.validate_pi_target([{"role": "definitely-not-a-real-role-xyz"}])
+
     def test_roles_tsv_with_model_columns_rejected_with_hint(self):
         legacy_header = "\t".join([
             "role", "mode", "temperature", "capability", "duty", "opencode_go",

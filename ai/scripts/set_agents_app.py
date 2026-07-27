@@ -23,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config
 import routing
+import set_agents_spawn
 
 # SET_AGENTS_ROOT/SET_AGENTS_STATE/SET_AGENTS_ROUTING_TEST_ROOT are test seams; real runs
 # never set them. routing_core itself never reads any of them (ADR-0006: the routing store's
@@ -353,6 +354,19 @@ def cmd_routing_recent_writers(human=False):
         _routing_output(routing.cli_envelope(True, "routing-recent-writers", data, (), ()), human); return 0
     except (routing.RoutingError, OSError):
         _routing_output(routing.cli_envelope(False, "routing-recent-writers", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
+
+
+def cmd_doctor(harness, human=False):
+    """AC-09: `--doctor --harness pi` — a redacted schema-2 envelope (pinned version,
+    auth.json KEY-SET, `pi --list-models` OK/FAIL). Never prints credential contents.
+    Only `--harness pi` is specified by this package; any other/absent harness is a
+    parse-time input error, not a routing decision."""
+    if harness != "pi":
+        _routing_output(routing.cli_envelope(False, "doctor", {}, (), ("DOCTOR_HARNESS_UNSUPPORTED",)), human); return 2
+    report = set_agents_spawn.doctor()
+    ok = bool(report.get("doctor_green"))
+    _routing_output(routing.cli_envelope(ok, "doctor", report, (), () if ok else ("PI_DOCTOR_NOT_GREEN",)), human)
+    return 0 if ok else 1
 
 
 def use_color():
@@ -1306,7 +1320,8 @@ def main():
     parser.add_argument("--mcp-remove", metavar="NAME")
     parser.add_argument("--mcp-on", metavar="NAME")
     parser.add_argument("--mcp-off", metavar="NAME")
-    parser.add_argument("--harness", choices=("opencode", "claude", "codex", "cursor", "gemini"))
+    parser.add_argument("--harness", choices=("opencode", "claude", "codex", "cursor", "gemini", "pi"))
+    parser.add_argument("--doctor", action="store_true", help="chequeo redactado del harness (usar con --harness pi)")
     parser.add_argument("--plugins", action="store_true")
     parser.add_argument("--plugin-on", metavar="NAME")
     parser.add_argument("--plugin-off", metavar="NAME")
@@ -1354,6 +1369,8 @@ def main():
         return cmd_routing_open_runs(human=routing_human)
     if args.routing_recent_writers:
         return cmd_routing_recent_writers(human=routing_human)
+    if args.doctor:
+        return cmd_doctor(args.harness, human=routing_human)
 
     if args.status:
         return cmd_status(human=sys.stdout.isatty())

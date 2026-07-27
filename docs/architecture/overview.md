@@ -128,5 +128,63 @@ lane inherits the same table instead of re-deriving it:
   `selected_runtime`) caught at PARSE time — never passed to the service to degrade into a generic
   `FACTS_INCOMPLETE` — or an out-of-bounds `--latency-ms`.
 
-P1R (003) is ACCEPTED and its invariants stay load-bearing under this CLI. P2 (OpenCode lane) and P3 (Pi lane,
-gated) remain paused until 004 P1-dispatch-core passes its own package gates and independent acceptance.
+P1R (003) is ACCEPTED and its invariants stay load-bearing under this CLI. P2 (OpenCode lane) is a generated,
+tier-variant lane on top of the same decisions.
+
+## P3 Pi lane (004 P3-pi-lane, ADR-0007)
+
+Pi is a fourth, per-spawn-selectable runtime — the only lane where a single decision can land on EITHER
+audited provider (`openai-codex` or `anthropic`) in the same invocation. Unlike P2 (a generated tree of
+`<role>@<tier>` OpenCode variants), Pi gets **no generated agent tree**: the canonical prompt
+(`Global/_canonical/agents/<role>.md`, the same source every harness derives from) is passed verbatim to
+the child via `--append-system-prompt`. The consumer is a CLI-subprocess spawner
+(`ai/scripts/set_agents_spawn.py`), not an in-process TypeScript/SDK host — proven sufficient by a live
+spike (`docs/specs/004-adaptive-dispatch/evidence/P3-spike-T300.md`) and re-verified end to end in
+`docs/specs/004-adaptive-dispatch/evidence/P3-implementation.md`.
+
+```mermaid
+flowchart LR
+    Decide["--route-decide (selected_runtime=pi)"] --> RunID["run_id (writer authorized)"]
+    RunID --> Dispatched["--route-dispatched"]
+    Dispatched --> Spawn["set_agents_spawn.spawn(): pinned pi subprocess, guarded"]
+    Spawn -->|agent_settled, model matches| Success["--route-terminal success"]
+    Spawn -->|crash: exit!=0 or no agent_settled| Failure["--route-terminal failure"]
+    Spawn -->|message.model != decided| Mismatch["--route-terminal failure (never success)"]
+```
+
+- **Exact pin, not the wrapper's soft pin**: every pi invocation (probe and spawn alike) goes through
+  `routing_core.catalog.pi_pinned_argv`, which runs `pnpm dlx --package
+  @earendil-works/pi-coding-agent@<PI_PINNED_VERSION> pi ...` (deliberately NO `--` separator — pinned pi
+  rejects it as `Unknown option: --`) — never the bare `pi` on PATH, whose personal wrapper only soft-pins
+  by release age.
+- **Guards-as-flags (002 AC-04 at this enforcement point)**: `--no-session`, `--no-extensions`, and
+  `--no-context-files` (repair R1/SEC-A02: a caller-passed `spawn_cwd` can never auto-load its own
+  AGENTS.md/CLAUDE.md config into the child) are unconditional on every spawn (fresh ephemeral context;
+  pi-subagents — the only delegation extension Pi ships — never loads, so children are depth 0). The `-t`
+  tool allowlist defaults to `GUARD_TOOLS_READONLY` (`read,grep,find,ls`); `GUARD_TOOLS_CODE_RW` exists only
+  as a documented future constant — `route_and_spawn`/`main()` have no parameter that can select it, since a
+  code-rw child's `bash` tool could re-invoke `pnpm dlx ... pi ...` itself and spawn its own pi children,
+  defeating `--no-extensions`'s depth-0 guarantee. Widening requires a bash-sandbox story that prevents that
+  re-invocation (see ADR-0007's repair-R1 amendment).
+- **Task-as-flag refusal (repair R1/SEC-A01)**: the untrusted `task` is the trailing positional in pi's argv
+  with no `--` barrier available; `spawn()` fails closed (`TASK_LOOKS_LIKE_FLAG`, before any subprocess
+  starts) whenever `task.lstrip()` starts with `-` — live-confirmed that pi's own parser silently consumes
+  such a token as an option rather than message text.
+- **Pairs and model-ID map (T-305)**: `(pi, openai-codex)` and `(pi, anthropic)` join the audited pair
+  table in `routing_core/catalog.py`, probed via `pi --list-models` (parsed by provider column) plus the
+  `auth.json` key-SET (never values). `openai-codex` is catalog-IDENTITY; `anthropic` short names
+  (`opus`/`sonnet`/`haiku`) translate through a curated `PI_MODEL_MAP`. Because no `routes.v1.toml` row
+  declares an explicit `runtimes` allowlist, every route becomes pi-compatible once the pi pairs are
+  audited — compatibility is then gated entirely by the per-decision inventory check (same as every other
+  runtime), not by a route-level restriction.
+- **The flip**: `routing_core/service.py`'s `PI_SIMULATION_ONLY` constant (declared once, next to `route()`)
+  gates a SINGLE `elif` branch. `False` (this package's state) removes pi's blanket exclusion so it falls
+  through to the SAME `self.inventory.get((runtime, provider))` check every other runtime already passes
+  through — an unprobed/unauthenticated pi pair still fails closed as `PROVIDER_UNAUTHENTICATED`, never
+  silently authorized. Rollback is the same constant back to `True` — one line, no data migration.
+- **Doctor**: `set_agents_app.py --doctor --harness pi --json` reports `{pinned_version, version_ok,
+  auth_providers, list_models_ok, doctor_green}` — `auth_providers` is the auth.json key-SET (provider
+  names only), never token values.
+
+P3 remains paused for acceptance until it passes its own package gates and independent review; ADR-0007
+records the full design record and the flip's gating evidence.

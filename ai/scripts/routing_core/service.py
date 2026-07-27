@@ -8,6 +8,17 @@ from .catalog import build_snapshot, probe_inventory
 from .domain import (RISK_ORDER, TIER_ORDER, RoutingError, StaticRoute, TaskRequest, _ObservedTaskFacts,
                      combined_risk, required_tier, RouteDecision)
 
+# ADR-0007 (P3-pi-lane, T-305): flipped False only once the pi doctor is green (pinned
+# version resolves, both audited pairs authenticate, `pi --list-models` parses — see
+# `set_agents_spawn.doctor`), the T-304 guards are proven (read-only, no-delegation
+# children), and the T-303 spawner closes its lifecycle including crash⇒failure — all
+# evidenced in docs/specs/004-adaptive-dispatch/evidence/P3-implementation.md. With this
+# False, a pi route still goes through the SAME per-decision inventory check every other
+# runtime does (line below): an unauthenticated/unprobed pi pair still fails closed as
+# PROVIDER_UNAUTHENTICATED, never silently authorized. Flipping back to True is the whole
+# rollback — one line, no data migration, no other file touched.
+PI_SIMULATION_ONLY = False
+
 
 class _FactsIssuer:
     """Invocation-scoped fact issuer; absent from the public facade and serialization."""
@@ -129,7 +140,7 @@ class RoutingService:
             # BEFORE tier ordering, so TIER_INSUFFICIENT never masks a more fundamental
             # reason on the same candidate set (contract 004 §Tier model, precedence).
             if not self.snapshot.identity_allowed(identity): reason="RUNTIME_UNAVAILABLE"
-            elif facts.selected_runtime == "pi": reason="PI_SIMULATION_ONLY"
+            elif PI_SIMULATION_ONLY and facts.selected_runtime == "pi": reason="PI_SIMULATION_ONLY"
             elif route.model not in self.inventory.get((facts.selected_runtime, route.provider), frozenset()): reason="PROVIDER_UNAUTHENTICATED"
             elif facts.role not in route.roles: reason="ROLE_INCOMPATIBLE"
             elif not set(facts.required_tools).union(request.required_tools).issubset(route.tools): reason="TOOLS_MISSING"

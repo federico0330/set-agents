@@ -8,6 +8,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -17,6 +18,7 @@ sys.path.insert(0,str(ROOT/"ai/scripts"))
 import models_config
 import routing
 import set_agents_app
+import set_agents_spawn
 from routing_core import catalog as routing_catalog
 
 class RoutingTests(unittest.TestCase):
@@ -87,27 +89,44 @@ class RoutingTests(unittest.TestCase):
         bad=svc.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="claude-code"),self.observed(svc,risk="extreme"))
         self.assertEqual(bad.reason_codes,("FACTS_INCOMPLETE",))
 
-    def test_pi_is_simulation_only_and_runtime_auth_is_pair_scoped(self):
+    def test_pi_is_pair_scoped_and_fails_closed_without_a_probed_pair(self):
+        # T-305: pi is now in the audited pair table (RUNTIME_UNAVAILABLE no longer fires
+        # for it, since no route.v1.toml row narrows `runtimes`), so an unprobed pi pair
+        # fails closed via the SAME PROVIDER_UNAUTHENTICATED path every other runtime uses
+        # — never RUNTIME_UNAVAILABLE, and never vacuously executable.
         svc=self.service(simulate=True); d=svc.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="pi"),self.observed(svc,runtime="pi"))
         self.assertFalse(d.execution_enabled); self.assertIn("NO_ELIGIBLE_ROUTE",d.reason_codes)
         self.assertIsNone(d.route_id)  # N08: not vacuously true under simulate=True — no candidate at all
-        # pi is absent from the audited pair table, so RUNTIME_UNAVAILABLE (pair-scoped) fires
-        # before the PI_SIMULATION_ONLY rule is even reached — pi has no path to identity_allowed.
-        self.assertTrue(any(item["reason"]=="RUNTIME_UNAVAILABLE" for item in d.exclusions))
+        self.assertTrue(d.exclusions); self.assertTrue(all(item["reason"]=="PROVIDER_UNAUTHENTICATED" for item in d.exclusions))
+        self.assertFalse(any(item["reason"]=="RUNTIME_UNAVAILABLE" for item in d.exclusions))
         unavailable=self.service(simulate=True,inventory={("codex","openai-codex"):{"gpt-5.6-sol"}})
         d=unavailable.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="opencode"),self.observed(unavailable,runtime="opencode"))
         self.assertFalse(d.execution_enabled); self.assertIsNone(d.route_id)
         self.assertEqual(d.reason_codes,("NO_ELIGIBLE_ROUTE",))
-        # N08: a real (non-simulate, writer-role) authorization attempt over pi is excluded
-        # by the actual PI_SIMULATION_ONLY rule, not merely by the simulate flag.
+        # A real (non-simulate, writer-role) authorization attempt over an unprobed pi pair
+        # is excluded the same way — no durable authorization without a fresh positive probe.
         with tempfile.TemporaryDirectory() as td:
             real=self.service(Path(td)/"state")
             d=real.route(routing.TaskRequest("implementer","change","documentation",selected_runtime="pi"),
                          self.observed(real,"implementer","pi"))
             self.assertFalse(d.execution_enabled); self.assertIsNone(d.route_id)
             self.assertEqual(d.reason_codes,("NO_ELIGIBLE_ROUTE",))
-            self.assertTrue(all(item["reason"]=="RUNTIME_UNAVAILABLE" for item in d.exclusions))
+            self.assertTrue(all(item["reason"]=="PROVIDER_UNAUTHENTICATED" for item in d.exclusions))
             self.assertEqual(real.store.open_runs(),[])  # never durably authorized
+
+    def test_pi_becomes_executable_once_probed_positive_by_the_normal_inventory_check(self):
+        # T-305 flip: with PI_SIMULATION_ONLY=False, a pi pair that a probe (real or
+        # cached) confirmed positive authorizes exactly like any other runtime — proving
+        # the flip only REMOVES a blanket exclusion, it never adds a new authorization path.
+        with tempfile.TemporaryDirectory() as td:
+            inventory=dict(self.inventory); inventory[("pi","openai-codex")]={"gpt-5.6-sol"}
+            svc=self.service(Path(td)/"state",inventory=inventory)
+            request=routing.TaskRequest("implementer","change","documentation",selected_runtime="pi")
+            d=svc.route(request,self.observed(svc,"implementer","pi"))
+            self.assertTrue(d.execution_enabled, d.reason_codes)
+            self.assertEqual((d.runtime,d.provider,d.model),("pi","openai-codex","gpt-5.6-sol"))
+            self.assertIsNotNone(d.run_id)
+            self.assertEqual(svc.store.open_runs()[0]["run_id"],d.run_id)
 
     def test_probe_parsers_are_pair_specific_and_fail_closed(self):
         # Parsers are validated hermetically against recorded shapes; live CLI
@@ -126,6 +145,333 @@ class RoutingTests(unittest.TestCase):
             routing_catalog._parse_opencode_models("Error: Provider not found: anthropic\n","anthropic")
         with self.assertRaises(routing.RoutingError):
             routing_catalog._parse_opencode_models("anthropic/opus\nunexpected junk\n","anthropic")
+        # T-305: `pi --list-models` column table — openai-codex ids are catalog-IDENTITY
+        # (spike-verified); anthropic raw ids are translated through PI_MODEL_MAP so a
+        # short catalog name only survives if ITS curated Pi id is present in the table.
+        table=("provider      model                       context  max-out\n"
+              "anthropic     claude-opus-4-8             1M       128K\n"
+              "anthropic     claude-sonnet-5             1M       128K\n"
+              "anthropic     claude-sonnet-4-5           1M       64K\n"  # not in PI_MODEL_MAP -> ignored
+              "openai-codex  gpt-5.6-luna                272K     128K\n")
+        self.assertEqual(routing_catalog._parse_pi_models(table,"openai-codex"),{"gpt-5.6-luna"})
+        self.assertEqual(routing_catalog._parse_pi_models(table,"anthropic"),{"opus","sonnet"})
+        self.assertEqual(routing_catalog._parse_pi_models(table,"google"),set())  # audited pair only, but never raises
+        with self.assertRaises(routing.RoutingError):
+            routing_catalog._parse_pi_models("No models available. Use /login to authenticate.\n","anthropic")
+        # No `--` separator (live QA finding): pnpm dlx forwards it VERBATIM into pi's own
+        # parser, which chokes on a real multi-flag spawn (only pi's early-exit flags like
+        # --version/--list-models tolerate the stray token, masking the bug for probes).
+        self.assertEqual(routing_catalog.pi_pinned_argv("--list-models"),
+                         ("pnpm","dlx","--package",f"{routing_catalog.PI_PACKAGE}@{routing_catalog.PI_PINNED_VERSION}",
+                          "pi","--list-models"))
+        self.assertEqual(routing_catalog.PI_MODEL_MAP["anthropic"],
+                         {"opus":"claude-opus-4-8","sonnet":"claude-sonnet-5","haiku":"claude-haiku-4-5"})
+
+    def test_pi_auth_provider_keys_reads_names_only_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            home=Path(td); agent=home/".pi/agent"; agent.mkdir(parents=True)
+            (agent/"auth.json").write_text(json.dumps(
+                {"anthropic":{"apiKey":"sk-should-never-be-read"},"openai-codex":{"apiKey":"also-secret"}}))
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home):
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset({"anthropic","openai-codex"}))
+            # Missing file, foreign JSON shape, and corrupt JSON all fail closed to empty —
+            # never raise, and the function never returns anything but top-level key names.
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home/"nope"):
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset())
+            (agent/"auth.json").write_text(json.dumps(["not","a","dict"]))
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home):
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset())
+            (agent/"auth.json").write_text("not json at all")
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home):
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset())
+
+    _PI_STUB = textwrap.dedent('''
+        import sys, json
+        args = sys.argv[1:]
+        task = args[-1]
+        target = args[args.index("--model") + 1]
+        provider, model = target.split("/", 1)
+        if task == "SIMULATE:crash-exit":
+            sys.exit(1)
+        if task == "SIMULATE:crash-no-settle":
+            print(json.dumps({"type": "agent_start"}))
+            sys.exit(0)
+        if task == "SIMULATE:crash-with-secret":
+            print("Error: upstream auth failed, Authorization: Bearer sk-ant-totally-secret-value-12345", file=sys.stderr)
+            sys.exit(1)
+        if task == "SIMULATE:fallback":
+            # SEC-A04: the echoed model still matches target_id -- only stderr reveals
+            # that pi silently substituted a different real model's config underneath.
+            print('Warning: Model "' + model + '" not found for provider "' + provider
+                  + '". Using custom model id.', file=sys.stderr)
+        if task == "SIMULATE:mismatch":
+            model = "unexpected-model"
+        stop_reason = "error" if task == "SIMULATE:turn-error" else "stop"
+        message = {"role": "assistant", "provider": provider, "model": model, "stopReason": stop_reason,
+                  "usage": {"cost": {"total": 0.001}}}
+        if stop_reason == "error":
+            message["errorMessage"] = "boom"
+        print(json.dumps({"type": "agent_start"}))
+        print(json.dumps({"type": "message_end", "message": message}))
+        print(json.dumps({"type": "agent_settled"}))
+    ''')
+
+    def _stub_pi(self, td):
+        path = Path(td) / "stub_pi.py"; path.write_text(self._PI_STUB); return path
+
+    def _patched_pi_argv(self, stub):
+        return lambda *a: (sys.executable, str(stub), *a)
+
+    def test_spawn_guard_flags_are_unconditional_and_default_tools_are_readonly(self):
+        # T-304/AC-11g: --no-session/--no-extensions are on EVERY invocation the spawner
+        # builds, and the default tool allowlist has no write/edit/bash tool at all — a
+        # protected-path write has no tool to go through, regardless of guard tier.
+        self.assertFalse({"write","edit","bash"} & set(set_agents_spawn.GUARD_TOOLS_READONLY))
+        with tempfile.TemporaryDirectory() as td:
+            stub=self._stub_pi(td); captured={}
+            def fake_argv(*a): captured["args"]=a; return (sys.executable,str(stub),*a)
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=fake_argv):
+                prompt=Path(td)/"role.md"; prompt.write_text("You are a test role.")
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:success","openai-codex",
+                                                       "gpt-5.6-luna",prompt,cwd=td)
+            self.assertEqual(outcome,"success"); self.assertEqual(detail["model"],"openai-codex/gpt-5.6-luna")
+            self.assertIn("--no-session",captured["args"]); self.assertIn("--no-extensions",captured["args"])
+            self.assertIn("--no-context-files",captured["args"])  # SEC-A02: unconditional too
+            idx=captured["args"].index("--tools")
+            self.assertEqual(captured["args"][idx+1],",".join(set_agents_spawn.GUARD_TOOLS_READONLY))
+            # Guards never relax even when the caller widens the tool tier.
+            captured.clear()
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=fake_argv):
+                set_agents_spawn.spawn("implementer","SIMULATE:success","openai-codex","gpt-5.6-luna",prompt,
+                                       guard_tools=set_agents_spawn.GUARD_TOOLS_CODE_RW,cwd=td)
+            self.assertIn("--no-session",captured["args"]); self.assertIn("--no-extensions",captured["args"])
+            self.assertIn("--no-context-files",captured["args"])
+
+    def test_spawn_refuses_a_task_that_lexically_looks_like_a_flag(self):
+        # SEC-A01: pinned pi rejects a `--` end-of-options sentinel outright, so a
+        # hostile trailing token could otherwise be consumed by pi's OWN parser as an
+        # option (live-confirmed: a task of exactly "--offline" is silently swallowed,
+        # never reaching pi as message text) -- e.g. "--tools=bash,edit,write" attempting
+        # to widen the tool allowlist past the read-only guard. spawn() must refuse
+        # BEFORE ever building the argv or starting any subprocess.
+        with tempfile.TemporaryDirectory() as td:
+            prompt=Path(td)/"role.md"; prompt.write_text("role")
+            with mock.patch.object(set_agents_spawn,"subprocess") as subprocess_mock:
+                for hostile_task in ("--tools=bash,edit,write", "-x", "--offline"):
+                    outcome,detail=set_agents_spawn.spawn("implementer",hostile_task,"openai-codex",
+                                                          "gpt-5.6-luna",prompt,cwd=td)
+                    self.assertEqual(outcome,"failure")
+                    self.assertEqual(detail["reason"],"TASK_LOOKS_LIKE_FLAG")
+                subprocess_mock.run.assert_not_called()  # refused before any subprocess ever started
+            # A leading space before the dash is still a hostile task once stripped.
+            outcome,detail=set_agents_spawn.spawn("implementer","   --tools=bash,edit,write","openai-codex",
+                                                  "gpt-5.6-luna",prompt,cwd=td)
+            self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"TASK_LOOKS_LIKE_FLAG")
+            # An ordinary task (no leading dash) is completely unaffected.
+            with tempfile.TemporaryDirectory() as td2:
+                stub=self._stub_pi(td2)
+                with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=self._patched_pi_argv(stub)):
+                    outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:success","openai-codex",
+                                                          "gpt-5.6-luna",prompt,cwd=td2)
+                self.assertEqual(outcome,"success")
+
+    def test_spawn_detects_stderr_model_fallback_marker_and_never_trusts_the_echoed_model(self):
+        # SEC-A04 (DiD): pi's CLI subprocess mode never threads the SDK's
+        # `modelFallbackMessage` into the --mode json stdout stream (verified against the
+        # pinned 0.81.1 source: it is wired only into InteractiveMode). pi's own CLI
+        # model resolver instead prints an equivalent plain-text warning to STDERR when it
+        # silently substitutes a different real model's config under the requested id --
+        # even though the assistant message still echoes the REQUESTED (mismatched) id,
+        # so the plain observed==target_id check alone cannot catch it.
+        with tempfile.TemporaryDirectory() as td:
+            stub=self._stub_pi(td); prompt=Path(td)/"role.md"; prompt.write_text("role")
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=self._patched_pi_argv(stub)):
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:fallback","openai-codex","gpt-5.6-luna",prompt,cwd=td)
+            self.assertEqual(outcome,"model_mismatch")
+            self.assertEqual(detail["reason"],"PI_MODEL_FALLBACK")
+
+    def test_spawn_never_persists_raw_stderr_secrets(self):
+        # SEC-A05 (DiD): the child inherits the full os.environ; a crash's stderr is
+        # redacted for known secret shapes and kept short, never a raw dump.
+        with tempfile.TemporaryDirectory() as td:
+            stub=self._stub_pi(td); prompt=Path(td)/"role.md"; prompt.write_text("role")
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=self._patched_pi_argv(stub)):
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:crash-with-secret","openai-codex","gpt-5.6-luna",prompt,cwd=td)
+            self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"PI_CRASH")
+            self.assertNotIn("sk-ant-totally-secret-value-12345",detail["stderr"])
+            self.assertIn("[REDACTED]",detail["stderr"])
+
+    def test_spawn_crash_paths_close_as_failure_never_success(self):
+        # T-303: exit != 0, or a completed process that never reaches `agent_settled`,
+        # both close as failure — the two literal crash conditions in the contract.
+        with tempfile.TemporaryDirectory() as td:
+            stub=self._stub_pi(td); prompt=Path(td)/"role.md"; prompt.write_text("role")
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=self._patched_pi_argv(stub)):
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:crash-exit","openai-codex","gpt-5.6-luna",prompt,cwd=td)
+                self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"PI_CRASH")
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:crash-no-settle","openai-codex","gpt-5.6-luna",prompt,cwd=td)
+                self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"PI_CRASH")
+
+    def test_spawn_model_mismatch_and_turn_error_are_never_reported_as_success(self):
+        with tempfile.TemporaryDirectory() as td:
+            stub=self._stub_pi(td); prompt=Path(td)/"role.md"; prompt.write_text("role")
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=self._patched_pi_argv(stub)):
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:mismatch","openai-codex","gpt-5.6-luna",prompt,cwd=td)
+                self.assertEqual(outcome,"model_mismatch"); self.assertEqual(detail["expected"],"openai-codex/gpt-5.6-luna")
+                outcome,detail=set_agents_spawn.spawn("implementer","SIMULATE:turn-error","openai-codex","gpt-5.6-luna",prompt,cwd=td)
+                self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"PI_TURN_ERROR")
+
+    def test_spawn_rejects_unmapped_model_and_missing_role_prompt(self):
+        outcome,detail=set_agents_spawn.spawn("implementer","x","anthropic","no-such-tier",Path("/nonexistent-role.md"))
+        self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"MODEL_ID_UNMAPPED")
+        with tempfile.TemporaryDirectory() as td:
+            outcome,detail=set_agents_spawn.spawn("implementer","x","openai-codex","gpt-5.6-luna",Path(td)/"missing.md")
+            self.assertEqual(outcome,"failure"); self.assertEqual(detail["reason"],"ROLE_PROMPT_MISSING")
+
+    def test_spawn_default_cwd_is_an_isolated_scratch_dir_cleaned_up_after(self):
+        # T-304 argv/cwd/env guard: with no explicit cwd, spawn() never runs pi in the
+        # caller's own working directory, and never leaves the scratch dir behind.
+        with tempfile.TemporaryDirectory() as td:
+            stub=self._stub_pi(td); prompt=Path(td)/"role.md"; prompt.write_text("role")
+            seen={}
+            real_run=set_agents_spawn.subprocess.run
+            def spy_run(argv,cwd=None,**kwargs):
+                seen["cwd"]=str(cwd); return real_run(argv,cwd=cwd,**kwargs)
+            with mock.patch.object(set_agents_spawn.catalog,"pi_pinned_argv",side_effect=self._patched_pi_argv(stub)), \
+                 mock.patch.object(set_agents_spawn.subprocess,"run",side_effect=spy_run):
+                set_agents_spawn.spawn("implementer","SIMULATE:success","openai-codex","gpt-5.6-luna",prompt)
+            self.assertNotEqual(seen["cwd"],os.getcwd())
+            self.assertFalse(Path(seen["cwd"]).exists())
+
+    def test_doctor_is_green_only_when_version_auth_and_list_models_all_agree(self):
+        def fake_run(argv,**kwargs):
+            if argv[-1]=="--version":
+                return types.SimpleNamespace(returncode=0,stdout=set_agents_spawn.catalog.PI_PINNED_VERSION+"\n",stderr="")
+            return types.SimpleNamespace(returncode=0,stdout="provider model\nanthropic claude-haiku-4-5\n",stderr="")
+        with mock.patch.object(set_agents_spawn.subprocess,"run",side_effect=fake_run), \
+             mock.patch.object(set_agents_spawn.catalog,"pi_auth_provider_keys",return_value=frozenset({"anthropic","openai-codex"})):
+            report=set_agents_spawn.doctor()
+        self.assertTrue(report["doctor_green"]); self.assertTrue(report["version_ok"]); self.assertTrue(report["list_models_ok"])
+        self.assertEqual(report["auth_providers"],["anthropic","openai-codex"])
+        with mock.patch.object(set_agents_spawn.subprocess,"run",side_effect=fake_run), \
+             mock.patch.object(set_agents_spawn.catalog,"pi_auth_provider_keys",return_value=frozenset()):
+            self.assertFalse(set_agents_spawn.doctor()["doctor_green"])  # auth missing -> never green
+
+    def test_route_and_spawn_sequences_decide_dispatch_spawn_terminal(self):
+        calls=[]
+        def fake_cli(args,env=None,timeout=60):
+            calls.append(args)
+            if args[0]=="--route-decide":
+                payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"0"*32,
+                                          "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]}
+            else:
+                payload={"ok":True,"data":{},"reason_codes":[]}
+            return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
+        with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
+             mock.patch.object(set_agents_spawn,"spawn",return_value=("success",{"model":"openai-codex/gpt-5.6-luna","usage":{}})):
+            result=set_agents_spawn.route_and_spawn("implementer","documentation","do the thing")
+        self.assertEqual(result["status"],"success")
+        self.assertEqual([c[0] for c in calls],["--route-decide","--route-dispatched","--route-terminal"])
+        self.assertEqual(calls[2][1],"run1_"+"0"*32); self.assertEqual(calls[2][2],"success")
+
+    def test_route_and_spawn_refuses_non_executable_decision_without_spawning(self):
+        def fake_cli(args,env=None,timeout=60):
+            self.assertEqual(args[0],"--route-decide")  # never reaches dispatch/spawn
+            payload={"ok":True,"data":{"execution_enabled":False},"reason_codes":["REVIEW_IDENTITY_UNVERIFIED"]}
+            return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
+        with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
+             mock.patch.object(set_agents_spawn,"spawn") as spawn_mock:
+            result=set_agents_spawn.route_and_spawn("package-reviewer","documentation","review it")
+        self.assertEqual(result["status"],"refused"); spawn_mock.assert_not_called()
+
+    def test_route_and_spawn_closes_run_as_failure_when_the_child_crashes(self):
+        def fake_cli(args,env=None,timeout=60):
+            if args[0]=="--route-decide":
+                payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"1"*32,
+                                          "provider":"anthropic","model":"haiku"},"reason_codes":[]}
+            else:
+                payload={"ok":True,"data":{},"reason_codes":[]}
+            return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
+        with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli) as cli_mock, \
+             mock.patch.object(set_agents_spawn,"spawn",return_value=("failure",{"reason":"PI_CRASH"})):
+            result=set_agents_spawn.route_and_spawn("implementer","documentation","do it")
+        self.assertEqual(result["status"],"failure")
+        terminal_call=cli_mock.call_args_list[-1][0][0]
+        self.assertEqual(terminal_call[0],"--route-terminal"); self.assertEqual(terminal_call[2],"failure")
+
+    def test_route_and_spawn_never_exposes_a_code_rw_override_and_always_spawns_readonly(self):
+        # SEC-A02: route_and_spawn has no `guard_tools` parameter at all -- code-rw is not
+        # reachable from this (or main()'s) lifecycle entry point.
+        with self.assertRaises(TypeError):
+            set_agents_spawn.route_and_spawn("implementer","documentation","do it",
+                                             guard_tools=set_agents_spawn.GUARD_TOOLS_CODE_RW)
+        def fake_cli(args,env=None,timeout=60):
+            if args[0]=="--route-decide":
+                payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"4"*32,
+                                          "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]}
+            else:
+                payload={"ok":True,"data":{},"reason_codes":[]}
+            return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
+        with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
+             mock.patch.object(set_agents_spawn,"spawn",return_value=("success",{"model":"openai-codex/gpt-5.6-luna","usage":{}})) as spawn_mock:
+            set_agents_spawn.route_and_spawn("implementer","documentation","do the thing")
+        self.assertEqual(spawn_mock.call_args.kwargs["guard_tools"],set_agents_spawn.GUARD_TOOLS_READONLY)
+
+    def test_route_and_spawn_closes_run_as_failure_when_a_lifecycle_cli_call_raises(self):
+        # SEC-A03/PKG-N01: an exception from `_run_app_cli` (e.g. TimeoutExpired/OSError)
+        # AFTER authorization must never leave the run open -- a best-effort
+        # --route-terminal failure close is attempted and the child is never spawned.
+        terminal_calls=[]
+        def fake_cli(args,env=None,timeout=60):
+            if args[0]=="--route-decide":
+                payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"2"*32,
+                                          "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]}
+                return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
+            if args[0]=="--route-dispatched":
+                raise subprocess.TimeoutExpired(cmd="route-dispatched",timeout=60)
+            terminal_calls.append(args)
+            return types.SimpleNamespace(stdout=json.dumps({"ok":True,"data":{},"reason_codes":[]})+"\n",returncode=0)
+        with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
+             mock.patch.object(set_agents_spawn,"spawn") as spawn_mock:
+            result=set_agents_spawn.route_and_spawn("implementer","documentation","do it")
+        spawn_mock.assert_not_called()  # dispatch itself raised -- the child is never spawned
+        self.assertEqual(result["status"],"failure"); self.assertEqual(result["run_id"],"run1_"+"2"*32)
+        self.assertEqual(result["reason"],"ORCHESTRATION_EXCEPTION")
+        self.assertEqual(len(terminal_calls),1)
+        self.assertEqual(terminal_calls[0][0],"--route-terminal"); self.assertEqual(terminal_calls[0][2],"failure")
+
+    def test_route_and_spawn_survives_a_terminal_cli_exception_after_a_successful_spawn(self):
+        # SEC-A03/PKG-N01: even once the child spawn genuinely succeeded, an exception
+        # raised by the CLOSING --route-terminal call itself must not escape -- the
+        # function catches it, best-effort retries the close, and reports failure rather
+        # than silently claiming success for a run whose terminal state is now uncertain.
+        calls=[]
+        def fake_cli(args,env=None,timeout=60):
+            calls.append(args[0])
+            if args[0]=="--route-decide":
+                payload={"ok":True,"data":{"execution_enabled":True,"run_id":"run1_"+"5"*32,
+                                          "provider":"openai-codex","model":"gpt-5.6-luna"},"reason_codes":[]}
+                return types.SimpleNamespace(stdout=json.dumps(payload)+"\n",returncode=0)
+            if args[0]=="--route-dispatched":
+                return types.SimpleNamespace(stdout=json.dumps({"ok":True,"data":{},"reason_codes":[]})+"\n",returncode=0)
+            raise OSError("boom")  # every --route-terminal attempt raises
+        with mock.patch.object(set_agents_spawn,"_run_app_cli",side_effect=fake_cli), \
+             mock.patch.object(set_agents_spawn,"spawn",return_value=("success",{"model":"openai-codex/gpt-5.6-luna","usage":{}})):
+            result=set_agents_spawn.route_and_spawn("implementer","documentation","do it")
+        self.assertEqual(result["status"],"failure")  # never reported success once the close itself failed
+        self.assertEqual(result["reason"],"ORCHESTRATION_EXCEPTION")
+        self.assertEqual(calls.count("--route-terminal"),2)  # the original attempt + the best-effort close
+
+    def test_cmd_doctor_requires_harness_pi_and_never_leaks_credential_values(self):
+        result=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--doctor","--json"],cwd=ROOT,text=True,capture_output=True)
+        self.assertEqual(result.returncode,2); self.assertEqual(json.loads(result.stdout)["reason_codes"],["DOCTOR_HARNESS_UNSUPPORTED"])
+        result=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--doctor","--harness","pi","--json"],cwd=ROOT,text=True,capture_output=True)
+        self.assertIn(result.returncode,(0,1))
+        data=json.loads(result.stdout)
+        self.assertEqual(set(data["data"]),{"pinned_version","version_ok","auth_providers","list_models_ok","doctor_green"})
+        self.assertNotIn("apiKey",result.stdout); self.assertNotIn("token",result.stdout.lower())
+        for provider in data["data"]["auth_providers"]:
+            self.assertIn(provider,{"anthropic","openai-codex","openai","google"})
 
     def test_sqlite_authorization_closes_fallback_before_dispatch(self):
         with tempfile.TemporaryDirectory() as td:
@@ -528,6 +874,29 @@ class RoutingTests(unittest.TestCase):
                 self.assertTrue((cache_root/"probe-cache.json").exists())
             finally:
                 os.environ["PATH"]=old
+
+    def test_probe_pi_pair_timeout_is_raised_to_the_cold_pnpm_allowance(self):
+        # PKG-N02: the doctor already allows 60s (set_agents_spawn.DOCTOR_TIMEOUT_SECONDS)
+        # for a cold `pnpm dlx` resolution; probe_inventory's own default (20s, sized for
+        # the other three runtimes' fast local CLI probes) must not silently time out a
+        # cold pi store -- only the pi pairs get the floor, every other pair keeps the
+        # caller's own timeout.
+        from routing_core import catalog as cat
+        captured=[]
+        def fake_run(argv,**kwargs):
+            captured.append((argv,kwargs.get("timeout")))
+            if argv[:2]==("pnpm","dlx"):
+                return types.SimpleNamespace(returncode=0,stdout="provider model\nopenai-codex gpt-5.6-luna\n",stderr="")
+            return types.SimpleNamespace(returncode=0,stdout="Logged in using ChatGPT\n",stderr="")
+        with mock.patch.object(cat.subprocess,"run",side_effect=fake_run), \
+             mock.patch.object(cat,"pi_auth_provider_keys",return_value=frozenset({"openai-codex"})):
+            result=cat.probe_inventory(self.config, cache_root=None,
+                                       pairs=[("pi","openai-codex"),("codex","openai-codex")], timeout=5.0)
+        self.assertEqual(result[("pi","openai-codex")],{"gpt-5.6-luna"})
+        pi_timeout=next(t for a,t in captured if a[:2]==("pnpm","dlx"))
+        codex_timeout=next(t for a,t in captured if a[0]=="codex")
+        self.assertGreaterEqual(pi_timeout,cat.PI_PROBE_MIN_TIMEOUT_SECONDS)
+        self.assertEqual(codex_timeout,5.0)  # non-pi pairs are never slowed by the pi floor
 
     def test_fresh_selected_reprobe_gates_writer_authorization(self):
         calls=[]

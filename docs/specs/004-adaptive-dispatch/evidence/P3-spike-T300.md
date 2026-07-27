@@ -58,6 +58,36 @@ the catalog and (b) actually route a spawn through Pi, the user must `pi` → `/
 (Codex) and/or Claude Pro/Max (subscriptions already held per project memory). Until then, P3 can be built
 and tested ONLY hermetically with `PI_SIMULATION_ONLY` kept true; the flip (T-305) and live QA need auth.
 
+## Real model inventory (post-login, 2026-07-27) — the concrete mapping for T-305
+User authenticated Pi via `/login` subscriptions. `auth.json` keys: **`anthropic`, `openai-codex`** —
+both **identical to the catalog's provider names** (routes.v1.toml `provider` field). `pi --list-models`:
+
+- **`openai-codex`**: `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra` (+ gpt-5.3-codex-spark, 5.4, 5.4-mini,
+  5.5). → **IDENTITY mapping**: catalog model `gpt-5.6-luna|sol|terra` == Pi id verbatim. No translation.
+- **`anthropic`**: `claude-opus-4-5|4-6|4-7|4-8`, `claude-sonnet-4-5|4-6`, `claude-sonnet-5`,
+  `claude-haiku-4-5`, `claude-fable-5` (+ dated snapshots). → catalog SHORT names need a curated map:
+  `opus → claude-opus-4-8`, `sonnet → claude-sonnet-5`, `haiku → claude-haiku-4-5` (aligns with the
+  harness's existing Claude tiers: auditors=opus-4.8, implement=sonnet-5, mechanical=haiku-4.5). This map
+  is the only translation P3 needs; it lives with the catalog↔Pi id resolution in T-305 and is
+  user-adjustable (version choice is a curated decision, not a hard fact).
+
+Both providers map cleanly; the openai-codex side is zero-friction (identity), so the CLI-subprocess spawn
+`pi --model openai-codex/gpt-5.6-terra --print` needs no id translation for the common (openai-codex) path.
+
+### Live end-to-end proof (per-spawn model, CLI subprocess) — 2026-07-27
+`pi --model openai-codex/gpt-5.6-luna --print --mode json --no-session "Reply … PI OK"` → exit 0, replied
+"PI OK" on **exactly** `provider:"openai-codex", model:"gpt-5.6-luna"` (echoed in every event). `--mode json`
+emits a clean lifecycle stream: `session → agent_start → turn_start → message_start/update/end →
+turn_end → agent_end → agent_settled`, each carrying `provider`, `model`, and `usage`
+(input/output/cache tokens + `cost.total` USD). Terminal signal = `agent_settled` + exit 0. This is
+everything `set_agents_spawn` needs: (i) per-spawn model via `--model`, (ii) fresh ephemeral context via
+`--no-session`, (iii) decided-model verification by reading `message.model` from the stream, (iv) cost/usage
+telemetry, (v) a deterministic terminal marker. **The spawn mechanism is proven; no TypeScript/SDK host is
+required for the core path** — a Python subprocess spawner (consistent with ai/scripts) suffices, with the
+002 AC-04 guards enforced as CLI flags (`--no-session` fresh context; `--no-extensions` so pi-subagents
+delegation is never loaded ⇒ depth-0 children; read-only tool allowlist `-t read,grep,ls,find` until guards
+are green). Note: `pi` mutates cwd — the spawner must run it from a controlled working dir.
+
 ## Recommendation
 Proceed to P3-pi-lane. Decompose against reality:
 - T-301 pin an EXACT Pi version (not release-age soft-pin); managed install + status/rollback + `--doctor
