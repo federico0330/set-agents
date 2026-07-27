@@ -1,0 +1,46 @@
+{
+  "acceptance_criteria": [],
+  "approved_spec": {
+    "approved_at": "2026-07-27T14:49:56+00:00",
+    "hash": "e821373ff2e805df",
+    "path": "docs/specs/005-portable-harness/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12
+  },
+  "current_package_id": null,
+  "feature_id": "005-portable-harness",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/005-portable-harness/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-27T14:49:56+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0
+  },
+  "mode": "feature",
+  "packages": [],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 0,
+  "schema_version": 1,
+  "updated_at": "2026-07-27T14:49:56+00:00"
+}

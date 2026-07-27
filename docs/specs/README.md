@@ -10,3 +10,5 @@
 | [001](001-harness-evolution/spec.md) | Package-based harness evolution | Shipped | 2026-07-08 |
 | [002](002-adaptive-pi-orchestration/spec.md) | Adaptive orchestration and Pi runtime | Superseded by [003](003-trusted-routing-pi-runtime/spec.md) | 2026-07-24 |
 | [003](003-trusted-routing-pi-runtime/spec.md) | Trusted routing and Pi runtime recovery | Approved | 2026-07-24 |
+| [004](004-adaptive-dispatch/spec.md) | Adaptive dispatch (per-task model routing) | Shipped | 2026-07-27 |
+| [005](005-portable-harness/spec.md) | Portable harness, mandatory vault, TUI selector | Draft | 2026-07-27 |
