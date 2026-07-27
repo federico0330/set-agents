@@ -32,8 +32,16 @@
   },
   "current_package_id": "P3-pi-lane",
   "feature_id": "004-adaptive-dispatch",
-  "final_state": null,
-  "global_gates": [],
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-07-27T14:04:38+00:00",
+      "evidence": "Global integration consistency: verify.sh VERIFY_PASS (172 tests: routing 48+pi, harness 104+variants/doctrine) over the fully integrated 3-package tree; DRIFT_OK (install up to date; P2 variants+doctrine live; P3 adds no generated artifacts); py_compile incl routing_core+set_agents_spawn clean; git tree committed f390187 + pushed origin/main; P1+P2+P3 all accepted; no read-only/core violations across the feature.",
+      "name": "feature-004-integration",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -1263,6 +1271,41 @@
       "package_id": "P3-pi-lane",
       "timestamp": "2026-07-27T14:01:38+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "All 3 packages accepted (P1 dispatch-core, P2 opencode-lane, P3 pi-lane); verify.sh VERIFY_PASS 172; committed f390187 + pushed; P2 installed, P3 needs no install (no generated artifacts, DRIFT_OK)."
+      },
+      "package_id": "P3-pi-lane",
+      "timestamp": "2026-07-27T14:04:12+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "feature-004-integration",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-27T14:04:38+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Feature 004 adaptive-dispatch COMPLETE: functional gentle-ai fork with runtime per-task model selection (P2 OpenCode <role>@<tier> variants + P3 true cross-provider via Pi CLI-subprocess), surpassing upstream static install-time binding."
+      },
+      "package_id": null,
+      "timestamp": "2026-07-27T14:04:38+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
@@ -2275,8 +2318,8 @@
       ]
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 92,
+  "phase": "DONE",
+  "revision": 95,
   "schema_version": 1,
-  "updated_at": "2026-07-27T14:01:38+00:00"
+  "updated_at": "2026-07-27T14:04:38+00:00"
 }
