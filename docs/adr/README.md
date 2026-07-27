@@ -10,3 +10,6 @@
 | [0003](0003-models-toml-source-of-truth.md) | Use `models.toml` as the model source of truth | Accepted | 2026-07-24 | — | — |
 | [0004](0004-adaptive-routing-pi-runtime.md) | Deterministic adaptive routing with opt-in Pi runtime | Superseded in part by 0005 | 2026-07-24 | — | 0005 (routing journal only) |
 | [0005](0005-trusted-routing-sqlite-lifecycle.md) | Trusted routing lifecycle in local SQLite | Accepted | 2026-07-24 | 0004 (routing journal only) | — |
+| [0006](0006-adaptive-dispatch-cache-and-facts.md) | Adaptive dispatch: hybrid fact derivation and probe cache (AM-1/AM-2) | Accepted | 2026-07-26 | — | — |
+| [0007](0007-pi-lane.md) | Pi lane: CLI-subprocess spawner, guards-as-flags, exact pin, gated flip | Accepted | 2026-07-27 | — | — |
+| [0008](0008-two-roots-portability.md) | Two roots: `HARNESS_HOME` vs `PROJECT_ROOT`, install-time baking, project-scoped routing | Accepted | 2026-07-27 | — | — |
