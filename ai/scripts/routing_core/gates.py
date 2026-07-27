@@ -11,9 +11,15 @@ class GateSpec:
     cwd: str
     env: tuple[str,...] = ()
 
+# F07: covers the facade AND every routing_core module — a GateSpec argv is a fixed,
+# declared list (no shell glob expansion), so each file is named explicitly.
+_ROUTING_CORE_MODULES = ("domain.py", "service.py", "store.py", "catalog.py", "gates.py", "__init__.py")
+
 def gate_specs(root: Path):
     root=str(root.resolve())
-    return {"v2:python-compile": GateSpec("v2:python-compile",("/usr/bin/python3","-m","py_compile","ai/scripts/routing.py"),root,("PYTHONUTF8",)),
+    compile_argv = ("/usr/bin/python3","-m","py_compile","ai/scripts/routing.py",
+                    *(f"ai/scripts/routing_core/{name}" for name in _ROUTING_CORE_MODULES))
+    return {"v2:python-compile": GateSpec("v2:python-compile",compile_argv,root,("PYTHONUTF8",)),
             "v2:routing-unit": GateSpec("v2:routing-unit",("/usr/bin/python3","-m","unittest","discover","-s","tests","-p","test_routing.py"),root,("PYTHONUTF8",)),
             "v2:harness-verify": GateSpec("v2:harness-verify",(str((Path(root)/"ai/scripts/verify.sh").resolve()),),root,())}
 

@@ -46,7 +46,13 @@ Each static ID binds exactly the catalog tuple without runtime; a runtime-only c
 truncated-ID collision invalidates the snapshot.
 Missing/conflicting `selected_runtime` or any other mandatory fact disables dispatch. Auth cannot cross runtime
 boundaries: only the four approved P1R mappings are executable; Pi is simulation-only with execution disabled
-until P2. Explain leaves existing state byte-identical and creates no state.
+until P2/P3. Explain leaves the SQLite dispatch/event state byte-identical and never creates it — but (004
+P1, ADR-0006 AM-2) it is no longer "stateless" in the literal sense: it may READ the regenerable
+`routing-v2/probe-cache.json` file to answer without paying a full live probe, and composition may even
+create/validate that cache's private 0700 root directory so a later real decision can warm it. Explain never
+WRITES `probe-cache.json` itself (`cache_write=False` for every non-writer/simulate lane) — reading a cache is
+not a mutation; persisting a fresh probe result is. See ADR-0006 for the cache's key, TTL, and negative-result
+policy (a failed pair is never cached, so a transient failure costs one retry, never the whole TTL window).
 
 ## Key workflows
 
@@ -74,7 +80,10 @@ terminal-success `code-rw` dispatch, excludes its family, and prefers another au
 
 ## Use cases and delivery boundary
 
-- Explain a trusted hypothetical route without mutation.
+- Explain a trusted hypothetical route without mutating the SQLite dispatch/event state (it may read, never
+  write, the probe cache — see above).
+- Decide a real task descriptor (004 P1 `--route-decide`): durably authorize a writer, report an independent
+  review decision, or report a non-executable decision for any other role class — see the CLI contract below.
 - Authorize exactly one writer and at most one pre-write fallback.
 - Route independent review from persisted writer identity.
 - Report exact retained all-route/per-route p50/p90 plus insertion-counted lifetime rollups without task identity.
@@ -82,5 +91,42 @@ terminal-success `code-rw` dispatch, excludes its family, and prefers another au
 - Enumerate only the approved legacy basenames/rotated-event regex, `lstat` without following, and warn
   present/unsafe without opening, reading, or mutating legacy state.
 
-P1R is the only active implementation boundary. P2 and P3 remain paused until P1R passes its package gates and
-independent acceptance.
+## Adaptive dispatch CLI contract (004 P1-dispatch-core)
+
+Every routing mode is mutually exclusive with every other one and with every non-routing CLI argument, with a
+closed, per-mode exempt set for pure rendering/behavior modifiers:
+
+| Mode | Exempt modifier(s) | Mutates? |
+|---|---|---|
+| `--route-explain` | `--json` | No (read-only; may read, never write, the probe cache) |
+| `--routing-report` | `--json` | No |
+| `--route-decide` | `--json`, `--fresh-probes` | **Yes for writer roles** (durable authorization); no-op for review/other roles beyond the regenerable cache |
+| `--route-dispatched` | `--json` | Yes (lifecycle transition) |
+| `--route-terminal` | `--json`, `--latency-ms` | Yes (lifecycle transition; `failure` from `authorized` closes as `abandoned`) |
+| `--routing-open-runs` | `--json` | No (redacted listing) |
+| `--routing-recent-writers` | `--json` | No (redacted listing) |
+
+`--route-decide` for a writer role is explicitly documented and permissioned as a MUTATING command — it is
+never labeled read-only, even though its envelope shape matches every other routing mode.
+
+### `route-decide` reason → exit table
+
+`ok`/exit are derived from exactly one place (`set_agents_app._decide_status`, contract 004 F01), so P3's Pi
+lane inherits the same table instead of re-deriving it:
+
+- `ok=true`, exit 0: an executable writer decision; a verified reviewer decision (a candidate survived every
+  exclusion); a non-executable decision for any other (non-writer, non-review) role class; and the explicit
+  `REVIEW_IDENTITY_UNVERIFIED` reviewer report (tier/model still reported, execution stays disabled — a
+  non-executable decision never drives a routed spawn, doctrine AC-07).
+- `ok=false`, exit 1: every other non-executable reason — `ROUTING_UNAVAILABLE` (incl. SQLITE busy, never
+  auto-retried), `FACTS_INCOMPLETE`, `NO_ELIGIBLE_ROUTE`, `REVIEW_IDENTITY_INVALID`,
+  `REVIEWER_INDEPENDENCE_UNAVAILABLE`, `PROVIDER_UNAUTHENTICATED`, `AUTHORIZATION_INVALID`,
+  `AUTHORIZATION_REPLAY`, `CATALOG_INVALID`, `STATE_CONFLICT`, `CONTEXT_UNRESOLVED` (the default
+  feature/package resolution could not narrow to exactly one actively-executing package and the task needed
+  context — distinct from a resolved-but-missing pack, which is plain `CONTEXT_MISSING` inside the decision).
+- exit 2 `ROUTING_INPUT_INVALID`: malformed descriptor JSON, a closed-enum violation (`risk`,
+  `selected_runtime`) caught at PARSE time — never passed to the service to degrade into a generic
+  `FACTS_INCOMPLETE` — or an out-of-bounds `--latency-ms`.
+
+P1R (003) is ACCEPTED and its invariants stay load-bearing under this CLI. P2 (OpenCode lane) and P3 (Pi lane,
+gated) remain paused until 004 P1-dispatch-core passes its own package gates and independent acceptance.

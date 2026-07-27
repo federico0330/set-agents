@@ -5,14 +5,14 @@
 
 - [[features/002-adaptive-pi-orchestration|002-adaptive-pi-orchestration]] — fase `BLOCKED` · paquetes 0/1 · **BLOCKED**
 - [[features/003-trusted-routing-pi-runtime|003-trusted-routing-pi-runtime]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
-- [[features/004-adaptive-dispatch|004-adaptive-dispatch]] — fase `PACKAGE_PLANNING` · paquetes 0/0
+- [[features/004-adaptive-dispatch|004-adaptive-dispatch]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **003-trusted-routing-pi-runtime** → `INTEGRATION` — all packages accepted
-- **004-adaptive-dispatch** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
+- **004-adaptive-dispatch** → `INTEGRATION` — all packages accepted
 
 ## Decisiones
 
@@ -30,7 +30,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-07-26T14:58:25+00:00_
+_Actualizado: 2026-07-27T10:01:27+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

@@ -1,11 +1,54 @@
-catalog_version = 1
+catalog_version = 2
+
+# One tier per row (fast < balanced < frontier). Tier-aware selection picks the
+# lowest eligible tier >= the required tier, then curated_priority, then route_id.
+
+[[routes]]
+provider = "openai-codex"
+model = "gpt-5.6-luna"
+family = "gpt-5.6"
+effort = "low"
+tier = "fast"
+roles = ["adversarial-judge", "agent-factory", "app-runner", "architect", "brainstormer", "debugger", "delta-reviewer", "frontend-engineer", "gate-runner", "github-release-manager", "image-describer", "implementer", "integrator", "local-gate-runner", "memory-scribe", "orchestrator", "package-planner", "package-reviewer", "product-analyst", "project-bootstrapper", "refactor-specialist", "repair-agent", "runtime-verifier", "security-auditor", "spec-challenger", "test-writer", "ux-ui-designer"]
+tools = ["read", "shell", "write"]
+curated_priority = 10
+
+[[routes]]
+provider = "anthropic"
+model = "haiku"
+family = "haiku"
+effort = "medium"
+tier = "fast"
+roles = ["adversarial-judge", "agent-factory", "app-runner", "architect", "brainstormer", "debugger", "delta-reviewer", "frontend-engineer", "gate-runner", "github-release-manager", "image-describer", "implementer", "integrator", "local-gate-runner", "memory-scribe", "orchestrator", "package-planner", "package-reviewer", "product-analyst", "project-bootstrapper", "refactor-specialist", "repair-agent", "runtime-verifier", "security-auditor", "spec-challenger", "test-writer", "ux-ui-designer"]
+tools = ["read", "shell", "write"]
+curated_priority = 20
 
 [[routes]]
 provider = "openai-codex"
 model = "gpt-5.6-sol"
 family = "gpt-5.6"
 effort = "medium"
-tiers = ["balanced", "fast", "frontier"]
+tier = "balanced"
+roles = ["adversarial-judge", "agent-factory", "app-runner", "architect", "brainstormer", "debugger", "delta-reviewer", "frontend-engineer", "gate-runner", "github-release-manager", "image-describer", "implementer", "integrator", "local-gate-runner", "memory-scribe", "orchestrator", "package-planner", "package-reviewer", "product-analyst", "project-bootstrapper", "refactor-specialist", "repair-agent", "runtime-verifier", "security-auditor", "spec-challenger", "test-writer", "ux-ui-designer"]
+tools = ["read", "shell", "write"]
+curated_priority = 10
+
+[[routes]]
+provider = "anthropic"
+model = "sonnet"
+family = "sonnet"
+effort = "medium"
+tier = "balanced"
+roles = ["adversarial-judge", "agent-factory", "app-runner", "architect", "brainstormer", "debugger", "delta-reviewer", "frontend-engineer", "gate-runner", "github-release-manager", "image-describer", "implementer", "integrator", "local-gate-runner", "memory-scribe", "orchestrator", "package-planner", "package-reviewer", "product-analyst", "project-bootstrapper", "refactor-specialist", "repair-agent", "runtime-verifier", "security-auditor", "spec-challenger", "test-writer", "ux-ui-designer"]
+tools = ["read", "shell", "write"]
+curated_priority = 20
+
+[[routes]]
+provider = "openai-codex"
+model = "gpt-5.6-terra"
+family = "gpt-5.6"
+effort = "high"
+tier = "frontier"
 roles = ["adversarial-judge", "agent-factory", "app-runner", "architect", "brainstormer", "debugger", "delta-reviewer", "frontend-engineer", "gate-runner", "github-release-manager", "image-describer", "implementer", "integrator", "local-gate-runner", "memory-scribe", "orchestrator", "package-planner", "package-reviewer", "product-analyst", "project-bootstrapper", "refactor-specialist", "repair-agent", "runtime-verifier", "security-auditor", "spec-challenger", "test-writer", "ux-ui-designer"]
 tools = ["read", "shell", "write"]
 curated_priority = 10
@@ -15,7 +58,7 @@ provider = "anthropic"
 model = "opus"
 family = "opus"
 effort = "medium"
-tiers = ["balanced", "fast", "frontier"]
+tier = "frontier"
 roles = ["adversarial-judge", "agent-factory", "app-runner", "architect", "brainstormer", "debugger", "delta-reviewer", "frontend-engineer", "gate-runner", "github-release-manager", "image-describer", "implementer", "integrator", "local-gate-runner", "memory-scribe", "orchestrator", "package-planner", "package-reviewer", "product-analyst", "project-bootstrapper", "refactor-specialist", "repair-agent", "runtime-verifier", "security-auditor", "spec-challenger", "test-writer", "ux-ui-designer"]
 tools = ["read", "shell", "write"]
 curated_priority = 20

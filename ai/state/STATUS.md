@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-07-26T14:58:34+00:00
+Actualizado: 2026-07-27T10:01:45+00:00
 
 ## Features
 
@@ -10,13 +10,45 @@ Actualizado: 2026-07-26T14:58:34+00:00
 |---|---|---|---|---|---|---|---|---|---|---|
 | 002-adaptive-pi-orchestration | feature | BLOCKED | P1-routing-core (repair_required) | 0/1 | 12/12 | 2/2 | 5 | HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. | - | 2026-07-24T16:16:04+00:00 block |
 | 003-trusted-routing-pi-runtime | feature | PACKAGE_ACCEPTED | P1R-trusted-routing (accepted) | 1/1 | 16/16 | 3/3 | 0 | - | INTEGRATION | 2026-07-25T03:01:53+00:00 accept-package |
-| 004-adaptive-dispatch | feature | PACKAGE_PLANNING | - | 0/0 | 0/12 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-07-26T14:58:25+00:00 init |
+| 004-adaptive-dispatch | feature | PACKAGE_ACCEPTED | P1-dispatch-core (accepted) | 1/1 | 7/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-27T10:01:27+00:00 accept-package |
 
 ## Quick-fixes recientes
 
 - _sin quick-fixes registrados_
 
 ## Bitácora (últimos 15)
+
+[2026-07-27T10:01:45+00:00] P1-dispatch-core · orchestrator · done
+Cliente: El cerebro del despacho adaptativo quedo aceptado: el arnes ya elige nivel (rapido/balanceado/frontera) y modelo por tarea, con una consulta que pasa de 14 segundos a menos de uno, y cada despacho de escritura queda autorizado y auditado. Tres revisores independientes encontraron 18 detalles y todos se cerraron.
+Ingeniería: P1-dispatch-core PACKAGE_ACCEPTED: impl (T-100..T-105) + P1-R1 consolidated repair (18 findings from 2 package-reviewers + 1 security-auditor) + independent gates + delta-review pass. Tests 29->48, verify.sh 146 VERIFY_PASS. Core AM-1/AM-2 confirmed sound by all reviewers. Next: P2-opencode-lane (tier variants + orchestrator decide->spawn doctrine).
+
+[2026-07-27T09:55:30+00:00] P1-dispatch-core · delta-reviewer · started
+Cliente: Un revisor distinto va a reproducir cada uno de los 18 problemas y comprobar que el arreglo sea real, sin reabrir una revision general.
+Ingeniería: DELTA_REVIEW R1 delta-reviewer read-only spawn 7/12: decide resolved|open per PKG-N01..N11/SEC-A01..A03 against contract 1.1.0; reproduce each attack; check delta regressions; verify core AM-1/AM-2 untouched.
+
+[2026-07-27T09:49:43+00:00] P1-dispatch-core · gate-runner · started
+Cliente: Una validacion independiente va a repetir todas las pruebas del paquete reparado antes de entregarlo al revisor delta.
+Ingeniería: DELTA_REVIEW R1 gate-runner read-only spawn 6/12: focused 48, harness 2, setup, py_compile incl routing_core, GateSpecs, verify.sh >=300s, CLI matrix, git diff --check, ownership vs 03939b1.
+
+[2026-07-27T01:48:42+00:00] P1-dispatch-core · repair-agent · started
+Cliente: Un reparador va a cerrar los 14 hallazgos en una sola tanda: arreglar los codigos de salida de la CLI, la auditoria del estado abandonado, la resolucion de contexto, la independencia del reviewer y la cobertura de pruebas.
+Ingeniería: PACKAGE_REPAIR R1, repair-agent (Claude in-session) spawn 5/12: reason->exit table (PKG-N01/SEC-002), single-UPDATE abandon+audit (PKG-N02/SEC-A/B), abandoned DDL CHECK+timestamp (PKG-N03), context resolution active-package+freshness+CONTEXT_UNRESOLVED (PKG-N05/N06/SEC-001), independence_verified flag (SEC-A01), uncaught exceptions+latency bounds (SEC-A02), cache dir validation + explain read-only + positive-only cache (SEC-A03/PKG-N07), CLI+catalog test matrix (PKG-N04/N08), docs+GateSpec (PKG-N09/N11), perf targeted open (PKG-N10).
+
+[2026-07-27T01:29:10+00:00] P1-dispatch-core · security-auditor · started
+Cliente: En paralelo, un auditor va a intentar abusar del descriptor, del cache y del ciclo de vida para conseguir un despacho que no corresponde.
+Ingeniería: Panel P1-R1, security-auditor read-only, spawn 4/12: descriptor abuse/tier downgrade, cache poisoning/staleness, abandoned-state abuse, envelope redaction, R3 threat model applies.
+
+[2026-07-27T01:29:10+00:00] P1-dispatch-core · package-reviewer · started
+Cliente: Un revisor independiente va a comprobar que el despacho adaptativo cumple cada criterio aprobado sin romper los invariantes del nucleo de ruteo.
+Ingeniería: Panel P1-R1, package-reviewer read-only over 03939b1..WORKTREE, spawn 3/12: AC-00..AC-05 conformance, 003 invariant regressions, AM-1/AM-2 fidelity, tier semantics, structured findings.
+
+[2026-07-27T01:25:41+00:00] P1-dispatch-core · gate-runner · started
+Cliente: Una instancia independiente va a repetir todas las validaciones y comprobar que el paquete no salio de su ownership.
+Ingeniería: PACKAGE_GATES P1-dispatch-core, gate-runner read-only spawn 2/12: focused suite, harness regressions, setup_models, py_compile, GateSpecs, verify.sh >=120s, CLI matrix, git diff --check, ownership vs 03939b1.
+
+[2026-07-26T15:00:39+00:00] P1-dispatch-core · implementer · started
+Cliente: Un implementador va a construir el nucleo consumible del ruteo: catalogo por niveles, seleccion por riesgo, la CLI de despacho y el cache seguro de autenticacion, con validacion local por tarea.
+Ingeniería: PACKAGE_IMPLEMENTATION P1-dispatch-core spawn 1/12 (Claude Fable in-session): T-100 ADR-0006, T-101 catalog v2 single-tier, T-102 tier-aware selection, T-103 SCHEMA 4 + dispatch CLI, T-104 probe cache + fresh-selected, T-105 backlog+suite. Baseline 03939b103ca49f35457529c4cf8f889873ac8068.
 
 [2026-07-26T14:58:25+00:00] orchestrator · done
 Cliente: El cliente aprobo el contrato del despacho adaptativo tras dos rondas de challenge independiente: el arnes va a elegir modelo por tarea (nivel rapido/balanceado/frontera) en OpenCode ya, y con eleccion dinamica real en Pi si el estudio de viabilidad da bien.
@@ -45,36 +77,4 @@ Ingeniería: User-authorized fresh budget for R3: max_spawns_per_package 13->16 
 [2026-07-24T23:54:28+00:00] P1R-trusted-routing · delta-reviewer · done
 Cliente: La revisión independiente final confirmó que R2 mejora el comportamiento, pero deja abiertos los diez outcomes FD-001..FD-010; P1R no puede aceptarse.
 Ingeniería: Final delta verdict=repair_required: FD-001 critical, FD-002..FD-009 high, FD-010 medium. Gates pass but counterexamples remain; no scope creep/full review required.
-
-[2026-07-24T23:46:06+00:00] P1R-trusted-routing · delta-reviewer · started
-Cliente: Un revisor delta independiente va a validar R2 antes de aceptar P1R.
-Ingeniería: Fresh review budget 13/13 authorized by user; delta-reviewer read-only only, no code mutation or self-approval.
-
-[2026-07-24T23:42:45+00:00] P1R-trusted-routing · orchestrator · blocked
-Cliente: R2 pasa todos los gates, pero el paquete no se acepta porque falta el revisor delta independiente y ya no quedan spawns disponibles.
-Ingeniería: HUMAN_DECISION_REQUIRED: spawn budget 12/12 exhausted; previous delta instance completed/unavailable; implementer cannot approve own repair. Feature remains BLOCKED despite R2 gate pass.
-
-[2026-07-24T23:42:07+00:00] P1R-trusted-routing · gate-runner · done
-Cliente: Los gates R2 quedaron verdes: compilación exacta, 107 tests, verify.sh, configuración, negativos de CLI/GateSpec y diff.
-Ingeniería: Final gate-runner: py_compile PASS; unittest 107 PASS; setup PASS; VERIFY_PASS; diff PASS; CLI explain exit0/conflict exit2; pytest opcional no instalado; ownership temporal sin violación nueva.
-
-[2026-07-24T23:37:11+00:00] P1R-trusted-routing · gate-runner · started
-Cliente: Una última validación independiente va a repetir R2 y comprobar ownership exacto antes del delta reviewer.
-Ingeniería: Spawn 12/12 final: gate-runner read-only executes focused/all GateSpecs/verify/CLI and alternate-index ownership from 51b84e3f; no more spawns after this.
-
-[2026-07-24T23:25:29+00:00] P1R-trusted-routing · repair-agent · started
-Cliente: Un repair-agent va a corregir los diez hallazgos delta en dos bloques acotados y verificables, preservando P2/P3 pausados.
-Ingeniería: PACKAGE_REPAIR R2: bounded trust/catalog block plus SQLite/lifecycle/CLI block; only final repair slot before independent gate and reused delta reviewer; spawn 11/12, no contract weakening.
-
-[2026-07-24T23:25:24+00:00] P1R-trusted-routing · orchestrator · started
-Cliente: La autorización reabrió el paquete: la segunda reparación será acotada a DR-001..DR-010 y mantendrá P2/P3 pausados.
-Ingeniería: PACKAGE_REPAIR R2 autorizado por user; phase PACKAGE_REPAIR, repair_batches=1, deep_review_cycles=2, spawns=10/12; quedan sólo repair-agent + gate-runner y luego follow-up del delta reviewer existente.
-
-[2026-07-24T23:20:11+00:00] P1R-trusted-routing · repair-agent · started
-Cliente: Un único reparador hospedado va a cerrar ahora las diez cadenas pendientes desde la capa más profunda, con pruebas que demuestren cada frontera; no alcanza con mantener verdes los tests anteriores.
-Ingeniería: PACKAGE_REPAIR R2, spawn 10/12: remove constructible authorization/facts seams, exact probes/catalog, validate-before-mutate SQLite, complete lifecycle/rollups/compaction/CLI and production-shaped AC tests; no P2/P3, no self-approval.
-
-[2026-07-24T23:16:06+00:00] P1R-trusted-routing · delta-reviewer · done
-Cliente: La revisión delta confirmó que sólo 2 de 18 hallazgos cerraron; 16 siguen abiertos aunque los tests pasen, por lo que P1R no puede aceptarse.
-Ingeniería: Delta R1 verdict=repair_required; SEC-003/007 resolved; DR-001 critical, DR-002..009 high, DR-010 medium. Sin regresión nueva, pero outcomes originales incompletos. Ciclo profundo final.
 

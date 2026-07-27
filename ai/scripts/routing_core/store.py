@@ -11,10 +11,10 @@ import time
 from pathlib import Path
 from .domain import ImplementationIdentity, RoutingError
 
-SCHEMA = 3
+SCHEMA = 4
 _RUN = re.compile(r"^run1_[0-9a-f]{32}$")
 _IDENTITY = ("route_id", "runtime", "provider", "model", "family", "effort")
-_EVENT_TYPES = {"authorized", "dispatched", "partial", "fallback", "terminal", "rejected"}
+_EVENT_TYPES = {"authorized", "dispatched", "partial", "fallback", "terminal", "rejected", "abandoned"}
 _OUTCOMES = {"success", "failure", "none"}
 
 
@@ -54,6 +54,16 @@ class RoutingStore:
         # It is trusted only for ancestors; the managed leaf still must be this uid's 0700 directory.
         if not leaf and st.st_uid not in {0, os.getuid(), 65534}: raise RoutingError("ROUTING_UNAVAILABLE")
         if not leaf and (stat.S_IMODE(st.st_mode) & 0o022) and not (st.st_mode & stat.S_ISVTX): raise RoutingError("ROUTING_UNAVAILABLE")
+
+    def ensure_cache_root(self) -> Path:
+        """AM-2/F06: create-or-validate the private cache root, never the DB file.
+
+        Reuses the exact same private-directory discipline as the store
+        (never chmod/adopt a foreign existing directory); a caller that
+        catches `RoutingError` here degrades to fresh, uncached probing.
+        """
+        self._safe_dir(create=True)
+        return self.root
 
     def _safe_dir(self, create: bool):
         self._check_supported()
@@ -114,12 +124,16 @@ CREATE TABLE dispatches (
  selected_route_id TEXT NOT NULL, selected_runtime TEXT NOT NULL, selected_provider TEXT NOT NULL, selected_model TEXT NOT NULL, selected_family TEXT NOT NULL, selected_effort TEXT NOT NULL,
  fallback_route_id TEXT, fallback_runtime TEXT, fallback_provider TEXT, fallback_model TEXT, fallback_family TEXT, fallback_effort TEXT,
  actual_route_id TEXT, actual_runtime TEXT, actual_provider TEXT, actual_model TEXT, actual_family TEXT, actual_effort TEXT,
- state TEXT NOT NULL CHECK(state IN ('authorized','dispatched','terminal_success','terminal_failure')), partial_write INTEGER NOT NULL DEFAULT 0 CHECK(partial_write IN (0,1)), fallback_window_open INTEGER NOT NULL CHECK(fallback_window_open IN (0,1)), fallback_consumed INTEGER NOT NULL DEFAULT 0 CHECK(fallback_consumed IN (0,1)),
+ state TEXT NOT NULL CHECK(state IN ('authorized','dispatched','terminal_success','terminal_failure','abandoned')), partial_write INTEGER NOT NULL DEFAULT 0 CHECK(partial_write IN (0,1)), fallback_window_open INTEGER NOT NULL CHECK(fallback_window_open IN (0,1)), fallback_consumed INTEGER NOT NULL DEFAULT 0 CHECK(fallback_consumed IN (0,1)),
  authorized_at INTEGER NOT NULL, dispatched_at INTEGER, partial_write_at INTEGER, fallback_consumed_at INTEGER, terminal_at INTEGER, updated_at INTEGER NOT NULL,
  CHECK((fallback_route_id IS NULL AND fallback_runtime IS NULL AND fallback_provider IS NULL AND fallback_model IS NULL AND fallback_family IS NULL AND fallback_effort IS NULL) OR (fallback_route_id IS NOT NULL AND fallback_runtime IS NOT NULL AND fallback_provider IS NOT NULL AND fallback_model IS NOT NULL AND fallback_family IS NOT NULL AND fallback_effort IS NOT NULL)),
  CHECK((actual_route_id IS NULL AND actual_runtime IS NULL AND actual_provider IS NULL AND actual_model IS NULL AND actual_family IS NULL AND actual_effort IS NULL) OR (actual_route_id IS NOT NULL AND actual_runtime IS NOT NULL AND actual_provider IS NOT NULL AND actual_model IS NOT NULL AND actual_family IS NOT NULL AND actual_effort IS NOT NULL)),
- CHECK(state='authorized' OR actual_route_id IS NOT NULL),
- CHECK(state NOT IN ('terminal_success','terminal_failure') OR fallback_window_open=0),
+ CHECK(state IN ('authorized','abandoned') OR actual_route_id IS NOT NULL),
+ -- N03: abandoned is a never-dispatched close — it can never carry an actual (dispatched)
+ -- identity. Its close timestamp is `updated_at` (documented here): `terminal_at`'s ordering
+ -- CHECK below requires dispatched_at, which a never-dispatched row never has.
+ CHECK(state<>'abandoned' OR (actual_route_id IS NULL AND actual_runtime IS NULL AND actual_provider IS NULL AND actual_model IS NULL AND actual_family IS NULL AND actual_effort IS NULL)),
+ CHECK(state NOT IN ('terminal_success','terminal_failure','abandoned') OR fallback_window_open=0),
  CHECK(dispatched_at IS NULL OR dispatched_at>=authorized_at),
  CHECK(terminal_at IS NULL OR (dispatched_at IS NOT NULL AND terminal_at>=dispatched_at)),
  CHECK(fallback_consumed=0 OR fallback_route_id IS NOT NULL));
@@ -237,7 +251,7 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
             except Exception: pass
 
     def _transition(self, run_id, sql, params, event, outcome="none", latency=None):
-        c=self._connect()
+        c=self._connect(); row=None
         try:
             c.execute("BEGIN IMMEDIATE"); row=c.execute("SELECT actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort,fallback_consumed FROM dispatches WHERE run_id=?",(run_id,)).fetchone(); result=c.execute(sql,params)
             if not row or result.rowcount != 1:
@@ -246,9 +260,13 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
             # audit the fallback identity, never the originally selected one).
             self._event(c,event,tuple(row[:6] if all(row[:6]) else row[6:12]),outcome,latency=latency,via_fallback=bool(row[12])); c.execute("COMMIT")
         except RoutingError: raise
-        except sqlite3.Error as exc:
+        except (OverflowError, sqlite3.Error) as exc:
             try:c.execute("ROLLBACK")
             except sqlite3.Error:pass
+            # SEC-A02: an out-of-range latency (OverflowError at SQLite bind time, e.g. an
+            # unvalidated caller) or any other sqlite failure still leaves an independent
+            # audit trail before mapping to ROUTING_UNAVAILABLE — never a silent traceback.
+            self._rejection_event(tuple(row[6:12]) if row else None,"ROUTING_UNAVAILABLE")
             raise RoutingError("ROUTING_UNAVAILABLE") from exc
         finally:c.close()
 
@@ -272,6 +290,86 @@ CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX even
         except RoutingError:raise
         except sqlite3.Error as exc: raise RoutingError("ROUTING_UNAVAILABLE") from exc
         finally:c.close()
+    def abandon(self, run_id):
+        """Close a never-dispatched authorization (contract 004 AC-03): terminal, no actual identity."""
+        c=self._connect()
+        try:
+            now=self._now(); c.execute("BEGIN IMMEDIATE")
+            row=c.execute("SELECT selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort FROM dispatches WHERE run_id=? AND state='authorized'",(run_id,)).fetchone()
+            changed=c.execute("UPDATE dispatches SET state='abandoned',fallback_window_open=0,updated_at=? WHERE run_id=? AND state='authorized'",(now,run_id))
+            if not row or changed.rowcount != 1:
+                c.execute("ROLLBACK"); self._rejection_event(tuple(row) if row else None,"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
+            self._event(c,"abandoned",tuple(row),"failure"); c.execute("COMMIT")
+        except RoutingError: raise
+        except sqlite3.Error as exc:
+            try:c.execute("ROLLBACK")
+            except sqlite3.Error:pass
+            raise RoutingError("ROUTING_UNAVAILABLE") from exc
+        finally:c.close()
+
+    def close_run(self, run_id, outcome, latency_ms=None):
+        """Close ANY run_id in one transaction (F02): reads the current state ONCE and
+        transitions to exactly the right destination — `dispatched` -> `terminal_<outcome>`,
+        `authorized`+failure -> `abandoned` (contract 004 AC-03), anything else -> a single
+        `rejected`/STATE_CONFLICT event. This replaces the CLI's former
+        `try terminal() except STATE_CONFLICT: abandon()` two-transaction pattern, which left
+        a spurious rejected row behind a SUCCESSFUL abandon (terminal() already audited its
+        own STATE_CONFLICT before abandon() ever ran) and wrote TWO rejected rows for a
+        nonexistent/already-terminal run_id. Returns the resulting state string.
+        """
+        if outcome not in {"success", "failure"}: raise RoutingError("AUTHORIZATION_INVALID")
+        c=self._connect(); row=None
+        try:
+            now=self._now(); c.execute("BEGIN IMMEDIATE")
+            row=c.execute("SELECT state,actual_route_id,actual_runtime,actual_provider,actual_model,actual_family,actual_effort,"
+                          "selected_route_id,selected_runtime,selected_provider,selected_model,selected_family,selected_effort,"
+                          "fallback_consumed FROM dispatches WHERE run_id=?",(run_id,)).fetchone()
+            state = row[0] if row else None
+            if state == "dispatched":
+                changed=c.execute("UPDATE dispatches SET state=?,fallback_window_open=0,terminal_at=?,updated_at=? "
+                                  "WHERE run_id=? AND state='dispatched'",(f"terminal_{outcome}",now,now,run_id))
+                if changed.rowcount != 1:
+                    c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
+                identity = tuple(row[1:7]) if all(row[1:7]) else tuple(row[7:13])
+                self._event(c,"terminal",identity,outcome,latency=latency_ms,via_fallback=bool(row[13])); c.execute("COMMIT")
+                return f"terminal_{outcome}"
+            if state == "authorized" and outcome == "failure":
+                changed=c.execute("UPDATE dispatches SET state='abandoned',fallback_window_open=0,updated_at=? "
+                                  "WHERE run_id=? AND state='authorized'",(now,run_id))
+                if changed.rowcount != 1:
+                    c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
+                self._event(c,"abandoned",tuple(row[7:13]),"failure"); c.execute("COMMIT")
+                return "abandoned"
+            # Nonexistent run_id, already-terminal/abandoned row, or authorized+success (which
+            # has no defined transition — success only ever follows a real dispatch): exactly
+            # ONE rejected event, never two.
+            c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]) if row else None,"STATE_CONFLICT")
+            raise RoutingError("STATE_CONFLICT")
+        except RoutingError: raise
+        except (OverflowError, sqlite3.Error) as exc:
+            try:c.execute("ROLLBACK")
+            except sqlite3.Error:pass
+            self._rejection_event(tuple(row[7:13]) if row else None,"ROUTING_UNAVAILABLE")
+            raise RoutingError("ROUTING_UNAVAILABLE") from exc
+        finally:c.close()
+
+    def open_runs(self):
+        """Redacted listing of non-terminal rows: (run_id, state, age_ms)."""
+        c=self._connect()
+        try:
+            now=self._now()
+            return [{"run_id":r[0],"state":r[1],"age_ms":now-r[2]} for r in
+                    c.execute("SELECT run_id,state,authorized_at FROM dispatches WHERE state IN ('authorized','dispatched') ORDER BY authorized_at")]
+        finally:c.close()
+
+    def recent_writers(self, limit=20):
+        """Redacted listing of recent terminal-success writer run_ids for reviewer identity sourcing."""
+        c=self._connect()
+        try:
+            return [{"run_id":r[0],"terminal_at":r[1]} for r in
+                    c.execute("SELECT run_id,terminal_at FROM dispatches WHERE role_class='writer' AND state='terminal_success' ORDER BY terminal_at DESC,run_id LIMIT ?",(int(limit),))]
+        finally:c.close()
+
     def implementation_identity(self, run_id):
         c=self._connect()
         try:

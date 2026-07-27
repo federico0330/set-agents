@@ -10,23 +10,36 @@ catalog, MCP servers, and Claude Code plugins.
 import argparse
 import json
 import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import tomllib
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config
 import routing
 
-# SET_AGENTS_ROOT/SET_AGENTS_STATE are test seams; real runs never set them.
+# SET_AGENTS_ROOT/SET_AGENTS_STATE/SET_AGENTS_ROUTING_TEST_ROOT are test seams; real runs
+# never set them. routing_core itself never reads any of them (ADR-0006: the routing store's
+# production root is fixed, derived from the account database, never from the environment) —
+# this indirection lives entirely here, in the CLI composition layer (F07).
 ROOT = Path(os.environ.get("SET_AGENTS_ROOT") or Path(__file__).resolve().parents[2])
 STATE_DIR = Path(os.environ.get("SET_AGENTS_STATE") or Path.home() / ".local/state/set-agentes")
+ROUTING_TEST_ROOT = os.environ.get("SET_AGENTS_ROUTING_TEST_ROOT")
 APP_CONFIG = STATE_DIR / "config.toml"
 MANAGED_MCP = models_config.MANAGED_MCP
 HARNESS_CLIS = ("opencode", "claude", "codex")
+
+
+def _routing_store():
+    """F07: the one seam a hermetic CLI test uses to drive decide/dispatched/terminal/abandoned
+    against a temp root. Never set by real runs (see the module-level seam note above)."""
+    return routing.RoutingStore._for_tests(Path(ROUTING_TEST_ROOT)) if ROUTING_TEST_ROOT else routing.RoutingStore()
 
 
 def routing_catalog(simulation=False):
@@ -34,7 +47,7 @@ def routing_catalog(simulation=False):
     config = models_config.load_config(ROOT / "models.toml")
     roster = models_config.load_roster(ROOT / "roles.tsv")
     # No optimistic defaults: each real invocation gets a fresh exact probe.
-    return routing.compose(config, roster, simulate=simulation), config
+    return routing.compose(config, roster, simulate=simulation, store=None if simulation else _routing_store()), config
 
 
 def _routing_output(payload, human):
@@ -72,13 +85,274 @@ def cmd_route_explain(task_class, human=False):
 
 def cmd_routing_report(human=False):
     try:
-        report = routing.RoutingStore().report()
+        report = _routing_store().report()
     except (OSError, routing.RoutingError):
         report = {"retained_events": 0, "p50_ms": None, "p90_ms": None, "reason_codes": ["ROUTING_UNAVAILABLE"]}
     reasons = tuple(report.get("reason_codes", ()))
     warnings = routing.legacy_warnings(STATE_DIR)
     _routing_output(routing.cli_envelope(not reasons, "routing-report", report, warnings, reasons), human)
     return 1 if reasons else 0
+
+
+_RUN_ID = re.compile(r"^run1_[0-9a-f]{32}$")
+
+
+def _role_class_of(row):
+    if row["capability"] == "code-rw": return "writer"
+    if row["capability"] == "review-ro" and row["duty"] in {"audit", "judge"}: return "review"
+    return "other"
+
+
+# F01: the ONLY two "non-executable but still ok=true" shapes a decision can take — a
+# non-executable decision for a non-writer, non-review role class, and the explicit,
+# doctrine-named REVIEW_IDENTITY_UNVERIFIED reviewer report. Every other non-executable
+# decision (FACTS_INCOMPLETE, NO_ELIGIBLE_ROUTE, REVIEW_IDENTITY_INVALID,
+# PROVIDER_UNAUTHENTICATED, REVIEWER_INDEPENDENCE_UNAVAILABLE, AUTHORIZATION_INVALID,
+# AUTHORIZATION_REPLAY, CATALOG_INVALID, STATE_CONFLICT, ROUTING_UNAVAILABLE, ...) is a
+# real failure: ok=false, exit 1. Centralized so P3's Pi lane inherits the same table.
+_DECIDE_OK_NON_EXECUTABLE_REASONS = ((), ("REVIEW_IDENTITY_UNVERIFIED",))
+
+
+def _decide_status(decision):
+    """(ok, exit_code) for a `route-decide` RouteDecision — the reason->exit table (F01)."""
+    if decision.execution_enabled or decision.reason_codes in _DECIDE_OK_NON_EXECUTABLE_REASONS:
+        return True, 0
+    return False, 1
+
+
+_SAFE_STATE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+# F03: a feature phase or package status this terminal never has an "active" context pack —
+# naming it explicitly can never flip CONTEXT_MISSING, and it is never chosen by default
+# resolution either.
+_TERMINAL_FEATURE_PHASES = {"DONE", "BLOCKED", None}
+_TERMINAL_PACKAGE_STATUS = {"accepted", "done", "blocked", "cancelled"}
+
+
+def _load_feature_doc(path):
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def _validate_context_pack_path(pack):
+    """SEC-A02: a foreign/malformed feature-state.json must never crash route-decide nor
+    escape the repo. Non-str, empty, absolute, or traversal-outside-ROOT all degrade to 'no
+    pack' — never a bare `ROOT / pack` (an absolute right-hand side silently DISCARDS ROOT
+    under pathlib's own semantics, which would let a crafted state file probe arbitrary
+    filesystem paths)."""
+    if not isinstance(pack, str) or not pack or os.path.isabs(pack):
+        return None
+    root = ROOT.resolve()
+    candidate = (root / pack).resolve()
+    try:
+        if os.path.commonpath([str(candidate), str(root)]) != str(root):
+            return None
+    except ValueError:
+        return None
+    return candidate
+
+
+def _package_context_ok(doc, package_id):
+    """Existence AND freshness (F03b): a pack older than the package's own last recorded
+    mutation (falling back to the feature doc's) is stale and reports False, conservatively."""
+    for package in doc.get("packages", []):
+        if package.get("package_id") != package_id:
+            continue
+        path = _validate_context_pack_path(package.get("context_pack"))
+        if path is None:
+            return False
+        try:
+            st = path.lstat()
+        except OSError:
+            return False
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+            return False
+        reference = package.get("updated_at") or doc.get("updated_at")
+        if isinstance(reference, str):
+            try:
+                ref_epoch = datetime.fromisoformat(reference).timestamp()
+            except ValueError:
+                ref_epoch = None
+            if ref_epoch is not None and st.st_mtime < ref_epoch:
+                return False  # stale: the pack predates the package's last recorded mutation
+        return True
+    return False
+
+
+def _resolve_context_pack(feature_id, package_id):
+    """AM-1/F03: context flags derive from the active package's context pack — EXISTENCE AND
+    FRESHNESS, never presence alone. Returns `(context_ok, feature_id, package_id)`:
+    `context_ok` is True/False once a package is identified (pack good, or missing/stale/the
+    feature or package is terminal), or None when the package itself could not even be
+    resolved (CONTEXT_UNRESOLVED at the caller — distinct from a resolved-but-missing pack,
+    contract 004 AC-03's "no resolvable package ⇒ context flags false" applies to the
+    EXPLICIT-id case; the ambiguous DEFAULT case is a distinct signal).
+    """
+    state_dir = ROOT / "ai/state/features"
+    if feature_id:
+        if not _SAFE_STATE_ID.fullmatch(feature_id):
+            return False, feature_id, package_id
+        # N10: with an explicit feature_id, open ONLY that one file — never glob the directory.
+        doc = _load_feature_doc(state_dir / f"{feature_id}.json")
+        if doc is None or doc.get("feature_id") != feature_id:
+            return False, feature_id, package_id
+        target = package_id if (package_id and _SAFE_STATE_ID.fullmatch(package_id)) else doc.get("current_package_id")
+        # F03a: naming a BLOCKED/DONE feature can never flip CONTEXT_MISSING — the same
+        # non-terminal filter used by default resolution applies here too. `target` is still
+        # resolved above so the audit payload always shows the effective package_id.
+        if doc.get("phase") in _TERMINAL_FEATURE_PHASES:
+            return False, feature_id, target
+        return _package_context_ok(doc, target), feature_id, target
+    # No feature_id: resolve the single feature whose CURRENT package is actively executing
+    # (package status non-terminal) — "exactly one non-terminal FEATURE" under-resolves
+    # whenever more than one feature is mid-flight (e.g. one sitting at PACKAGE_ACCEPTED for
+    # its current package while another is still mid-repair).
+    candidates = []
+    try:
+        for candidate_path in sorted(state_dir.glob("*.json")):
+            doc = _load_feature_doc(candidate_path)
+            if doc is None or doc.get("phase") in _TERMINAL_FEATURE_PHASES:
+                continue
+            current = doc.get("current_package_id")
+            package = next((p for p in doc.get("packages", []) if p.get("package_id") == current), None)
+            if package is not None and package.get("status") not in _TERMINAL_PACKAGE_STATUS:
+                candidates.append((doc, current))
+    except OSError:
+        return None, None, None
+    if len(candidates) != 1:
+        return None, None, None  # CONTEXT_UNRESOLVED at the caller, distinct from NO_ELIGIBLE_ROUTE
+    doc, target = candidates[0]
+    return _package_context_ok(doc, target), doc.get("feature_id"), target
+
+
+def cmd_route_decide(source, human=False, fresh=False):
+    allowed = {"role", "task_class", "risk", "review_of_run_id", "selected_runtime", "feature_id", "package_id"}
+    try:
+        raw = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
+        doc = json.loads(raw)
+        if not isinstance(doc, dict) or set(doc) - allowed: raise ValueError
+        role, task_class = doc.get("role"), doc.get("task_class")
+        if not isinstance(role, str) or task_class not in routing.TASK_CLASSES: raise ValueError
+        req_risk = doc.get("risk", "low"); runtime = doc.get("selected_runtime", "opencode")
+        review_of = doc.get("review_of_run_id")
+        feature_id = doc.get("feature_id"); package_id = doc.get("package_id")
+        for value in (req_risk, runtime) + tuple(v for v in (review_of, feature_id, package_id) if v is not None):
+            if not isinstance(value, str) or not value: raise ValueError
+        # F01: a descriptor risk/runtime outside the closed enum is a PARSE failure (exit 2
+        # ROUTING_INPUT_INVALID) — it never reaches the service to degrade into FACTS_INCOMPLETE.
+        if req_risk not in routing.RISK_ORDER or runtime not in routing.SELECTED_RUNTIMES: raise ValueError
+    except (OSError, ValueError):
+        _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    try:
+        config = models_config.load_config(ROOT / "models.toml")
+        roster = models_config.load_roster(ROOT / "roles.tsv")
+        row = next((item for item in roster if item["role"] == role), None)
+        if row is None:
+            _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("FACTS_INCOMPLETE",)), human); return 1
+        role_class = _role_class_of(row)
+        # AM-1 (ADR-0006): capability decides write access and tools; task_class decides criticality
+        # and the base risk; the descriptor risk can only RAISE (combined in the service); context
+        # flags derive from the active package's context pack.
+        writer = role_class == "writer"
+        criticality = task_class if task_class in routing.CRITICAL else ""
+        base_risk = "high" if (criticality or task_class == "incident") else "low"
+        needs_context = bool(criticality) or base_risk == "high" or req_risk == "high"
+        context_ok, resolved_feature, resolved_package = _resolve_context_pack(feature_id, package_id)
+        if needs_context and context_ok is None:
+            # F03d: the harness itself could not narrow the default resolution to exactly one
+            # actively-executing package — distinct from NO_ELIGIBLE_ROUTE (a real catalog
+            # exclusion), and distinct from a resolved-but-missing pack (plain CONTEXT_MISSING).
+            data = {"feature_id": resolved_feature, "package_id": resolved_package, "context_ok": None}
+            _routing_output(routing.cli_envelope(False, "route-decide", data, (), ("CONTEXT_UNRESOLVED",)), human)
+            return 1
+        context_flag = bool(context_ok)
+        unverified_review = role_class == "review" and not review_of
+        simulate = not writer and not (role_class == "review" and review_of)
+        service = routing.compose(config, roster, simulate=simulate, fresh_probes=fresh,
+                                  store=None if simulate else _routing_store())
+        request = routing.TaskRequest(role=role, operation="inspection" if task_class == "inspection" else "change",
+                                      task_class=task_class, risk=req_risk, selected_runtime=runtime)
+        facts = service._observe_for_invocation(role=role, operation=request.operation, task_class=task_class,
+            read_write="write" if writer else "read", write_started=False,
+            risk=base_risk, criticality=criticality, affected_surfaces=(),
+            required_tools=("read", "shell", "write") if writer else ("read",),
+            context_required=needs_context,
+            context_present=context_flag, critical_coverage=context_flag, selected_runtime=runtime)
+        decision = service.route(request, facts, review_of, unverified_review=unverified_review)
+        tier = next((r.tier for r in service.snapshot.routes if r.route_id == decision.route_id), None)
+        data = decision.to_dict(); data["tier"] = tier; data["role_class"] = role_class
+        # F03: the effective (feature_id, package_id, context_ok) is always in the envelope,
+        # even when context wasn't needed, for audit.
+        data["feature_id"] = resolved_feature; data["package_id"] = resolved_package; data["context_ok"] = context_flag
+        ok, exit_code = _decide_status(decision)
+        _routing_output(routing.cli_envelope(ok, "route-decide", data, (), decision.reason_codes), human)
+        return exit_code
+    except models_config.ModelsError:
+        _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    # SEC-A02: any unvalidated internal edge (a malformed feature-state.json field, an
+    # out-of-range value reaching the store) degrades to ROUTING_UNAVAILABLE — never an
+    # uncaught traceback breaking the schema-2 envelope / one-JSON-line contract.
+    except (routing.RoutingError, OSError, TypeError, ValueError, OverflowError):
+        _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
+
+
+def _lifecycle_command(name, run_id, action, human):
+    if not isinstance(run_id, str) or not _RUN_ID.fullmatch(run_id):
+        _routing_output(routing.cli_envelope(False, name, {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    try:
+        result = action(_routing_store())
+        _routing_output(routing.cli_envelope(True, name, result, (), ()), human); return 0
+    except routing.RoutingError as exc:
+        _routing_output(routing.cli_envelope(False, name, {}, (), (str(exc),)), human); return 1
+    except (OSError, TypeError, ValueError, OverflowError):
+        _routing_output(routing.cli_envelope(False, name, {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
+
+
+def cmd_route_dispatched(run_id, human=False):
+    def action(store):
+        store.mark_dispatched(run_id); return {"run_id": run_id, "state": "dispatched"}
+    return _lifecycle_command("route-dispatched", run_id, action, human)
+
+
+_LATENCY_MAX = 2**31 - 1
+
+
+def cmd_route_terminal(run_id, outcome, latency_ms, human=False):
+    if outcome not in {"success", "failure"}:
+        _routing_output(routing.cli_envelope(False, "route-terminal", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    # SEC-A02: bound --latency-ms at the CLI, before it ever reaches the store — an
+    # out-of-range value (overflow) or a negative one (would decrement rollup sums) is a
+    # PARSE failure, not a runtime one.
+    if latency_ms is not None and (isinstance(latency_ms, bool) or not isinstance(latency_ms, int)
+                                   or not (0 <= latency_ms <= _LATENCY_MAX)):
+        _routing_output(routing.cli_envelope(False, "route-terminal", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    def action(store):
+        # F02: ONE transaction reads the state and transitions to exactly the right
+        # destination (dispatched->terminal, authorized+failure->abandoned, anything else a
+        # single rejected/STATE_CONFLICT) — never a try-terminal-then-except-abandon pair of
+        # independent transactions, which left a spurious rejected row behind a successful
+        # abandon and wrote two rejected rows for an unclosable run.
+        state = store.close_run(run_id, outcome, latency_ms)
+        return {"run_id": run_id, "state": state}
+    return _lifecycle_command("route-terminal", run_id, action, human)
+
+
+def cmd_routing_open_runs(human=False):
+    try:
+        data = {"open_runs": _routing_store().open_runs()}
+        _routing_output(routing.cli_envelope(True, "routing-open-runs", data, (), ()), human); return 0
+    except (routing.RoutingError, OSError):
+        _routing_output(routing.cli_envelope(False, "routing-open-runs", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
+
+
+def cmd_routing_recent_writers(human=False):
+    try:
+        data = {"recent_writers": _routing_store().recent_writers()}
+        _routing_output(routing.cli_envelope(True, "routing-recent-writers", data, (), ()), human); return 0
+    except (routing.RoutingError, OSError):
+        _routing_output(routing.cli_envelope(False, "routing-recent-writers", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
 
 
 def use_color():
@@ -1011,6 +1285,13 @@ def main():
     parser.add_argument("--status", action="store_true", help="estado en una línea (APP_STATUS ...)")
     parser.add_argument("--route-explain", metavar="TASK_CLASS")
     parser.add_argument("--routing-report", action="store_true")
+    parser.add_argument("--route-decide", metavar="FILE", help="descriptor JSON ('-' = stdin); decide y, para writers, autoriza")
+    parser.add_argument("--route-dispatched", metavar="RUN_ID")
+    parser.add_argument("--route-terminal", nargs=2, metavar=("RUN_ID", "OUTCOME"))
+    parser.add_argument("--routing-open-runs", action="store_true")
+    parser.add_argument("--routing-recent-writers", action="store_true")
+    parser.add_argument("--fresh-probes", action="store_true", help="con --route-decide: saltea el cache de probes")
+    parser.add_argument("--latency-ms", type=int, default=None, help="con --route-terminal: latencia observada")
     parser.add_argument("--json", action="store_true", help="salida JSON para comandos de observabilidad")
     parser.add_argument("--check-update", action="store_true")
     parser.add_argument("--update", action="store_true")
@@ -1038,21 +1319,41 @@ def main():
     args = parser.parse_args()
 
     routing_human = sys.stdout.isatty() and not args.json
-    # Routing observability modes are total: JSON is a rendering modifier, but
-    # no other argument — operational command or modifier — may be silently
-    # combined with an explain/report. Comparing every parsed argument against
-    # its parser default keeps this exhaustive when new flags are added.
-    routing_mode = bool(args.route_explain or args.routing_report)
-    _routing_args = {"json", "route_explain", "routing_report"}
+    # Routing modes are total: JSON is a rendering modifier, per-mode modifiers are the only
+    # exemptions (--fresh-probes with decide, --latency-ms with terminal), and no other argument —
+    # operational command or modifier — may be silently combined with a routing mode. Comparing every
+    # parsed argument against its parser default keeps this exhaustive when new flags are added.
+    # F08/N11: presence is checked with `is not None` for value-bearing flags, NEVER truthiness —
+    # `--route-decide ""` is a present-but-EMPTY string, which is falsy and would otherwise fall
+    # straight through every mode check into the interactive menu/help instead of failing closed.
+    _mode_flags = (args.route_explain is not None, args.routing_report, args.route_decide is not None,
+                   args.route_dispatched is not None, args.route_terminal is not None,
+                   args.routing_open_runs, args.routing_recent_writers)
+    routing_mode = any(_mode_flags)
+    _routing_args = {"json", "route_explain", "routing_report", "route_decide", "route_dispatched",
+                     "route_terminal", "routing_open_runs", "routing_recent_writers",
+                     "fresh_probes", "latency_ms"}
     other_mode = any(value != parser.get_default(name)
                      for name, value in vars(args).items() if name not in _routing_args)
-    if (args.route_explain and args.routing_report) or (routing_mode and other_mode):
+    modifier_misuse = (args.fresh_probes and args.route_decide is None) or \
+                      (args.latency_ms is not None and args.route_terminal is None)
+    if (sum(_mode_flags) > 1) or (routing_mode and other_mode) or modifier_misuse:
         _routing_output(routing.cli_envelope(False, "routing", {}, (), ("ROUTING_INPUT_INVALID",)), routing_human)
         return 2
-    if args.route_explain:
+    if args.route_explain is not None:
         return cmd_route_explain(args.route_explain, human=routing_human)
     if args.routing_report:
         return cmd_routing_report(human=routing_human)
+    if args.route_decide is not None:
+        return cmd_route_decide(args.route_decide, human=routing_human, fresh=args.fresh_probes)
+    if args.route_dispatched is not None:
+        return cmd_route_dispatched(args.route_dispatched, human=routing_human)
+    if args.route_terminal is not None:
+        return cmd_route_terminal(args.route_terminal[0], args.route_terminal[1], args.latency_ms, human=routing_human)
+    if args.routing_open_runs:
+        return cmd_routing_open_runs(human=routing_human)
+    if args.routing_recent_writers:
+        return cmd_routing_recent_writers(human=routing_human)
 
     if args.status:
         return cmd_status(human=sys.stdout.isatty())

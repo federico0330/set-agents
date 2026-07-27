@@ -10,11 +10,13 @@ import textwrap
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"ai/scripts"))
 import models_config
 import routing
+import set_agents_app
 from routing_core import catalog as routing_catalog
 
 class RoutingTests(unittest.TestCase):
@@ -30,8 +32,8 @@ class RoutingTests(unittest.TestCase):
                   context_present=True,critical_coverage=True,selected_runtime=runtime)
         data.update(changes); return data
 
-    def service(self, root=None, inventory=None, simulate=False):
-        return routing._compose_for_tests(self.config,self.roster,inventory or self.inventory,root,simulate=simulate)
+    def service(self, root=None, inventory=None, simulate=False, reprobe=None):
+        return routing._compose_for_tests(self.config,self.roster,inventory or self.inventory,root,simulate=simulate,reprobe=reprobe)
 
     def observed(self, service, role="product-analyst", runtime="claude-code", **changes):
         return service._observe_for_invocation(**self.facts(role, runtime, **changes))
@@ -43,7 +45,7 @@ class RoutingTests(unittest.TestCase):
         return decision
 
     def test_static_ids_exclude_runtime_and_catalog_is_immutable(self):
-        service=self.service(); routes=service.snapshot.routes
+        service=self.service(simulate=True); routes=service.snapshot.routes
         self.assertTrue(all(r.route_id.startswith("rt1_") and len(r.route_id)==20 for r in routes))
         openai=next(r for r in routes if r.provider=="openai-codex")
         self.assertIn((openai.route_id,"codex",openai.provider,openai.model,openai.family,openai.effort),service.snapshot.identities)
@@ -71,8 +73,10 @@ class RoutingTests(unittest.TestCase):
         decision=svc.route(request,facts)
         self.assertFalse(decision.execution_enabled)
         self.assertIn("NO_ELIGIBLE_ROUTE",decision.reason_codes)
-        # The anthropic route (the only claude-code-compatible one) is excluded for context, not risk passthrough.
-        self.assertEqual({item["reason"] for item in decision.exclusions},{"RUNTIME_UNAVAILABLE","CONTEXT_MISSING"})
+        # v2 catalog: openai rows are runtime-unavailable for claude-code, unauthenticated anthropic tiers
+        # fall to auth, and the eligible frontier route is excluded for context — not risk passthrough.
+        self.assertEqual({item["reason"] for item in decision.exclusions},
+                         {"RUNTIME_UNAVAILABLE","PROVIDER_UNAUTHENTICATED","CONTEXT_MISSING"})
         # The same observation with low risk routes normally.
         ok=svc.route(routing.TaskRequest("product-analyst","change","documentation",risk="low",selected_runtime="claude-code"),
                      self.observed(svc,risk="low",context_required=False,context_present=False,critical_coverage=False))
@@ -84,11 +88,26 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(bad.reason_codes,("FACTS_INCOMPLETE",))
 
     def test_pi_is_simulation_only_and_runtime_auth_is_pair_scoped(self):
-        svc=self.service(); d=svc.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="pi"),self.observed(svc,runtime="pi"))
+        svc=self.service(simulate=True); d=svc.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="pi"),self.observed(svc,runtime="pi"))
         self.assertFalse(d.execution_enabled); self.assertIn("NO_ELIGIBLE_ROUTE",d.reason_codes)
-        unavailable=self.service(inventory={("codex","openai-codex"):{"gpt-5.6-sol"}})
+        self.assertIsNone(d.route_id)  # N08: not vacuously true under simulate=True — no candidate at all
+        # pi is absent from the audited pair table, so RUNTIME_UNAVAILABLE (pair-scoped) fires
+        # before the PI_SIMULATION_ONLY rule is even reached — pi has no path to identity_allowed.
+        self.assertTrue(any(item["reason"]=="RUNTIME_UNAVAILABLE" for item in d.exclusions))
+        unavailable=self.service(simulate=True,inventory={("codex","openai-codex"):{"gpt-5.6-sol"}})
         d=unavailable.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="opencode"),self.observed(unavailable,runtime="opencode"))
-        self.assertFalse(d.execution_enabled)
+        self.assertFalse(d.execution_enabled); self.assertIsNone(d.route_id)
+        self.assertEqual(d.reason_codes,("NO_ELIGIBLE_ROUTE",))
+        # N08: a real (non-simulate, writer-role) authorization attempt over pi is excluded
+        # by the actual PI_SIMULATION_ONLY rule, not merely by the simulate flag.
+        with tempfile.TemporaryDirectory() as td:
+            real=self.service(Path(td)/"state")
+            d=real.route(routing.TaskRequest("implementer","change","documentation",selected_runtime="pi"),
+                         self.observed(real,"implementer","pi"))
+            self.assertFalse(d.execution_enabled); self.assertIsNone(d.route_id)
+            self.assertEqual(d.reason_codes,("NO_ELIGIBLE_ROUTE",))
+            self.assertTrue(all(item["reason"]=="RUNTIME_UNAVAILABLE" for item in d.exclusions))
+            self.assertEqual(real.store.open_runs(),[])  # never durably authorized
 
     def test_probe_parsers_are_pair_specific_and_fail_closed(self):
         # Parsers are validated hermetically against recorded shapes; live CLI
@@ -124,6 +143,28 @@ class RoutingTests(unittest.TestCase):
             run=d.run_id; svc.store.mark_dispatched(run); svc.store.terminal(run,"success")
             review=svc.route(routing.TaskRequest("package-reviewer","change","documentation",selected_runtime="claude-code"),self.observed(svc,"package-reviewer","claude-code"),run)
             self.assertFalse(review.execution_enabled); self.assertNotEqual(review.family,"gpt-5.6")
+            # SEC-A01: a genuinely independent (different-provider, different-family) verified
+            # review decision sets the positive flag.
+            self.assertTrue(review.independence_verified)
+
+    def test_review_provider_conflict_excludes_same_provider_siblings(self):
+        # F04: with only ONE provider authenticated, a repopulated per-model-family catalog
+        # must not let a same-provider sibling model satisfy reviewer independence — 003's
+        # fail-closed REVIEWER_INDEPENDENCE_UNAVAILABLE is restored via a hard exclusion.
+        with tempfile.TemporaryDirectory() as td:
+            single_provider={("claude-code","anthropic"):{"haiku","sonnet","opus"}}
+            svc=self.service(Path(td)/"state",inventory=single_provider)
+            request=routing.TaskRequest("implementer","change","documentation",selected_runtime="claude-code")
+            d=svc.route(request,self.observed(svc,"implementer","claude-code"))
+            self.assertTrue(d.execution_enabled, d.reason_codes); self.assertEqual(d.provider,"anthropic")
+            svc.store.mark_dispatched(d.run_id); svc.store.terminal(d.run_id,"success")
+            review=svc.route(routing.TaskRequest("package-reviewer","change","documentation",selected_runtime="claude-code"),
+                             self.observed(svc,"package-reviewer","claude-code"),d.run_id)
+            self.assertFalse(review.execution_enabled)
+            self.assertEqual(review.reason_codes,("REVIEWER_INDEPENDENCE_UNAVAILABLE",))
+            self.assertFalse(review.independence_verified)
+            conflicts={item["reason"] for item in review.exclusions}
+            self.assertIn("REVIEW_PROVIDER_CONFLICT",conflicts)
 
     def test_rejected_lifecycle_operations_are_audited(self):
         with tempfile.TemporaryDirectory() as td:
@@ -157,13 +198,18 @@ class RoutingTests(unittest.TestCase):
                 self.assertEqual(terminal_route,d.fallback_identity[0])
             finally: c.close()
 
-    def test_explain_cli_is_schema_two_and_creates_no_state(self):
+    def test_explain_cli_is_schema_two_and_creates_no_decision_state(self):
         state=Path.home()/".local/state/set-agentes/routing-v2"
-        before=sorted(state.glob("*")) if state.exists() else []
+        # AM-2 amendment: the regenerable probe cache is the ONE file explain may write;
+        # decision/lifecycle state (the SQLite DB and sidecars) must stay untouched.
+        snapshot=lambda: sorted(p for p in state.glob("*") if p.name != "probe-cache.json") if state.exists() else []
+        db=state/"routing.db"; db_before=db.read_bytes() if db.is_file() else None
+        before=snapshot()
         result=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--route-explain","documentation","--json"],cwd=ROOT,text=True,capture_output=True)
         self.assertIn(result.returncode,(0,1),result.stderr); self.assertEqual(result.stdout.count("\n"),1)
         data=json.loads(result.stdout); self.assertEqual(set(data),{"schema_version","ok","command","data","warnings","reason_codes"}); self.assertEqual(data["schema_version"],2)
-        self.assertEqual(before,sorted(state.glob("*")) if state.exists() else [])
+        self.assertEqual(before,snapshot())
+        self.assertEqual(db_before,db.read_bytes() if db.is_file() else None)
 
     def test_cli_mode_exclusion_covers_every_non_routing_argument(self):
         # Any argument other than --json combined with an observability mode is a
@@ -279,6 +325,334 @@ class RoutingTests(unittest.TestCase):
             for secret in (b"documentation",b"change",os.environ.get("USER","@@none@@").encode(),str(Path.home()).encode(),b"@gmail",b"password",b"token"):
                 self.assertNotIn(secret,blob)
 
+    def test_required_tier_matrix_is_total(self):
+        from routing_core import domain
+        for task_class in sorted(domain.TASK_CLASSES):
+            for risk in sorted(domain.RISK_ORDER):
+                tier = domain.required_tier(task_class, risk)
+                if task_class in domain.CRITICAL or risk == "high":
+                    self.assertEqual(tier, "frontier", (task_class, risk))
+                elif task_class in {"mechanical","documentation","inspection"} and risk == "low":
+                    self.assertEqual(tier, "fast", (task_class, risk))
+                else:
+                    self.assertEqual(tier, "balanced", (task_class, risk))
+        with self.assertRaises(routing.RoutingError): domain.required_tier("nope", "low")
+        with self.assertRaises(routing.RoutingError): domain.required_tier("security", "nope")
+
+    def test_tier_selection_fast_wins_and_insufficient_excludes(self):
+        inv = {("codex","openai-codex"):{"gpt-5.6-luna","gpt-5.6-sol","gpt-5.6-terra"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s", inventory=inv)
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            self.assertTrue(d.execution_enabled); self.assertEqual(d.model,"gpt-5.6-luna")  # fast WINS
+            d2=svc.route(routing.TaskRequest("implementer","change","security",risk="high",selected_runtime="codex"),
+                         self.observed(svc,"implementer","codex",task_class="security",risk="high",criticality="security"))
+            self.assertEqual(d2.model,"gpt-5.6-terra")
+            insufficient={item["route_id"] for item in d2.exclusions if item["reason"]=="TIER_INSUFFICIENT"}
+            self.assertEqual(len(insufficient),2)  # luna and sol tiers are below frontier
+            svc.store.abandon(d.run_id); svc.store.abandon(d2.run_id)
+
+    def test_tier_insufficient_never_masks_a_more_fundamental_exclusion(self):
+        # F10: hard exclusions (role/tools/context/independence) are evaluated BEFORE
+        # TIER_INSUFFICIENT, so a route that is ALSO missing context reports CONTEXT_MISSING
+        # on every candidate route — never a masking TIER_INSUFFICIENT for the lower tiers.
+        inv={("codex","openai-codex"):{"gpt-5.6-luna","gpt-5.6-sol","gpt-5.6-terra"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s", inventory=inv)
+            d=svc.route(routing.TaskRequest("implementer","change","security",risk="high",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="security",risk="high",
+                                     criticality="security",context_present=False,critical_coverage=False))
+            self.assertFalse(d.execution_enabled)
+            reason_set={item["reason"] for item in d.exclusions}
+            # Anthropic rows are RUNTIME_UNAVAILABLE (codex never pairs with anthropic — a
+            # harder, earlier exclusion); every codex row (fast/balanced/frontier alike) is
+            # CONTEXT_MISSING, never TIER_INSUFFICIENT.
+            self.assertEqual(reason_set,{"CONTEXT_MISSING","RUNTIME_UNAVAILABLE"})
+            codex_reasons={item["reason"] for item in d.exclusions if item["route_id"] in
+                          {r.route_id for r in svc.snapshot.routes if r.provider=="openai-codex"}}
+            self.assertEqual(codex_reasons,{"CONTEXT_MISSING"})
+
+    def test_descriptor_risk_only_raises_the_derived_base(self):
+        svc=self.service(simulate=True)
+        # Observed high risk + requested low: frontier still required (raise-only, AM-1).
+        tier_of=lambda d: next(r.tier for r in svc.snapshot.routes if r.route_id==d.route_id)
+        d=svc.route(routing.TaskRequest("product-analyst","change","documentation",risk="low",selected_runtime="claude-code"),
+                    self.observed(svc,risk="high"))
+        self.assertIsNotNone(d.route_id); self.assertEqual(tier_of(d),"frontier")
+        # Observed low + requested high: the request raises to frontier symmetrically.
+        d2=svc.route(routing.TaskRequest("product-analyst","change","documentation",risk="high",selected_runtime="claude-code"),
+                     self.observed(svc,risk="low"))
+        self.assertIsNotNone(d2.route_id); self.assertEqual(tier_of(d2),"frontier")
+
+    def test_unhashable_required_tools_degrades_not_raises(self):
+        svc=self.service(simulate=True)
+        request=routing.TaskRequest("product-analyst","change","documentation",required_tools=(["read"],),selected_runtime="claude-code")
+        d=svc.route(request,self.observed(svc))
+        self.assertEqual(d.reason_codes,("FACTS_INCOMPLETE",))
+
+    def test_facts_unhashable_required_tools_degrades_not_raises(self):
+        # F05: the N-1 guard covers facts.required_tools too — not just the request side —
+        # so a non-str member never reaches the `set(facts.required_tools)` call downstream.
+        svc=self.service(simulate=True)
+        request=routing.TaskRequest("product-analyst","change","documentation",selected_runtime="claude-code")
+        facts=self.observed(svc,required_tools=(["read"],))
+        d=svc.route(request,facts)
+        self.assertEqual(d.reason_codes,("FACTS_INCOMPLETE",))
+
+    def test_compose_for_tests_requires_explicit_root(self):
+        with self.assertRaises(ValueError):
+            routing._compose_for_tests(self.config,self.roster,self.inventory)
+
+    def _probe_stubs(self, td):
+        bins=Path(td)/"bin"; bins.mkdir(); log=Path(td)/"probes.log"
+        scripts={
+            "codex": '#!/bin/sh\necho "$0 $@" >> %s\necho "Logged in using ChatGPT" 1>&2\n' % log,
+            "claude": '#!/bin/sh\necho "$0 $@" >> %s\necho \'{"loggedIn": true}\'\n' % log,
+            "opencode": ('#!/bin/sh\necho "$0 $@" >> %s\n'
+                         'if [ "$1" = "auth" ]; then printf "\\342\\227\\217  OpenAI oauth\\n"; exit 0; fi\n'
+                         'if [ "$2" = "openai" ]; then echo "openai/gpt-5.6-sol"; exit 0; fi\n'
+                         'echo "Error: Provider not found: $2"; exit 0\n') % log,
+        }
+        for name, body in scripts.items():
+            path=bins/name; path.write_text(body); path.chmod(0o755)
+        return bins, log
+
+    def test_probe_cache_is_filtering_only_redacted_and_invalidated(self):
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            cache_root=Path(td)/"root"; cache_root.mkdir(mode=0o700)
+            env_patch={"PATH": f"{bins}:{os.environ['PATH']}"}
+            old=os.environ["PATH"]; os.environ["PATH"]=env_patch["PATH"]
+            try:
+                cold=cat.probe_inventory(self.config, cache_root=cache_root, now=1000.0)
+                self.assertEqual(cold[("codex","openai-codex")], set(self.config["catalog"]["codex"]))
+                self.assertEqual(cold[("opencode","openai-codex")],{"gpt-5.6-sol"})
+                self.assertNotIn(("opencode","anthropic"),cold)  # Error: with exit 0 fails the pair
+                self.assertTrue(log.read_text())
+                cache=cache_root/"probe-cache.json"
+                self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+                doc=json.loads(cache.read_text())
+                self.assertEqual(set(doc),{"key","at","pairs"})  # redacted pair->models only
+                # Warm within TTL: the two POSITIVE pairs are never re-probed, but the one
+                # NEGATIVE pair (F06b: never cached, so it costs a retry every call, not the
+                # whole TTL) is retried — its stub is deterministic, so the result is unchanged.
+                log.write_text("")
+                warm=cat.probe_inventory(self.config, cache_root=cache_root, now=1100.0)
+                self.assertEqual(warm,cold)
+                retried=log.read_text()
+                self.assertIn("bin/opencode",retried)
+                self.assertNotIn("bin/codex",retried); self.assertNotIn("bin/claude",retried)
+                # Expired TTL reprobes; corrupt cache is ignored fail-closed; digest change invalidates.
+                for breaker in (lambda: cat.probe_inventory(self.config, cache_root=cache_root, now=1000.0+9999),
+                                lambda: (cache.write_text("{corrupt"), cat.probe_inventory(self.config, cache_root=cache_root, now=1100.0))[-1]):
+                    log.write_text(""); result=breaker()
+                    self.assertEqual(result,cold); self.assertNotEqual(log.read_text(),"")
+                changed=json.loads(json.dumps(self.config)); changed["routing"]=dict(changed["routing"], fallback_limit=9)
+                log.write_text(""); cat.probe_inventory(changed, cache_root=cache_root, now=1100.0)
+                self.assertNotEqual(log.read_text(),"")
+                # pairs= path is always fresh and never cached.
+                log.write_text(""); pairwise=cat.probe_inventory(self.config, cache_root=None, pairs=[("codex","openai-codex")])
+                self.assertEqual(set(pairwise),{("codex","openai-codex")}); self.assertNotEqual(log.read_text(),"")
+            finally:
+                os.environ["PATH"]=old
+
+    def test_probe_cache_recovers_a_negative_pair_within_ttl(self):
+        # F06(b): a transient failure is never remembered for the whole TTL — the very
+        # next call, still well inside the 300s window, sees the recovery immediately.
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            cache_root=Path(td)/"root"; cache_root.mkdir(mode=0o700)
+            old=os.environ["PATH"]; os.environ["PATH"]=f"{bins}:{old}"
+            try:
+                cold=cat.probe_inventory(self.config, cache_root=cache_root, now=1000.0)
+                self.assertNotIn(("opencode","anthropic"),cold)  # negative: never persisted
+                # Flip the stub so opencode now authenticates anthropic too, then probe again
+                # a second later (well inside TTL): the recovered pair must show up immediately.
+                (bins/"opencode").write_text('#!/bin/sh\necho "$0 $@" >> %s\n'
+                    'if [ "$1" = "auth" ]; then printf "\\342\\227\\217  OpenAI oauth\\n\\342\\227\\217  Anthropic oauth\\n"; exit 0; fi\n'
+                    'if [ "$2" = "openai" ]; then echo "openai/gpt-5.6-sol"; exit 0; fi\n'
+                    'echo "anthropic/opus"\n' % log)
+                (bins/"opencode").chmod(0o755)
+                recovered=cat.probe_inventory(self.config, cache_root=cache_root, now=1001.0)
+                self.assertIn(("opencode","anthropic"),recovered)
+                self.assertEqual(recovered[("opencode","anthropic")],{"opus"})
+                # The still-cached positives are untouched by the recovery.
+                self.assertEqual(recovered[("codex","openai-codex")],cold[("codex","openai-codex")])
+            finally:
+                os.environ["PATH"]=old
+
+    def test_probe_cache_read_reintersects_with_configured_models(self):
+        # F09: even a key-matching, byte-valid cache document can never widen the audited
+        # set beyond the live models.toml catalog — a foreign/stale model name is dropped.
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            cache_root=Path(td)/"root"; cache_root.mkdir(mode=0o700)
+            key=cat._cache_key(self.config)
+            doc={"key":key,"at":1000.0,"pairs":{"codex|openai-codex":["gpt-5.6-luna","totally-bogus-model"]}}
+            path=cache_root/"probe-cache.json"; path.write_text(json.dumps(doc)); path.chmod(0o600)
+            out=cat._read_probe_cache(cache_root,key,1000.5,self.config)
+            self.assertEqual(out,{("codex","openai-codex"):{"gpt-5.6-luna"}})
+
+    def test_probe_cache_ignores_unvalidated_directory(self):
+        # SEC-A03: the cache root must pass the same private-dir discipline as the store
+        # (no symlink, this uid's 0700 dir) — `Path.is_dir()` alone follows symlinks.
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            real=Path(td)/"real"; real.mkdir(mode=0o700)
+            link=Path(td)/"link"; link.symlink_to(real)
+            self.assertFalse(cat._validate_cache_dir(link))
+            wrong_mode=Path(td)/"wrong"; wrong_mode.mkdir(mode=0o755)
+            self.assertFalse(cat._validate_cache_dir(wrong_mode))
+            self.assertTrue(cat._validate_cache_dir(real))
+            # A write attempt against an unvalidated root never creates anything.
+            cat._write_probe_cache(link,"key",{("codex","openai-codex"):{"gpt-5.6-luna"}},1000.0)
+            self.assertEqual(list(real.iterdir()),[])
+
+    def test_probe_cache_write_false_is_read_only(self):
+        # SEC-A03: the simulate/explain lane may READ a warm cache but must never WRITE one
+        # (preserves the "no mutation" contract even though live probes still run to fill it).
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            cache_root=Path(td)/"root"; cache_root.mkdir(mode=0o700)
+            old=os.environ["PATH"]; os.environ["PATH"]=f"{bins}:{old}"
+            try:
+                result=cat.probe_inventory(self.config, cache_root=cache_root, now=1000.0, cache_write=False)
+                self.assertTrue(result)
+                self.assertFalse((cache_root/"probe-cache.json").exists())
+                # A subsequent normal (writable) call still persists it.
+                cat.probe_inventory(self.config, cache_root=cache_root, now=1001.0)
+                self.assertTrue((cache_root/"probe-cache.json").exists())
+            finally:
+                os.environ["PATH"]=old
+
+    def test_fresh_selected_reprobe_gates_writer_authorization(self):
+        calls=[]
+        def verifying(pairs): calls.append(tuple(pairs)); return {p:{"gpt-5.6-luna"} for p in pairs}
+        inv={("codex","openai-codex"):{"gpt-5.6-luna"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s",inventory=inv,reprobe=verifying)
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            self.assertTrue(d.execution_enabled)
+            self.assertEqual(calls,[(("codex","openai-codex"),)])  # exactly the selected pair, once
+            svc.store.abandon(d.run_id)
+        def refusing(pairs): return {p:set() for p in pairs}
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s",inventory=inv,reprobe=refusing)
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            self.assertFalse(d.execution_enabled); self.assertEqual(d.reason_codes,("PROVIDER_UNAUTHENTICATED",))
+            self.assertEqual(svc.store.open_runs(),[])  # nothing was durably authorized
+
+    def test_abandoned_closes_authorized_and_is_never_review_identity(self):
+        inv={("codex","openai-codex"):{"gpt-5.6-luna"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s",inventory=inv)
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            self.assertEqual([r["run_id"] for r in svc.store.open_runs()],[d.run_id])
+            with self.assertRaisesRegex(routing.RoutingError,"STATE_CONFLICT"):
+                svc.store.terminal(d.run_id,"success")  # never terminal_success without dispatch
+            svc.store.abandon(d.run_id)
+            self.assertEqual(svc.store.open_runs(),[])
+            self.assertEqual(svc.store.recent_writers(),[])
+            with self.assertRaisesRegex(routing.RoutingError,"REVIEW_IDENTITY_INVALID"):
+                svc.store.implementation_identity(d.run_id)
+            with self.assertRaisesRegex(routing.RoutingError,"STATE_CONFLICT"):
+                svc.store.abandon(d.run_id)  # abandoned is terminal
+
+    def test_abandoned_check_forbids_actual_identity(self):
+        # N03: the DDL itself, not just application code, refuses an abandoned row that
+        # somehow carries a dispatched (actual) identity.
+        with tempfile.TemporaryDirectory() as td:
+            store=routing.RoutingStore._for_tests(Path(td)/"s"); store.report()  # creates a pristine database
+            c=sqlite3.connect(store.db_path)
+            try:
+                with self.assertRaises(sqlite3.IntegrityError):
+                    c.execute(
+                        "INSERT INTO dispatches (run_id,role,role_class,selected_route_id,selected_runtime,"
+                        "selected_provider,selected_model,selected_family,selected_effort,actual_route_id,"
+                        "actual_runtime,actual_provider,actual_model,actual_family,actual_effort,state,"
+                        "fallback_window_open,authorized_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        ("run1_"+"a"*32,"implementer","writer","rt","codex","openai-codex","gpt-5.6-sol","gpt-5.6","medium",
+                         "rt","codex","openai-codex","gpt-5.6-sol","gpt-5.6","medium",  # actual_* set: forbidden on abandoned
+                         "abandoned",0,0,0))
+            finally:
+                c.close()
+
+    def test_close_run_never_writes_a_spurious_rejected_event(self):
+        # F02: a successful close (either lane) writes ZERO rejected events, and a close
+        # attempt against a run that cannot be closed writes exactly ONE — never the
+        # try-terminal-then-except-abandon double-transaction pattern this replaces.
+        inv={("codex","openai-codex"):{"gpt-5.6-luna"}}
+
+        def rejected_count(store):
+            c=store._connect()
+            try: return c.execute("SELECT COUNT(*) FROM events WHERE event_type='rejected'").fetchone()[0]
+            finally: c.close()
+
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s",inventory=inv)
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            state=svc.store.close_run(d.run_id,"failure")  # authorized, never dispatched -> abandoned
+            self.assertEqual(state,"abandoned")
+            self.assertEqual(rejected_count(svc.store),0)
+            self.assertEqual([r["state"] for r in svc.store.recent_writers()],[])
+
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s",inventory=inv)
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            svc.store.mark_dispatched(d.run_id)
+            state=svc.store.close_run(d.run_id,"success")
+            self.assertEqual(state,"terminal_success")
+            self.assertEqual(rejected_count(svc.store),0)
+
+        with tempfile.TemporaryDirectory() as td:
+            svc=self.service(Path(td)/"s",inventory=inv)
+            # A run_id that never existed: exactly one rejected event, not two.
+            with self.assertRaisesRegex(routing.RoutingError,"STATE_CONFLICT"):
+                svc.store.close_run("run1_"+"0"*32,"failure")
+            self.assertEqual(rejected_count(svc.store),1)
+            # Closing an already-terminal run: still exactly one rejected event.
+            d=svc.route(routing.TaskRequest("implementer","change","mechanical",selected_runtime="codex"),
+                        self.observed(svc,"implementer","codex",task_class="mechanical",context_required=False))
+            svc.store.mark_dispatched(d.run_id); svc.store.terminal(d.run_id,"success")
+            with self.assertRaisesRegex(routing.RoutingError,"STATE_CONFLICT"):
+                svc.store.close_run(d.run_id,"failure")
+            self.assertEqual(rejected_count(svc.store),2)
+
+    def test_unverified_review_reports_tier_without_execution(self):
+        svc=self.service(simulate=True)
+        facts=self.observed(svc,"package-reviewer","claude-code",context_required=False)
+        d=svc.route(routing.TaskRequest("package-reviewer","change","documentation",selected_runtime="claude-code"),facts,unverified_review=True)
+        self.assertFalse(d.execution_enabled); self.assertEqual(d.reason_codes,("REVIEW_IDENTITY_UNVERIFIED",))
+        self.assertIsNotNone(d.model)
+        strict=svc.route(routing.TaskRequest("package-reviewer","change","documentation",selected_runtime="claude-code"),
+                         self.observed(svc,"package-reviewer","claude-code",context_required=False))
+        self.assertEqual(strict.reason_codes,("REVIEW_IDENTITY_INVALID",))  # default stays 003-strict
+
+    def test_dispatch_cli_mode_and_modifier_exclusion(self):
+        cases=(["--route-decide","-","--routing-report"],
+               ["--fresh-probes","--routing-report"],
+               ["--latency-ms","5","--route-decide","-"],
+               ["--route-terminal","run1_"+"a"*32,"success","--yes"],
+               ["--route-decide","-","--yes"])  # N11: the real total-exclusion case (not the
+               # argparse "expected one argument" usage error of `--route-decide --json --yes`)
+        for extra in cases:
+            result=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--json",*extra],
+                                  cwd=ROOT,text=True,capture_output=True,stdin=subprocess.DEVNULL)
+            self.assertEqual(result.returncode,2,(extra,result.stdout,result.stderr))
+            self.assertIn("ROUTING_INPUT_INVALID",result.stdout)
+        bad=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--route-dispatched","not-a-run","--json"],
+                           cwd=ROOT,text=True,capture_output=True)
+        self.assertEqual(bad.returncode,2); self.assertIn("ROUTING_INPUT_INVALID",bad.stdout)
+
     def test_compaction_keeps_bounded_events_and_percentiles(self):
         with tempfile.TemporaryDirectory() as td:
             svc=self.service(Path(td)/"state")
@@ -289,5 +663,269 @@ class RoutingTests(unittest.TestCase):
                 conn.execute("COMMIT")
             finally: conn.close()
             report=store.report(); self.assertEqual((report["p50_ms"],report["p90_ms"]),(20,30))
+
+    # ------------------------------------------------------------- F01/F02/F03/F07/N04 CLI
+
+    def _cli_env(self, routing_root, bins=None):
+        env=dict(os.environ); env["SET_AGENTS_ROUTING_TEST_ROOT"]=str(routing_root)
+        if bins is not None: env["PATH"]=f"{bins}:{env['PATH']}"
+        return env
+
+    def _cli_run(self, args, env, input_text=None):
+        return subprocess.run([sys.executable,"ai/scripts/set_agents_app.py",*args],
+                              cwd=ROOT,text=True,capture_output=True,env=env,input=input_text)
+
+    def test_route_decide_cli_hermetic_matrix(self):
+        # N04/F01/F02/F07: a fully hermetic decide->dispatched->terminal(->abandoned) cycle
+        # against a temp routing root (the F07 seam), driving every role_class shape of the
+        # F01 reason->exit table through the real CLI subprocess.
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            env=self._cli_env(Path(td)/"routing-root", bins)
+
+            def decide(descriptor):
+                return self._cli_run(["--route-decide","-","--json"],env,json.dumps(descriptor))
+
+            # Writer: executable, ok=true, exit 0.
+            writer=decide({"role":"implementer","task_class":"mechanical","selected_runtime":"codex"})
+            self.assertEqual(writer.returncode,0,(writer.stdout,writer.stderr))
+            wdata=json.loads(writer.stdout)
+            self.assertTrue(wdata["ok"]); self.assertTrue(wdata["data"]["execution_enabled"])
+            self.assertEqual(wdata["data"]["reason_codes"],[])
+            run_id=wdata["data"]["run_id"]; self.assertTrue(run_id.startswith("run1_"))
+            self.assertEqual(wdata["data"]["tier"],"fast")
+
+            # docs-rw ("other" role_class): non-executable, empty reason_codes, still ok=true.
+            other=decide({"role":"product-analyst","task_class":"documentation","selected_runtime":"claude-code"})
+            self.assertEqual(other.returncode,0,(other.stdout,other.stderr))
+            odata=json.loads(other.stdout)
+            self.assertTrue(odata["ok"]); self.assertFalse(odata["data"]["execution_enabled"])
+            self.assertEqual(odata["data"]["reason_codes"],[])
+
+            # Reviewer without review_of_run_id: unverified, ok=true, exit 0, tier still reported.
+            unverified=decide({"role":"package-reviewer","task_class":"documentation","selected_runtime":"claude-code"})
+            self.assertEqual(unverified.returncode,0,(unverified.stdout,unverified.stderr))
+            udata=json.loads(unverified.stdout)
+            self.assertTrue(udata["ok"]); self.assertFalse(udata["data"]["execution_enabled"])
+            self.assertEqual(udata["data"]["reason_codes"],["REVIEW_IDENTITY_UNVERIFIED"])
+            self.assertIsNotNone(udata["data"]["model"])
+            self.assertFalse(udata["data"]["independence_verified"])
+
+            # An unknown role: ok=false, exit 1 — the "other side" of the F01 table.
+            unknown=decide({"role":"nonexistent-role","task_class":"documentation"})
+            self.assertEqual(unknown.returncode,1,(unknown.stdout,unknown.stderr))
+            self.assertFalse(json.loads(unknown.stdout)["ok"])
+
+            # F07/lifecycle: dispatched -> terminal(success), all via CLI against the temp root.
+            dispatched=self._cli_run(["--route-dispatched",run_id,"--json"],env)
+            self.assertEqual(dispatched.returncode,0,(dispatched.stdout,dispatched.stderr))
+            self.assertEqual(json.loads(dispatched.stdout)["data"]["state"],"dispatched")
+            terminal=self._cli_run(["--route-terminal",run_id,"success","--json"],env)
+            self.assertEqual(terminal.returncode,0,(terminal.stdout,terminal.stderr))
+            self.assertEqual(json.loads(terminal.stdout)["data"]["state"],"terminal_success")
+
+            recent=self._cli_run(["--routing-recent-writers","--json"],env)
+            self.assertEqual(recent.returncode,0)
+            self.assertEqual([r["run_id"] for r in json.loads(recent.stdout)["data"]["recent_writers"]],[run_id])
+
+            # Reviewer WITH a verified review_of_run_id: a candidate is found (a different
+            # provider/family than the writer above), ok=true, independence_verified true.
+            verified=decide({"role":"package-reviewer","task_class":"documentation","selected_runtime":"claude-code",
+                             "review_of_run_id":run_id})
+            self.assertEqual(verified.returncode,0,(verified.stdout,verified.stderr))
+            vdata=json.loads(verified.stdout)
+            self.assertTrue(vdata["ok"]); self.assertFalse(vdata["data"]["execution_enabled"])
+            self.assertEqual(vdata["data"]["reason_codes"],[])
+            self.assertTrue(vdata["data"]["independence_verified"])
+            self.assertNotEqual(vdata["data"]["provider"],"openai-codex")
+
+            # A second writer decide, closed as failure BEFORE dispatch -> abandoned (F02/F07).
+            second=decide({"role":"implementer","task_class":"mechanical","selected_runtime":"codex"})
+            second_run=json.loads(second.stdout)["data"]["run_id"]
+            abandoned=self._cli_run(["--route-terminal",second_run,"failure","--json"],env)
+            self.assertEqual(abandoned.returncode,0,(abandoned.stdout,abandoned.stderr))
+            self.assertEqual(json.loads(abandoned.stdout)["data"]["state"],"abandoned")
+            open_runs=json.loads(self._cli_run(["--routing-open-runs","--json"],env).stdout)["data"]["open_runs"]
+            self.assertEqual(open_runs,[])
+
+    def test_route_decide_cli_lock_fails_closed(self):
+        # F01: SQLITE busy (holder BEGIN IMMEDIATE) ⇒ ROUTING_UNAVAILABLE, exit 1, no retry.
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            routing_root=Path(td)/"routing-root"
+            env=self._cli_env(routing_root, bins)
+            descriptor=json.dumps({"role":"implementer","task_class":"mechanical","selected_runtime":"codex"})
+            first=self._cli_run(["--route-decide","-","--json"],env,descriptor)
+            self.assertEqual(first.returncode,0,(first.stdout,first.stderr))
+            holder=sqlite3.connect(routing_root/"routing.db")
+            holder.execute("PRAGMA busy_timeout=0")
+            holder.execute("BEGIN IMMEDIATE")
+            try:
+                locked=self._cli_run(["--route-decide","-","--json"],env,descriptor)
+                self.assertEqual(locked.returncode,1,(locked.stdout,locked.stderr))
+                ldata=json.loads(locked.stdout)
+                self.assertFalse(ldata["ok"]); self.assertEqual(ldata["reason_codes"],["ROUTING_UNAVAILABLE"])
+            finally:
+                holder.execute("ROLLBACK"); holder.close()
+
+    def test_route_terminal_latency_bound_rejects_without_traceback(self):
+        # SEC-A02: an out-of-range (OverflowError-at-bind-time) or negative --latency-ms is a
+        # PARSE failure at the CLI, before it ever reaches the store — exit 2, one JSON line,
+        # never a traceback.
+        with tempfile.TemporaryDirectory() as td:
+            env=self._cli_env(Path(td)/"routing-root")
+            run_id="run1_"+"a"*32
+            for bad in (str(2**70), "-5"):
+                result=self._cli_run(["--route-terminal",run_id,"success","--latency-ms",bad,"--json"],env)
+                self.assertEqual(result.returncode,2,(bad,result.stdout,result.stderr))
+                self.assertEqual(result.stdout.count("\n"),1)
+                self.assertNotIn("Traceback",result.stderr)
+                self.assertIn("ROUTING_INPUT_INVALID",result.stdout)
+
+    def test_route_decide_empty_string_never_falls_through_to_menu(self):
+        # F08/N11: `--route-decide ""` is PRESENT (an empty string), not ABSENT — truthiness
+        # would let it fall through every mode check into the interactive menu/help.
+        result=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--route-decide","","--json"],
+                              cwd=ROOT,text=True,capture_output=True,stdin=subprocess.DEVNULL)
+        self.assertEqual(result.returncode,2,(result.stdout,result.stderr))
+        self.assertEqual(result.stdout.count("\n"),1)
+        self.assertIn("ROUTING_INPUT_INVALID",result.stdout)
+
+    def test_route_decide_descriptor_enum_violations_are_parse_errors(self):
+        # F01: a risk/selected_runtime outside the closed enum is caught at PARSE (exit 2),
+        # never reaching the service to degrade into a generic FACTS_INCOMPLETE.
+        for bad in ({"role":"implementer","task_class":"documentation","risk":"extreme"},
+                    {"role":"implementer","task_class":"documentation","selected_runtime":"bogus"}):
+            result=subprocess.run([sys.executable,"ai/scripts/set_agents_app.py","--route-decide","-","--json"],
+                                  cwd=ROOT,text=True,capture_output=True,input=json.dumps(bad))
+            self.assertEqual(result.returncode,2,(bad,result.stdout,result.stderr))
+            self.assertIn("ROUTING_INPUT_INVALID",result.stdout)
+
+    def test_decide_status_helper_matrix(self):
+        # F01: the centralized reason->exit helper, exhaustively.
+        RD=routing.RouteDecision
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,True,())),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,())),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,("REVIEW_IDENTITY_UNVERIFIED",))),(True,0))
+        for reason in ("FACTS_INCOMPLETE","NO_ELIGIBLE_ROUTE","REVIEW_IDENTITY_INVALID","PROVIDER_UNAUTHENTICATED",
+                      "AUTHORIZATION_INVALID","AUTHORIZATION_REPLAY","CATALOG_INVALID","STATE_CONFLICT",
+                      "ROUTING_UNAVAILABLE","REVIEWER_INDEPENDENCE_UNAVAILABLE"):
+            self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,(reason,))),(False,1),reason)
+
+    def test_validate_context_pack_path_rejects_unsafe_values(self):
+        # SEC-A02: non-str, absolute, and traversal-outside-ROOT all degrade to "no pack" —
+        # never a bare `ROOT / pack` (which silently discards ROOT for an absolute value).
+        old_root=set_agents_app.ROOT
+        with tempfile.TemporaryDirectory() as td:
+            set_agents_app.ROOT=Path(td)
+            try:
+                self.assertIsNone(set_agents_app._validate_context_pack_path(None))
+                self.assertIsNone(set_agents_app._validate_context_pack_path(123))
+                self.assertIsNone(set_agents_app._validate_context_pack_path([]))
+                self.assertIsNone(set_agents_app._validate_context_pack_path(""))
+                self.assertIsNone(set_agents_app._validate_context_pack_path("/etc/passwd"))
+                self.assertIsNone(set_agents_app._validate_context_pack_path("../outside.md"))
+                (Path(td)/"docs").mkdir()
+                (Path(td)/"docs/pack.md").write_text("x")
+                self.assertEqual(set_agents_app._validate_context_pack_path("docs/pack.md"),
+                                 (Path(td)/"docs/pack.md").resolve())
+            finally:
+                set_agents_app.ROOT=old_root
+
+    def _write_feature_doc(self, root, name, phase, pkg_status, updated_at=None, context_pack="docs/pack.md", pkg_updated_at=None):
+        doc={"feature_id":name,"phase":phase,"current_package_id":"P1","updated_at":updated_at,
+             "packages":[{"package_id":"P1","status":pkg_status,"context_pack":context_pack,"updated_at":pkg_updated_at}]}
+        (root/"ai/state/features"/f"{name}.json").write_text(json.dumps(doc))
+
+    def test_resolve_context_pack_phase_freshness_and_default_resolution(self):
+        # F03/N05/N06: existence AND freshness, the phase filter applies even with an explicit
+        # feature_id, and the default resolution picks the feature whose CURRENT package is
+        # actively executing (not merely "feature phase isn't terminal").
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"ai/state/features").mkdir(parents=True); (root/"docs").mkdir()
+            pack=root/"docs/pack.md"; pack.write_text("ctx")
+            old_root=set_agents_app.ROOT; set_agents_app.ROOT=root
+            try:
+                # (a) Explicit feature_id, but the feature is BLOCKED: never flips CONTEXT_MISSING.
+                self._write_feature_doc(root,"blocked-feat","BLOCKED","in_progress")
+                self.assertEqual(set_agents_app._resolve_context_pack("blocked-feat",None),(False,"blocked-feat","P1"))
+                # (b) Explicit feature_id, active, fresh pack (mtime just touched): True.
+                self._write_feature_doc(root,"active-feat","PACKAGE_GATES","in_progress","2020-01-01T00:00:00+00:00")
+                os.utime(pack,(time.time(),time.time()))
+                self.assertEqual(set_agents_app._resolve_context_pack("active-feat",None),(True,"active-feat","P1"))
+                # (c) Same shape, but the pack PREDATES the package's own updated_at: stale ⇒ False.
+                self._write_feature_doc(root,"stale-feat","PACKAGE_GATES","in_progress",
+                                        pkg_updated_at="2099-01-01T00:00:00+00:00")
+                self.assertEqual(set_agents_app._resolve_context_pack("stale-feat",None),(False,"stale-feat","P1"))
+                # (d) No feature_id, TWO candidates whose current package is actively executing
+                # (active-feat and stale-feat both qualify) ⇒ CONTEXT_UNRESOLVED (None), distinct
+                # from a resolved-but-missing pack.
+                ok,_,_=set_agents_app._resolve_context_pack(None,None)
+                self.assertIsNone(ok)
+                # (e) A package sitting at a TERMINAL status (e.g. already accepted) is never a
+                # default candidate even though its feature's phase isn't DONE/BLOCKED — remove
+                # the freshness-ambiguity contributor (stale-feat) but KEEP accepted-feat: if the
+                # terminal-package-status filter were broken, this would still resolve to
+                # ambiguous (None) instead of the single remaining active-feat.
+                self._write_feature_doc(root,"accepted-feat","PACKAGE_ACCEPTED","accepted")
+                (root/"ai/state/features"/"stale-feat.json").unlink()
+                ok,fid,pid=set_agents_app._resolve_context_pack(None,None)
+                self.assertEqual((ok,fid,pid),(True,"active-feat","P1"))
+            finally:
+                set_agents_app.ROOT=old_root
+
+    def test_resolve_context_pack_opens_only_the_named_file(self):
+        # N10 (perf): with an explicit feature_id, resolution never globs the directory.
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td); (root/"ai/state/features").mkdir(parents=True)
+            self._write_feature_doc(root,"only-me","PACKAGE_GATES","in_progress",context_pack=None)
+            old_root=set_agents_app.ROOT; set_agents_app.ROOT=root
+            try:
+                with mock.patch.object(Path,"glob",side_effect=AssertionError("must not glob with an explicit feature_id")):
+                    result=set_agents_app._resolve_context_pack("only-me",None)
+                self.assertEqual(result,(False,"only-me","P1"))  # no context_pack ⇒ False, but no crash/glob
+            finally:
+                set_agents_app.ROOT=old_root
+
+    def _toml_row(self, row):
+        lines=["[[routes]]"]
+        for key, value in row.items():
+            if isinstance(value, str):
+                lines.append(f'{key} = "{value}"')
+            elif isinstance(value, list):
+                items=", ".join(f'"{item}"' for item in value)
+                lines.append(f'{key} = [{items}]')
+            else:
+                lines.append(f'{key} = {value}')
+        return "\n".join(lines)
+
+    def _write_catalog(self, td, rows):
+        text="catalog_version = 2\n\n" + "\n\n".join(self._toml_row(row) for row in rows) + "\n"
+        path=Path(td)/"routes.toml"; path.write_text(text)
+        return path
+
+    def test_catalog_negative_matrix(self):
+        # N04: the closed-schema/enum negative matrix, isolated from the roster-coverage check
+        # (each case raises during its own row's validation, before coverage is even reached).
+        base=dict(provider="openai-codex", model="gpt-5.6-luna", family="gpt-5.6", effort="low",
+                  tier="fast", roles=["implementer"], tools=["read","shell","write"], curated_priority=10)
+        cases={
+            "tiers-list (old schema)": {**{k:v for k,v in base.items() if k!="tier"}, "tiers":["fast"]},
+            "unknown tier": {**base, "tier":"ultra"},
+            "xhigh unbenchmarked": {**base, "effort":"xhigh"},
+            "codex effort not configured": {**base, "effort":"nope"},
+            "anthropic effort not medium": {**base, "provider":"anthropic", "model":"haiku", "family":"haiku", "effort":"low"},
+            "unaudited runtime": {**base, "runtimes":["pi"]},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            for label, row in cases.items():
+                path=self._write_catalog(td,[row])
+                with self.assertRaises(routing.RoutingError, msg=label):
+                    routing_catalog.build_snapshot(path, self.roster, self.config)
+            # Two rows differing ONLY in `runtimes` collapse to the same canonical tuple
+            # (AC-12: runtimes is never part of the static-ID) and stay a duplicate.
+            path=self._write_catalog(td,[{**base,"runtimes":["codex"]},{**base,"runtimes":["opencode"]}])
+            with self.assertRaises(routing.RoutingError):
+                routing_catalog.build_snapshot(path, self.roster, self.config)
 
 if __name__ == "__main__": unittest.main()

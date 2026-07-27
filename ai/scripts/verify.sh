@@ -5,7 +5,7 @@ cd "$ROOT"
 
 ./build.sh --check
 python3 -m unittest discover -s tests -v
-python3 -m py_compile ai/scripts/*.py tests/*.py
+python3 -m py_compile ai/scripts/*.py ai/scripts/routing_core/*.py tests/*.py
 git diff --check
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"

@@ -16,6 +16,20 @@ TASK_CLASSES = {"inspection", "documentation", "mechanical", "implementation", "
 CRITICAL = {"architecture", "security", "money", "migration", "concurrency", "public-contract"}
 RISK_ORDER = {"low": 0, "medium": 1, "high": 2}
 OPERATIONS = {"inspection", "change"}
+TIER_ORDER = {"fast": 0, "balanced": 1, "frontier": 2}
+SELECTED_RUNTIMES = {"opencode", "claude-code", "codex", "pi"}
+_FAST_ELIGIBLE = {"mechanical", "documentation", "inspection"}
+
+
+def required_tier(task_class: str, risk: str) -> str:
+    """Pure required-tier resolution over validated facts (contract 004 §Tier model)."""
+    if task_class not in TASK_CLASSES or risk not in RISK_ORDER:
+        raise RoutingError("FACTS_INCOMPLETE")
+    if task_class in CRITICAL or risk == "high":
+        return "frontier"
+    if task_class in _FAST_ELIGIBLE and risk == "low":
+        return "fast"
+    return "balanced"
 
 
 def combined_risk(observed: str, requested: str) -> str:
@@ -92,7 +106,11 @@ class _ObservedTaskFacts:
         valid = (all(value is not None for value in fields) and self.role in roster and self.read_write in {"read", "write"}
                  and self.operation in OPERATIONS and self.task_class in TASK_CLASSES
                  and self.risk in RISK_ORDER and (self.criticality == "" or self.criticality in CRITICAL)
-                 and self.selected_runtime in {"opencode", "claude-code", "codex", "pi"}
+                 and self.selected_runtime in SELECTED_RUNTIMES
+                 # F05: an unhashable/non-string member must degrade here, before any `set(...)`
+                 # call downstream ever sees it (backlog N-1 covers the request side only).
+                 and isinstance(self.required_tools, (tuple, list))
+                 and all(isinstance(tool, str) for tool in self.required_tools)
                  and self.facts_version == "routing-v2" and isinstance(self.observed_at, (int, float)) and not isinstance(self.observed_at, bool)
                  and self.observed_at <= now and now - self.observed_at <= 30 and not self.ambiguous
                  and scope is not None and self._scope is scope)
@@ -102,7 +120,9 @@ class _ObservedTaskFacts:
 @dataclasses.dataclass(frozen=True)
 class StaticRoute:
     catalog_version: int; provider: str; model: str; family: str; effort: str
-    tiers: tuple[str, ...]; roles: tuple[str, ...]; tools: tuple[str, ...]; curated_priority: int; route_id: str
+    # Single tier per row (contract 004); the canonical binding encodes it as a
+    # one-element group so the 003 static-ID tuple shape is unchanged.
+    tier: str; roles: tuple[str, ...]; tools: tuple[str, ...]; curated_priority: int; route_id: str
 
     @staticmethod
     def identifier(catalog_version, provider, model, family, effort, tiers, roles, tools, curated_priority, digest=hashlib.sha256):
@@ -127,6 +147,10 @@ class RouteDecision:
     execution_enabled: bool; reason_codes: tuple[str, ...] = (); exclusions: tuple[dict[str, str], ...] = ()
     fallback_identity: tuple[str, str, str, str, str, str] | None = None
     run_id: str | None = None
+    # SEC-A01: a POSITIVE, additive signal — true only for a review decision that
+    # matched a real terminal writer AND survived the family+provider exclusion.
+    # An unverified reviewer decision (or any non-review decision) never sets it.
+    independence_verified: bool = False
     @property
     def identity(self):
         return None if None in (self.route_id, self.runtime, self.provider, self.model, self.family, self.effort) else (self.route_id, self.runtime, self.provider, self.model, self.family, self.effort)
