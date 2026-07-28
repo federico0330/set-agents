@@ -282,6 +282,12 @@ def validate_state(data: dict[str, Any]) -> list[str]:
             errors.append(f"{pid}: spawn budget exceeded")
         if attempts.get("gate_failures", 0) > budgets.get("max_gate_failures_per_package", 3):
             errors.append(f"{pid}: gate failure budget exceeded")
+        finding_ids = [f.get("id") for f in package.get("findings", []) if isinstance(f, dict)]
+        duplicates = {fid for fid in finding_ids if fid and finding_ids.count(fid) > 1}
+        if duplicates:
+            # Every finding lookup is first-match, so a duplicate is invisible to every
+            # command and visible only to has_open_findings: the package deadlocks.
+            errors.append(f"{pid}: duplicate finding ids: {', '.join(sorted(duplicates))}")
         # Defaulted, not required: state files written before this budget existed stay valid.
         verification_budget = budgets.get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
         if attempts.get("verifications", 0) > verification_budget:
@@ -517,6 +523,11 @@ def next_transition(data: dict[str, Any]) -> dict[str, Any]:
         if package and package.get("review_panels") and package["review_panels"][-1].get("status") == "in_progress":
             return {"phase": phase, "next": "PACKAGE_REVIEW", "reason": "review panel in progress"}
     if phase == "PACKAGE_REPAIR":
+        if package and not package.get("verifications") and has_open_findings(package, {"critical", "high", "medium"}):
+            # `next` is the machine advisor the orchestrator consults. Sending it to
+            # DELTA_REVIEW here recommends a command that now refuses to run.
+            return {"phase": phase, "next": "PACKAGE_REPAIR",
+                    "reason": "record-verification is required before repair"}
         return {"phase": phase, "next": "DELTA_REVIEW", "reason": "repair batch recorded"}
     if phase == "DELTA_REVIEW":
         if package and package.get("delta_reviews"):
@@ -584,7 +595,10 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
         "spawns": f"{spawns}/{budgets.get('max_spawns_per_package', '?')}",
         "reviews": f"{cycles}/{budgets.get('max_deep_review_cycles', '?')}",
         "open_findings": open_findings,
-        "blocker": blockers[-1].get("reason", "") if blockers else "-",
+        # Raw here would put agent-authored newlines and pipes into a markdown TABLE in
+        # a file memory-scribe and adversarial-judge read.  `_short` collapses the
+        # whitespace; the pipe escape keeps the row a row.
+        "blocker": _short(blockers[-1].get("reason", ""), 160).replace("|", "\\|") if blockers else "-",
         "next": (next_transition(data).get("next") or "-"),
         "last_event": f"{last.get('timestamp', '')} {last.get('event', '')}".strip() or "-",
     }
@@ -658,8 +672,8 @@ def format_narrative(entry: dict[str, Any]) -> list[str]:
     )
     return [
         f"[{entry.get('at', '?')}] {tail}".rstrip(),
-        f"Cliente: {entry.get('client') or '-'}",
-        f"Ingeniería: {entry.get('tech') or '-'}",
+        f"Cliente: {_short(entry.get('client'), 400) or '-'}",
+        f"Ingeniería: {_short(entry.get('tech'), 400) or '-'}",
         "",
     ]
 
@@ -1420,6 +1434,13 @@ def normalize_findings(raw_findings: list[str]) -> list[dict[str, Any]]:
         # and let a critical finding be born already retired.
         if finding.get("status", "open") != "open":
             raise StateError(f"finding cannot be created with status {finding['status']}: {finding['id']}")
+        # Blacklisting one key at a time is how the previous three rounds each patched a
+        # symptom.  These are the fields the gates READ; a filer that can set them at
+        # birth can make its own finding irrefutable (`verified_verdict`) or unbounded
+        # (`repair_attempts` seeded negative defeats max_repairs_per_finding).
+        smuggled = sorted(FINDING_BOOKKEEPING & set(finding))
+        if smuggled:
+            raise StateError(f"finding cannot be created carrying {smuggled}: {finding['id']}")
         finding["status"] = "open"
         findings.append(finding)
     return findings
@@ -1480,11 +1501,7 @@ def cmd_record_review(args: argparse.Namespace) -> int:
         attempts["deep_review_cycles"] = attempts.get("deep_review_cycles", 0) + 1
         data["metrics"]["package_reviews"] += 1
         for finding in findings:
-            existing = next((item for item in package["findings"] if item.get("id") == finding["id"]), None)
-            if existing:
-                existing.update(finding)
-            else:
-                package["findings"].append(finding)
+            merge_finding(package, finding)
         if args.verdict == "repair_required":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
@@ -1559,11 +1576,7 @@ def cmd_record_subreview(args: argparse.Namespace) -> int:
             "at": now(),
         })
         for finding in findings:
-            existing = next((item for item in package["findings"] if item.get("id") == finding["id"]), None)
-            if existing:
-                existing.update(finding)
-            else:
-                package["findings"].append(finding)
+            merge_finding(package, finding)
         record_event(data, "record-subreview", "PACKAGE_REVIEW", "PACKAGE_REVIEW", args.actor, args.package_id, {"role": args.role, "verdict": args.verdict, "finding_count": len(findings)}, args.event_id)
         return True
 
@@ -1696,6 +1709,44 @@ def _repair_entered_from_review(data: dict[str, Any], package_id: str | None) ->
     return False
 
 
+# The verification axis is scoped to the cycle that produced it.  Left on a finding that
+# is raised again, a cycle-1 verdict authorises a cycle-2 repair against a different diff:
+# a reusable credential.  Archive it and reset, so the finding re-enters unjudged.
+# Fields owned by the lifecycle, never by whoever files the finding.
+FINDING_BOOKKEEPING = frozenset({"verified_verdict", "verified_by", "verified_at", "verdict_reason",
+                                 "verdict_evidence", "verification_history", "repair_attempts"})
+VERIFICATION_AXIS = ("verified_verdict", "verified_by", "verified_at", "verdict_reason", "verdict_evidence")
+
+
+def merge_finding(package: dict[str, Any], incoming: dict[str, Any]) -> None:
+    """Add a finding, or re-raise an existing one with its verification axis cleared."""
+    existing = next((item for item in package.setdefault("findings", [])
+                     if item.get("id") == incoming["id"]), None)
+    if existing is None:
+        package["findings"].append(incoming)
+        return
+    archived = {key: existing.pop(key) for key in VERIFICATION_AXIS if key in existing}
+    if archived:
+        archived["archived_at"] = now()
+        existing.setdefault("verification_history", []).append(archived)
+    existing.update(incoming)
+
+
+def require_verified(package: dict[str, Any], finding_id: str, action: str) -> dict[str, Any]:
+    """Every exit from the open set above `low` needs a verdict, not just repair.
+
+    An invariant on a record must be enforced at EVERY transition of that record; one
+    installed only in the command that motivated it leaks through the doors nobody
+    reopened.
+    """
+    finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
+    if not finding:
+        raise StateError(f"unknown finding: {finding_id}")
+    if finding.get("severity") in {"critical", "high", "medium"} and not finding.get("verified_verdict"):
+        raise StateError(f"finding was never verified: {finding_id} (cannot {action})")
+    return finding
+
+
 def cmd_record_verification(args: argparse.Namespace) -> int:
     """Adversarial refutation pass between the review panel and repair.
 
@@ -1734,6 +1785,8 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
             # repairs it would prevent.
             if has_open_findings(package, {"critical", "high", "medium"}):
                 raise StateError("--skip-reason requires all open findings to be low severity")
+            if len(args.skip_reason) > MAX_VERDICT_FIELD or len(args.evidence or "") > MAX_VERDICT_FIELD:
+                raise StateError(f"waiver fields exceed {MAX_VERDICT_FIELD} chars")
             record = {"skipped": True, "reason": args.skip_reason, "at": now(), "evidence": args.evidence}
             package.setdefault("verifications", []).append(record)
             # Its own counter, not the budgeted one: a waiver is the declaration that no
@@ -1836,8 +1889,7 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
                 # The verifier killed it with evidence.  Repairing it anyway would
                 # change code for a defect that was shown not to exist.
                 raise StateError(f"cannot repair refuted finding: {finding_id}")
-            if finding.get("severity") in {"critical", "high", "medium"} and not finding.get("verified_verdict"):
-                raise StateError(f"finding was never verified: {finding_id}")
+            require_verified(package, finding_id, "repair it")
             repaired.append(finding)
         if args.skip_delta:
             # Physical waiver, not a prose one: skipping the delta review is legal
@@ -1882,11 +1934,22 @@ def cmd_record_delta_review(args: argparse.Namespace) -> int:
         package = package_by_id(data, args.package_id)
         new_findings = normalize_findings(args.new_finding or [])
         for finding_id in args.closed_finding or []:
-            finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
-            if finding:
-                finding["status"] = "closed"
+            # The other exit from the open set.  Without this guard a `critical` finding
+            # is retired here with no verdict, no repair and no trace — the same failure
+            # shape the actor gate closed, surviving on the flank it did not cover.
+            finding = require_verified(package, finding_id, "close it in a delta review")
+            if finding.get("severity") in {"critical", "high", "medium"} and not finding.get("repair_attempts"):
+                # A delta review confirms that a repair closed a finding; it cannot be the
+                # thing that closes it.  Otherwise a verified-but-unrepaired critical
+                # leaves the open set with no code change and no record.
+                raise StateError(
+                    f"delta review cannot close an unrepaired {finding['severity']} finding: {finding_id}")
+            finding["status"] = "closed"
         for finding in new_findings:
-            package.setdefault("findings", []).append(finding)
+            # Merge, never blind-append: every lookup downstream is first-match, so a
+            # duplicate id is invisible to every command and leaves the package with no
+            # CLI exit at all.
+            merge_finding(package, finding)
         requires_full = bool(args.requires_full_review)
         review = {
             "verdict": args.verdict,
@@ -2232,7 +2295,7 @@ def run_dry_workflow(feature_id: str) -> dict[str, Any]:
         "verified_at": now(),
         "verified_verdict": "refuted",
         "verdict_reason": "an existing regression test already covers the cited path",
-        "verdict_evidence": "tests/test_example.py:42 asserts the same interleaving",
+        "verdict_evidence": "$ pytest tests/test_example.py -k interleaving\n1 passed, 0 failed",
     })
     upheld = package["findings"][0]
     upheld.update({"verified_by": "finding-verifier", "verified_at": now(), "verified_verdict": "upheld"})

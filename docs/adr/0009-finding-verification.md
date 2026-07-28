@@ -197,6 +197,41 @@ Verified by the reviewer and not repaired, because it is correct: the waiver can
 finding into repair. `record-repair`'s per-finding `verified_verdict` guard holds regardless of how many
 waivers were recorded, so N waivers are no worse than one.
 
+### D1/D2 corrected (auditoría final) — la invariante vivía en un comando, no en el modelo
+
+La auditoría final (panel de seguridad + arquitectura sobre la feature entera) devolvió el diagnóstico que
+las tres rondas anteriores no habían visto, porque cada una miró su propio diff: **la invariante "un hallazgo
+`medium+` no sale del conjunto abierto sin veredicto" se instaló en `record-repair`, no en el modelo de
+hallazgos.** Las tres fugas estaban afuera de los dos comandos endurecidos, en las puertas que ningún diff
+tocaba:
+
+1. **`record-delta-review --closed-finding` no tenía ninguna guarda.** Ni severidad, ni veredicto, ni
+   reparación, ni actor — la única de las cuatro rutas de escritura terminal sin control. Reproducido: un
+   hallazgo `critical` de seguridad sale del conjunto abierto sin cambio de código y sin registro, y el
+   paquete se acepta. Ahora exige veredicto **y** reparación previa: un delta review **confirma** que una
+   reparación cerró un hallazgo, no puede ser lo que lo cierra.
+2. **Un hallazgo re-levantado heredaba el veredicto del ciclo anterior.** `existing.update(finding)` sólo
+   pisa las claves entrantes, así que `verified_verdict` sobrevivía sobre un hallazgo que volvía a estar
+   abierto: una credencial reutilizable que autorizaba la reparación del ciclo 2 con un juicio emitido contra
+   otro diff. El eje de verificación ahora se archiva en `verification_history` y se resetea (`merge_finding`).
+3. **`--new-finding` con un id existente appendeaba un duplicado.** Todos los lookups son first-match, así que
+   la copia nueva era invisible para todo comando y visible sólo para `has_open_findings`: el paquete quedaba
+   sin salida por CLI, sólo `block` + edición manual del JSON. Ahora mergea, y `validate_state` reporta ids
+   duplicados como ya hacía con `package_id`.
+
+Y la de seguridad, que es de la misma familia y peor: **`normalize_findings` saneaba `status` y nada más.**
+`verified_verdict` y `repair_attempts` — los campos que las guardas nuevas **leen** — eran asignables al nacer.
+Un `upheld` pre-seteado vuelve el hallazgo permanentemente irrefutable (le saca al verificador su única razón
+de existir, elegida por quien levanta el hallazgo); un `repair_attempts` negativo hace que
+`max_repairs_per_finding` no dispare nunca. Se cierra por **whitelist**: `FINDING_BOOKKEEPING` es propiedad
+del ciclo de vida, nunca de quien archiva. Blacklistear una clave por vez es exactamente lo que hicieron las
+tres rondas anteriores.
+
+Dos correcciones menores de la misma ronda: `next` recomendaba `DELTA_REVIEW` desde `PACKAGE_REPAIR` aunque el
+comando que ese consejo implica ahora se niegue a correr (y el `reason` era literalmente falso); y el brief del
+verificador enumeraba seis causales de refutación mientras el CLI acepta evidencia para tres — las dos
+sobrantes producían citas fabricadas, síntoma que ya estaba en el propio repo con números de línea inventados.
+
 ### Repairs outside the state machine
 
 - **`_short` is a trust boundary** (SEC-003). `merge_note` splits on the FIRST `NOTES_AUTO_END` with

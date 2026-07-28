@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-07-27T17:58:36+00:00
+Actualizado: 2026-07-28T02:05:38+00:00
 
 ## Features
 

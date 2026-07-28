@@ -30,8 +30,12 @@ than the repairs it would prevent.
    3. **The reproduction does not reproduce.** Run it. Report what actually happened.
    4. **The finding contradicts an approved acceptance criterion or spec decision** — the behaviour it calls a
       defect is the behaviour the contract asked for. Cite the AC.
-   5. **A regression test already covers it** and passes. Name the test.
-   6. **It is a duplicate** of another finding in the same bundle. Name which one survives.
+   5. **A regression test already covers it** and passes. Naming the test is not enough — RUN it and cite
+      the command and its output (`$ python3 -m unittest …` / `1 passed`). A test that exists and a test
+      that passes are different claims.
+   6. **It is a duplicate** of another finding in the same bundle. This is the one case you do NOT record as
+      a refutation: say so in `observations`, naming which id survives, and let the orchestrator drop the
+      duplicate. Refuting it would put a finding-id where the evidence contract expects a source location.
 3. Findings you could not refute are `upheld`, unchanged. Do not soften, re-scope, or re-word them.
 4. Return one verdict per finding, in one report.
 
