@@ -17,6 +17,7 @@
 
 ## Decisiones
 
+- [[decisiones/2026-07-28 audit-debt-006-p2|Deuda registrada de la auditoria final de 006-P2 (no reparada a proposito)]]
 - [[decisiones/2026-07-28 routing-db-schema4-unmigratable|La DB de routing local no se puede migrar de schema 4 a 5 por el path sancionado]]
 - [[decisiones/2026-07-27 p1-pi-project-cwd-propagation|Pi lifecycle propagates project context by explicit cwd]]
 - [[decisiones/2026-07-27 global-absolute-path-leak|Pre-existing absolute-path leak in tracked Global/ templates (out of P1 scope, tracked)]]
@@ -24,7 +25,6 @@
 - [[decisiones/2026-07-27 t300-pi-lane-feasibility-yes|T-300 spike: P3-pi-lane is FEASIBLE (all four YES)]]
 - [[decisiones/2026-07-27 sec-a02-coord-run-closure-accepted|SEC-A02 accepted: coord may terminal/abandon any routing run]]
 - [[decisiones/2026-07-26 scope-cheap-tier-and-pi-spike|Alcance 004: tier barato sin opencode/* y P3 condicionado a spike]]
-- [[decisiones/2026-07-26 am2-probe-cache-fresh-selected|AM-2: cache de probes filtering-only + re-probe fresco del seleccionado (enmienda a 003/ADR-0005)]]
 
 ## Referencias
 

@@ -8,7 +8,7 @@ Escrito la noche del 2026-07-27. Todo lo de abajo está commiteado, con gate ver
 
 **Feature 006 `execution-graph`, paquetes P1 y P2, entregados y auditados.**
 
-Seis commits nuevos, de `90e9948` a `07ae326`. La suite pasó de **181 a 201 tests**, cero salteados, ninguna
+Ocho commits nuevos, de `90e9948` a `02ed998`. La suite pasó de **181 a 209 tests**, cero salteados, ninguna
 regresión debilitada. `VERIFY_PASS`, `CHECK_PASS`, `GLOBAL_PORTABILITY_OK`, `SELF_SCAFFOLD_SYNC_OK`,
 `INSTALL_PASS`, `DRIFT_OK`. La instalación global está sincronizada.
 
@@ -52,7 +52,7 @@ El paquete pasó por el ciclo completo y **no salió bien a la primera, en ningu
 | Pasada de refutación (el nodo aplicado a sí mismo) | **13 de 13 sostenidos**, cero refutaciones — intentó refutar seis en serio y falló por evidencia en todas. Además ruteó un hueco que el panel no vio |
 | Delta review #1 | `repair_required`, **2 `high` nuevos** — introducidos por mi propia reparación |
 | Delta review #2 | `repair_required`, **2 más** — introducidos por la reparación de la reparación |
-| Auditoría final (seguridad + arquitectura) | ver sección 5 |
+| Auditoría final (seguridad + arquitectura, sobre el todo entregado) | `repair_required`, **15 hallazgos** — 11 de arquitectura, 4 de seguridad |
 
 Los tres `high` del panel decían todos lo mismo, y es la lección de la noche: **puse la ceremonia en el prompt
 y dejé el CLI blando**. El `implementer` podía refutar un hallazgo `critical` de seguridad contra su propio
@@ -65,7 +65,31 @@ Y después, reparando eso, metí dos regresiones más: un guardián que se anula
 más chico que los flujos que los otros presupuestos ya permiten, que terminaba en `BLOCKED` estando dentro de
 todo.
 
-**Todo eso lo encontraron los revisores, no yo.**
+Y la auditoría final, que es la que más me enseñó, encontró el error de fondo que las tres rondas no vieron
+**porque cada una miró solo su propio diff**:
+
+> **Instalé la invariante en un comando, no en el modelo de hallazgos.**
+
+"Un hallazgo `medium+` no sale del conjunto abierto sin veredicto" lo puse en `record-repair`. Las tres fugas
+estaban **afuera** de los dos comandos que endurecí, en las puertas que ningún diff tocaba:
+
+- `record-delta-review --closed-finding` **no tenía ninguna guarda** — ni severidad, ni veredicto, ni
+  reparación, ni actor. Era la única de las cuatro rutas de escritura terminal sin control. Un hallazgo
+  `critical` de seguridad salía del conjunto abierto sin cambio de código y sin registro, y el paquete se
+  aceptaba.
+- Un hallazgo re-levantado en el ciclo 2 **heredaba el veredicto del ciclo 1**: una credencial reutilizable
+  que autorizaba una reparación con un juicio emitido contra otro diff.
+- `--new-finding` con un id existente appendeaba un duplicado, y como todos los lookups son first-match, el
+  paquete quedaba **sin salida por CLI**.
+
+Y la de seguridad, peor y de la misma familia: `verified_verdict` y `repair_attempts` —los campos que mis
+guardas nuevas **leen**— eran asignables al nacer. Un `upheld` pre-seteado vuelve el hallazgo permanentemente
+irrefutable, elegido por quien lo levanta. Un `repair_attempts` negativo hace que `max_repairs_per_finding` no
+dispare nunca. Lo cerré por **whitelist**, porque blacklistear una clave por vez es exactamente lo que habían
+hecho las tres rondas anteriores.
+
+**Todo eso lo encontraron los revisores, no yo.** Nueve reparados, seis registrados como deuda explícita en
+`ai/state/decisions-log.jsonl` (`audit-debt-006-p2`), con el criterio de cada uno.
 
 ---
 
@@ -199,6 +223,7 @@ diffeable y offline. Ningún arnés SaaS lo tiene, porque su estado es el transc
 | 2 | **005-P3 `tui`** | pendiente, va último del 005 |
 | 3 | **006-P3 `graph-view`** | bloqueado por (1) |
 | 4 | Reparación de `migrate_from_v4` en la 005 | nueva, sale del hallazgo de esta noche |
+| 5 | Deuda de la auditoría (`audit-debt-006-p2`) | 6 ítems registrados; los más valiosos son `repair_entry` como campo autoritativo y el compare-and-swap en `mutate` |
 
 **Deuda registrada, sin paquete:** `Global/_canonical/opencode-agents/package-gate-runner.md` sigue con paths
 absolutos y nombres de módulos de negocio de un proyecto cliente. Repo privado, pero se copia a cada máquina
