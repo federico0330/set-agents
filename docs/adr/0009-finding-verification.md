@@ -175,6 +175,28 @@ findings. The thesis of this ADR silently stopped holding in its own documented 
 Now the scan skips any event whose `from == to`. Both regressions are pinned by tests that fail without the
 fix; the absence of a spawn in the original test fixture is precisely what let this ship green.
 
+### D7 corrected again (second delta review, DR-05/DR-06) — one default, and the waiver is a loop too
+
+Raising the command's default from 2 to 6 left `validate_state`'s default at 2. The key is **optional** —
+every state file written before it omits it — so for all four existing features the command authorised a pass
+that `fail_if_invalid` then rejected. The failure shape got *worse*, not better: where there had been a
+governed `BLOCKED` with a recorded blocker, there was now an ungoverned `StateError`, no blocker, and `next`
+still recommending `DELTA_REVIEW`. That is precisely what this decision exists to prevent, surviving on the
+flank the fix did not look at.
+
+`DEFAULT_MAX_VERIFICATIONS = 6` is now the single source for all three readers (`validate_state`,
+`base_state`, `cmd_record_verification`). An optional budget key with more than one default is a drift waiting
+to happen.
+
+And the waiver counter, given its own dimension to keep the cheap path reachable, was left uncapped — the only
+loop in the harness without a ceiling, in a file whose own comment says it caps every loop. It now shares the
+same budget value against its own counter: same ceiling, separate dimension, no second key to drift. Both are
+`block_with_reason`, never a raise.
+
+Verified by the reviewer and not repaired, because it is correct: the waiver cannot launder a `medium+`
+finding into repair. `record-repair`'s per-finding `verified_verdict` guard holds regardless of how many
+waivers were recorded, so N waivers are no worse than one.
+
 ### Repairs outside the state machine
 
 - **`_short` is a trust boundary** (SEC-003). `merge_note` splits on the FIRST `NOTES_AUTO_END` with

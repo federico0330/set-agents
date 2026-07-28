@@ -2355,6 +2355,44 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(waived.returncode, 0, waived.stdout)
         self.assertNotEqual(json.loads(waived.stdout)["state"]["phase"], "BLOCKED")
 
+    def test_every_reader_of_the_verification_budget_defaults_alike(self):
+        # The key is optional — state files predate it. If the command and validate_state
+        # default differently, the command authorises a pass validate_state then rejects:
+        # an ungoverned StateError instead of a recorded blocker.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, verify=False)
+            data = json.loads(state.read_text())
+            declared = data["budgets"].pop("max_verifications_per_package")   # legacy shape
+            data["packages"][0]["attempts"]["verifications"] = declared - 1
+            state.write_text(json.dumps(data))
+            inside = self.verify(state, self.UPHELD, check=False)
+            self.assertEqual(inside.returncode, 0, inside.stdout)
+            past = self.verify(state, json.dumps({"id": "F-001", "verdict": "upheld"}), check=False)
+            data = json.loads(state.read_text())
+        # Past the ceiling it must BLOCK with a recorded blocker, never raise.
+        self.assertEqual(past.returncode, 0, past.stdout)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("verification budget exhausted", data["blockers"][-1]["reason"])
+
+    def test_the_waiver_loop_is_capped_like_every_other_loop(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False, verify=False)
+            low = json.dumps({"id": "F-LOW", "severity": "low", "category": "testing"})
+            self.run_state(state, "record-review", "PKG-01", "repair_required",
+                           "--actor", "package-reviewer", "--finding", low)
+            data = json.loads(state.read_text())
+            budget = data["budgets"]["max_verifications_per_package"]
+            data["packages"][0]["attempts"]["verification_waivers"] = budget - 1
+            state.write_text(json.dumps(data))
+            self.run_state(state, "record-verification", "PKG-01", "--actor", "orchestrator",
+                           "--skip-reason", "all-findings-low")
+            self.assertEqual(json.loads(state.read_text())["phase"], "PACKAGE_REPAIR")
+            self.run_state(state, "record-verification", "PKG-01", "--actor", "orchestrator",
+                           "--skip-reason", "all-findings-low")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("verification waiver budget exhausted", data["blockers"][-1]["reason"])
+
     def test_the_note_carries_the_proof_not_only_the_claim(self):
         with tempfile.TemporaryDirectory() as td:
             root, state = self._notes_project(td)

@@ -84,6 +84,11 @@ NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist
 # verdicts and the cost waiver stay open to the coordinator; only refutation is closed.
 REFUTING_ACTORS = {"finding-verifier"}
 # Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
+# Every reader of `max_verifications_per_package` must default to the SAME number: the key
+# is optional (state files predate it), so a mismatch means the command authorises a pass
+# that `validate_state` then rejects — an ungoverned StateError instead of a recorded
+# blocker, which is the failure shape this budget exists to prevent.
+DEFAULT_MAX_VERIFICATIONS = 6
 # `max_verifications_per_package` is a runaway backstop, NOT the anti-retry control —
 # that is `verified_verdict` stickiness, which makes an `upheld` finding unjudgeable a
 # second time.  It must therefore be dimensioned against the flows the other budgets
@@ -154,7 +159,7 @@ def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any
             "max_package_subdivisions": 1,
             "max_spawns_per_package": 12,
             "max_gate_failures_per_package": 3,
-            "max_verifications_per_package": 6,
+            "max_verifications_per_package": DEFAULT_MAX_VERIFICATIONS,
         },
         "metrics": {
             "task_deep_reviews": 0,
@@ -278,8 +283,11 @@ def validate_state(data: dict[str, Any]) -> list[str]:
         if attempts.get("gate_failures", 0) > budgets.get("max_gate_failures_per_package", 3):
             errors.append(f"{pid}: gate failure budget exceeded")
         # Defaulted, not required: state files written before this budget existed stay valid.
-        if attempts.get("verifications", 0) > budgets.get("max_verifications_per_package", 2):
+        verification_budget = budgets.get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
+        if attempts.get("verifications", 0) > verification_budget:
             errors.append(f"{pid}: verification budget exceeded")
+        if attempts.get("verification_waivers", 0) > verification_budget:
+            errors.append(f"{pid}: verification waiver budget exceeded")
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")
@@ -1710,10 +1718,17 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         package = package_by_id(data, args.package_id)
         attempts = package.setdefault("attempts", {})
         verdicts = normalize_verdicts(args.verdict or [])
+        budget = data.get("budgets", {}).get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
 
         if args.skip_reason:
             if verdicts:
                 raise StateError("--skip-reason cannot be combined with --verdict")
+            # Waivers keep their own counter so the cheap path stays reachable once the
+            # verification budget is spent — but they are still a loop, and this harness
+            # caps every loop.  Same ceiling, separate dimension, no second key to drift.
+            if attempts.get("verification_waivers", 0) >= budget:
+                return block_with_reason(data, args.actor, args.package_id,
+                                         f"verification waiver budget exhausted for {args.package_id}")
             # Physical waiver, not a prose one: skipping verification is legal only
             # when nothing above `low` is open, where the spawn costs more than the
             # repairs it would prevent.
@@ -1733,10 +1748,9 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         if not verdicts:
             raise StateError("record-verification requires --verdict or --skip-reason")
 
-        # After the waiver branch on purpose: blocking a package because it tried to take
-        # the CHEAP path would be absurd, and the waiver is the one exit that always has
-        # to stay reachable.
-        budget = data.get("budgets", {}).get("max_verifications_per_package", 6)
+        # Checked after the waiver branch on purpose: the two counters are separate
+        # dimensions, so spending the verification budget never makes the cheap path
+        # unreachable.
         if attempts.get("verifications", 0) >= budget:
             return block_with_reason(data, args.actor, args.package_id,
                                      f"verification budget exhausted for {args.package_id}")
