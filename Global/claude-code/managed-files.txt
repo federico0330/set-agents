@@ -6,6 +6,7 @@ agents/architect.md
 agents/brainstormer.md
 agents/debugger.md
 agents/delta-reviewer.md
+agents/finding-verifier.md
 agents/frontend-engineer.md
 agents/gate-runner.md
 agents/github-release-manager.md

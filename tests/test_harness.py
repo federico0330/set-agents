@@ -1961,6 +1961,157 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(len(data["packages"][0]["review_panels"][0]["subreviews"]), 4)
         self.assertEqual(data["phase"], "PACKAGE_REPAIR")
 
+    # ------------------------------------------------ contract 006 / P2-finding-verification
+
+    REFUTED = json.dumps({
+        "id": "F-001", "verdict": "refuted",
+        "reason": "the cited path is guarded upstream",
+        "evidence": "src/example.py:42",
+    })
+    UPHELD = json.dumps({"id": "F-002", "verdict": "upheld"})
+
+    def test_refuted_finding_never_reaches_repair_and_never_blocks_acceptance(self):
+        # The thesis of the package: a finding killed with evidence costs no code change.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                "--verdict", self.REFUTED, "--verdict", self.UPHELD,
+            )
+            refused = self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-001", "--changed-file", "src/example.py", check=False,
+            )
+            self.assertEqual(refused.returncode, 2)
+            self.assertIn("cannot repair refuted finding: F-001", refused.stdout)
+
+            self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-002", "--changed-file", "src/example.py", "--verification", "focused-test",
+            )
+            self.run_state(state, "record-delta-review", "PKG-01", "pass", "--actor", "delta-reviewer", "--closed-finding", "F-002")
+            self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+            self.run_state(
+                state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier",
+                "--url", "http://localhost:3000", "--browser", "playwright", "--check", "flow works",
+            )
+            self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator")
+            data = json.loads(state.read_text())
+
+        package = data["packages"][0]
+        refuted = next(f for f in package["findings"] if f["id"] == "F-001")
+        # The finding is retired, never deleted: the grounds stay in the record.
+        self.assertEqual(refuted["status"], "refuted")
+        self.assertEqual(refuted["verdict_reason"], "the cited path is guarded upstream")
+        self.assertEqual(refuted["verdict_evidence"], "src/example.py:42")
+        self.assertEqual(refuted["verified_by"], "finding-verifier")
+        self.assertNotIn("repair_attempts", refuted)
+        self.assertEqual(package["verifications"][-1]["refuted"], ["F-001"])
+        self.assertEqual(package["verifications"][-1]["upheld"], ["F-002"])
+        self.assertEqual(package["status"], "accepted")
+
+    def test_verification_does_not_consume_a_review_cycle(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            before = json.loads(state.read_text())["packages"][0]["attempts"]["deep_review_cycles"]
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                "--verdict", self.REFUTED, "--verdict", self.UPHELD,
+            )
+            package = json.loads(state.read_text())["packages"][0]
+        # Verification is an edge inside the cycle the panel already counted.
+        self.assertEqual(package["attempts"]["deep_review_cycles"], before)
+        self.assertEqual(package["attempts"]["verifications"], 1)
+
+    def test_refutation_without_evidence_is_rejected(self):
+        # A refutation carries the same evidentiary burden the finding did.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            for bad in (
+                {"id": "F-001", "verdict": "refuted", "reason": "no me parece"},
+                {"id": "F-001", "verdict": "refuted", "evidence": "src/example.py:42"},
+            ):
+                result = self.run_state(
+                    state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                    "--verdict", json.dumps(bad), check=False,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("refuted verdict requires reason and evidence", result.stdout)
+            still_open = json.loads(state.read_text())["packages"][0]["findings"][0]
+        self.assertEqual(still_open["status"], "open")
+
+    def test_all_findings_refuted_skips_repair_and_delta_entirely(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            second = json.dumps({
+                "id": "F-002", "verdict": "refuted",
+                "reason": "an existing regression test already covers it",
+                "evidence": "tests/test_harness.py:1",
+            })
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                "--verdict", self.REFUTED, "--verdict", second,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(data["phase"], "PACKAGE_TESTING")
+        self.assertEqual(data["packages"][0]["status"], "testing_required")
+        self.assertEqual(data["metrics"]["repair_batches"], 0)
+
+    def test_skip_waiver_is_physical_and_refused_above_low_severity(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            refused = self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "orchestrator",
+                "--skip-reason", "all-findings-low", check=False,
+            )
+            self.assertEqual(refused.returncode, 2)
+            self.assertIn("requires all open findings to be low severity", refused.stdout)
+
+            both = self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "orchestrator",
+                "--skip-reason", "all-findings-low", "--verdict", self.UPHELD, check=False,
+            )
+            self.assertEqual(both.returncode, 2)
+            self.assertIn("cannot be combined", both.stdout)
+
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            low = json.dumps({"id": "F-LOW", "severity": "low", "category": "testing"})
+            self.run_state(state, "record-review", "PKG-01", "repair_required", "--actor", "package-reviewer", "--finding", low)
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "orchestrator",
+                "--skip-reason", "all-findings-low",
+            )
+            package = json.loads(state.read_text())["packages"][0]
+        # The waiver lands in the state file, never in a chat log.
+        self.assertTrue(package["verifications"][-1]["skipped"])
+        self.assertEqual(package["verifications"][-1]["reason"], "all-findings-low")
+        self.assertEqual(package["findings"][0]["status"], "open")
+
+    def test_refuted_finding_is_not_relisted_by_a_second_review_panel(self):
+        # Dedup runs against everything seen, not against what survived: otherwise a
+        # refuted finding resurfaces every cycle and the loop never dries.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                "--verdict", self.REFUTED, "--verdict", self.UPHELD,
+            )
+            self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-002", "--changed-file", "src/example.py",
+            )
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "repair_required", "--actor", "delta-reviewer",
+                "--requires-full-review", "--reason", "the repair changed the public contract",
+            )
+            self.run_state(state, "start-review-panel", "PKG-01", "--role", "package-reviewer")
+            self.run_state(state, "record-subreview", "PKG-01", "package-reviewer", "pass", "--actor", "package-reviewer")
+            self.run_state(state, "finalize-review-panel", "PKG-01", "pass", "--actor", "package-reviewer")
+            package = json.loads(state.read_text())["packages"][0]
+        self.assertNotIn("F-001", package["reviews"][-1]["findings"])
+        self.assertEqual(package["attempts"]["deep_review_cycles"], 2)
+
     def test_package_review_requires_completed_tasks(self):
         with tempfile.TemporaryDirectory() as td:
             state = Path(td) / "feature.json"

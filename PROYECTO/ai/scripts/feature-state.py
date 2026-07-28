@@ -67,6 +67,7 @@ MUTATING_COMMANDS = {
     "start-review-panel",
     "record-subreview",
     "finalize-review-panel",
+    "record-verification",
     "record-repair",
     "record-delta-review",
     "record-testing",
@@ -171,6 +172,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "reviews": [],
         "review_panels": [],
         "findings": [],
+        "verifications": [],
         "repairs": [],
         "delta_reviews": [],
         "testing": [],
@@ -178,6 +180,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "attempts": {
             "deep_review_cycles": 0,
             "repair_batches": 0,
+            "verifications": 0,
             "subdivisions": 0,
             "spawns": 0,
         },
@@ -344,9 +347,16 @@ def mutate(
     return data, before != data
 
 
+# A finding leaves the open set three ways: it was repaired (`closed`), it was
+# explicitly accepted as won't-fix (`accepted`), or `finding-verifier` refuted it
+# before it ever reached repair (`refuted`).  A refuted finding is never deleted —
+# it keeps its verdict and evidence in the package record.
+TERMINAL_FINDING_STATUSES = {"closed", "accepted", "refuted"}
+
+
 def has_open_findings(package: dict[str, Any], severities: set[str] | None = None) -> bool:
     for finding in package.get("findings", []):
-        if finding.get("status", "open") in {"closed", "accepted"}:
+        if finding.get("status", "open") in TERMINAL_FINDING_STATUSES:
             continue
         if severities is None or finding.get("severity") in severities:
             return True
@@ -533,7 +543,7 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
         1
         for p in packages
         for f in p.get("findings", [])
-        if f.get("status", "open") not in {"closed", "accepted"}
+        if f.get("status", "open") not in TERMINAL_FINDING_STATUSES
     )
     blockers = [b for b in data.get("blockers", []) if not b.get("resolved_at")]
     history = data.get("history", [])
@@ -882,7 +892,7 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
         1
         for package in _note_packages(data)
         for finding in package.get("findings", [])
-        if finding.get("status", "open") not in {"closed", "accepted"}
+        if finding.get("status", "open") not in TERMINAL_FINDING_STATUSES
     )
     if open_findings:
         bits.append(f"{open_findings} hallazgos abiertos")
@@ -1007,10 +1017,22 @@ def _package_body(fid: str, package: dict[str, Any]) -> str:
         lines += ["", "## Hallazgos", ""]
         for finding in findings:
             label = finding.get("category") or finding.get("summary") or ""
-            lines.append(f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')} — {_short(label)}")
+            line = f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')} — {_short(label)}"
+            if finding.get("status") == "refuted":
+                # The grounds a finding was killed on belong in the record, not in a chat log.
+                line += f" · refutado: {_short(finding.get('verdict_reason', ''))}"
+            lines.append(line)
     trail = []
     for review in _dicts(package.get("reviews")):
         trail.append(f"- review: {review.get('verdict')} ({len(review.get('findings', []))} hallazgos)")
+    for verification in _dicts(package.get("verifications")):
+        if verification.get("skipped"):
+            trail.append(f"- verificación: salteada ({_short(verification.get('reason', ''))})")
+        else:
+            trail.append(
+                f"- verificación: {len(verification.get('refuted', []))} refutados, "
+                f"{len(verification.get('upheld', []))} sostenidos"
+            )
     for repair in _dicts(package.get("repairs")):
         trail.append(f"- repair: {', '.join(repair.get('finding_ids', []))} → {len(repair.get('changed_files', []))} archivos")
     for delta in _dicts(package.get("delta_reviews")):
@@ -1519,7 +1541,11 @@ def cmd_finalize_review_panel(args: argparse.Namespace) -> int:
         panel["status"] = "completed"
         panel["completed_at"] = now()
         panel["verdict"] = args.verdict
-        panel_findings = [finding.get("id") for finding in package.get("findings", []) if finding.get("status", "open") != "closed"]
+        # Findings still live when the panel closes.  `refuted` joins `closed` here so a
+        # finding the verifier killed in cycle 1 cannot reappear in the cycle-2 panel —
+        # dedup runs against everything seen, not against what survived.  `accepted`
+        # keeps its existing treatment (it stays listed) on purpose.
+        panel_findings = [finding.get("id") for finding in package.get("findings", []) if finding.get("status", "open") not in {"closed", "refuted"}]
         package.setdefault("reviews", []).append({
             "verdict": args.verdict,
             "findings": panel_findings,
@@ -1553,6 +1579,89 @@ def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, 
     return True
 
 
+def normalize_verdicts(raw_verdicts: list[str]) -> list[dict[str, Any]]:
+    verdicts = []
+    for raw in raw_verdicts:
+        verdict = parse_json_object(raw)
+        if not verdict.get("id") or verdict.get("verdict") not in {"upheld", "refuted"}:
+            raise StateError("verdict requires id and verdict upheld|refuted")
+        if verdict["verdict"] == "refuted" and not (verdict.get("reason") and verdict.get("evidence")):
+            # A refutation carries the same evidentiary burden the finding did.
+            # Without both, the verdict is not a refutation — it is an opinion.
+            raise StateError(f"refuted verdict requires reason and evidence: {verdict['id']}")
+        verdicts.append(verdict)
+    return verdicts
+
+
+def cmd_record_verification(args: argparse.Namespace) -> int:
+    """Adversarial refutation pass between the review panel and repair.
+
+    This is NOT a review cycle: it never touches `deep_review_cycles`.  It is an
+    edge inside the cycle the panel already counted.
+    """
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        if data["phase"] != "PACKAGE_REPAIR":
+            raise StateError(f"cannot record verification from phase {data['phase']}")
+        package = package_by_id(data, args.package_id)
+        attempts = package.setdefault("attempts", {})
+        verdicts = normalize_verdicts(args.verdict or [])
+
+        if args.skip_reason:
+            if verdicts:
+                raise StateError("--skip-reason cannot be combined with --verdict")
+            # Physical waiver, not a prose one: skipping verification is legal only
+            # when nothing above `low` is open, where the spawn costs more than the
+            # repairs it would prevent.
+            if has_open_findings(package, {"critical", "high", "medium"}):
+                raise StateError("--skip-reason requires all open findings to be low severity")
+            record = {"skipped": True, "reason": args.skip_reason, "at": now(), "evidence": args.evidence}
+            package.setdefault("verifications", []).append(record)
+            record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor,
+                         args.package_id, {"skipped": True, "reason": args.skip_reason}, args.event_id)
+            return True
+
+        if not verdicts:
+            raise StateError("record-verification requires --verdict or --skip-reason")
+
+        refuted, upheld = [], []
+        for verdict in verdicts:
+            finding = next((item for item in package.get("findings", []) if item.get("id") == verdict["id"]), None)
+            if not finding:
+                raise StateError(f"unknown finding: {verdict['id']}")
+            if finding.get("status", "open") in TERMINAL_FINDING_STATUSES:
+                raise StateError(f"finding is not open: {verdict['id']} ({finding.get('status')})")
+            finding["verified_by"] = args.actor
+            finding["verified_at"] = now()
+            if verdict["verdict"] == "refuted":
+                # The finding is never deleted: it keeps its verdict and evidence so the
+                # package record shows what was killed and on what grounds.
+                finding["status"] = "refuted"
+                finding["verdict_reason"] = verdict["reason"]
+                finding["verdict_evidence"] = verdict["evidence"]
+                refuted.append(finding["id"])
+            else:
+                upheld.append(finding["id"])
+
+        package.setdefault("verifications", []).append({
+            "refuted": refuted, "upheld": upheld, "at": now(), "evidence": args.evidence,
+        })
+        attempts["verifications"] = attempts.get("verifications", 0) + 1
+
+        if not has_open_findings(package):
+            # Every finding was refuted: there is nothing left to repair, so the repair
+            # pass and its delta review are skipped entirely.  That is the whole point.
+            data["phase"] = "PACKAGE_TESTING"
+            package["status"] = "testing_required"
+        record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
+                     {"refuted": len(refuted), "upheld": len(upheld)}, args.event_id)
+        return True
+
+    data, changed = mutate(path, args, "record-verification", update)
+    return output_state(data, changed, path)
+
+
 def cmd_record_repair(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
 
@@ -1568,6 +1677,10 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
             finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
             if not finding:
                 raise StateError(f"unknown finding: {finding_id}")
+            if finding.get("status") == "refuted":
+                # The verifier killed it with evidence.  Repairing it anyway would
+                # change code for a defect that was shown not to exist.
+                raise StateError(f"cannot repair refuted finding: {finding_id}")
             repaired.append(finding)
         if args.skip_delta:
             # Physical waiver, not a prose one: skipping the delta review is legal
@@ -2155,6 +2268,15 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--allow-missing", action="store_true")
     finalize.add_argument("--evidence", default="")
     finalize.set_defaults(func=cmd_finalize_review_panel)
+
+    verification = sub.add_parser("record-verification")
+    add_common_state_args(verification)
+    verification.add_argument("package_id")
+    verification.add_argument("--feature-id")
+    verification.add_argument("--verdict", action="append")
+    verification.add_argument("--skip-reason", default="")
+    verification.add_argument("--evidence", default="")
+    verification.set_defaults(func=cmd_record_verification)
 
     repair = sub.add_parser("record-repair")
     add_common_state_args(repair)

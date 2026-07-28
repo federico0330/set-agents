@@ -12,6 +12,7 @@ agents/delta-reviewer.md
 agents/delta-reviewer@balanced.md
 agents/delta-reviewer@fast.md
 agents/delta-reviewer@frontier.md
+agents/finding-verifier.md
 agents/frontend-engineer.md
 agents/gate-runner.md
 agents/github-release-manager.md

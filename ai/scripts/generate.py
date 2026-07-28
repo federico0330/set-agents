@@ -33,6 +33,7 @@ ORCHESTRATOR_TASK_ALLOW = {
     "local-gate-runner",
     "package-gate-runner",
     "package-reviewer",
+    "finding-verifier",
     "repair-agent",
     "delta-reviewer",
     "security-auditor",

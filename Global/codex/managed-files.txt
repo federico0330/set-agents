@@ -6,6 +6,7 @@ agents/architect.toml
 agents/brainstormer.toml
 agents/debugger.toml
 agents/delta-reviewer.toml
+agents/finding-verifier.toml
 agents/frontend-engineer.toml
 agents/gate-runner.toml
 agents/github-release-manager.toml

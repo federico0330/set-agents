@@ -20,6 +20,7 @@ local-gate-runner	subagent	0.0	gate-ro	gate
 package-reviewer	subagent	0.0	review-ro	audit
 delta-reviewer	subagent	0.0	review-ro	audit
 security-auditor	subagent	0.0	review-ro	audit
+finding-verifier	subagent	0.0	review-ro	audit
 adversarial-judge	subagent	0.0	review-ro	judge
 github-release-manager	subagent	0.0	release	release
 memory-scribe	subagent	0.0	memory-rw	memory

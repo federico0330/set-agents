@@ -78,7 +78,8 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
   budget exhausted), you stop delegating — that budget is the enforcement of the Spawn economy rules below,
   not a suggestion.
 - `record-gate`, including `check-owned-paths.py`, before package review.
-- `record-review`, `record-repair`, `record-delta-review`, and `accept-package` after the corresponding agent.
+- `record-review`, `record-verification`, `record-repair`, `record-delta-review`, and `accept-package` after
+  the corresponding agent.
 - `start-review-panel`, `record-subreview`, and `finalize-review-panel` when multiple specialist reviewers are
   useful. A panel consumes one deep review cycle no matter how many subreviewers contribute.
 - `record-testing` after regression/integration tests.
@@ -225,7 +226,23 @@ static agent — you consume that decision and spawn the OpenCode variant it hon
    Trigger early focused checkpoints only for auth, authorization, tenant isolation, payments,
    secrets, crypto, destructive migrations/deletes, incompatible public contracts, system permissions, or
    untrusted code execution.
-9. If findings exist, `repair-agent` repairs them in a consolidated pass.
+9. **If findings exist, they are refuted before they are repaired.** `finding-verifier` gets the WHOLE
+   consolidated list in ONE spawn with the inverted brief — try to kill each finding, not to confirm it — and
+   returns `upheld|refuted` per finding, recorded with `record-verification`. Only what survives reaches
+   `repair-agent`, which then repairs it in a consolidated pass. A false finding otherwise costs a repair, a
+   delta review, a real code change made for nothing, and one of your two review cycles.
+   - **Cost gate:** spawn the verifier only when the consolidated panel left at least one `medium`, `high` or
+     `critical` finding. An all-`low` bundle goes straight to repair with
+     `record-verification --skip-reason all-findings-low` — a physical waiver in the state file, never a
+     decision left in chat. The CLI refuses that waiver if anything above `low` is open.
+   - **Risk classification of the spawn:** classify it `risk=high` when the worst severity in the bundle is
+     `critical`/`high` or any finding's category is `security`. That is all you do — `routes.v1.toml` picks
+     the tier from there. Escalation is a routing decision, not a second verifier.
+   - Verification is NOT a review cycle: `record-verification` never touches `deep_review_cycles`. It is an
+     edge inside the cycle the panel already counted.
+   - If every finding is refuted there is nothing to repair: the CLI moves the package straight to testing.
+     Refuted findings stay in the record with their reason and evidence — they are never deleted, and the
+     `adversarial-judge` sees them in the final bundle.
 10. `delta-reviewer` reviews the repair delta and previous findings — UNLESS the repair legally recorded the
     physical waiver (`record-repair --skip-delta`: every repaired finding ≤ medium AND ≤ 3 changed files; the
     CLI enforces both and records the waiver in the event). It performs a full re-review only if the repair
@@ -294,8 +311,8 @@ session has burned a week of quota in two days; treat them as invariants, not st
 - **Retry budget per phase: one focused retry, then `BLOCKED`.** If a spawned agent fails, times out, or returns
   unusable output, you may re-spawn it ONCE with a sharper self-contained message. A second failure is a
   blocker to record, not a reason for `_retry2`/`_finish`/`_last_retry` spawn chains.
-- **Soft cap: ~12 spawns per package.** Plan (1) + implement (1-3) + gates (1-2) + review panel (1-3) + repair (1)
-  + delta (1) + tests (1) + runtime QA (1-2) fits comfortably. If you are about to exceed the cap, stop and
+- **Soft cap: ~12 spawns per package.** Plan (1) + implement (1-3) + gates (1-2) + review panel (1-3) +
+  verify (0-1) + repair (1) + delta (1) + tests (1) + runtime QA (1-2) fits comfortably. If you are about to exceed the cap, stop and
   re-read the package plan — the decomposition is wrong, and that is a finding for `package-planner`, not a
   license to keep spawning.
 

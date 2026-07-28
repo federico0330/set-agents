@@ -46,6 +46,17 @@ class RoutingTests(unittest.TestCase):
         self.assertTrue(decision.execution_enabled, decision.reason_codes)
         return decision
 
+    def test_every_roster_role_is_routable_including_finding_verifier(self):
+        # catalog.build_snapshot requires union(route.roles) == roster exactly: a role
+        # added to roles.tsv and missing from any route row raises CATALOG_INVALID and
+        # takes routing down harness-wide, not just for that role.
+        names={row["role"] for row in self.roster}
+        self.assertIn("finding-verifier", names)
+        routes=self.service(simulate=True).snapshot.routes
+        self.assertEqual(set().union(*(set(r.roles) for r in routes)), names)
+        for tier in ("fast","balanced","frontier"):
+            self.assertTrue(any("finding-verifier" in r.roles for r in routes if r.tier==tier), tier)
+
     def test_static_ids_exclude_runtime_and_catalog_is_immutable(self):
         service=self.service(simulate=True); routes=service.snapshot.routes
         self.assertTrue(all(r.route_id.startswith("rt1_") and len(r.route_id)==20 for r in routes))
