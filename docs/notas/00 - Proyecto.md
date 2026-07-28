@@ -17,6 +17,7 @@
 
 ## Decisiones
 
+- [[decisiones/2026-07-28 routing-db-schema4-unmigratable|La DB de routing local no se puede migrar de schema 4 a 5 por el path sancionado]]
 - [[decisiones/2026-07-27 p1-pi-project-cwd-propagation|Pi lifecycle propagates project context by explicit cwd]]
 - [[decisiones/2026-07-27 global-absolute-path-leak|Pre-existing absolute-path leak in tracked Global/ templates (out of P1 scope, tracked)]]
 - [[decisiones/2026-07-27 ac09-ac10-pi-minimal-target-accepted|AC-09/AC-10 literal deviations accepted: minimal pi target + pnpm-store pin]]
@@ -24,7 +25,6 @@
 - [[decisiones/2026-07-27 sec-a02-coord-run-closure-accepted|SEC-A02 accepted: coord may terminal/abandon any routing run]]
 - [[decisiones/2026-07-26 scope-cheap-tier-and-pi-spike|Alcance 004: tier barato sin opencode/* y P3 condicionado a spike]]
 - [[decisiones/2026-07-26 am2-probe-cache-fresh-selected|AM-2: cache de probes filtering-only + re-probe fresco del seleccionado (enmienda a 003/ADR-0005)]]
-- [[decisiones/2026-07-26 am1-hybrid-facts|AM-1: derivacion hibrida de facts con risk raise-only (enmienda a 003)]]
 
 ## Referencias
 

@@ -48,7 +48,7 @@ feature_spawns_per_package = 12
 incident_spawns = 2
 
 [areas.coord]
-claude = "fable"
+claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "high"
 opencode = { "go-zen" = "openai/gpt-5.6-fast", "zen" = "openai/gpt-5.4", "local" = "openai/gpt-5.4" }

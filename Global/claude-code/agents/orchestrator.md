@@ -2,7 +2,7 @@
 name: orchestrator
 description: "Orchestrator \u2014 read-only coordinator of the package-based delivery lifecycle"
 tools: Read, Grep, Glob, Bash, Agent(brainstormer, product-analyst, project-bootstrapper, architect, agent-factory, ux-ui-designer, spec-challenger, package-planner, test-writer, implementer, frontend-engineer, refactor-specialist, debugger, repair-agent, integrator, gate-runner, local-gate-runner, package-reviewer, delta-reviewer, security-auditor, finding-verifier, adversarial-judge, github-release-manager, memory-scribe, image-describer, app-runner, runtime-verifier)
-model: fable
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Bash"
