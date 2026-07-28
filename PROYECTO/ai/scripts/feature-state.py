@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import tempfile
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -77,12 +78,17 @@ MUTATING_COMMANDS = {
     "reopen",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
+# Refuting retires a blocking finding with no code change: it is an authorization verb,
+# not bookkeeping, so it needs its own actor gate.  Enforcing separation of duties one
+# step downstream of the verb that defeats the gate is not enforcement.  `upheld`
+# verdicts and the cost waiver stay open to the coordinator; only refutation is closed.
+REFUTING_ACTORS = {"finding-verifier"}
 # Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
 MODE_BUDGETS = {
-    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3},
-    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3},
-    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2},
-    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2},
+    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 2},
+    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 2},
+    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 1},
+    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 1},
 }
 # --no-render: high-frequency intra-phase writes (record-spawn, log-narrative)
 # defer STATUS/bitacora/notes regeneration; sync-notes consolidates later.
@@ -141,11 +147,13 @@ def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any
             "max_package_subdivisions": 1,
             "max_spawns_per_package": 12,
             "max_gate_failures_per_package": 3,
+            "max_verifications_per_package": 2,
         },
         "metrics": {
             "task_deep_reviews": 0,
             "package_reviews": 0,
             "repair_batches": 0,
+            "verifications": 0,
             "delta_reviews": 0,
             "human_questions_after_approval": 0,
         },
@@ -261,6 +269,9 @@ def validate_state(data: dict[str, Any]) -> list[str]:
             errors.append(f"{pid}: spawn budget exceeded")
         if attempts.get("gate_failures", 0) > budgets.get("max_gate_failures_per_package", 3):
             errors.append(f"{pid}: gate failure budget exceeded")
+        # Defaulted, not required: state files written before this budget existed stay valid.
+        if attempts.get("verifications", 0) > budgets.get("max_verifications_per_package", 2):
+            errors.append(f"{pid}: verification budget exceeded")
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")
@@ -792,6 +803,9 @@ def notes_root(state_file: Path, notes_dir: str | None = None) -> Path | None:
 
 def merge_note(existing: str | None, title: str, body: str) -> str:
     """Regenerate only the machine-owned block; everything else is the human's."""
+    # Defense in depth behind `_short`: the split below uses maxsplit=1, so a body
+    # carrying either marker would silently redefine the block boundary.
+    body = body.replace(NOTES_AUTO_END, "--›").replace(NOTES_AUTO_BEGIN, "‹!--")
     generated = f"{NOTES_AUTO_BEGIN}\n{body.rstrip()}\n{NOTES_AUTO_END}"
     if existing and NOTES_AUTO_BEGIN in existing and NOTES_AUTO_END in existing:
         prefix, rest = existing.split(NOTES_AUTO_BEGIN, 1)
@@ -818,6 +832,11 @@ def write_note(path: Path, title: str, body: str) -> bool:
 
 def _short(text: Any, limit: int = 120) -> str:
     text = " ".join(str(text or "").split())
+    # `merge_note` splits on the FIRST NOTES_AUTO_END, so a generated body able to emit
+    # that terminator moves the machine/human boundary permanently: the text below it is
+    # promoted into the human-owned region and re-promoted on every regeneration.  Every
+    # agent-authored field rendered from state passes through here — neutralize once.
+    text = text.replace("<!--", "‹!--").replace("-->", "--›")
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
@@ -1019,8 +1038,13 @@ def _package_body(fid: str, package: dict[str, Any]) -> str:
             label = finding.get("category") or finding.get("summary") or ""
             line = f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')} — {_short(label)}"
             if finding.get("status") == "refuted":
-                # The grounds a finding was killed on belong in the record, not in a chat log.
-                line += f" · refutado: {_short(finding.get('verdict_reason', ''))}"
+                # The grounds AND the proof belong in the record, not in a chat log: a
+                # reason without its evidence is the claim without the burden.
+                line += (
+                    f" · refutado por {finding.get('verified_by', '?')}:"
+                    f" {_short(finding.get('verdict_reason', ''))}"
+                    f" [{_short(finding.get('verdict_evidence', ''), 80)}]"
+                )
             lines.append(line)
     trail = []
     for review in _dicts(package.get("reviews")):
@@ -1374,7 +1398,13 @@ def normalize_findings(raw_findings: list[str]) -> list[dict[str, Any]]:
         finding = parse_json_object(raw)
         if not finding.get("id") or finding.get("severity") not in {"critical", "high", "medium", "low"}:
             raise StateError("finding requires id and severity critical|high|medium|low")
-        finding.setdefault("status", "open")
+        # A finding is born open, always.  Terminal statuses are set only by the commands
+        # that own them (record-repair, record-delta-review --closed-finding,
+        # record-verification); a caller-supplied one would bypass their evidence checks
+        # and let a critical finding be born already retired.
+        if finding.get("status", "open") != "open":
+            raise StateError(f"finding cannot be created with status {finding['status']}: {finding['id']}")
+        finding["status"] = "open"
         findings.append(finding)
     return findings
 
@@ -1579,18 +1609,68 @@ def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, 
     return True
 
 
+# The three shapes the finding-verifier brief enumerates: a source location, a command
+# that was actually run, or the acceptance criterion that sanctions the behaviour.
+EVIDENCE_SHAPES = (
+    re.compile(r"[\w./-]+\.\w+:\d+"),        # path/to/file.py:42
+    re.compile(r"(?m)^\s*\$\s*\S"),          # $ command that was run
+    re.compile(r"\bAC-\d+\b"),               # AC-07
+)
+MAX_VERDICT_FIELD = 2000
+MIN_EVIDENCE_LEN = 24
+
+
+def _verdict_text(verdict: dict[str, Any], field: str) -> str:
+    value = verdict.get(field)
+    # Truthiness is a presence check, not an evidentiary burden: `True`, `{"k": "v"}`
+    # and `"   "` are all truthy and none of them is evidence.
+    if not isinstance(value, str) or not value.strip():
+        raise StateError(f"refuted verdict {field} must be a non-empty string: {verdict['id']}")
+    value = value.strip()
+    if len(value) > MAX_VERDICT_FIELD:
+        raise StateError(f"refuted verdict {field} exceeds {MAX_VERDICT_FIELD} chars: {verdict['id']}")
+    return value
+
+
 def normalize_verdicts(raw_verdicts: list[str]) -> list[dict[str, Any]]:
-    verdicts = []
+    verdicts: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for raw in raw_verdicts:
         verdict = parse_json_object(raw)
         if not verdict.get("id") or verdict.get("verdict") not in {"upheld", "refuted"}:
             raise StateError("verdict requires id and verdict upheld|refuted")
-        if verdict["verdict"] == "refuted" and not (verdict.get("reason") and verdict.get("evidence")):
+        if verdict["id"] in seen:
+            # Two verdicts for one finding produce a self-contradictory record whose
+            # outcome depends on argument order.
+            raise StateError(f"duplicate verdict for finding: {verdict['id']}")
+        seen.add(verdict["id"])
+        if verdict["verdict"] == "refuted":
             # A refutation carries the same evidentiary burden the finding did.
-            # Without both, the verdict is not a refutation — it is an opinion.
-            raise StateError(f"refuted verdict requires reason and evidence: {verdict['id']}")
+            verdict["reason"] = _verdict_text(verdict, "reason")
+            evidence = _verdict_text(verdict, "evidence")
+            if len(evidence) < MIN_EVIDENCE_LEN:
+                raise StateError(f"refuted verdict evidence is too short to be evidence: {verdict['id']}")
+            if not any(shape.search(evidence) for shape in EVIDENCE_SHAPES):
+                raise StateError(
+                    f"refuted verdict evidence must cite a file:line, a command run, or an AC: {verdict['id']}"
+                )
+            verdict["evidence"] = evidence
         verdicts.append(verdict)
     return verdicts
+
+
+def _repair_entered_from_review(data: dict[str, Any], package_id: str | None) -> bool:
+    """Did this package reach PACKAGE_REPAIR from the review panel, or from a red gate?
+
+    PACKAGE_REPAIR has four entry points — review, delta review, a failed testing run and
+    a failed runtime QA.  Only the first is a findings problem; the other three carry an
+    obligation the finding set cannot see.
+    """
+    for event in reversed(data.get("history", [])):
+        if event.get("to") != "PACKAGE_REPAIR" or event.get("package_id") not in (None, package_id):
+            continue
+        return event.get("event") in {"record-review", "finalize-review-panel", "record-delta-review"}
+    return False
 
 
 def cmd_record_verification(args: argparse.Namespace) -> int:
@@ -1601,12 +1681,25 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
     """
     path = state_file_arg(args)
 
+    if not args.actor:
+        raise StateError("record-verification requires an explicit --actor")
+
     def update(data: dict[str, Any]) -> bool:
+        if args.event_id and any(item.get("event_id") == args.event_id for item in data.get("history", [])):
+            # Replay of a timed-out call is a no-op, like start-review-panel and
+            # record-subreview.  Without this the per-finding guards below fire first and
+            # a retry cannot tell "already applied" from "state corrupt".
+            return False
         if data["phase"] != "PACKAGE_REPAIR":
             raise StateError(f"cannot record verification from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
         attempts = package.setdefault("attempts", {})
         verdicts = normalize_verdicts(args.verdict or [])
+
+        budget = data.get("budgets", {}).get("max_verifications_per_package", 2)
+        if attempts.get("verifications", 0) >= budget:
+            return block_with_reason(data, args.actor, args.package_id,
+                                     f"verification budget exhausted for {args.package_id}")
 
         if args.skip_reason:
             if verdicts:
@@ -1618,12 +1711,20 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
                 raise StateError("--skip-reason requires all open findings to be low severity")
             record = {"skipped": True, "reason": args.skip_reason, "at": now(), "evidence": args.evidence}
             package.setdefault("verifications", []).append(record)
+            attempts["verifications"] = attempts.get("verifications", 0) + 1
+            data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
             record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor,
                          args.package_id, {"skipped": True, "reason": args.skip_reason}, args.event_id)
             return True
 
         if not verdicts:
             raise StateError("record-verification requires --verdict or --skip-reason")
+
+        if any(item["verdict"] == "refuted" for item in verdicts) and args.actor not in REFUTING_ACTORS:
+            # Retiring a blocking finding with no code change is the verifier's verb
+            # alone.  Without this the implementer can clear the findings against its
+            # own diff and the package accepts with no repair and no delta review.
+            raise StateError(f"{args.actor} cannot refute findings; only {'/'.join(sorted(REFUTING_ACTORS))} may")
 
         refuted, upheld = [], []
         for verdict in verdicts:
@@ -1632,8 +1733,16 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
                 raise StateError(f"unknown finding: {verdict['id']}")
             if finding.get("status", "open") in TERMINAL_FINDING_STATUSES:
                 raise StateError(f"finding is not open: {verdict['id']} ({finding.get('status')})")
+            if finding.get("verified_verdict") == "upheld":
+                # `upheld` is terminal for verification even though the finding stays
+                # open for repair.  Otherwise re-verifying is a retry-until-you-win loop
+                # in a harness that caps every other loop.
+                raise StateError(f"finding was already upheld and cannot be re-verified: {verdict['id']}")
+            if verdict["verdict"] == "refuted" and finding.get("source_role") == args.actor:
+                raise StateError(f"{args.actor} raised {verdict['id']} and cannot refute it")
             finding["verified_by"] = args.actor
             finding["verified_at"] = now()
+            finding["verified_verdict"] = verdict["verdict"]
             if verdict["verdict"] == "refuted":
                 # The finding is never deleted: it keeps its verdict and evidence so the
                 # package record shows what was killed and on what grounds.
@@ -1648,10 +1757,13 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
             "refuted": refuted, "upheld": upheld, "at": now(), "evidence": args.evidence,
         })
         attempts["verifications"] = attempts.get("verifications", 0) + 1
+        data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
 
-        if not has_open_findings(package):
+        if not has_open_findings(package) and _repair_entered_from_review(data, args.package_id):
             # Every finding was refuted: there is nothing left to repair, so the repair
             # pass and its delta review are skipped entirely.  That is the whole point.
+            # Gated on WHY the package is in PACKAGE_REPAIR: a red test or a failed
+            # runtime QA put it here for a reason the finding set knows nothing about.
             data["phase"] = "PACKAGE_TESTING"
             package["status"] = "testing_required"
         record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
@@ -1673,6 +1785,14 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
         ids = args.finding_id or []
         changed_files = args.changed_file or []
         repaired = []
+        if not package.get("verifications") and has_open_findings(package, {"critical", "high", "medium"}):
+            # A waiver is only physical when it lives inside the command it waives.
+            # Without this, skipping record-verification entirely is free and leaves no
+            # trace, and the verification node is mandatory in prose but optional in code.
+            raise StateError(
+                "record-verification (or its --skip-reason waiver) is required before repairing "
+                "findings above low severity"
+            )
         for finding_id in ids:
             finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
             if not finding:
@@ -1681,6 +1801,8 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
                 # The verifier killed it with evidence.  Repairing it anyway would
                 # change code for a defect that was shown not to exist.
                 raise StateError(f"cannot repair refuted finding: {finding_id}")
+            if finding.get("severity") in {"critical", "high", "medium"} and not finding.get("verified_verdict"):
+                raise StateError(f"finding was never verified: {finding_id}")
             repaired.append(finding)
         if args.skip_delta:
             # Physical waiver, not a prose one: skipping the delta review is legal
@@ -2066,15 +2188,34 @@ def run_dry_workflow(feature_id: str) -> dict[str, Any]:
     data["metrics"]["package_reviews"] = 1
     data["phase"] = "PACKAGE_REPAIR"
     record_event(data, "record-review", "PACKAGE_REVIEW", "PACKAGE_REPAIR", "package-reviewer", "PKG-01", {"finding_count": 2})
+    # The bundle carries a high finding, so ADR-0009 D4 requires the verifier: the
+    # self-demonstration must show the node, refutation shape included.
+    refuted = package["findings"][1]
+    refuted.update({
+        "status": "refuted",
+        "verified_by": "finding-verifier",
+        "verified_at": now(),
+        "verified_verdict": "refuted",
+        "verdict_reason": "an existing regression test already covers the cited path",
+        "verdict_evidence": "tests/test_example.py:42 asserts the same interleaving",
+    })
+    upheld = package["findings"][0]
+    upheld.update({"verified_by": "finding-verifier", "verified_at": now(), "verified_verdict": "upheld"})
+    package["verifications"].append({"refuted": ["F-002"], "upheld": ["F-001"], "at": now(), "evidence": "dry-run refutation pass"})
+    package["attempts"]["verifications"] = 1
+    data["metrics"]["verifications"] = 1
+    record_event(data, "record-verification", "PACKAGE_REPAIR", "PACKAGE_REPAIR", "finding-verifier", "PKG-01", {"refuted": 1, "upheld": 1})
     for finding in package["findings"]:
+        if finding["status"] == "refuted":
+            continue
         finding["status"] = "closed"
         finding["repair_attempts"] = 1
-    package["repairs"].append({"finding_ids": ["F-001", "F-002"], "changed_files": ["src/example.py"], "verification": ["focused-unit-test"], "at": now()})
+    package["repairs"].append({"finding_ids": ["F-001"], "changed_files": ["src/example.py"], "verification": ["focused-unit-test"], "at": now()})
     package["attempts"]["repair_batches"] = 1
     data["metrics"]["repair_batches"] = 1
     data["phase"] = "DELTA_REVIEW"
-    record_event(data, "record-repair", "PACKAGE_REPAIR", "DELTA_REVIEW", "repair-agent", "PKG-01", {"finding_ids": ["F-001", "F-002"]})
-    package["delta_reviews"].append({"verdict": "pass", "closed_findings": ["F-001", "F-002"], "new_or_reopened_findings": [], "requires_full_review": False, "reason": "dry-run", "at": now()})
+    record_event(data, "record-repair", "PACKAGE_REPAIR", "DELTA_REVIEW", "repair-agent", "PKG-01", {"finding_ids": ["F-001"]})
+    package["delta_reviews"].append({"verdict": "pass", "closed_findings": ["F-001"], "new_or_reopened_findings": [], "requires_full_review": False, "reason": "dry-run", "at": now()})
     data["metrics"]["delta_reviews"] = 1
     data["phase"] = "PACKAGE_TESTING"
     record_event(data, "record-delta-review", "DELTA_REVIEW", "PACKAGE_TESTING", "delta-reviewer", "PKG-01", {"verdict": "pass"})
@@ -2276,7 +2417,10 @@ def build_parser() -> argparse.ArgumentParser:
     verification.add_argument("--verdict", action="append")
     verification.add_argument("--skip-reason", default="")
     verification.add_argument("--evidence", default="")
-    verification.set_defaults(func=cmd_record_verification)
+    # `verified_by` IS the independence attribution; silently recording the coordinator's
+    # default would erase the one thing the field exists for.  Drop the inherited default
+    # so the command can demand an explicit actor.
+    verification.set_defaults(func=cmd_record_verification, actor=None)
 
     repair = sub.add_parser("record-repair")
     add_common_state_args(repair)

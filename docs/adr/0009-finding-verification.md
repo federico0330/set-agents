@@ -95,6 +95,80 @@ into the agent brief and enforced by the CLI: `normalize_verdicts` rejects a `re
 observation is routed by the orchestrator, because a finding smuggled in through the verifier would skip the
 review-cycle count.
 
+## Amendment log (1.0.0 → 1.1.0, post-review)
+
+The concurrent review panel (`package-reviewer` + `security-auditor`) returned `repair_required` with 13
+consolidated findings, and the `finding-verifier` — this ADR's own node, applied to itself — upheld **all 13**
+after attempting genuine refutation on six. The pattern behind them: the ceremony was written into the prose
+and the CLI was left soft. Four decisions are amended and two are added.
+
+### D1 amended — the actor gate (SEC-001 / PV-01)
+
+`record-verification` accepted any `--actor`. Reproduced end to end: `--actor implementer` refuted a
+`critical`/`security` finding against its own diff, the package moved to `PACKAGE_TESTING`, and it then
+accepted with `repairs=[]` and `delta_reviews=[]`. `NON_ACCEPTING_ACTORS` was being enforced one step
+downstream of the verb that defeats the gate, which is not enforcement.
+
+Now: `REFUTING_ACTORS = {"finding-verifier"}` — only the verifier may refute; `upheld` verdicts and the waiver
+stay open to the coordinator. A refutation is also rejected when the actor equals the finding's `source_role`.
+`--actor` is required explicitly (no default), because `verified_by` IS the independence attribution.
+
+### D4 amended — a waiver must live inside the command it waives (OBS-5)
+
+`--skip-delta` is checked inside `record-repair`; `--skip-reason` guarded a step nothing required, so skipping
+verification entirely was free and left no trace. The node was mandatory in prose and optional in code.
+
+Now: `record-repair` refuses to run while the package has no verification record and any open finding is above
+`low`, and refuses any individual finding above `low` that carries no `verified_verdict`.
+
+### D6 amended — evidence, not presence (SEC-002)
+
+`not (reason and evidence)` is a truthiness check: `True`, `{"k": "v"}` and `"   "` all passed and retired
+`critical` security findings. And `verdict_evidence` was persisted but rendered nowhere, so the human-facing
+audit trail this ADR leans on was empty exactly when it mattered.
+
+Now: both fields must be non-empty strings after `strip()`, capped at 2000 chars; `evidence` has a minimum
+length and must match one of the three shapes the brief enumerates (`file:line`, a `$` command with output, or
+an `AC-\d+`). Both the reason AND the evidence are rendered in the package note, with the verifier's name.
+
+### D7 (new) — `upheld` is terminal for verification, and the pass is budgeted (PV-02)
+
+`upheld` left the finding `open`, so the terminal-status guard never fired on a second pass: verify `upheld`,
+then verify again as `refuted`, repeatable without limit. A retry-until-you-win loop in a harness that caps
+every other loop. Now a finding carrying `verified_verdict == "upheld"` cannot be re-verified, and
+`max_verifications_per_package` (2 for feature/scoped, 1 for quick-fix/incident) blocks the package when
+exhausted. The budget is validated with a default, so state files written before it stay valid.
+
+### D8 (new) — the auto-transition is gated on why the package is in repair (PV-04)
+
+`PACKAGE_REPAIR` has four entry points: review, delta review, a failed testing run and a failed runtime QA.
+Keying the skip-to-testing transition on the finding set alone meant refuting an unrelated `low` finding after
+a red test marked the package testing-ready with the red test never addressed. Now
+`_repair_entered_from_review` inspects the last history event that set the phase, and only the review paths
+qualify.
+
+### Repairs outside the state machine
+
+- **`_short` is a trust boundary** (SEC-003). `merge_note` splits on the FIRST `NOTES_AUTO_END` with
+  `maxsplit=1`, so a `verdict_reason` carrying that marker permanently promoted agent-authored text plus a
+  stale findings snapshot into the human-owned region of `docs/notas/`, re-promoted on every regeneration.
+  `_short` now neutralizes both markers for every state-derived field, and `merge_note` neutralizes the body
+  as defense in depth.
+- **Findings cannot be born terminal** (PV-03). `normalize_findings` accepted a caller-supplied `status`, so a
+  `critical` finding could be created already `refuted` — bypassing every evidence check. It is now rejected
+  on ingress; terminal statuses belong only to the commands that own them.
+- **Replay is a no-op** (PV-08), **duplicate verdicts in one batch are rejected** (PV-09), the waived
+  verification **counts against its budget** and a `verifications` **metric** exists (PV-10).
+- **`PROYECTO/prompt.md` and `PROYECTO/AGENTS.md`** teach the node (PV-05). They were still instructing
+  findings straight to repair, so a scaffolded project got the CLI without the doctrine. Note the reviewer's
+  correction: agent doctrine is installed from `Global/`, not scaffolded from `PROYECTO/`, so this was a
+  contradiction between the starter template and the installed prose rather than total inertness — and the
+  drift is systemic, not specific to this line.
+- **D5 is no longer inert** (SEC-004 / PV-06). `models.toml` now carries `[roles.finding-verifier.tiers.*]`,
+  so the OpenCode variants exist and tier escalation can actually be applied. `routes.v1.toml` membership was
+  necessary for catalog validity but never sufficient for tiering.
+- **The dry run demonstrates the node** (PV-11), refutation shape included.
+
 ## Consecuencias
 
 - **+1 spawn per package**, of audit tier, only when the bundle warrants it. Measured against real package
@@ -103,7 +177,13 @@ review-cycle count.
   package straight to `PACKAGE_TESTING` — no repair, no delta review.
 - **New failure mode: an overconfident verifier.** Mitigated by D6 (default `upheld`, evidence mandatory) and
   by D2 (refutations are visible in the record and in the judge's bundle), not eliminated. If refutations of
-  real defects show up in practice, the fix is the tier, not the removal of the node.
+  real defects show up in practice, the fix is the tier, not the removal of the node — and after the D5
+  amendment that fix can actually be applied on every runtime.
+- **`refuted` is irreversible today.** `reopen` only applies from `BLOCKED` and does not touch finding
+  statuses, so a wrongly refuted finding can be undone only by hand-editing the state JSON. Accepted for now:
+  the actor gate plus mandatory evidence make a wrong refutation expensive to produce, and an
+  `--reopen-finding` path is a distinct decision about who may un-retire a finding. Recorded here so it is a
+  known limit rather than a discovery.
 - `roles.tsv` and `ai/catalogs/routes.v1.toml` must stay in sync: `routing_core/catalog.py:387` requires
   `union(route.roles) == roster_names` exactly. A role added to the roster and missing from any route row
   raises `CATALOG_INVALID` and takes down routing harness-wide — not just for that role.

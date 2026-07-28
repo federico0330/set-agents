@@ -13,6 +13,9 @@ agents/delta-reviewer@balanced.md
 agents/delta-reviewer@fast.md
 agents/delta-reviewer@frontier.md
 agents/finding-verifier.md
+agents/finding-verifier@balanced.md
+agents/finding-verifier@fast.md
+agents/finding-verifier@frontier.md
 agents/frontend-engineer.md
 agents/gate-runner.md
 agents/github-release-manager.md

@@ -72,6 +72,26 @@ Design and rejected alternatives: **ADR-0009**.
 - **AC-12** — the cost gate is a physical waiver: `record-verification --skip-reason` is refused while any
   open finding is above `low`, and the skip is recorded in the state file.
 
+Added after the review panel (ADR-0009 amendment log, contract 1.1.0):
+
+- **AC-13** — only `finding-verifier` may refute, never a finding it raised itself, and `--actor` is required
+  explicitly so `verified_by` always carries the real independence attribution.
+- **AC-14** — `record-repair` refuses to run while the package has no verification record and any open finding
+  is above `low`, and refuses any individual `medium+` finding that carries no verdict. The node is mandatory
+  in code, waivable only on the record.
+- **AC-15** — `reason` and `evidence` are non-empty strings after `strip()`, capped at 2000 chars; `evidence`
+  has a minimum length and must cite a `file:line`, a `$` command with its output, or an `AC-\d+`. Both are
+  rendered in the package note alongside the verifier's name.
+- **AC-16** — `upheld` is terminal for verification, and `max_verifications_per_package` blocks the package
+  when exhausted.
+- **AC-17** — the skip-to-testing transition fires only when the package entered `PACKAGE_REPAIR` from review
+  or delta review, never from a failed testing run or runtime QA.
+- **AC-18** — a finding cannot be created with a terminal status; `_short` and `merge_note` neutralize the
+  `notas:auto` markers so generated text can never move the machine/human boundary; replays of a
+  `--event-id` are no-ops and duplicate verdicts in one batch are rejected.
+- **AC-19** — `finding-verifier` has tier variants in `models.toml`, so the D5 escalation is applicable on
+  every runtime, and `PROYECTO/prompt.md` + `PROYECTO/AGENTS.md` teach the node.
+
 ## P3 — graph-view (blocked)
 
 Blocked on `005-P2-vault-mandatory`: the trace viewer lives in the vault, and the vault is today neither

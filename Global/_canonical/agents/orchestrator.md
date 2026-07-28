@@ -135,12 +135,12 @@ precondition for `USER_APPROVAL`, not a chat-level note to work around.
    that wasn't declared, that is itself a finding to record, not a silent addition to the panel.
 6. For each package, delegate implementation to `implementer`, `frontend-engineer`, `refactor-specialist`, or
    `integrator` as appropriate. Workers run local validation per task but never deep-audit or approve themselves.
-   `implementer`, `debugger`, `package-reviewer`, `delta-reviewer`, and `security-auditor` are **tiered
-   roles**: before spawning one of them, follow the decide→spawn protocol below.
+   `implementer`, `debugger`, `package-reviewer`, `delta-reviewer`, `security-auditor`, and
+   `finding-verifier` are **tiered roles**: before spawning one of them, follow the decide→spawn protocol below.
 
 ### Tiered dispatch — decide→spawn protocol (contract 004, AC-07)
 
-For the five tiered roles above, the model is chosen PER TASK by the routing brain (P1), not baked into a
+For the six tiered roles above, the model is chosen PER TASK by the routing brain (P1), not baked into a
 static agent — you consume that decision and spawn the OpenCode variant it honors:
 
 1. **Decide.** Before delegating, run
@@ -189,7 +189,7 @@ static agent — you consume that decision and spawn the OpenCode variant it hon
       `review_of_run_id` was offered — benign, spawn the base reviewer. INVALID means one WAS offered and
       the routing brain rejected it (wrong role, not a real terminal writer, forged/stale/replayed id) — a
       hard denial (3c): halt, never degrade.
-4. **Reviewers** (`package-reviewer`, `delta-reviewer`, `security-auditor`) are routed to a variant ONLY
+4. **Reviewers** (`package-reviewer`, `delta-reviewer`, `security-auditor`, `finding-verifier`) are routed to a variant ONLY
    with a verified `review_of_run_id` — sourced from the package's recorded writer run in state, or from
    `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing-recent-writers` when context was compacted and the id was
    lost. Never guess or fabricate a `review_of_run_id`: omitting it yields the benign
@@ -225,10 +225,19 @@ static agent — you consume that decision and spawn the OpenCode variant it hon
    returns `upheld|refuted` per finding, recorded with `record-verification`. Only what survives reaches
    `repair-agent`, which then repairs it in a consolidated pass. A false finding otherwise costs a repair, a
    delta review, a real code change made for nothing, and one of your two review cycles.
+   - **Only `finding-verifier` may refute, and never a finding it raised itself.** Retiring a blocking finding
+     with no code change is an authorization verb, not bookkeeping: `record-verification` requires an explicit
+     `--actor` and rejects a refutation from anyone else. `upheld` verdicts and the waiver stay open to you.
+   - **The node is mandatory in code, not only here.** `record-repair` refuses a finding above `low` that
+     carries no verdict, and refuses to run at all while the package has no verification record. There is no
+     way to skip it silently — only to waive it on the record.
    - **Cost gate:** spawn the verifier only when the consolidated panel left at least one `medium`, `high` or
      `critical` finding. An all-`low` bundle goes straight to repair with
      `record-verification --skip-reason all-findings-low` — a physical waiver in the state file, never a
      decision left in chat. The CLI refuses that waiver if anything above `low` is open.
+   - **`upheld` is final and the pass is budgeted.** A finding the verifier could not kill is not re-judged;
+     re-verifying is rejected, and `max_verifications_per_package` blocks the package when exhausted. Asking
+     again until the answer changes is not verification.
    - **Risk classification of the spawn:** classify it `risk=high` when the worst severity in the bundle is
      `critical`/`high` or any finding's category is `security`. That is all you do — `routes.v1.toml` picks
      the tier from there. Escalation is a routing decision, not a second verifier.

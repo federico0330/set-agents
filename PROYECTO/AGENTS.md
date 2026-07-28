@@ -39,8 +39,11 @@ No agregar integraciones, sync bancario, exportes contables, OCR ni pasarelas de
 - Test: `<comando de test>`  · Lint: `<...>`  · Build: `<...>` (reflejarlos en verify.sh).
 
 ## Separación de deberes
-El orquestador sólo inspecciona y delega. `gate-runner` ejecuta la verificación. `package-reviewer` y
-`delta-reviewer` son read-only. Ningún agente que modifica código audita o juzga ese mismo cambio.
+El orquestador sólo inspecciona y delega. `gate-runner` ejecuta la verificación. `package-reviewer`,
+`delta-reviewer`, `security-auditor` y `finding-verifier` son read-only. Ningún agente que modifica código
+audita o juzga ese mismo cambio — y ninguno refuta un hallazgo contra su propio diff: retirar un hallazgo sin
+tocar código es un verbo de autorización, así que sólo el `finding-verifier` puede hacerlo, nunca sobre un
+hallazgo que él mismo levantó.
 
 ## MCP
 - Context7 para docs actuales del framework/ORM/librerías de test cuando haya incertidumbre de versión.

@@ -97,7 +97,14 @@ especialistas y lo registra como una sola iteración de auditoría.
 >    `@package-reviewer` más `@security-auditor`, `@db-auditor`, `@performance-auditor`, `@red-team`,
 >    `@blue-team` o `@ux-ui-designer` cuando la superficie lo justifique. Registrá `start-review-panel`,
 >    `record-subreview` y `finalize-review-panel`.
-> 10. Si hay findings, `@repair-agent` repara el conjunto completo y se registra `record-repair`.
+> 10. Si hay findings, primero se refutan y recién después se reparan. `@finding-verifier` recibe el conjunto
+>     COMPLETO en un solo spawn con la consigna invertida (matar cada hallazgo, no confirmarlo) y devuelve
+>     `upheld|refuted` por hallazgo; se registra con `record-verification --actor finding-verifier`. Sólo lo que
+>     sobrevive llega a `@repair-agent`, que repara el conjunto completo y registra `record-repair`.
+>     El CLI lo exige: no se puede reparar un hallazgo `medium+` que no pasó por verificación, y sólo el
+>     `finding-verifier` puede refutar. Si el bundle es todo `low`, salteá con
+>     `record-verification --skip-reason all-findings-low` — el salteo queda en el estado, no en el chat.
+>     Verificar NO consume ciclo de review.
 > 11. `@delta-reviewer` revisa el delta. Si pasa, se avanza a testing; si cambia arquitectura/contratos/riesgo, el
 >     estado decide si queda budget para re-review completo.
 > 12. `@test-writer` agrega regresiones de fin de ciclo, `@gate-runner` corre tests/gates y se registra

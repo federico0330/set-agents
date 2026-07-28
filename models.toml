@@ -154,6 +154,15 @@ opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "loc
 [roles.delta-reviewer.tiers.frontier]
 opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
 
+[roles.finding-verifier.tiers.fast]
+opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "local" = "openai/gpt-5.6-luna" }
+
+[roles.finding-verifier.tiers.balanced]
+opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "local" = "openai/gpt-5.6-sol" }
+
+[roles.finding-verifier.tiers.frontier]
+opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "local" = "openai/gpt-5.6-terra" }
+
 [roles.frontend-engineer]
 opencode = { "go-zen" = "openai/gpt-5.3-codex-spark", "local" = "openai/gpt-5.4-mini" }
 
