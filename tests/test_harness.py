@@ -1206,7 +1206,8 @@ class HarnessTests(unittest.TestCase):
 
     # --------------------------------------------------- contract 004 / P2-opencode-lane
 
-    TIERED_ROLES = ("security-auditor", "package-reviewer", "delta-reviewer", "implementer", "debugger")
+    TIERED_ROLES = ("security-auditor", "package-reviewer", "delta-reviewer", "implementer", "debugger",
+                    "finding-verifier")
     TIERS = ("fast", "balanced", "frontier")
 
     def test_tier_variants_emitted_identical_to_base_and_orchestrator_can_delegate_them(self):
@@ -2107,6 +2108,10 @@ class HarnessTests(unittest.TestCase):
         self.assertTrue(package["verifications"][-1]["skipped"])
         self.assertEqual(package["verifications"][-1]["reason"], "all-findings-low")
         self.assertEqual(package["findings"][0]["status"], "open")
+        # Visible in its own counter, without consuming the runaway backstop — otherwise
+        # the cheap path becomes unreachable exactly at the ceiling.
+        self.assertEqual(package["attempts"]["verification_waivers"], 1)
+        self.assertEqual(package["attempts"]["verifications"], 0)
 
     def test_refuted_finding_is_not_relisted_by_a_second_review_panel(self):
         # Dedup runs against everything seen, not against what survived: otherwise a
@@ -2176,15 +2181,20 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("already upheld and cannot be re-verified", retry.stdout)
             package = json.loads(state.read_text())["packages"][0]
             self.assertEqual(package["findings"][0]["status"], "open")
-            self.assertEqual(package["budgets"] if "budgets" in package else {}, {})
 
         with tempfile.TemporaryDirectory() as td:
+            # The backstop still exists — driven from the declared budget, never from a
+            # number this test hardcodes, so resizing it cannot silently unpin the guard.
             state = self.create_ready_package(td, verify=False)
-            self.verify(state, self.UPHELD)                       # 1st
-            self.verify(state, json.dumps({"id": "F-001", "verdict": "upheld"}))  # 2nd, budget = 2
             data = json.loads(state.read_text())
-            self.assertEqual(data["packages"][0]["attempts"]["verifications"], 2)
-            self.verify(state, json.dumps({"id": "F-001", "verdict": "upheld"}))  # 3rd -> budget
+            budget = data["budgets"]["max_verifications_per_package"]
+            self.assertGreaterEqual(budget, data["budgets"]["max_deep_review_cycles"] * 2,
+                                    "the backstop must not be smaller than the flows other budgets allow")
+            data["packages"][0]["attempts"]["verifications"] = budget - 1
+            state.write_text(json.dumps(data))
+            self.verify(state, self.UPHELD)                                        # last one inside budget
+            self.assertEqual(json.loads(state.read_text())["phase"], "PACKAGE_REPAIR")
+            self.verify(state, json.dumps({"id": "F-001", "verdict": "upheld"}))   # one past it
             data = json.loads(state.read_text())
         self.assertEqual(data["phase"], "BLOCKED")
         self.assertIn("verification budget exhausted", data["blockers"][-1]["reason"])
@@ -2279,6 +2289,96 @@ class HarnessTests(unittest.TestCase):
                                          "--verdict", self.UPHELD, check=False)
         self.assertEqual(wrong_phase.returncode, 2)
         self.assertIn("cannot record verification from phase PACKAGE_REVIEW", wrong_phase.stdout)
+
+    def test_all_refuted_reaches_testing_after_a_spawn_and_across_two_calls(self):
+        # `record-spawn` is MANDATORY before delegating, and a verifier may legitimately
+        # split its verdicts across calls.  Neither may change the answer to "how did this
+        # package reach PACKAGE_REPAIR?" — both write intra-phase events.
+        second = json.dumps({
+            "id": "F-002", "verdict": "refuted",
+            "reason": "an existing regression test already covers it",
+            "evidence": "tests/test_harness.py:1 asserts the same interleaving",
+        })
+        for label, spawn in (("with spawn", True), ("without spawn", False)):
+            with tempfile.TemporaryDirectory() as td:
+                state = self.create_ready_package(td, verify=False)
+                if spawn:
+                    self.run_state(state, "record-spawn", "PKG-01", "finding-verifier",
+                                   "--client", "revisamos los hallazgos", "--tech", "refutación adversarial")
+                self.verify(state, self.REFUTED)          # first call
+                self.assertEqual(json.loads(state.read_text())["phase"], "PACKAGE_REPAIR", label)
+                self.verify(state, second)                 # second call closes the set
+                data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_TESTING", label)
+            self.assertEqual(data["metrics"]["repair_batches"], 0, label)
+
+    def test_verification_budget_survives_two_review_cycles(self):
+        # The budget is a runaway backstop, not the anti-retry control: a flow inside
+        # every other declared budget must never end BLOCKED.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, verify=False)
+            self.verify(state, self.UPHELD, json.dumps({"id": "F-001", "verdict": "upheld"}))
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                           "--finding-id", "F-001", "--finding-id", "F-002", "--changed-file", "src/a.py")
+            regression = json.dumps({"id": "F-R1", "severity": "medium", "category": "correctness"})
+            self.run_state(state, "record-delta-review", "PKG-01", "repair_required", "--actor", "delta-reviewer",
+                           "--new-finding", regression, "--reason", "the repair introduced a regression")
+            self.verify(state, json.dumps({"id": "F-R1", "verdict": "upheld"}))
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                           "--finding-id", "F-R1", "--changed-file", "src/a.py")
+            self.run_state(state, "record-delta-review", "PKG-01", "repair_required", "--actor", "delta-reviewer",
+                           "--requires-full-review", "--reason", "the repair changed the public contract")
+            # Second and last deep review cycle, still legal.
+            self.run_state(state, "start-review-panel", "PKG-01", "--role", "package-reviewer")
+            late = json.dumps({"id": "F-R2", "severity": "high", "category": "correctness"})
+            self.run_state(state, "record-subreview", "PKG-01", "package-reviewer", "repair_required",
+                           "--actor", "package-reviewer", "--finding", late)
+            self.run_state(state, "finalize-review-panel", "PKG-01", "repair_required", "--actor", "package-reviewer")
+            self.verify(state, json.dumps({"id": "F-R2", "verdict": "upheld"}))
+            data = json.loads(state.read_text())
+        self.assertNotEqual(data["phase"], "BLOCKED", "an in-budget flow must not need a human")
+        self.assertEqual(data["packages"][0]["attempts"]["deep_review_cycles"], 2)
+        self.assertEqual(data["packages"][0]["findings"][-1]["verified_verdict"], "upheld")
+
+    def test_the_waiver_stays_reachable_even_with_the_budget_spent(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False, verify=False)
+            low = json.dumps({"id": "F-LOW", "severity": "low", "category": "testing"})
+            self.run_state(state, "record-review", "PKG-01", "repair_required",
+                           "--actor", "package-reviewer", "--finding", low)
+            data = json.loads(state.read_text())
+            data["packages"][0]["attempts"]["verifications"] = data["budgets"]["max_verifications_per_package"]
+            state.write_text(json.dumps(data))
+            waived = self.run_state(state, "record-verification", "PKG-01", "--actor", "orchestrator",
+                                    "--skip-reason", "all-findings-low", check=False)
+        # Blocking a package for taking the CHEAP path would be absurd.
+        self.assertEqual(waived.returncode, 0, waived.stdout)
+        self.assertNotEqual(json.loads(waived.stdout)["state"]["phase"], "BLOCKED")
+
+    def test_the_note_carries_the_proof_not_only_the_claim(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+
+            def state_cmd(*args):
+                return run("python3", str(FEATURE_STATE), *args, "--state-file", str(state))
+
+            state_cmd("transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            for task in ("T-001", "T-002"):
+                state_cmd("complete-task", "PKG-01", task, "--actor", "implementer", "--validation", "unit")
+            state_cmd("transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+            state_cmd("record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
+            state_cmd("update-package", "PKG-01", "--integrated", "true", "--diff-ref", "HEAD..work")
+            state_cmd("transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
+            state_cmd("record-review", "PKG-01", "repair_required", "--actor", "package-reviewer",
+                      "--finding", json.dumps({"id": "F-1", "severity": "high", "category": "correctness"}))
+            state_cmd("record-verification", "PKG-01", "--actor", "finding-verifier", "--verdict", json.dumps({
+                "id": "F-1", "verdict": "refuted", "reason": "guarded upstream",
+                "evidence": "src/example.py:42 rejects it before the cited branch",
+            }))
+            note = (root / "docs/notas/features/feat-x/PKG-01.md").read_text(encoding="utf-8")
+        self.assertIn("guarded upstream", note)
+        self.assertIn("src/example.py:42", note, "a reason without its evidence is a claim without the burden")
+        self.assertIn("finding-verifier", note, "who refuted it is part of the record")
 
     def test_findings_cannot_be_born_terminal(self):
         # normalize_findings is the ingress; a caller-supplied status would bypass

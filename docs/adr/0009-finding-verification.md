@@ -147,6 +147,34 @@ a red test marked the package testing-ready with the red test never addressed. N
 `_repair_entered_from_review` inspects the last history event that set the phase, and only the review paths
 qualify.
 
+### D7 corrected (delta review, DR-01) — the budget is a backstop, not the control
+
+Sized at 2 per package, `max_verifications_per_package` was smaller than the flows the other budgets already
+allow. Reproduced inside every declared budget: two review cycles with a delta-review regression in each end
+in `BLOCKED`; in `quick-fix`/`incident` a *single* delta-review regression became unrepairable. That defeats
+`max_deep_review_cycles` and turns "the delta reviewer found a regression" into a routine human escalation —
+exactly what the question policy forbids.
+
+The anti-retry control is `verified_verdict` stickiness, not the counter. The counter is a runaway backstop
+and is now dimensioned against the flows it must not block: 6 for feature/scoped, 3 for quick-fix/incident.
+Two further corrections: the budget is evaluated **after** the waiver branch, because blocking a package for
+taking the cheap path is absurd; and a waiver increments its own `attempts["verification_waivers"]` rather
+than the budgeted counter — V-12 asked for the waiver to be *visible*, not for it to consume a scarce
+resource, and counting it in the budget made the waiver unreachable at the ceiling through a second door.
+
+### D8 corrected (delta review, DR-02) — an intra-phase event is not an entry
+
+`_repair_entered_from_review` scanned history for the last event with `to == "PACKAGE_REPAIR"`, but
+`record_event` writes `to = data["phase"]` for anything that does not move the phase. Two commands poisoned
+it: `record-spawn`, which orchestrator doctrine makes **mandatory before every delegation**, and
+`record-verification` itself when a verifier splits verdicts across calls. Reproduced: the same two
+refutations reach `PACKAGE_TESTING` in one call with no spawn, and stay stuck in `PACKAGE_REPAIR` with the
+spawn — degrading into an empty repair pass plus a full delta review for a package with zero surviving
+findings. The thesis of this ADR silently stopped holding in its own documented flow.
+
+Now the scan skips any event whose `from == to`. Both regressions are pinned by tests that fail without the
+fix; the absence of a spawn in the original test fixture is precisely what let this ship green.
+
 ### Repairs outside the state machine
 
 - **`_short` is a trust boundary** (SEC-003). `merge_note` splits on the FIRST `NOTES_AUTO_END` with
@@ -179,6 +207,12 @@ qualify.
   by D2 (refutations are visible in the record and in the judge's bundle), not eliminated. If refutations of
   real defects show up in practice, the fix is the tier, not the removal of the node — and after the D5
   amendment that fix can actually be applied on every runtime.
+- **`_short` escaping is repo-wide and does not heal the past** (delta review, DR-03). It now rewrites a
+  literal `-->` in EVERY state-derived field, so an ASCII arrow inside a narrative renders as `--›` —
+  cosmetic, confined to the machine-owned block, and zero occurrences in current repo state. And
+  `merge_note` escapes the generated body, not `existing`: a note that already carried an injected
+  `NOTES_AUTO_END` from before this repair keeps it, and its stale tail stays in the human region. The vector
+  never fired here (all four state files are clean), so this is a documented limit, not a live defect.
 - **`refuted` is irreversible today.** `reopen` only applies from `BLOCKED` and does not touch finding
   statuses, so a wrongly refuted finding can be undone only by hand-editing the state JSON. Accepted for now:
   the actor gate plus mandatory evidence make a wrong refutation expensive to produce, and an

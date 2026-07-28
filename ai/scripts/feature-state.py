@@ -84,11 +84,18 @@ NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist
 # verdicts and the cost waiver stay open to the coordinator; only refutation is closed.
 REFUTING_ACTORS = {"finding-verifier"}
 # Physical budgets per triage mode: ceremony must be proportional to risk, not to diff size.
+# `max_verifications_per_package` is a runaway backstop, NOT the anti-retry control —
+# that is `verified_verdict` stickiness, which makes an `upheld` finding unjudgeable a
+# second time.  It must therefore be dimensioned against the flows the other budgets
+# already allow: each review cycle can produce a repair round, each delta review can
+# reopen one with new findings that now REQUIRE a verdict before repair, and one pass may
+# legitimately be split across two calls.  Sized below `max_deep_review_cycles` it would
+# BLOCK a package that is inside every other budget.
 MODE_BUDGETS = {
-    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 2},
-    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 2},
-    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 1},
-    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 1},
+    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 6},
+    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 6},
+    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3},
+    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3},
 }
 # --no-render: high-frequency intra-phase writes (record-spawn, log-narrative)
 # defer STATUS/bitacora/notes regeneration; sync-notes consolidates later.
@@ -147,7 +154,7 @@ def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any
             "max_package_subdivisions": 1,
             "max_spawns_per_package": 12,
             "max_gate_failures_per_package": 3,
-            "max_verifications_per_package": 2,
+            "max_verifications_per_package": 6,
         },
         "metrics": {
             "task_deep_reviews": 0,
@@ -189,6 +196,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
             "deep_review_cycles": 0,
             "repair_batches": 0,
             "verifications": 0,
+            "verification_waivers": 0,
             "subdivisions": 0,
             "spawns": 0,
         },
@@ -1667,6 +1675,13 @@ def _repair_entered_from_review(data: dict[str, Any], package_id: str | None) ->
     obligation the finding set cannot see.
     """
     for event in reversed(data.get("history", [])):
+        if event.get("from") == event.get("to"):
+            # Intra-phase events carry `to = current phase` and never entered anything.
+            # `record-spawn` (mandatory before every delegation) and a second
+            # `record-verification` call both land here; counting them would make this
+            # answer depend on how the verifier was invoked rather than on how the
+            # package arrived.
+            continue
         if event.get("to") != "PACKAGE_REPAIR" or event.get("package_id") not in (None, package_id):
             continue
         return event.get("event") in {"record-review", "finalize-review-panel", "record-delta-review"}
@@ -1696,11 +1711,6 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         attempts = package.setdefault("attempts", {})
         verdicts = normalize_verdicts(args.verdict or [])
 
-        budget = data.get("budgets", {}).get("max_verifications_per_package", 2)
-        if attempts.get("verifications", 0) >= budget:
-            return block_with_reason(data, args.actor, args.package_id,
-                                     f"verification budget exhausted for {args.package_id}")
-
         if args.skip_reason:
             if verdicts:
                 raise StateError("--skip-reason cannot be combined with --verdict")
@@ -1711,7 +1721,10 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
                 raise StateError("--skip-reason requires all open findings to be low severity")
             record = {"skipped": True, "reason": args.skip_reason, "at": now(), "evidence": args.evidence}
             package.setdefault("verifications", []).append(record)
-            attempts["verifications"] = attempts.get("verifications", 0) + 1
+            # Its own counter, not the budgeted one: a waiver is the declaration that no
+            # pass was needed, so it must be VISIBLE without consuming the runaway
+            # backstop — otherwise the cheap path becomes unreachable at the ceiling.
+            attempts["verification_waivers"] = attempts.get("verification_waivers", 0) + 1
             data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
             record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor,
                          args.package_id, {"skipped": True, "reason": args.skip_reason}, args.event_id)
@@ -1719,6 +1732,14 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
 
         if not verdicts:
             raise StateError("record-verification requires --verdict or --skip-reason")
+
+        # After the waiver branch on purpose: blocking a package because it tried to take
+        # the CHEAP path would be absurd, and the waiver is the one exit that always has
+        # to stay reachable.
+        budget = data.get("budgets", {}).get("max_verifications_per_package", 6)
+        if attempts.get("verifications", 0) >= budget:
+            return block_with_reason(data, args.actor, args.package_id,
+                                     f"verification budget exhausted for {args.package_id}")
 
         if any(item["verdict"] == "refuted" for item in verdicts) and args.actor not in REFUTING_ACTORS:
             # Retiring a blocking finding with no code change is the verifier's verb
