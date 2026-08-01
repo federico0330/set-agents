@@ -19,40 +19,7 @@
     "hash": "433771847056d3ad87fea8cd5a009a39e5dad1daabd9c505ae680078bcf7ed77",
     "path": "docs/specs/003-trusted-routing-pi-runtime/spec.md"
   },
-  "blockers": [
-    {
-      "at": "2026-07-24T23:17:04+00:00",
-      "package_id": "P1R-trusted-routing",
-      "reason": "HUMAN_DECISION_REQUIRED: R1 delta leaves 1 critical, 8 high and 1 medium consolidated finding open; approved rollout allowed at most one consolidated repair and the focused delta review, so no further mutation/review cycle is authorized.",
-      "resolved_at": "2026-07-24T23:19:43+00:00",
-      "resolved_by": "user",
-      "resolved_reason": "User explicitly authorized a second consolidated repair and focused delta review for DR-001..DR-010."
-    },
-    {
-      "at": "2026-07-24T23:42:37+00:00",
-      "package_id": "P1R-trusted-routing",
-      "reason": "HUMAN_DECISION_REQUIRED: R2 gates pass, but the independent delta reviewer instance is unavailable and the 12-spawn budget is exhausted; no self-approval is permitted. Re-authorize with a fresh review budget or accept the package only after an independent delta review.",
-      "resolved_at": "2026-07-24T23:45:19+00:00",
-      "resolved_by": "user",
-      "resolved_reason": "User explicitly authorized a fresh independent delta-review budget after R2 gates passed but reviewer capacity was exhausted."
-    },
-    {
-      "at": "2026-07-24T23:54:16+00:00",
-      "package_id": "P1R-trusted-routing",
-      "reason": "HUMAN_DECISION_REQUIRED: independent final delta review leaves FD-001 critical, FD-002..FD-009 high and FD-010 medium open; R2 gates pass but contractual counterexamples remain.",
-      "resolved_at": "2026-07-25T02:06:33+00:00",
-      "resolved_by": "user",
-      "resolved_reason": "User authorized R3 (third consolidated repair) with fresh budget: 1 repair batch + independent gates + 1 focused delta review; threat-model amendment approved (in-process/same-UID adversary out of scope; unsatisfiable halves of FD-001/FD-004/FD-006 become approved exceptions)."
-    },
-    {
-      "at": "2026-07-25T02:07:50+00:00",
-      "package_id": "P1R-trusted-routing",
-      "reason": "deep review budget exhausted",
-      "resolved_at": "2026-07-25T02:08:28+00:00",
-      "resolved_by": "user",
-      "resolved_reason": "Same R3 authorization: deep-review budget extended 2->3 for the rehydration panel; prior block was budget arithmetic, not a new decision."
-    }
-  ],
+  "blockers": [],
   "budgets": {
     "max_deep_review_cycles": 3,
     "max_gate_failures_per_package": 3,
@@ -62,7 +29,16 @@
   },
   "current_package_id": "P1R-trusted-routing",
   "feature_id": "003-trusted-routing-pi-runtime",
-  "global_gates": [],
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-07-29T17:10:39+00:00",
+      "evidence": "verify.sh -> VERIFY_PASS (284 tests); build.sh --check -> SELF_SCAFFOLD_SYNC_OK; integrator confirmed AC-by-AC in docs/specs/003-trusted-routing-pi-runtime/evidence/integration.md",
+      "name": "integration verify",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -1071,6 +1047,41 @@
       "package_id": "P1R-trusted-routing",
       "timestamp": "2026-07-25T03:01:53+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "Integrator confirmed all accepted packages together satisfy the approved spec; global gates (verify.sh, build.sh --check) pass."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-29T17:10:21+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "integration verify",
+        "status": "pass"
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-29T17:10:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Integration evidence consolidated at docs/specs/003-trusted-routing-pi-runtime/evidence/integration.md; global gate recorded; resolved historical blockers cleared from the array (done_ready bug, registered as debt); no open blocker remains."
+      },
+      "package_id": "P1R-trusted-routing",
+      "timestamp": "2026-07-29T17:13:45+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
@@ -2107,8 +2118,8 @@
       ]
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 77,
+  "phase": "DONE",
+  "revision": 80,
   "schema_version": 1,
-  "updated_at": "2026-07-25T03:01:53+00:00"
+  "updated_at": "2026-07-29T17:13:45+00:00"
 }

@@ -1,7 +1,7 @@
 ---
 description: "Spec-Challenger \u2014 pre-approval read-only challenge of the Feature Contract"
 mode: subagent
-model: openai/gpt-5.6-sol
+model: openai/gpt-5.5
 temperature: 0.0
 steps: 12
 hidden: true

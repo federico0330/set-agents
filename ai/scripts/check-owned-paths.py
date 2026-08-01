@@ -17,7 +17,7 @@ def load_state(path: Path) -> dict[str, Any]:
 
 def package_by_id(data: dict[str, Any], package_id: str) -> dict[str, Any]:
     for package in data.get("packages", []):
-        if package.get("package_id") == package_id:
+        if package.get("package_id", package.get("id")) == package_id:
             return package
     raise SystemExit(f"UNKNOWN_PACKAGE: {package_id}")
 
@@ -60,7 +60,7 @@ def main() -> int:
     data = load_state(Path(args.state_file))
     package = package_by_id(data, args.package_id)
     changed = args.changed_file or changed_files_from_git(args.baseline or "HEAD")
-    owned = package.get("owned_paths", []) + package.get("shared_paths", [])
+    owned = package.get("owned_paths", package.get("ownershipPaths", [])) + package.get("shared_paths", [])
     read_only = package.get("read_only_paths", [])
     violations = []
     read_only_violations = []

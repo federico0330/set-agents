@@ -57,10 +57,18 @@ doc = "https://jqlang.org"
 [cli.obsidian]
 detect = "obsidian"
 note = "abrí ~/tu-empresa/obsidian como vault: ahí viven las notas de la documentación viva"
+# SEC-007: apt/dnf/zypper entries were removed -- verified against the real Debian/Ubuntu
+# package APIs and obsidian.md's own download page: there is no installable `obsidian` apt/
+# dnf/zypper package (only .deb/AppImage/Flathub/snap). A fabricated command here would fail
+# or, worse, silently succeed installing an unrelated same-named package. pacman/brew/winget
+# are verified correct. Without an entry, cmd_tools_install falls through to `doc` honestly
+# instead of running a command that doesn't do what it claims.
 [cli.obsidian.install]
 pacman = "sudo pacman -S --needed --noconfirm obsidian"
 brew = "brew install --cask obsidian"
-doc = "https://obsidian.md/download"
+winget = "winget install --id Obsidian.Obsidian --silent"
+choco = "choco install obsidian -y"
+doc = "https://obsidian.md/download (Debian/Ubuntu/Fedora/openSUSE: sin paquete apt/dnf/zypper -- usá Flatpak `flatpak install flathub md.obsidian.Obsidian`, Snap `snap install obsidian --classic`, o el AppImage del link)"
 
 [cli.syncthing]
 detect = "syncthing"

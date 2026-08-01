@@ -43,3 +43,9 @@ jobs:
       - name: Compile python scripts
         shell: pwsh
         run: python -m py_compile (Get-ChildItem ai/scripts/*.py).FullName
+      # AC-11 (005-P2/DEC-7): machine-verified tier stops being parse-only. This proves the
+      # SELECTION logic (platform_pm/pick_method, path resolution, JSON envelopes) works on real
+      # Windows Python — it does not prove Obsidian's GUI actually installs (DEC-7's manual tier).
+      - name: Full unittest suite
+        shell: pwsh
+        run: python -m unittest discover -s tests -v

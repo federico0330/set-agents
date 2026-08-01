@@ -1,0 +1,2689 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12",
+    "AC-13"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-28T16:44:47+00:00",
+    "hash": "ec14f43bbd17336b212625e86dc4fcff27fcc394e8eb3fb21b3b55209289693c",
+    "path": "docs/specs/009-self-application/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P3-panel-integrity",
+  "feature_id": "009-self-application",
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-07-29T17:10:39+00:00",
+      "evidence": "verify.sh -> VERIFY_PASS (284 tests); build.sh --check -> SELF_SCAFFOLD_SYNC_OK; integrator confirmed AC-by-AC in docs/specs/009-self-application/evidence/integration.md",
+      "name": "integration verify",
+      "required": true,
+      "status": "pass"
+    }
+  ],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/009-self-application/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-28T16:44:47+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Guard en verify.sh que falla si un prompt canonico nombra una ruta literal que no resuelve, con waivers motivados",
+          "Test que parsea los prompts y prueba que lo que memory-scribe escribe es subconjunto de lo que los lectores leen",
+          "Mudar el nivel cross-proyecto a docs/ai/knowledge/_global y sembrar el nivel de proyecto del arnes desde la plantilla",
+          "Repuntar sync-project.sh y memory-scribe.md al domicilio nuevo y reparar la referencia muerta de local-gate-runner",
+          "Alinear el formato de escritura de save_memory.py --domain con el contrato de seccion y prefijo que declara memory-scribe"
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:45:04+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Decidir y escribir el punto de aplicacion del gate, con su consecuencia asumida",
+          "Gate que exige ai/state/features/<id>.json cuando el trabajo llego a entrega, sin disparar en el ciclo previo a la aprobacion, nombrando el comando remedio",
+          "init deja de poder afirmar una aprobacion que nadie verifico"
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T16:45:26+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "start-review-panel exige miembros declarados",
+          "start-review-panel contra un panel-id existente es error, nunca no-op silencioso",
+          "Canal sancionado para un hallazgo que llega despues de cerrado el panel, sin fase nueva",
+          "Corregir la deriva de registro: fila de ADR-0009 ausente del indice y la asercion invertida en design.md:455"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T16:45:26+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:45:47+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Guard en verify.sh que falla si un prompt canonico nombra una ruta literal que no resuelve, con waivers motivados"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Guard en verify.sh que falla si un prompt canonico nombra una ruta literal que no resuelve, con waivers motivados",
+        "validations": [
+          "SET_AGENTS_GUEST_VERIFY=1 ./ai/scripts/verify.sh -> exit 1, CANONICAL_DANGLING_PATH count=27 across 10 canonical prompts, before any fix. Adversarial proof that the guard catches the defect it was written for; the full suite runs at the package gate.",
+          "Waiver set is 3 entries, each with its reason inline: ai/state/verify.log, docs/adr/NNNN-slug.md, docs/project/architecture.md. 60 literal references checked, 16 templated forms skipped."
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:46:50+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Test que parsea los prompts y prueba que lo que memory-scribe escribe es subconjunto de lo que los lectores leen"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:46:50+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Test que parsea los prompts y prueba que lo que memory-scribe escribe es subconjunto de lo que los lectores leen",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.{test_knowledge_write_and_read_targets_agree,test_save_memory_writes_the_format_the_scribe_declares,test_domain_knowledge_is_wired_through_the_canon} -> FAILED (failures=2, errors=1) on the unfixed tree. AC-04 fails on docs/ai/knowledge/_global/algorithms.md not existing; AC-12 errors because save_memory.py has no --section/--knowledge-dir yet; the pre-existing canon test fails on the strengthened disk assertion.",
+          "The AC-04 test parses the prompts (brace expansion included) instead of assertIn on literals, and asserts subset rather than equality because every reader also declares the _global tier the scribe is forbidden to write."
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:48:23+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Mudar el nivel cross-proyecto a docs/ai/knowledge/_global y sembrar el nivel de proyecto del arnes desde la plantilla"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:48:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Mudar el nivel cross-proyecto a docs/ai/knowledge/_global y sembrar el nivel de proyecto del arnes desde la plantilla",
+        "validations": [
+          "git mv of the five cross-project files preserves history; knowledge/ no longer exists; find docs/ai -type f lists exactly 10 files, five per tier.",
+          "The project tier is a verbatim copy of PROYECTO/docs/ai/knowledge/ - the same seed bootstrap_project.py:132-138 gives every scaffolded project. No content was invented, which the contract excludes explicitly."
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:48:40+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Repuntar sync-project.sh y memory-scribe.md al domicilio nuevo y reparar la referencia muerta de local-gate-runner"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:48:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Repuntar sync-project.sh y memory-scribe.md al domicilio nuevo y reparar la referencia muerta de local-gate-runner",
+        "validations": [
+          "SET_AGENTS_GUEST_VERIFY=1 ./ai/scripts/verify.sh -> CANONICAL_PATHS_OK, GLOBAL_PORTABILITY_OK, VERIFY_PASS, exit 0. The same guard that listed 27 dangling sites now reports none.",
+          "local-gate-runner.md no longer hardcodes one feature's state file; it uses ai/state/features/<feature_id>.json, the templated form every other canonical prompt already uses, which the guard skips by design."
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:49:30+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Alinear el formato de escritura de save_memory.py --domain con el contrato de seccion y prefijo que declara memory-scribe"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:49:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Alinear el formato de escritura de save_memory.py --domain con el contrato de seccion y prefijo que declara memory-scribe",
+        "validations": [
+          "The three previously failing tests now pass, plus test_memory_fallback_does_not_block (the general --log path is untouched), test_sync_project_copies_generic_scripts_and_guards_active_state (distribution survived the move) and test_bootstrap_preserves_existing_content_and_is_idempotent. Ran 6 tests, OK.",
+          "--section is required with --domain rather than defaulted: guessing which section an entry belongs to is the same silent-wrong-behaviour class this package exists to remove. An unknown section is UNKNOWN_SECTION and a missing domain file is MISSING_KNOWLEDGE_FILE; neither appends anywhere."
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:50:27+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:50:27+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:26+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "self-scaffold-sync",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:26+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "whitespace",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:26+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:27+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "canonical-paths",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:27+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:27+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:28+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "architect"
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:51+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Mando el primero de dos revisores independientes a auditar el paquete entero. No escribi\u00f3 nada de esto y corre en otro modelo, as\u00ed que lo mira sin los sesgos del que lo hizo.",
+        "purpose": "Deep review of the integrated package: correctness of the guard, the move, and the two new tests",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel RP-01, member 1 of 2, dispatched concurrently per the 006-P1 rule. Sonnet 5 against an Opus 5 writer: clean context is the primary independence guarantee (ADR-0011). Read-only, never patches."
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:51+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "El segundo revisor mira otra cosa: no si est\u00e1 bien hecho, sino si estaba bien pensado. Si el domicilio nuevo es el correcto y si el guard nuevo va a envejecer bien o va a molestar hasta que alguien lo apague.",
+        "purpose": "Design review: whether the two-tier resolution and the ratchet's shape are the right ones to live with",
+        "role": "architect",
+        "spawns": 2,
+        "tech": "Panel RP-01, member 2 of 2, same batch. Distinct lens from the package-reviewer: design durability of the two-tier home, the waiver mechanism's failure mode, and the blast radius of a prose ratchet over every canonical prompt."
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T16:56:52+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 3,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:09:09+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 5,
+        "role": "architect",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:09:38+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:09:38+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de arreglar nada, mando un tercer revisor a tratar de tumbar los ocho hallazgos. Su trabajo no es confirmarlos: es demostrar que est\u00e1n mal. Lo que sobreviva a eso es lo que arreglo.",
+        "purpose": "Adversarially refute the eight panel findings before any repair is recorded (ADR-0009)",
+        "role": "finding-verifier",
+        "spawns": 3,
+        "tech": "Third distinct model in the chain (Fable 5) after an Opus 5 writer and two Sonnet 5 reviewers, so the refutation is independent of both the author and the finding authors. ADR-0009 requires a verified_verdict before record-repair will accept a critical/high/medium finding."
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:10:08+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:18:10+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 1,
+        "upheld": 1
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:19:22+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 4,
+        "upheld": 1
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:20:03+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:20:29+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-02",
+          "F-03",
+          "F-04"
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:26:54+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Ultimo control: un revisor mira solamente lo que cambie al reparar, no el paquete entero. Es la pasada que verifica que arreglar no haya roto otra cosa.",
+        "purpose": "Focused review of the repair delta only: the guard extraction, the line-anchored heading match, and the corrected waiver reasons",
+        "role": "delta-reviewer",
+        "spawns": 4,
+        "tech": "Delta review of repair batch 1 closing F-02, F-03, F-04. Sonnet 5, clean context, read-only. Scope is the delta: ai/scripts/check-canonical-paths.py (new), verify.sh, save_memory.py, tests/test_harness.py."
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:27:10+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:38:00+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:38:00+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:38:00+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:38:13+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T17:38:14+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1-knowledge-home aceptado; se abre P2-state-machine-required. Sin --package-id a proposito: cmd_transition:1249 pisaria el status de P1."
+      },
+      "package_id": null,
+      "timestamp": "2026-07-28T18:06:13+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:06:36+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Excepciones de ownership registradas; arranca la implementacion de AC-05/06/13"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:06:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Decidir y escribir el punto de aplicacion del gate, con su consecuencia asumida"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:07:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Decidir y escribir el punto de aplicacion del gate, con su consecuencia asumida",
+        "validations": [
+          "Decision registrada con log-decision, slug el-gate-de-estado-obligatorio-vive-en-verify-sh: el gate vive solo en verify.sh, con la consecuencia asumida por escrito (no bloquea un commit local). El dato que decide contra pre-commit es que .git/hooks/ no se versiona, asi que no existe en un clon nuevo ni en el runner del CI; el post-commit existente termina en '|| true' (build.sh:37-49) y no puede fallar nada.",
+          "Prueba adversarial del gate ANTES de cualquier waiver: python3 ai/scripts/check-feature-state.py . -> exit 1, FEATURE_STATE_MISSING id=006-execution-graph evidence=02ed998, con la linea de remedio completa. No dispara sobre 001-harness-evolution, que no produce ningun commit 'Feature 001 P<n>': AC-06 medido y no afirmado.",
+          "Prueba adversarial de AC-13 sobre el arbol de hoy: init 010-fake docs/specs/010-fake/spec.md deadbeef -> ok, y el estado queda afirmando hash 'deadbeef' con from=USER_APPROVAL, contra un archivo cuyo sha256 real es 6d8d335b. Ese es el defecto."
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:09:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Gate que exige ai/state/features/<id>.json cuando el trabajo llego a entrega, sin disparar en el ciclo previo a la aprobacion, nombrando el comando remedio"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:09:17+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Gate que exige ai/state/features/<id>.json cuando el trabajo llego a entrega, sin disparar en el ciclo previo a la aprobacion, nombrando el comando remedio",
+        "validations": [
+          "ai/scripts/check-feature-state.py con un solo waiver motivado (006-execution-graph, citando AC-07 en spec.md:129-132 y el slug feature-006-delivered-outside-state-machine). Sin el waiver salia 1 sobre el defecto vivo; con el, FEATURE_STATE_OK. Enganchado en verify.sh despues de check-canonical-paths.py: SET_AGENTS_GUEST_VERIFY=1 ./ai/scripts/verify.sh -> GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK, VERIFY_PASS, exit 0.",
+          "test_feature_state_gate_fails_when_a_delivered_feature_has_no_state_file maneja el camino de falla contra un repo de prueba: entrega sin estado -> exit 1 + FEATURE_STATE_MISSING + el remedio con el sha256 real del spec; feature solo redactada (commit sin token P<n>) -> FEATURE_STATE_OK, que es AC-06 medido y no afirmado; sin historia de git -> FEATURE_STATE_UNCHECKED por stderr y exit 0, ruidoso y fijado por el test en vez de degradar a no-op silencioso. El guest-verify ademas fija FEATURE_STATE_OK por nombre, asi que borrar el guard ya no deja la suite verde."
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:11:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "init deja de poder afirmar una aprobacion que nadie verifico"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:11:30+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "init deja de poder afirmar una aprobacion que nadie verifico",
+        "validations": [
+          "cmd_init verifica sha256(spec_path) contra el hash recibido y se niega con SPEC_HASH_MISMATCH o SPEC_NOT_FOUND sin escribir el archivo de estado; --approved-by pasa a ser requerido, con el precedente de reopen --authorized-by que ya lo exige. El evento de historia lleva spec_hash_verified y approved_by: la evidencia, no solo la afirmacion. Mismo cambio en PROYECTO/ai/scripts/feature-state.py, ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2.",
+          "test_init_refuses_to_attest_a_spec_it_did_not_verify fallaba sobre el arbol previo y ahora pasa: hash equivocado, spec ausente y falta de atribucion son los tres rechazos, y en los tres el archivo de estado no existe. Las 19 llamadas a init de la suite migraron al helper init_state, que escribe un spec real y lo hashea, asi que ningun test puede volver a pasar un nombre y una ficcion. test_sync_notes_renders_hub_feature_and_package_notes se reapunto al digest real en vez de la cadena 'hash-abc': misma asercion, misma fuerza.",
+          "Superficie de prompts alineada con el CLI: Global/_canonical/commands/feature-batch.md y PROYECTO/prompt.md documentan --approved-by y que el hash se verifica; Global/ regenerado con ./build.sh (opencode y claude-code reciben feature-batch; codex no publica commands). Dos residuos registrados con log-decision en vez de arreglados de contrabando: LEGAL_TRANSITIONS sigue sin las cuatro fases previas, y las 4 derivas de hash vivas no se convierten en gate porque endurecer validate dejaria a sync-project.sh sin poder sincronizar proyectos."
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T18:28:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "verify.sh verde, ownership pasa"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:56+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:56+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "self-scaffold-sync",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "whitespace",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "feature-state",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "canonical-paths",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:07:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Seis gates verdes; abre panel RP-01"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:08:03+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "architect"
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:08:22+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Mando el primero de dos revisores independientes a auditar el paquete entero. No escribio nada de esto y corre en otro modelo, asi que lo mira sin los sesgos del que lo hizo.",
+        "purpose": "Deep review of the integrated package: the gate's signal, the init hash verification, and the 19-site test migration",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel RP-01, miembro 1 de 2, despachado concurrentemente por la regla de 006-P1. Sonnet 5 contra un escritor Opus 5: contexto limpio como garantia primaria de independencia (ADR-0011). Read-only, nunca parchea."
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:08:40+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "El segundo revisor mira otra cosa: no si esta bien hecho, sino si estaba bien pensado. Si usar los mensajes de commit como senal de entrega es una base solida o algo que se va a romper el dia que alguien escriba un commit distinto.",
+        "purpose": "Design review: whether the commit-history signal and the required --approved-by will age well, and what the gate's blast radius really is",
+        "role": "architect",
+        "spawns": 2,
+        "tech": "Panel RP-01, miembro 2 de 2, mismo lote. Lente distinta a la del package-reviewer: durabilidad de la senal de historia, el costo de volver --approved-by requerido en un CLI que ya documentan tres runtimes, y el radio de un gate nuevo en verify.sh que corre para todos."
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:08:40+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 5,
+        "role": "architect",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:17:54+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 4,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:19:14+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:19:26+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de arreglar nada, mando un tercer revisor a tratar de tumbar los nueve hallazgos. Su trabajo no es confirmarlos: es demostrar que estan mal. Lo que sobreviva a eso es lo que arreglo.",
+        "purpose": "Adversarially refute the nine panel findings before any repair is recorded (ADR-0009)",
+        "role": "finding-verifier",
+        "spawns": 3,
+        "tech": "Tercer modelo distinto de la cadena (Fable 5) despues de un escritor Opus 5 y dos revisores Sonnet 5, asi que la refutacion es independiente del autor y de los autores de los hallazgos. ADR-0009 exige verified_verdict antes de que record-repair acepte un hallazgo critical/high/medium."
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T19:19:40+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 5,
+        "upheld": 4
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:05:57+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01",
+          "F-02",
+          "F-03",
+          "F-08"
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:12:04+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Ultimo control: un revisor mira solamente lo que cambie al reparar, no el paquete entero. Es la pasada que verifica que arreglar no haya roto otra cosa.",
+        "purpose": "Focused review of the repair delta only: the merged delivery regex, the shallow-clone refusal, and the executable convention declaration",
+        "role": "delta-reviewer",
+        "spawns": 4,
+        "tech": "Delta review del lote de reparacion 1, cierra F-01, F-02, F-03 y F-08. Sonnet 5, contexto limpio, read-only. Alcance: ai/scripts/check-feature-state.py, Global/_canonical/commands/feature-batch.md y sus generados, tests/test_harness.py."
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:12:11+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:18:45+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:18:45+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:19:22+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:19:23+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T21:19:23+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-07-28T21:53:26+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T21:53:27+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T21:54:49+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Corregir la deriva de registro: fila de ADR-0009 ausente del indice y la asercion invertida en design.md:455"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T21:55:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Corregir la deriva de registro: fila de ADR-0009 ausente del indice y la asercion invertida en design.md:455",
+        "validations": [
+          "3 tests nuevos: 2 mostrados en rojo antes del arreglo (0009 sin fila; la asercion invertida presente), verdes despues"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T21:56:05+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "start-review-panel exige miembros declarados",
+        "validations": [
+          "test_start_review_panel_requires_declared_members: rojo antes (rc 0, roles ['package-reviewer'], ciclo gastado), verde despues"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T21:59:17+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "start-review-panel contra un panel-id existente es error, nunca no-op silencioso",
+        "validations": [
+          "3 tests: duplicado, replay que no quema ciclo, y las 4 conductas de extend-review-panel. Los 7 mostrados en rojo antes"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T21:59:17+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Canal sancionado para un hallazgo que llega despues de cerrado el panel, sin fase nueva",
+        "validations": [
+          "5 tests nuevos mostrados en rojo antes; suite completa 232 OK (base 217), ninguno skipeado"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:05:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "package verify",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "self-scaffold-sync",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "whitespace",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "adversarial-proof",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:31+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:11:32+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "architect"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:12:24+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Le pedimos a un revisor independiente, con otro modelo y sin ver como se escribio el codigo, que trate de romper lo que acabamos de construir. Es la regla de la casa: quien implementa nunca aprueba su propio trabajo.",
+        "purpose": "Deep review del paquete integrado: correccion, contratos de datos y cobertura de tests",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel RP-01, miembro 1 de 2, declarado en la llamada de apertura con --role (que ahora es obligatorio, gracias a este mismo paquete). Sonnet 5, contexto limpio, read-only. Foco: el cortocircuito de replay por event-id, los rechazos de record-late-review, la clave nueva late_reviews contra nueve archivos de estado que la preceden, y si los 16 tests fallan de verdad sobre el arbol previo."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:12:24+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "El segundo revisor mira otra cosa: no si el codigo anda, sino si el conjunto tiene sentido y si lo que los manuales prometen es lo que el sistema hace.",
+        "purpose": "Revision de diseno: si los tres verbos del panel forman un modelo coherente y si la doctrina escrita coincide con el codigo",
+        "role": "architect",
+        "spawns": 2,
+        "tech": "Panel RP-01, miembro 2 de 2, concurrente con el package-reviewer. Sonnet 5, contexto limpio, read-only. Es el mismo rol cuyos cinco hallazgos, en 007-P0, no tuvieron canal -- que es la razon por la que existe AC-10."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:12:24+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:36:21+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "architect",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "role": "architect",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:36:21+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:36:21+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de arreglar nada, un tercer revisor con la consigna invertida: su trabajo es matar cada hallazgo, no confirmarlo. Lo que sobrevive a eso es lo que se repara. Sirve para no gastar cambios de codigo en problemas que no existen.",
+        "purpose": "Refutacion adversarial de los cuatro hallazgos antes de reparar (ADR-0009)",
+        "role": "finding-verifier",
+        "spawns": 3,
+        "tech": "Fable 5, cuarto modelo distinto de la cadena tras un escritor en Opus 5 y dos revisores en Sonnet 5. Read-only. Los cuatro hallazgos en un solo lote. Ojo con F-01 y F-02: el patron raiz preexiste en record_event y en record-subreview, asi que la pregunta real no es si el defecto existe sino si este paquete lo empeoro o solo lo heredo."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:36:31+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 1,
+        "upheld": 3
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:45:26+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01",
+          "F-02",
+          "F-03"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:51:41+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Ultimo control: un revisor nuevo mira solo lo que se cambio para arreglar los tres problemas, no el paquete entero. Confirma que se arreglaron de verdad y que el arreglo no rompio otra cosa.",
+        "purpose": "Delta review acotada al lote de reparacion de F-01, F-02 y F-03",
+        "role": "delta-reviewer",
+        "spawns": 4,
+        "tech": "Sonnet 5, contexto limpio, read-only, alcance limitado a los cuatro archivos del lote. Foco: si replayed() unifico bien las dos definiciones que antes podian discrepar, si blacklistear source_role rompe algun ingreso legitimo, y si los cuatro tests de reparacion fallan de verdad sobre el arbol previo a la reparacion."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T22:51:48+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:15:30+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:19:49+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-05"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:19:49+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:19:49+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "global": false,
+        "name": "package verify (post-repair)",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:20:23+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:20:23+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T23:20:47+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Antes de cerrar del todo esta parte del arnes (la que hace que el sistema se aplique sus propias reglas), un integrador revisa que los tres paquetes entregados funcionen juntos y no dejen nada suelto.",
+        "purpose": "",
+        "role": "integrator",
+        "spawns": 5,
+        "tech": "Integracion de 009-self-application: verify.sh y build.sh --check ya corrieron en verde (284 tests, SELF_SCAFFOLD_SYNC_OK) a nivel orquestador; el integrador confirma que P1+P2+P3 juntos siguen satisfaciendo el contrato 1.1.0 (13 ACs) y consolida evidencia en docs/specs/009-self-application/evidence/."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-29T16:55:25+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "Integrator confirmed all accepted packages together satisfy the approved spec; global gates (verify.sh, build.sh --check) pass."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-29T17:10:20+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "integration verify",
+        "status": "pass"
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-29T17:10:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Integration evidence consolidated at docs/specs/009-self-application/evidence/integration.md; global gate recorded; no blocking cross-package findings."
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-29T17:10:45+00:00",
+      "to": "DONE"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 4,
+    "human_questions_after_approval": 0,
+    "package_reviews": 3,
+    "repair_batches": 4,
+    "task_deep_reviews": 0,
+    "verifications": 6
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-12"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/check-canonical-paths.py",
+          "reason": "F-02 repair: the AC-03 guard is extracted out of the verify.sh heredoc so it can be tested at all. The package owns ai/scripts/verify.sh but no wildcard over ai/scripts/, and the extraction is the repair the finding requires.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 4,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 3
+      },
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-28T17:38:00+00:00",
+          "closed_findings": [
+            "F-02",
+            "F-03",
+            "F-04"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Independent delta reviewer, clean context, scope limited to the four files of the repair batch. All three upheld findings closed with reproduced evidence, no new findings. It verified independently that the tightened templated-form regex is strictly more conservative: every comma-bearing candidate in Global/_canonical is already inside a brace enumeration and no candidate carries a lone closing angle bracket, so the change can only catch a dangling path that used to be wrongly skipped, never fail a healthy tree. Also confirmed set -e propagation blocks VERIFY_PASS after a failing guard, the guest checkout carries the new script via copytree, py_compile picks it up by glob, and the sync-project GENERIC list correctly excludes it because a scaffolded project has no canonical prompts to check. Full suite 214 OK.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "8da2734f73f1e215b80432d29acb00640f188642",
+      "findings": [
+        {
+          "ac": "AC-03",
+          "detail": "verify.sh:67 classifies a literal as templated when it contains any of <>{}*, \u2014 a character-class test that cannot tell a runtime placeholder from a concrete brace enumeration. memory-scribe.md:12 names docs/ai/knowledge/{security,data,architecture,algorithms,frontend}.md: five fully concrete paths, no <...> span anywhere, silently skipped. Reproduced. If that line loses a domain, gains a sixth or typos one, or if a domain file is deleted, the guard still prints CANONICAL_PATHS_OK. AC-03 claims to close the class and does not close it for the instance the package was written for; only the new AC-04 test backstops it today. Repair: expand {a,b,c} enumerations before the template filter, and require a real angle-bracket span to classify as templated.",
+          "id": "F-01",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "refuted",
+          "title": "The AC-03 guard is blind to the one literal that matters most",
+          "verdict_evidence": "docs/specs/009-self-application/spec.md:92-94 states the skip rule; scratch repro: rm docs/ai/knowledge/architecture.md then python3 -m unittest tests.test_harness.HarnessTests.test_knowledge_write_and_read_targets_agree returned FAILED; a typo in the brace literal returned FAILED; Global/_canonical/agents/project-bootstrapper.md:8 would add three further dangling paths under the proposed fix",
+          "verdict_reason": "The blind spot is real but the risk it names is covered, by measurement rather than assertion. AC-03 as approved states that literals containing angle brackets, braces, stars or commas are skipped, so skipping the brace form is the contract rather than a deviation from it. The residual is caught by the AC-04 test, which parses that same brace literal and asserts each expansion exists.",
+          "verified_at": "2026-07-28T17:20:03+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-12",
+          "detail": "file_under_section uses text.partition(f\"## {section}\"), so any exact prefix of a real heading is accepted. Reproduced: --section \"Decision\" against a file holding ## Decisiones y porqu\u00e9s succeeds and files the entry there. memory-scribe.md:19-20 states the script refuses a section the file does not have, so the prompt documents a guarantee the code does not give. Repair: anchor to a whole line with re.search(rf\"^## {re.escape(section)}\\\\s*$\", text, re.M).",
+          "id": "F-03",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "save_memory.py matches a section by substring, not by heading line",
+          "verified_at": "2026-07-28T17:19:22+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-03",
+          "detail": "verify.sh:69-73 checks only key membership (named in waived); the reason string is never read. AC-03 states that a waiver without a reason is a hole, and that rule is enforced by review discipline alone. Repair: assert every reason is non-empty when the waiver set is consulted.",
+          "id": "F-05",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "refuted",
+          "title": "Waiver reasons are never validated, so an empty one passes",
+          "verdict_evidence": "ai/scripts/verify.sh:69-73 holds three non-empty reasons; ai/scripts/verify.sh:82 tests only membership",
+          "verdict_reason": "Describes a hypothetical future edit, not a defect in the delivered code.",
+          "verified_at": "2026-07-28T17:19:22+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-03",
+          "detail": "CANONICAL_DANGLING_PATH lives entirely inside a python heredoc in verify.sh and nothing in tests/ names it. The only test that runs verify.sh end to end (test_harness.py:970-971) asserts GLOBAL_PORTABILITY_OK and VERIFY_PASS and never CANONICAL_PATHS_OK, so it does not even pin the guard by name. The fail-before/pass-after proof exists only as prose in the state file, which decays. P2 also declares verify.sh, so the next package can refactor the block with the suite green throughout. This is the same silent decay as defect #1, one level up. Repair: a test that builds a synthetic canonical prompt naming a nonexistent path and asserts the guard fails with CANONICAL_DANGLING_PATH.",
+          "id": "F-02",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "architect",
+          "status": "closed",
+          "title": "The new guard has no regression test, so breaking it stays green",
+          "verified_at": "2026-07-28T17:18:10+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-03",
+          "detail": "verify.sh:70 waives ai/state/verify.log as produced by running this script. ai/scripts/verify.sh never writes it in any of its 92 lines; PROYECTO/ai/scripts/verify.sh:9 does, and Global/_canonical/agents/debugger.md:16 is the prompt naming it, which runs inside scaffolded projects. The waiver is legitimate but its stated cause is not, in the package whose own AC says a waiver without a reason is a hole. Repair: name the real producer.",
+          "id": "F-04",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "closed",
+          "title": "A waiver reason in the new guard is factually wrong",
+          "verified_at": "2026-07-28T17:20:03+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-02",
+          "detail": "check-owned-paths.py:25-27 uses flat fnmatch, where * crosses path separators. P1 declares docs/ai/knowledge/*, which also matches docs/ai/knowledge/_global/*.md. memory-scribe.md:28 forbids the scribe to touch the _global tier and nothing but that sentence enforces it. Before this package _global did not exist in the harness, so the boundary could not be crossed; it can now. docs/ai/knowledge/[a-z]*.md excludes _global correctly, verified. Repair is blocked inside P1: update-package cannot change owned_paths and re-init would destroy the delivered record.",
+          "id": "F-06",
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "The ownership glob for the knowledge tier silently covers the tier it must not",
+          "verdict_evidence": "git log --oneline -- ai/scripts/check-owned-paths.py returned f32a033 from feature 005; git diff bdf2a2b2 --stat -- ai/scripts/check-owned-paths.py returned empty; ai/state/decisions-log.jsonl:1 holds the slug el-chequeo-de-ownership-es-ciego-a-los-archivos-sin-trackear",
+          "verdict_reason": "A pre-existing property of the ownership tool misattributed to this package, whose proposed repair is affirmatively harmful. AC-02 required this package to write the global tier, so the wide match is the ownership the package needed: narrowing the pattern alone would have marked the mandated deliverables out of scope.",
+          "verified_at": "2026-07-28T17:20:03+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-02",
+          "detail": "The package relocates a cross-project distribution source, adds a new gate class, and changes a CLI contract, with no ADR. docs/architecture/overview.md still describes only the trusted-routing subsystem and never mentions a knowledge layer at either tier. The repo tells every agent to read docs/adr/ first, and specs are treated as more disposable than ADRs. Repair needs an ownership exception: no 009 package owns docs/adr/ except P3, which owns README.md only.",
+          "id": "F-07",
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "A durable decision was recorded only in a spec, and the architecture map does not know the layer exists",
+          "verdict_evidence": "docs/specs/009-self-application/spec.md:83-110 contains no ADR requirement in any P1 criterion; docs/architecture/overview.md:3 scopes itself to trusted routing P1R and defers rationale to the ADR index",
+          "verdict_reason": "Imposes an obligation neither the approved contract nor the repo convention contains. No P1 criterion requires an ADR, and the harness global rules name log-decision as the channel for a decision that outlives its package, with formal ADRs linked rather than duplicated.",
+          "verified_at": "2026-07-28T17:20:03+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-12",
+          "detail": "AC-12 constrains save_memory.py, while memory-scribe.md:20 still permits editing the domain file directly and no guard checks the shape of a hand-written entry. Not introduced here, but the package had the natural occasion to name it as a residual and did not.",
+          "id": "F-08",
+          "severity": "low",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "The hand-edit escape hatch makes the format guarantee conditional",
+          "verdict_evidence": "git diff bdf2a2b2 -- Global/_canonical/agents/memory-scribe.md shows the pre-image already permitted editing the file directly; docs/specs/009-self-application/spec.md:105-110",
+          "verdict_reason": "Pre-existing and out of the criterion scope. The hand-edit permission is in the pre-image of the diff, so the package did not introduce it. AC-12 is written about save_memory.py and never promises that every write path is mechanically enforced.",
+          "verified_at": "2026-07-28T17:20:03+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-28T17:38:00+00:00",
+          "evidence": "./ai/scripts/verify.sh after the repair -> Ran 214 tests OK (211 baseline, +3), GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, VERIFY_PASS, exit 0",
+          "name": "verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T16:56:26+00:00",
+          "evidence": "./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "self-scaffold-sync",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T16:56:26+00:00",
+          "evidence": "git diff --check clean (runs inside verify.sh:20)",
+          "name": "whitespace",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T17:38:00+00:00",
+          "evidence": "Re-run after the repair batch over the package's 53 files -> OWNERSHIP_PASS. ai/scripts/check-canonical-paths.py is covered by the approved exception recorded for the F-02 repair.",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T16:56:27+00:00",
+          "evidence": "AC-03 adversarial proof: same guard exited 1 with CANONICAL_DANGLING_PATH count=27 before the fix, exits 0 with CANONICAL_PATHS_OK after",
+          "name": "canonical-paths",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Que la capa de conocimiento exista en el arnes en los dos niveles que los prompts nombran, que verify.sh falle si un prompt canonico apunta a una ruta que no resuelve, y que lo que el escritor escribe sea lo que el lector lee, en ruta y en formato",
+      "owned_paths": [
+        "knowledge/*",
+        "docs/ai/knowledge/*",
+        "ai/scripts/verify.sh",
+        "ai/scripts/sync-project.sh",
+        "ai/scripts/save_memory.py",
+        "Global/_canonical/agents/memory-scribe.md",
+        "Global/_canonical/agents/local-gate-runner.md",
+        "Global/opencode/*",
+        "Global/claude-code/*",
+        "Global/codex/*",
+        "docs/specs/009-self-application/*",
+        "ai/state/features/009-self-application.json",
+        "ai/state/STATUS.md",
+        "ai/state/narrative-log.jsonl",
+        "ai/state/decisions-log.jsonl",
+        "docs/notas/*"
+      ],
+      "package_id": "P1-knowledge-home",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-28T17:26:54+00:00",
+          "changed_files": [
+            "ai/scripts/check-canonical-paths.py",
+            "ai/scripts/verify.sh",
+            "ai/scripts/save_memory.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "F-02",
+            "F-03",
+            "F-04"
+          ],
+          "verification": [
+            "F-02: the guard moved out of the verify.sh heredoc into ai/scripts/check-canonical-paths.py so its failing path can be driven against a fixture tree. New test test_canonical_path_guard_fails_on_a_dangling_reference asserts exit 1 and CANONICAL_DANGLING_PATH on a synthetic dangling reference, CANONICAL_PATHS_OK on a resolving one, and that templated and waived forms are skipped. The existing guest-verify test now pins CANONICAL_PATHS_OK by name (test_harness.py:970-973), so deleting the guard no longer leaves the suite green.",
+            "F-03: file_under_section now matches the heading as a whole line with re.escape and re.MULTILINE. Reproduced before: --section Decision was accepted against a file holding ## Decisiones y porqu\u00e9s. Now refused with UNKNOWN_SECTION and the file is left untouched, asserted in the AC-12 test.",
+            "F-04: the waiver reason names its real producer, PROYECTO/ai/scripts/verify.sh:9, not this repository's verify.sh. All three reasons now cite the file:line that settles them, and the script refuses to run with an empty reason (WAIVER_WITHOUT_REASON), which also answers refuted F-05 at no cost.",
+            "./ai/scripts/verify.sh -> Ran 214 tests OK (213 before the repair, +1), GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, VERIFY_PASS, exit 0."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-28T17:09:38+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "architect"
+          ],
+          "started_at": "2026-07-28T16:56:51+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-28T17:09:09+00:00",
+              "evidence": "Panel RP-01 member 1, Sonnet 5 against an Opus 5 writer. Independent verification done in a git worktree against baseline bdf2a2b with only tests/test_harness.py overlaid, confirming both new tests fail on the pre-change tree for the right reasons and the guard reports CANONICAL_DANGLING_PATH before and CANONICAL_PATHS_OK after. Re-traced sync-project.sh and bootstrap_project.py end to end, and confirmed the five project-tier files are byte-identical to the PROYECTO template. Cross-provider independence unavailable; degraded to same-provider, different-model, clean context per ADR-0011.",
+              "findings": [
+                "F-01",
+                "F-03",
+                "F-05"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-28T17:09:38+00:00",
+              "evidence": "Panel RP-01 member 2, Sonnet 5, same batch, design lens rather than correctness. Verified independently: fnmatch semantics of the ownership globs, that ai/scripts/verify.sh never writes ai/state/verify.log (PROYECTO/ai/scripts/verify.sh:9 does), that no test names CANONICAL_PATHS_OK, that 005-P1 is accepted and integrated so the verify.sh collision is latent, and that docs/architecture/overview.md never mentions the knowledge layer. Same degraded independence as member 1: cross-provider unavailable, clean context preserved.",
+              "findings": [
+                "F-02",
+                "F-04",
+                "F-06",
+                "F-07",
+                "F-08"
+              ],
+              "role": "architect",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-28T17:09:38+00:00",
+          "evidence": "Panel RP-01 closed: two independent reviewers, one batch, both on Sonnet 5 against an Opus 5 writer. Eight findings, two high. They converged independently on the waiver-reason weakness from opposite directions (one that the reason is unvalidated, the other that one reason is factually wrong), which is the signal that the waiver mechanism, not any single waiver, is the soft spot. Each found a high the other missed: the guard's blindness to concrete brace enumerations, and the guard's total absence of regression coverage. Degraded independence recorded here rather than mentioned: cross-provider was unavailable, so both members ran same-provider on a different model with clean context, and correlated blind spots survive that.",
+          "findings": [
+            "F-01",
+            "F-03",
+            "F-05",
+            "F-02",
+            "F-04",
+            "F-06",
+            "F-07",
+            "F-08"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "El nivel cross-proyecto tiene un solo consumidor (sync-project.sh:84) y un test vivo que lo verifica de punta a punta; si la mudanza no lo repunta, todo proyecto deja de recibir la capa global en silencio",
+        "AC-03 es un ratchet sobre prosa: cualquier prompt futuro que nombre una ruta que todavia no existe rompe el gate de todos, asi que el set de waivers tiene que quedar legible o lo primero que va a hacer alguien es ensancharlo"
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-28T17:38:13+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Guard en verify.sh que falla si un prompt canonico nombra una ruta literal que no resuelve, con waivers motivados",
+          "local_validations": [
+            "SET_AGENTS_GUEST_VERIFY=1 ./ai/scripts/verify.sh -> exit 1, CANONICAL_DANGLING_PATH count=27 across 10 canonical prompts, before any fix. Adversarial proof that the guard catches the defect it was written for; the full suite runs at the package gate.",
+            "Waiver set is 3 entries, each with its reason inline: ai/state/verify.log, docs/adr/NNNN-slug.md, docs/project/architecture.md. 60 literal references checked, 16 templated forms skipped."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Test que parsea los prompts y prueba que lo que memory-scribe escribe es subconjunto de lo que los lectores leen",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.{test_knowledge_write_and_read_targets_agree,test_save_memory_writes_the_format_the_scribe_declares,test_domain_knowledge_is_wired_through_the_canon} -> FAILED (failures=2, errors=1) on the unfixed tree. AC-04 fails on docs/ai/knowledge/_global/algorithms.md not existing; AC-12 errors because save_memory.py has no --section/--knowledge-dir yet; the pre-existing canon test fails on the strengthened disk assertion.",
+            "The AC-04 test parses the prompts (brace expansion included) instead of assertIn on literals, and asserts subset rather than equality because every reader also declares the _global tier the scribe is forbidden to write."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Mudar el nivel cross-proyecto a docs/ai/knowledge/_global y sembrar el nivel de proyecto del arnes desde la plantilla",
+          "local_validations": [
+            "git mv of the five cross-project files preserves history; knowledge/ no longer exists; find docs/ai -type f lists exactly 10 files, five per tier.",
+            "The project tier is a verbatim copy of PROYECTO/docs/ai/knowledge/ - the same seed bootstrap_project.py:132-138 gives every scaffolded project. No content was invented, which the contract excludes explicitly."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Repuntar sync-project.sh y memory-scribe.md al domicilio nuevo y reparar la referencia muerta de local-gate-runner",
+          "local_validations": [
+            "SET_AGENTS_GUEST_VERIFY=1 ./ai/scripts/verify.sh -> CANONICAL_PATHS_OK, GLOBAL_PORTABILITY_OK, VERIFY_PASS, exit 0. The same guard that listed 27 dangling sites now reports none.",
+            "local-gate-runner.md no longer hardcodes one feature's state file; it uses ai/state/features/<feature_id>.json, the templated form every other canonical prompt already uses, which the guard skips by design."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Alinear el formato de escritura de save_memory.py --domain con el contrato de seccion y prefijo que declara memory-scribe",
+          "local_validations": [
+            "The three previously failing tests now pass, plus test_memory_fallback_does_not_block (the general --log path is untouched), test_sync_project_copies_generic_scripts_and_guards_active_state (distribution survived the move) and test_bootstrap_preserves_existing_content_and_is_idempotent. Ran 6 tests, OK.",
+            "--section is required with --domain rather than defaulted: guessing which section an entry belongs to is the same silent-wrong-behaviour class this package exists to remove. An unknown section is UNKNOWN_SECTION and a missing domain file is MISSING_KNOWLEDGE_FILE; neither appends anywhere."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-28T17:38:13+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "Ran 214 tests, OK, none skipped. Baseline at the start of the package was 211; the package adds three: test_knowledge_write_and_read_targets_agree (AC-04), test_save_memory_writes_the_format_the_scribe_declares (AC-12) and test_canonical_path_guard_fails_on_a_dangling_reference (AC-03, added by the F-02 repair). Two pre-existing tests were strengthened rather than weakened: test_domain_knowledge_is_wired_through_the_canon now asserts both tiers on disk, and the guest-verify test pins CANONICAL_PATHS_OK by name. All three new tests were shown failing on the pre-change tree before the fix.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-28T17:18:10+00:00",
+          "evidence": "probe",
+          "refuted": [],
+          "upheld": [
+            "F-02"
+          ]
+        },
+        {
+          "at": "2026-07-28T17:19:22+00:00",
+          "evidence": "probe",
+          "refuted": [
+            "F-05"
+          ],
+          "upheld": [
+            "F-03"
+          ]
+        },
+        {
+          "at": "2026-07-28T17:20:03+00:00",
+          "evidence": "Adversarial refutation on Fable 5, the third distinct model after an Opus 5 writer and two Sonnet 5 reviewers. Every confirmation was reproduced by running the command; every refutation cites a file:line or a command with its output.",
+          "refuted": [
+            "F-01",
+            "F-06",
+            "F-07",
+            "F-08"
+          ],
+          "upheld": [
+            "F-04"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-13"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/check-feature-state.py",
+          "reason": "AC-05/AC-06 gate. It is a new file, and the package owns ai/scripts/verify.sh but no wildcard over ai/scripts/. It lives in its own script rather than a verify.sh heredoc because the P1 finding F-02 proved a guard whose failing path no test can drive decays unnoticed.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_canonical/commands/feature-batch.md",
+          "reason": "AC-13 changes the init CLI contract (--approved-by required, the spec hash now verified). Line 28 of this prompt documents that invocation; leaving it stale would be this feature's own defect - a declaration that no longer matches the code.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/opencode/*",
+          "reason": "Regenerated by ./build.sh from _canonical, never edited by hand. verify.sh:25-27 fails on a stale Global/ via diff -ruN against a fresh staging build.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/claude-code/*",
+          "reason": "Regenerated by ./build.sh from _canonical, never edited by hand. verify.sh:25-27 fails on a stale Global/ via diff -ruN against a fresh staging build.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/codex/*",
+          "reason": "Regenerated by ./build.sh from _canonical, never edited by hand. verify.sh:25-27 fails on a stale Global/ via diff -ruN against a fresh staging build.",
+          "status": "approved"
+        },
+        {
+          "path": "PROYECTO/prompt.md",
+          "reason": "Line 89 documents the same init invocation for a scaffolded project, which receives the identical feature-state.py that build.sh --check keeps byte-identical. The CLI change reaches projects, so the project-facing prompt has to reach them with it.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 4,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-28T21:19:22+00:00",
+          "closed_findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-08"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Revisor de delta independiente, contexto limpio, alcance limitado a los tres archivos del lote de reparacion. Los cuatro hallazgos sostenidos quedan cerrados con evidencia reproducida, sin hallazgos nuevos ni reabiertos. Verifico por su cuenta lo que mas importaba: corrio el par de regex viejo y el nuevo sobre el historial real y confirmo que el nuevo conserva los 11 commits de entrega genuinos y solo descarta b5bc4d0 (documento de handoff) y ced2caa (spike de factibilidad), ninguno de los cuales es una entrega. Sobre el guard de shallow encontro algo que el escritor no habia probado: un repositorio con cero commits tambien imprime false en --is-shallow-repository, y lo que lo salva es que el codigo gatea sobre el resultado de las dos llamadas y no solo de la primera; un clon parcial (--filter=blob:none) no es shallow y tiene historial completo, asi que procede correctamente. Y probo que el test de acuerdo entre prosa y regex es real mutando una copia del arbol en las dos direcciones por separado - solo el regex, solo el ejemplo del documento - y confirmando que cada mutacion rompe el test sola. Tambien explico por que la prosa nueva no puede hacer caer a check-canonical-paths.py: su extractor exige un literal entre backticks sin espacios, asi que los ejemplos multipalabra ni siquiera se parsean como candidatos, y el unico token nuevo que si califica, ai/scripts/check-feature-state.py, existe. Deja anotado como endurecimiento futuro, explicitamente no como defecto de esta reparacion, que los caminos de repo sin commits, worktree en detached HEAD, clon parcial y OSError de git degradan bien pero no tienen test propio. Gates reproducidos por el revisor, no asumidos: 217 tests OK, VERIFY_PASS.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "6e665bc4d9d6acabe3af9638e5ecaf88ce8c4562",
+      "findings": [
+        {
+          "ac": "AC-05",
+          "detail": "check-feature-state.py:41-42 keys delivery on '^Feature\\s+0*(\\d+)\\b' plus a '\\bP\\d' token, a shape inferred from git log and asserted in no file a contributor reads. Reproduced: grep -rniE 'commit (subject|message|title)|mensaje de commit' Global/_canonical PROYECTO/prompt.md docs/ returns nothing, grep -rn 'Feature 0' Global/_canonical PROYECTO/*.md returns nothing, and grep -rn 'git commit' Global/_canonical/ returns nothing - no canonical prompt so much as mentions committing. The failure mode is a false negative and therefore silent: a delivery phrased 'feat(010): ship P1' or squashed by GitHub with a different title never trips the gate, which reproduces AC-05's own target defect behind the false confidence of having a gate for it. Repair: declare the required subject shape in Global/_canonical/commands/feature-batch.md, which this package already edits and already owns by exception, and name check-feature-state.py as its enforcer.",
+          "id": "F-02",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "architect",
+          "status": "closed",
+          "title": "The commit-subject convention the whole gate rests on is declared nowhere",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-05",
+          "detail": "tests/test_harness.py:918-995 copies the whole checkout including .git (shutil.copytree with ignore_patterns('__pycache__','*.pyc') only) and then asserts FEATURE_STATE_OK in the guest verify output at :994. That mirrors CI faithfully, but it means a future convention violation on main fails a test whose name reads like a scaffolding regression, costing a debugging cycle to whoever does not already know the coupling. Also enumerated as false-positive surface: a subject that merely looks like a delivery ('Feature 12 P1 priority bug') trips the gate, and the guard's real invariant is temporal - it stays quiet only while init runs before the first matching commit. Repair: one comment at the assertion naming the cause.",
+          "id": "F-04",
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "A portability test is transitively coupled to this repository's live commit history",
+          "verdict_evidence": "tests/test_harness.py:989 asserts returncode 0 with verified.stdout + verified.stderr as the failure message, so the message already contains the FEATURE_STATE_MISSING line and the remedy emitted by check-feature-state.py:114-117",
+          "verdict_reason": "The claimed cost cannot occur: the failing assertion carries the guard's own output, so the failure self-diagnoses at the moment it happens, which is exactly what the requested comment would have added. The remaining false-positive paragraph is F-08's ground, and F-08 survives.",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-13",
+          "detail": "feature-state.py:2417 makes it required and the value flows straight into the event metadata with no format check, no enum, no cross-reference. Verified that no live state file carries the key yet, so there is no sample of what it gets filled with. The claimed precedent, cmd_reopen's required --authorized-by, holds in kind but not in frequency or stakes: reopen fires only from BLOCKED and marks a genuine human decision point, while init fires once per feature and is run mechanically by the orchestrator per feature-batch.md:28. Nothing stops 'user' from becoming the permanent information-free value. Still a net improvement over recording nothing; flagged so it is not later mistaken for verified accountability.",
+          "id": "F-05",
+          "severity": "low",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "--approved-by is required, unverified free text, on the entry point of every feature",
+          "verdict_evidence": "docs/specs/009-self-application/spec.md:133-141 states AC-13 in terms of the spec bytes only; ai/state/decisions-log.jsonl carries the slug las-cuatro-fases-previas-a-la-aprobacion-siguen-sin-transiciones sanctioning required free-text attribution on the reopen --authorized-by precedent",
+          "verdict_reason": "AC-13 promises that init cannot assert an approval that never happened by way of the spec sha256; it says nothing about verifying an approver's identity, and the recorded decision reasons explicitly that stronger approval evidence is unattainable. The finding names no violated criterion and itself concedes the change is a net improvement over recording nothing.",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-13",
+          "detail": "Reproduced independently rather than trusting the decision text: sha256sum of the specs for 002, 005, 007 and 008 returns 4551943e..., 10f7c98f..., 4b4ec109... and 09f0cd18..., none matching the recorded approved_spec.hash, and 005's recorded value is 16 hex characters rather than a sha256. validate_state:253-254 only requires non-empty path and hash, so all four pass validate forever, and AC-13's verification runs only at creation. The deferral is defensible and correctly logged (decisions-log slug cuatro-archivos-de-estado-afirman-un-spec-que-ya-no-existe; sync-project.sh:24-45 would abort project sync if validate were tightened today), but neither STATUS.md nor the four state files carry any marker, so from the artifact the record reads clean. Repair suggestion: a footnote pointing at the decision slug.",
+          "id": "F-06",
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "The four live drifted hashes are real debt that is invisible from the artifacts themselves",
+          "verdict_evidence": "ai/state/decisions-log.jsonl:31 holds the slug cuatro-archivos-de-estado-afirman-un-spec-que-ya-no-existe and it is rendered under docs/notas/decisiones/; the hash facts it cites are correct and were not in dispute",
+          "verdict_reason": "Re-raises a recorded, reasoned exclusion, and its premise that the debt is invisible from the artifacts is false: it is persisted in the decisions log and rendered into the notes tree, which is the channel the harness designates for a decision that outlives its package. The markers it asks for would require hand-editing machine-owned notas:auto blocks.",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-07",
+          "detail": "check-feature-state.py:150-153 refuses an empty reason and stale_waivers at :122-143 forces WAIVER_UNNECESSARY the moment a waived feature stops needing waiving, which is exercised by the test. What the script structurally cannot do is bound how many entries WAIVED accumulates or judge whether a new waiver's reason is sound rather than merely well written. Not a defect in this package; recorded because the question was asked directly and the honest answer is that the mechanism is sound and its integrity remains a review-panel judgement every time.",
+          "id": "F-07",
+          "severity": "low",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "The waiver mechanism is sound but its integrity is procedural, not enforced",
+          "verdict_evidence": "check-feature-state.py:150-153 refuses an empty reason with WAIVER_WITHOUT_REASON and check-feature-state.py:122-143 forces WAIVER_UNNECESSARY, which was observed firing during the F-03 shallow-clone reproduction",
+          "verdict_reason": "It describes no defect and says so in its own text. Every enforceable property it examined is implemented and exercised; what remains is a review-panel judgement by the harness's own separation-of-duties design, so there is nothing for a repair to change.",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "ac": "AC-05",
+          "detail": "check-feature-state.py:41 compiles '^Feature\\s+0*(\\d+)\\b' with no re.IGNORECASE. Reproduced by the orchestrator as well as the reviewer, in a throwaway repo with docs/specs/010-x/ and no state file: subject 'feature 010 P1-first-slice: ship it whole' -> FEATURE_STATE_OK exit 0, and the same subject with a capital F -> exit 1. Nothing enforces commit-subject casing (the package's own decision rules out hooks), so this is a live one-character bypass that still prints the all-clear token, which is worse than no gate. Repair: re.IGNORECASE, plus a test case with a lowercase subject mirroring the existing one.",
+          "id": "F-01",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "FEATURE_SUBJECT is case-sensitive, so one character evades the whole gate",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-05",
+          "detail": "check-feature-state.py:122-143 decides a waiver is unnecessary when no matching commit is visible, conflating git log's window with everything that ever happened. Reproduced against the real repository: git clone --depth 1 file:///home/federico/SET-AGENTES -> 1 commit visible, is-shallow-repository true, and the guard prints FEATURE_STATE_MISSING count=1 plus WAIVER_UNNECESSARY id=006-execution-graph, exit 1. On a full clone the same tree prints FEATURE_STATE_OK. Under set -euo pipefail (verify.sh:2,59) that blocks VERIFY_PASS for anyone who clones shallowly, and the printed remedy is actively harmful: deleting the waiver as advised makes 006 fail for real against full history. CI is safe (fetch-depth: 0) which is exactly why it would go unnoticed. Repair: detect shallowness with git rev-parse --is-shallow-repository and refuse to reason about waivers, or about absence of delivery, when history is truncated.",
+          "id": "F-03",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "stale_waivers turns a shallow clone into a red tree with a harmful remedy",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-06",
+          "detail": "check-feature-state.py:42 is '\\bP\\d' with no trailing boundary. Reproduced: 'Feature 011 drafted: note P95 latency requirement' and 'Feature 011: allow P001 local gate commands' both classify as package delivery, while 'Feature 011 drafted: contract 1.0.0' correctly does not. P001 is an established proper noun in this repo's own prose (Global/_canonical/agents/local-gate-runner.md:1) and percentile tokens appear across the specs. A SPEC_DRAFT or SPEC_CHALLENGE commit carrying one is misclassified, which breaks AC-06's explicit promise and hands the reader a remedy - run init now - that is AC-13's defect. Repair: anchor the token to the shape every real delivery commit uses, P<digits> immediately followed by '-' or ':' or a space, and add a decoy test.",
+          "id": "F-08",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "PACKAGE_TOKEN is unanchored and collides with prose this repository already writes",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "ac": "AC-05",
+          "detail": "check-feature-state.py:92-93 always prints --mode feature while the CLI default is scoped (feature-state.py subparser). Harmless because the line is a template ending in '...' that has to be edited anyway, but it should either be corrected or carry a comment saying why feature is always right for something that reached package delivery under docs/specs/<id>/.",
+          "id": "F-09",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "refuted",
+          "title": "The printed remedy hardcodes --mode feature",
+          "verdict_evidence": "ai/scripts/feature-state.py:2427 sets --mode default scoped with the adjacent comment that full feature budgets stay opt-in; all seven live state files under ai/state/features/ record mode=feature",
+          "verdict_reason": "The explicit --mode feature is required rather than wrong: the CLI default is scoped and full SDD budgets are opt-in, so omitting it would silently open a delivered feature under floor budgets. Every live feature under docs/specs/ is mode=feature, which is every case the guard can fire on.",
+          "verified_at": "2026-07-28T21:05:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-28T21:18:45+00:00",
+          "evidence": "./ai/scripts/verify.sh tras la reparacion -> Ran 217 tests OK, ninguno skipeado (base 214, +3). GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK, SELF_SCAFFOLD_SYNC_OK files=2, VERIFY_PASS, exit 0.",
+          "name": "verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T19:07:57+00:00",
+          "evidence": "./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2. Los dos feature-state.py quedan byte-identicos tras el cambio de cmd_init.",
+          "name": "self-scaffold-sync",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T19:07:57+00:00",
+          "evidence": "git diff --check limpio (corre dentro de verify.sh:20).",
+          "name": "whitespace",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T21:18:45+00:00",
+          "evidence": "Re-corrido tras el lote de reparacion sobre los 29 archivos modificados desde la aceptacion de P1 -> OWNERSHIP_PASS, out_of_scope vacio. Los tres archivos del delta ya estaban cubiertos: check-feature-state.py y feature-batch.md canonico/generados por excepcion aprobada, tests/test_harness.py como shared_path.",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T19:07:57+00:00",
+          "evidence": "AC-05/AC-06 prueba adversarial: el mismo guard, sin su unico waiver, salio 1 con FEATURE_STATE_MISSING id=006-execution-graph evidence=02ed998 y la linea de remedio; con el waiver motivado sale FEATURE_STATE_OK. No dispara sobre 001-harness-evolution, que nunca produjo un commit 'Feature 001 P<n>'.",
+          "name": "feature-state",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T19:07:57+00:00",
+          "evidence": "CANONICAL_PATHS_OK: el guard de P1 sigue verde tras el cambio de prompts (feature-batch.md nombra --approved-by, ninguna ruta nueva).",
+          "name": "canonical-paths",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Que entregar una feature por fuera de la maquina de estados sea un error y no silencio, en las dos direcciones: sin registro y con un registro que declara una aprobacion que nunca ocurrio",
+      "owned_paths": [
+        "ai/scripts/feature-state.py",
+        "PROYECTO/ai/scripts/feature-state.py",
+        "docs/specs/009-self-application/*",
+        "ai/state/features/009-self-application.json",
+        "ai/state/STATUS.md",
+        "ai/state/narrative-log.jsonl",
+        "ai/state/decisions-log.jsonl",
+        "docs/notas/*"
+      ],
+      "package_id": "P2-state-machine-required",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-28T21:12:04+00:00",
+          "changed_files": [
+            "ai/scripts/check-feature-state.py",
+            "Global/_canonical/commands/feature-batch.md",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-08"
+          ],
+          "verification": [
+            "F-01 y F-08 se reparan juntos porque son el mismo defecto: la senal de entrega se leia con dos regex sueltas. Ahora es una sola, DELIVERY_SUBJECT = ^Feature\\s+0*(\\d+)\\s+P(\\d+)\\b con re.IGNORECASE, que exige el token de paquete inmediatamente despues del numero. Medido contra el historial real: conserva los 11 commits de entrega genuinos y descarta los dos falsos positivos que ya existian (b5bc4d0 'Feature 005: handoff document for continuing P1 in OpenCode' y ced2caa 'Feature 004 T-300 spike'). Fixtures nuevos: subject en minuscula -> exit 1; senuelos P95 y P001 en fase de borrador -> FEATURE_STATE_OK.",
+            "F-03: delivery_commits consulta git rev-parse --is-shallow-repository antes de leer el log. Historial truncado -> FEATURE_STATE_UNCHECKED reason=shallow-clone y exit 0, no WAIVER_UNNECESSARY. Reproducido antes y despues con un git clone --depth 1 real de este checkout, y el test lo maneja clonando shallow desde ROOT. Un historial truncado no es evidencia de violacion, y un guard que reporta violaciones que no lo son es el que alguien apaga.",
+            "F-02: la convencion de subject queda declarada en Global/_canonical/commands/feature-batch.md nombrando a check-feature-state.py como su ejecutor, y regenerada a los tres runtimes. El test no chequea prosa: importa el regex vivo del guard, extrae los dos ejemplos entre backticks del prompt y exige que el positivo matchee y el negativo no, asi que documento y ejecutor no pueden desincronizarse en silencio.",
+            "./ai/scripts/verify.sh -> Ran 217 tests OK, ninguno skipeado (214 base, 216 antes de la reparacion, +1). GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK, VERIFY_PASS, exit 0. OWNERSHIP_PASS sobre los 29 archivos."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-28T19:19:26+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "architect"
+          ],
+          "started_at": "2026-07-28T19:08:22+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-28T19:17:54+00:00",
+              "evidence": "Panel RP-01 member 2, Sonnet 5 against an Opus 5 writer, design-durability lens rather than correctness. Every claim reproduced by running the command: the documentation greps for the commit convention all return empty, the four drifted spec hashes were recomputed rather than read from the decision entry, and the guest-verify copytree call was read to confirm .git is carried into the guest. Degraded independence per ADR-0011: cross-provider unavailable, so same-provider on a different model with clean context; correlated blind spots survive that.",
+              "findings": [
+                "F-02",
+                "F-04",
+                "F-05",
+                "F-06",
+                "F-07"
+              ],
+              "role": "architect",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-28T19:19:14+00:00",
+              "evidence": "Panel RP-01 member 1, Sonnet 5 against an Opus 5 writer, correctness lens. Every defect reproduced against the real repository rather than a fixture, including a genuine git clone --depth 1 of this checkout. Independently confirmed clean: cmd_init refuses on all three paths before atomic_write and --force never bypasses verify_spec_hash; both new tests fail on the pre-change tree for the intended reasons, verified by reverting the two feature-state.py copies to HEAD and deleting the untracked guard in a copied tree; the 19-site init migration weakens no assertion and test_sync_notes now asserts a recomputed real digest; set -euo pipefail does block VERIFY_PASS after a failing guard; the guest copytree preserves full .git so the guest path is unaffected by the shallow-clone defect; sync-project.sh does not distribute the guard; and the 006 waiver's citation of spec.md:129-132 and the decision slug is factually accurate. Degraded independence per ADR-0011: cross-provider unavailable, same-provider different model with clean context.",
+              "findings": [
+                "F-01",
+                "F-03",
+                "F-08",
+                "F-09"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-28T19:19:26+00:00",
+          "evidence": "Panel RP-01 cerrado: dos revisores independientes, un solo lote, ambos Sonnet 5 contra un escritor Opus 5. Nueve hallazgos, tres high, y los tres high los reprodujo el orquestador antes de aceptarlos. Convergieron desde lados opuestos sobre la misma debilidad estructural - la senal de entrega: uno que la convencion de commits no esta escrita en ningun lado, el otro que la regex que la lee es evadible con un caracter y confunde P95 con un paquete. Ese es el indicio de que el punto blando es la senal, no ninguna linea suelta. Ademas, el hallazgo que mas duele es sobre el ratchet que el escritor agrego por iniciativa propia: stale_waivers pone el arbol en rojo en cualquier clon shallow y aconseja borrar el waiver, que es justo lo que no hay que hacer. Independencia degradada respecto de ADR-0011: cross-provider no disponible, se preserva modelo distinto y contexto limpio; los puntos ciegos correlacionados sobreviven a eso.",
+          "findings": [
+            "F-02",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-01",
+            "F-03",
+            "F-08",
+            "F-09"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "AC-05 sale del paquete con el mecanismo sin decidir; las tres opciones tienen semanticas incompatibles y una de ellas (pre-commit bloqueante) es una clase de aplicacion que el repo nunca tuvo",
+        "AC-13 toca cmd_init, que es la puerta de entrada de toda feature: un guard mal calibrado deja al arnes sin poder abrir features",
+        "Comparte feature-state.py con P3 y verify.sh con P1; el contrato exige orden estricto porque no hay deteccion de colision entre paquetes"
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-28T21:19:23+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py",
+        "ai/scripts/verify.sh"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Decidir y escribir el punto de aplicacion del gate, con su consecuencia asumida",
+          "local_validations": [
+            "Decision registrada con log-decision, slug el-gate-de-estado-obligatorio-vive-en-verify-sh: el gate vive solo en verify.sh, con la consecuencia asumida por escrito (no bloquea un commit local). El dato que decide contra pre-commit es que .git/hooks/ no se versiona, asi que no existe en un clon nuevo ni en el runner del CI; el post-commit existente termina en '|| true' (build.sh:37-49) y no puede fallar nada.",
+            "Prueba adversarial del gate ANTES de cualquier waiver: python3 ai/scripts/check-feature-state.py . -> exit 1, FEATURE_STATE_MISSING id=006-execution-graph evidence=02ed998, con la linea de remedio completa. No dispara sobre 001-harness-evolution, que no produce ningun commit 'Feature 001 P<n>': AC-06 medido y no afirmado.",
+            "Prueba adversarial de AC-13 sobre el arbol de hoy: init 010-fake docs/specs/010-fake/spec.md deadbeef -> ok, y el estado queda afirmando hash 'deadbeef' con from=USER_APPROVAL, contra un archivo cuyo sha256 real es 6d8d335b. Ese es el defecto."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Gate que exige ai/state/features/<id>.json cuando el trabajo llego a entrega, sin disparar en el ciclo previo a la aprobacion, nombrando el comando remedio",
+          "local_validations": [
+            "ai/scripts/check-feature-state.py con un solo waiver motivado (006-execution-graph, citando AC-07 en spec.md:129-132 y el slug feature-006-delivered-outside-state-machine). Sin el waiver salia 1 sobre el defecto vivo; con el, FEATURE_STATE_OK. Enganchado en verify.sh despues de check-canonical-paths.py: SET_AGENTS_GUEST_VERIFY=1 ./ai/scripts/verify.sh -> GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK, VERIFY_PASS, exit 0.",
+            "test_feature_state_gate_fails_when_a_delivered_feature_has_no_state_file maneja el camino de falla contra un repo de prueba: entrega sin estado -> exit 1 + FEATURE_STATE_MISSING + el remedio con el sha256 real del spec; feature solo redactada (commit sin token P<n>) -> FEATURE_STATE_OK, que es AC-06 medido y no afirmado; sin historia de git -> FEATURE_STATE_UNCHECKED por stderr y exit 0, ruidoso y fijado por el test en vez de degradar a no-op silencioso. El guest-verify ademas fija FEATURE_STATE_OK por nombre, asi que borrar el guard ya no deja la suite verde."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "init deja de poder afirmar una aprobacion que nadie verifico",
+          "local_validations": [
+            "cmd_init verifica sha256(spec_path) contra el hash recibido y se niega con SPEC_HASH_MISMATCH o SPEC_NOT_FOUND sin escribir el archivo de estado; --approved-by pasa a ser requerido, con el precedente de reopen --authorized-by que ya lo exige. El evento de historia lleva spec_hash_verified y approved_by: la evidencia, no solo la afirmacion. Mismo cambio en PROYECTO/ai/scripts/feature-state.py, ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2.",
+            "test_init_refuses_to_attest_a_spec_it_did_not_verify fallaba sobre el arbol previo y ahora pasa: hash equivocado, spec ausente y falta de atribucion son los tres rechazos, y en los tres el archivo de estado no existe. Las 19 llamadas a init de la suite migraron al helper init_state, que escribe un spec real y lo hashea, asi que ningun test puede volver a pasar un nombre y una ficcion. test_sync_notes_renders_hub_feature_and_package_notes se reapunto al digest real en vez de la cadena 'hash-abc': misma asercion, misma fuerza.",
+            "Superficie de prompts alineada con el CLI: Global/_canonical/commands/feature-batch.md y PROYECTO/prompt.md documentan --approved-by y que el hash se verifica; Global/ regenerado con ./build.sh (opencode y claude-code reciben feature-batch; codex no publica commands). Dos residuos registrados con log-decision en vez de arreglados de contrabando: LEGAL_TRANSITIONS sigue sin las cuatro fases previas, y las 4 derivas de hash vivas no se convierten en gate porque endurecer validate dejaria a sync-project.sh sin poder sincronizar proyectos."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-28T21:19:23+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "Ran 217 tests, OK, ninguno skipeado. La base al empezar el paquete era 214; el paquete agrega tres: test_init_refuses_to_attest_a_spec_it_did_not_verify (AC-13), test_feature_state_gate_fails_when_a_delivered_feature_has_no_state_file (AC-05/AC-06) y test_the_delivery_commit_convention_is_declared_where_the_gate_reads_it (AC-05, agregado por la reparacion de F-02). Dos tests preexistentes se fortalecieron en vez de debilitarse: el guest-verify fija FEATURE_STATE_OK por nombre, y test_sync_notes_renders_hub_feature_and_package_notes pasa de asertar la cadena inventada 'hash-abc' a asertar el digest real recomputado en el test. Los tres tests nuevos se mostraron fallando sobre el arbol previo antes de cualquier arreglo, y los cuatro defectos reparados se reprodujeron primero: la evasion en minuscula, la colision de P95/P001, el clon shallow contra este mismo checkout, y la convencion sin declarar por triple grep vacio.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-28T21:05:57+00:00",
+          "evidence": "Adversarial refutation on Fable 5, the third distinct model after an Opus 5 writer and two Sonnet 5 reviewers. Every confirmation was reproduced by running the command, including a real git clone --depth 1 of this checkout; every refutation cites a file:line or a command with its output. It also strengthened F-08 beyond what the panel claimed by running the classifier over this repository's own history and finding two commits that already misclassify.",
+          "refuted": [
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-09"
+          ],
+          "upheld": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-08"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "Global/_canonical/commands/audit-package.md",
+          "reason": "Sus lineas 22-33 son la documentacion primaria del CLI del panel; los dos verbos nuevos (extend-review-panel, record-late-review) no tienen otro domicilio. AC-08/AC-09/AC-10 cambian el contrato de CLI del panel de review y este prompt canonico lo documenta; dejarlo desactualizado seria el defecto exacto de la feature 009: una declaracion que no coincide con la realidad. El paquete nacio con owned_paths incompletos por tercera vez en 009 -- se suma a la decision estado-no-sabe-amendar-un-contrato-revisado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_canonical/commands/feature-batch.md",
+          "reason": "Sus lineas 44-45 describen el flujo del panel para toda entrega por paquetes. AC-08/AC-09/AC-10 cambian el contrato de CLI del panel de review y este prompt canonico lo documenta; dejarlo desactualizado seria el defecto exacto de la feature 009: una declaracion que no coincide con la realidad. El paquete nacio con owned_paths incompletos por tercera vez en 009 -- se suma a la decision estado-no-sabe-amendar-un-contrato-revisado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_canonical/agents/orchestrator.md",
+          "reason": "Sus lineas 75-78 enumeran los verbos del panel, y su linea 333 es la orden que motiva extend-review-panel: hoy prescribe una accion imposible. AC-08/AC-09/AC-10 cambian el contrato de CLI del panel de review y este prompt canonico lo documenta; dejarlo desactualizado seria el defecto exacto de la feature 009: una declaracion que no coincide con la realidad. El paquete nacio con owned_paths incompletos por tercera vez en 009 -- se suma a la decision estado-no-sabe-amendar-un-contrato-revisado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_canonical/agents/package-planner.md",
+          "reason": "Sus lineas 26-27 llaman a required_reviewers 'un techo sobre el panel -- no podes invocar un revisor que no declaraste aca'. extend-review-panel contradice esa oracion en vivo y el paquete tiene que resolver la contradiccion, no solo actualizar el texto. AC-08/AC-09/AC-10 cambian el contrato de CLI del panel de review y este prompt canonico lo documenta; dejarlo desactualizado seria el defecto exacto de la feature 009: una declaracion que no coincide con la realidad. El paquete nacio con owned_paths incompletos por tercera vez en 009 -- se suma a la decision estado-no-sabe-amendar-un-contrato-revisado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_canonical/agents/finding-verifier.md",
+          "reason": "Su linea 13 acota al verificador a 'entre finalize-review-panel y repair-agent', lo que excluye el camino del hallazgo tardio de AC-10. AC-08/AC-09/AC-10 cambian el contrato de CLI del panel de review y este prompt canonico lo documenta; dejarlo desactualizado seria el defecto exacto de la feature 009: una declaracion que no coincide con la realidad. El paquete nacio con owned_paths incompletos por tercera vez en 009 -- se suma a la decision estado-no-sabe-amendar-un-contrato-revisado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/opencode/*",
+          "reason": "Generado por ./build.sh desde _canonical; verify.sh:25-27 falla con diff -ruN si queda desactualizado. Nunca se edita a mano.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/claude-code/*",
+          "reason": "Generado por ./build.sh desde _canonical; verify.sh:25-27 falla con diff -ruN si queda desactualizado. Nunca se edita a mano.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/codex/*",
+          "reason": "Generado por ./build.sh desde _canonical; verify.sh:25-27 falla con diff -ruN si queda desactualizado. Nunca se edita a mano.",
+          "status": "approved"
+        },
+        {
+          "path": "PROYECTO/prompt.md",
+          "reason": "Sus lineas 102-103 nombran los tres verbos del panel a un proyecto scaffoldeado que recibe el feature-state.py byte-identico. Mismo motivo que ya registro P2.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 5,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "medium",
+      "context_pack": "docs/specs/009-self-application/context/P3-panel-integrity.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-28T23:15:30+00:00",
+          "closed_findings": [
+            "F-01",
+            "F-02",
+            "F-03"
+          ],
+          "new_or_reopened_findings": [
+            "F-05"
+          ],
+          "reason": "Delta review independiente, contexto limpio, alcance limitado a los cuatro archivos del lote. Los tres hallazgos sostenidos quedan cerrados con evidencia reproducida y aparece uno nuevo. Verifico lo que mas importaba en vez de asumirlo: copio el arbol a un scratch, revirtio a mano los tres hunks de reparacion sobre los dos gemelos y confirmo que los cuatro tests nuevos fallan en rojo con AssertionErrors que corresponden a cada bug, y que esa es la UNICA diferencia contra la suite reparada (162 tests, exactamente 4 fallas, nada mas se movio). Despues muto cada arreglo por separado -- reensanchar el scope de replayed(), sacar source_role del blacklist, restaurar el string de reason falso -- y confirmo que en cada caso solo rompe el test correspondiente. Manejo el CLI real contra cuatro estados descartables para confirmar que record-review y record-delta-review --new-finding tambien rechazan un source_role forjado (o sea que el blacklist cierra el vector en todos los ingresos que comparten normalize_findings), que record-subreview legitimo sigue estampando source_role desde args.role, y que los findings legitimos de record-review siguen entrando con source_role null, que es la deuda preexistente y no cambio. Suite completa 237 OK, SELF_SCAFFOLD_SYNC_OK files=2, gemelos byte-identicos por cmp. F-04 correctamente no re-reportada.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-28T23:19:49+00:00",
+          "closed_findings": [
+            "F-05"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Segunda delta review sobre el unico hallazgo del lote anterior. F-05 cerrado: el comentario ahora describe la conducta real y el mecanismo queda fijado por un guard estructural que se muto y rompe. Sin hallazgos nuevos ni reabiertos. Gates reproducidos: 238 tests OK, VERIFY_PASS, SELF_SCAFFOLD_SYNC_OK files=2, whitespace limpio.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6",
+      "findings": [
+        {
+          "category": "correctness",
+          "id": "F-01",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El cortocircuito de replay por --event-id que agrega este paquete a start-review-panel (feature-state.py:1612), extend-review-panel (:1760) y record-late-review (:1829) se scopea SOLO por event_id sobre toda la historia, sin atarlo al nombre del comando. Reproducido por el orquestador: (a) record-spawn --event-id E-X y despues start-review-panel --event-id E-X devuelve ok:true changed:false y no crea ningun panel; (b) start-review-panel --event-id E1 seguido de extend-review-panel --event-id E1 devuelve changed:false y no agrega el rol. El caso grave es record-late-review: un hallazgo critico verificado desaparece sin rastro con rc=0, que es exactamente el no-op silencioso que AC-09 existe para eliminar, reintroducido por otra puerta. El patron preexiste en record_event:349 y cmd_record_verification, pero este paquete lo extiende a tres superficies nuevas, una de ellas el canal que un hallazgo tardio no debe perder.",
+          "verified_at": "2026-07-28T22:45:26+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "data-integrity",
+          "id": "F-02",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "normalize_findings blindea FINDING_BOOKKEEPING contra campos contrabandeados por el llamador pero NO incluye source_role, y record-late-review usa finding.setdefault('source_role', role) (:1869), que solo llena la clave si falta. Reproducido por el orquestador: un --finding con \"source_role\": \"architect\" declarado por el rol finding-verifier queda guardado como architect, y despues record-verification --actor finding-verifier --verdict refuted tiene exito (rc 0, status refuted). O sea, el guard anti-autorrefutacion de cmd_record_verification queda derrotado, que es el invariante que el propio context pack del paquete nombra como intocable. El test test_a_late_finding_cannot_be_refuted_by_the_role_that_filed_it solo cubre el caso omitido, nunca el contrabandeado: promete mas de lo que verifica.",
+          "verified_at": "2026-07-28T22:45:26+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "false-claim",
+          "id": "F-03",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "architect",
+          "status": "closed",
+          "summary": "Las dos ramas nuevas de next_transition llevan el comentario 'Reachable only through record-late-review: every other door into this phase already refuses while a blocking finding is open', y es falso. cmd_record_review (la ruta de revisor unico, documentada en audit-package.md:22 y no tocada por este paquete) pone phase=PACKAGE_TESTING con verdict=pass sin ningun chequeo de has_open_findings, a diferencia de finalize-review-panel y record-delta-review. Reproducido por el orquestador: record-review PKG-01 pass --finding '{severity: high}' deja el paquete en PACKAGE_TESTING con el hallazgo abierto, y next contesta 'a late review left a blocking finding open' sin que haya existido ninguna review tardia. El consejo es correcto pero el motivo que imprime es factualmente falso, y un agente que lo lea diagnostica mal. Ademas el context pack del paquete afirma la misma reachability y hay que corregirlo.",
+          "verified_at": "2026-07-28T22:45:26+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "dead-end-remedy",
+          "id": "F-04",
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "refuted",
+          "summary": "El rechazo de record-late-review contra un paquete accepted (:1855-1863) sugiere 'raise this against the integration or block the feature'. Ninguna de las dos mitades es un paso estructurado: no existe ningun verbo que adjunte un hallazgo a la fase INTEGRATION (record-gate --global-gate toma name/status/evidence, no findings), y block si existe pero solo appendea texto libre a data['blockers'] sin tocar package['findings'], asi que el hallazgo nunca recibe severidad, verificacion ni reparacion. Es el unico mensaje de error de toda la familia panel-integrity cuyo remedio es prosa en vez de un verbo nombrado, inconsistente con sus hermanos ('use extend-review-panel', 'use record-subreview', 'pass the original --event-id'). El hueco esta registrado como deuda a proposito, pero el mensaje lo presenta como si hubiera salida.",
+          "verdict_evidence": "ai/scripts/feature-state.py:471 (done_ready se niega a DONE con blockers) y :2340 (cmd_block es incondicional y sin guarda de fase); corrido por el verificador: block '<hallazgo>' --package-id PKG-01 -> phase BLOCKED con el texto como blocker",
+          "verdict_reason": "La afirmacion portante del hallazgo -- que ninguna de las dos mitades del mensaje es un paso estructurado -- es falsa. 'Block the feature' nombra el verbo block de este mismo CLI, y el verificador lo corrio: mueve la feature a BLOCKED con el texto del hallazgo como motivo, y done_ready se niega a llegar a DONE mientras haya blockers, o sea el hallazgo no puede morir en silencio: frena todo hasta que un humano autorice el reopen, que es exactamente la escalacion HUMAN_DECISION_REQUIRED que la doctrina prescribe cuando aparece un hallazgo contra trabajo ya aceptado. Lo que queda despues de esa correccion es la falta de contabilidad de severidad y verificacion, que es literalmente el hueco que la decision 2 registro como deuda con el usuario, mas una preferencia de redaccion que no viola ninguna AC.",
+          "verified_at": "2026-07-28T22:45:26+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        },
+        {
+          "category": "false-claim",
+          "id": "F-05",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "El guard de replay de cmd_start_review_panel (feature-state.py:1639-1641) quedo con un comentario de un borrador anterior del arreglo de F-01: 'Scoped globally by event_id like record_event's own dedupe, not narrowed to this event name'. Es falso y contradice la linea que esta tres arriba, replayed(data, \"start-review-panel\", args.event_id), y el docstring de replayed(). El guard SI esta keyeado por (event, event_id) igual que los otros tres; el comentario describe el bug previo a la reparacion como si fuera la conducta embarcada. Es exactamente la clase de defecto que F-03 existe para cerrar -- un comentario que afirma algo falso sobre el mecanismo -- dejado adentro del arreglo que cerro F-01, y ningun test lo agarra porque ninguno asierta sobre texto de comentarios. Verificado por el orquestador leyendo el bloque completo: es la unica ocurrencia, los otros tres call sites tienen comentarios correctos.",
+          "verified_at": "2026-07-28T23:19:49+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-28T22:11:31+00:00",
+          "evidence": "./ai/scripts/verify.sh exit 0: Ran 233 tests OK (base 217 al abrir el paquete, +16), ninguno skipeado, GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK, VERIFY_PASS",
+          "name": "package verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T22:11:31+00:00",
+          "evidence": "./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2: ai/scripts/feature-state.py y su gemelo PROYECTO/ai/scripts/feature-state.py byte-identicos tras los tres cambios de CLI",
+          "name": "self-scaffold-sync",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T22:11:31+00:00",
+          "evidence": "git diff --check sin salida",
+          "name": "whitespace",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T22:11:31+00:00",
+          "evidence": "check-owned-paths.py sobre 130 archivos fuente (el set completo por mtime, sin artefactos de __pycache__ que estan gitignoreados) -> OWNERSHIP_PASS con las 9 excepciones aprobadas antes de editar",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T22:11:31+00:00",
+          "evidence": "Los 16 tests nuevos se mostraron en rojo sobre el arbol previo antes de cualquier arreglo, y los cuatro defectos se reprodujeron primero con el CLI real: panel abierto sin miembros con el rechazo llegando recien en record-subreview; el 'ok:true, changed:false' de la correccion; el replay que mintea RP-02, lleva deep_review_cycles a 2, deja RP-01 huerfano, escribe sin entrada de historia y deja la feature en BLOCKED por 'deep review budget exhausted' en el siguiente panel legitimo; y las dos derivas de registro. El guard nuevo de verbos se muto en las dos direcciones (verbo mal escrito en el doc, verbo sin documentar) y rompe en ambas.",
+          "name": "adversarial-proof",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T23:20:23+00:00",
+          "evidence": "./ai/scripts/verify.sh exit 0 tras los dos lotes de reparacion: Ran 238 tests OK (base 217 al abrir el paquete, +21), ninguno skipeado, GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK, VERIFY_PASS; ./build.sh --check SELF_SCAFFOLD_SYNC_OK files=2; git diff --check limpio; check-owned-paths.py sobre los 130 archivos fuente OWNERSHIP_PASS",
+          "name": "package verify (post-repair)",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Cerrar los tres agujeros del ciclo de review que aparecieron al usarlo (panel sin miembros declarados, no-op silencioso, hallazgo tardio sin canal) y corregir la deriva de registro que aparecio al rastrearlos",
+      "owned_paths": [
+        "ai/scripts/feature-state.py",
+        "PROYECTO/ai/scripts/feature-state.py",
+        "docs/adr/README.md",
+        "docs/specs/003-trusted-routing-pi-runtime/design.md",
+        "docs/specs/009-self-application/*",
+        "ai/state/features/009-self-application.json",
+        "ai/state/STATUS.md",
+        "ai/state/narrative-log.jsonl",
+        "ai/state/decisions-log.jsonl",
+        "docs/notas/*"
+      ],
+      "package_id": "P3-panel-integrity",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-28T22:51:41+00:00",
+          "changed_files": [
+            "ai/scripts/feature-state.py",
+            "PROYECTO/ai/scripts/feature-state.py",
+            "tests/test_harness.py",
+            "docs/specs/009-self-application/context/P3-panel-integrity.md"
+          ],
+          "finding_ids": [
+            "F-01",
+            "F-02",
+            "F-03"
+          ],
+          "verification": [
+            "4 tests nuevos mostrados en rojo antes del arreglo; suite completa 237 OK, ninguno skipeado; VERIFY_PASS; SELF_SCAFFOLD_SYNC_OK files=2",
+            "F-01: nuevo helper replayed(data, event, event_id) como unica definicion de 'esta llamada exacta ya corrio', keyeada por comando ademas de id. Lo usan record_event y los cuatro updaters que cortocircuitan, incluido el guard preexistente de record-verification, asi que updater y record_event no pueden discrepar: si discreparan, una llamada pasaria su propio guard y perderia su entrada de historia en silencio. Narrow solo los guards habria cambiado un no-op silencioso por un hueco silencioso en la auditoria. F-02: source_role entra a FINDING_BOOKKEEPING, o sea se rechaza al nacer en vez de solo defaultearse; la atribucion la asigna el comando desde el rol que recibio, nunca se acepta del payload. Cierra tambien el mismo vector en record-subreview, que compartia la raiz. F-03: el comentario y los dos strings de reason dejan de afirmar una causa que el panel probo falsa; nombran el estado, no el culpable. La asimetria de fondo -- cmd_record_review es la unica puerta a PACKAGE_TESTING que no chequea has_open_findings -- queda registrada como deuda y NO se repara: record-review esta fuera de los criterios de este paquete y lo usa todo paquete en vuelo. F-04 refutada, sin cambio."
+          ]
+        },
+        {
+          "at": "2026-07-28T23:19:49+00:00",
+          "changed_files": [
+            "ai/scripts/feature-state.py",
+            "PROYECTO/ai/scripts/feature-state.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "F-05"
+          ],
+          "verification": [
+            "Suite completa 238 OK, ninguno skipeado; VERIFY_PASS; SELF_SCAFFOLD_SYNC_OK files=2; git diff --check limpio",
+            "El comentario pasa a describir lo que el codigo hace. Ademas se agrega test_replay_detection_has_exactly_one_definition, que no aserta sobre texto de comentarios -- ningun test deberia -- sino sobre la propiedad que el comentario describia: una sola definicion de 'esta llamada exacta ya corrio' y ningun scan inline de event_id fuera de replayed(), en los dos gemelos. Mutado: reinlinear un guard lo pone en rojo. Es lo unico que se puede fijar de esta clase, y se dice explicitamente que un comentario que miente sigue sin tener guard."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-28T22:36:21+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "architect"
+          ],
+          "started_at": "2026-07-28T22:12:24+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-28T22:36:21+00:00",
+              "evidence": "package-reviewer en Sonnet 5, contexto limpio, read-only, concurrente con el architect. Reprodujo cada afirmacion contra archivos de estado descartables con el CLI real, corrio la suite completa (233 OK) y manejo validate/status/next/resume/sync-notes contra copias de los siete archivos de estado de produccion (13 paquetes, ninguno con late_reviews) para confirmar que toda lectura de la clave nueva es .get()-segura. Confirmo AC-08, el rechazo del panel_id duplicado, el caso de replay del mismo comando, las dos correcciones de AC-11 y la identidad byte a byte de los gemelos.",
+              "findings": [
+                "F-01",
+                "F-02"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-28T22:36:21+00:00",
+              "evidence": "architect en Sonnet 5, contexto limpio, read-only, concurrente con el package-reviewer. Es el mismo rol cuyos cinco hallazgos en 007-P0 no tuvieron canal, o sea el destinatario real de AC-10. Reprodujo sus hallazgos contra estados descartables y verifico la coherencia entre los seis prompts reescritos y el codigo. Los dos revisores convergieron de forma independiente en F-01 y F-02, y el orquestador los reprodujo por su cuenta antes de aceptarlos.",
+              "findings": [
+                "F-03",
+                "F-04"
+              ],
+              "role": "architect",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-28T22:36:21+00:00",
+          "evidence": "Panel RP-01 de dos miembros declarados en la apertura, un solo ciclo de review profundo. Cuatro hallazgos consolidados: dos altos donde los dos revisores convergieron de forma independiente (colision de event-id entre comandos distintos, contrabando de source_role), uno alto sobre una afirmacion de reachability falsa que el propio paquete escribio, y uno medio sobre un mensaje de error que ofrece una salida que no existe. Independencia degradada y registrada: no hubo cruce de proveedor, los dos revisores corrieron en Sonnet 5 con contexto limpio y lentes distintas, sobre un escritor en Opus 5.",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Cambiar la semantica de start-review-panel toca el camino que todo paquete usa para abrir su review; un error deja al arnes sin poder revisar nada",
+        "Comparte feature-state.py con P2; orden estricto"
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-28T23:20:23+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "start-review-panel exige miembros declarados",
+          "local_validations": [
+            "test_start_review_panel_requires_declared_members: rojo antes (rc 0, roles ['package-reviewer'], ciclo gastado), verde despues"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "start-review-panel contra un panel-id existente es error, nunca no-op silencioso",
+          "local_validations": [
+            "3 tests: duplicado, replay que no quema ciclo, y las 4 conductas de extend-review-panel. Los 7 mostrados en rojo antes"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Canal sancionado para un hallazgo que llega despues de cerrado el panel, sin fase nueva",
+          "local_validations": [
+            "5 tests nuevos mostrados en rojo antes; suite completa 232 OK (base 217), ninguno skipeado"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Corregir la deriva de registro: fila de ADR-0009 ausente del indice y la asercion invertida en design.md:455",
+          "local_validations": [
+            "3 tests nuevos: 2 mostrados en rojo antes del arreglo (0009 sin fila; la asercion invertida presente), verdes despues"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-28T23:20:23+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "Ran 238 tests, OK, ninguno skipeado. La base al abrir el paquete era 217; este paquete agrega 21: siete de panel-integrity (miembros declarados, panel_id duplicado, replay que no quema ciclo, y las cuatro conductas de extend-review-panel incluida la exigencia de finalize), cinco de record-late-review (aterrizaje sin ciclo, autorrefutacion imposible, los cuatro rechazos, paquete aceptado, re-levantar un hallazgo refutado con su veredicto archivado), tres de AC-11 (toda ADR en disco tiene fila, ninguna fila apunta a un archivo ausente, el contador de exclusiones ya no esta invertido), uno de coherencia entre los verbos que nombra el canon y los que el CLI tiene, y cinco que salieron de la revision (colision de event-id entre comandos, historia completa tras la colision, atribucion forjada, next que no culpa a una review tardia inexistente, y una sola definicion de deteccion de replay). Los 21 se mostraron en rojo antes de su arreglo. Los cuatro defectos originales y los cinco hallazgos del ciclo de review se reprodujeron primero con el CLI real; el guard de verbos del canon y el guard estructural de replay se mutaron en las dos direcciones y rompen. Ningun test se debilito: el que el refutador senalo como mas flojo de lo que promete se reforzo con un segundo test para el caso que no cubria.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-28T22:45:26+00:00",
+          "evidence": "Refutacion adversarial en Fable 5, cuarto modelo distinto de la cadena tras un escritor en Opus 5 y dos revisores en Sonnet 5, contra el gemelo de PROYECTO verificado byte-identico con cmp. Los cuatro hallazgos en un solo lote, cada uno reproducido o no reproducido contra archivos de estado descartables, sin tomarle la palabra al panel. Argumento las dos refutaciones posibles de F-01 y F-02 (deuda heredada vs empeorada) antes de decidir. Ademas expuso dos cosas que el panel no vio, ambas preexistentes y registradas como deuda: done_ready:471 se niega a DONE por la mera existencia de blockers mientras reopen solo les estampa resolved_at sin removerlos ni filtrarlos, asi que una feature bloqueada y reabierta legitimamente no puede llegar nunca a DONE; y la raiz de F-03 es mas honda que su texto, porque cmd_record_review es la unica puerta hacia PACKAGE_TESTING que no chequea has_open_findings.",
+          "refuted": [
+            "F-04"
+          ],
+          "upheld": [
+            "F-01",
+            "F-02",
+            "F-03"
+          ]
+        },
+        {
+          "at": "2026-07-28T23:19:49+00:00",
+          "evidence": "Verificacion del hallazgo de delta review. La refutacion se intento por dos vias y ninguna sobrevive: no es preferencia de estilo porque el comentario afirma una conducta que el codigo no tiene, y no es preexistente porque la linea la introdujo el lote de reparacion de F-01 en este mismo paquete.",
+          "refuted": [],
+          "upheld": [
+            "F-05"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "DONE",
+  "revision": 110,
+  "schema_version": 1,
+  "updated_at": "2026-07-29T17:10:45+00:00"
+}

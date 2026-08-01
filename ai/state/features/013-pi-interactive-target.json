@@ -1,0 +1,65 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12",
+    "AC-13",
+    "AC-14"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-31T14:26:21+00:00",
+    "hash": "eb9c8c2702147112c2315a3b90eeb91dc480cbe07b821d77bda253a40c1153f5",
+    "path": "docs/specs/013-pi-interactive-target/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": null,
+  "feature_id": "013-pi-interactive-target",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "user",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/013-pi-interactive-target/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-31T14:26:21+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "feature",
+  "packages": [],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 0,
+  "schema_version": 1,
+  "updated_at": "2026-07-31T14:26:21+00:00"
+}

@@ -102,7 +102,7 @@ closed, per-mode exempt set for pure rendering/behavior modifiers:
 | `--routing-report` | `--json` | No |
 | `--route-decide` | `--json`, `--fresh-probes` | **Yes for writer roles** (durable authorization); no-op for review/other roles beyond the regenerable cache |
 | `--route-dispatched` | `--json` | Yes (lifecycle transition) |
-| `--route-terminal` | `--json`, `--latency-ms` | Yes (lifecycle transition; `failure` from `authorized` closes as `abandoned`) |
+| `--route-terminal` | `--json`, `--latency-ms`, `--usage` | Yes (lifecycle transition; `failure` from `authorized` closes as `abandoned`) |
 | `--routing-open-runs` | `--json` | No (redacted listing) |
 | `--routing-recent-writers` | `--json` | No (redacted listing) |
 
@@ -126,7 +126,9 @@ lane inherits the same table instead of re-deriving it:
   context — distinct from a resolved-but-missing pack, which is plain `CONTEXT_MISSING` inside the decision).
 - exit 2 `ROUTING_INPUT_INVALID`: malformed descriptor JSON, a closed-enum violation (`risk`,
   `selected_runtime`) caught at PARSE time — never passed to the service to degrade into a generic
-  `FACTS_INCOMPLETE` — or an out-of-bounds `--latency-ms`.
+  `FACTS_INCOMPLETE` — an out-of-bounds `--latency-ms`, or a `--usage` that is not JSON or not a JSON object
+  (007-P2 AC-11/AC-13; parseable-but-untrustworthy usage is the store's edge instead, and never blocks the
+  close — see `docs/adr/0010-spawn-accounting.md` D3).
 
 P1R (003) is ACCEPTED and its invariants stay load-bearing under this CLI. P2 (OpenCode lane) is a generated,
 tier-variant lane on top of the same decisions.
@@ -188,3 +190,48 @@ flowchart LR
 
 P3 remains paused for acceptance until it passes its own package gates and independent review; ADR-0007
 records the full design record and the flip's gating evidence.
+
+## Two roots: `HARNESS_HOME` vs `PROJECT_ROOT` (005-P1, ADR-0008)
+
+Before 005, the harness assumed "the project" and "the harness" were the same directory. `HARNESS_HOME` (the
+harness's own checkout) and `PROJECT_ROOT` (whatever repo the user is actually working in, discovered by
+walking up from cwd for an `ai/state/features/` or `.git` marker, self-inclusive, both markers checked at
+every level before moving up) are now distinct. `--project`/`SET_AGENTS_PROJECT` override the walk explicitly;
+explicit always wins over discovered. Path substitution into a real `HARNESS_HOME` happens exclusively at
+**install time** (`install.py`'s write path) — `Global/**` (git-tracked) always keeps the literal placeholder
+`__SET_AGENTS_ROOT__` and zero absolute paths, so the tracked tree stays machine-independent and `verify.sh`
+passes on every machine, not just the one that built it.
+
+**Backward-incompatibility consequence (SCHEMA 4→5, AC-05).** The routing DB (`routing-v2/routing.db`) gained
+a `project_key` column scoping `dispatches` to the project that generated each row (every pre-005 row is
+backfilled with the harness's own key, since routing before 005 only ever ran anchored at the harness). A
+checkout **older than 005** reading a schema-5 (or later) database fails closed via `store.py`'s existing
+`schema_version != SCHEMA` check (`ROUTING_UNAVAILABLE`) — this is not a new failure mode, it is the existing
+fail-closed doctrine applied to a version bump. Downgrading the harness below 005 against a migrated DB
+requires restoring the pre-migration backup that `migrate()` writes before any `ALTER`.
+
+## Vault topology (005-P2, ADR-0012)
+
+An Obsidian vault (`<empresa>/obsidian/`) is optional infrastructure, never required for the harness to
+function — `docs/notas/` (plain git-tracked markdown) is the source of truth regardless of whether a vault is
+linked. Two topologies coexist, disambiguated by a **persisted registry** (`<vault>/.set-agentes-vault.json`,
+keyed by the project's full repo path, never its basename) rather than by directory shape — the shape alone
+cannot tell "a real directory here is `--private`'s design" from "a real directory here is a lost hybrid
+link", which is exactly the ambiguous state real data was found in:
+
+- **Hybrid (default).** Notes live in the repo (`<project>/docs/notas/`); the vault side
+  (`<vault>/Proyectos/<name>`) is a symlink pointing at them.
+- **`--private` (survives, unchanged in its own mechanics).** Notes live in the vault; the repo gets a
+  symlink pointing out, excluded from the repo's git via `.git/info/exclude` so nothing note-related reaches
+  the project's remote.
+
+`set-agents --vault-doctor [--project DIR] [--dry-run] [--repair]` is a **report-only by default**,
+DISTINCT surface from `--doctor --harness pi` (004, schema-2 envelope, untouched) — repair requires both an
+explicit `--repair` flag and a marker from an immediately-preceding `--dry-run` whose plan fingerprint still
+matches the current disk state; it never repairs headlessly and never touches an unregistered project.
+Migrating a legacy vault-resident project into hybrid (`vault_migration_plan`/`apply_vault_migration`,
+`set_agents_app.py`) copies each file into the repo, byte-verifies the copy, and only then removes the
+vault-side original — an interrupted run leaves both copies present, never a half-moved state, and a re-run
+is idempotent. `set-agents --context [--project DIR] [--json]` is read-only (never reads a credential
+surface) and degrades honestly at every step: no vault, no company directory, and no project note are each
+reported as absent, never fabricated.

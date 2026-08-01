@@ -1,0 +1,71 @@
+# 008-dynamic-selection · grafo
+
+<!-- notas:auto -->
+```mermaid
+flowchart TD
+subgraph sg_008_dynamic_selection["008-dynamic-selection"]
+  feature_008_dynamic_selection_1["feature: 008-dynamic-selection"]
+  subgraph sg_008_dynamic_selection_p1_uninterrupted_delegation["P1-uninterrupted-delegation"]
+    package_008_dynamic_selection_p1_uninterrupted_delegation_1["package: P1-uninterrupted-delegation"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_1["F-01 #40;critical#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_2["F-02 #40;high#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_3["F-03 #40;high#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_4["F-04 #40;medium#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_5["F-08 #40;low#41;"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_6["F-09 #40;low#41;"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_7["F-05 #40;medium#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_8["F-06 #40;medium#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_9["F-07 #40;low#41;"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_10["F-10 #40;low#41;"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_11["F-11 #40;low#41;"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_12["D-01 #40;medium#41; verified_by=finding-verifier"]
+    finding_008_dynamic_selection_p1_uninterrupted_delegation_13["D-02 #40;low#41; verified_by=finding-verifier"]
+    review_008_dynamic_selection_p1_uninterrupted_delegation_1["package-reviewer: repair_required"]
+    review_008_dynamic_selection_p1_uninterrupted_delegation_2["architect: repair_required"]
+    review_008_dynamic_selection_p1_uninterrupted_delegation_3["delta: repair_required"]
+    verification_008_dynamic_selection_p1_uninterrupted_delegation_1["verified_by=finding-verifier"]
+    verification_008_dynamic_selection_p1_uninterrupted_delegation_2["verified_by=finding-verifier"]
+    repair_008_dynamic_selection_p1_uninterrupted_delegation_1["8 changed files"]
+    repair_008_dynamic_selection_p1_uninterrupted_delegation_2["2 changed files"]
+  end
+end
+review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_1
+review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_2
+review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_3
+review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_4
+review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_5
+review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_6
+review_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_7
+review_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_8
+review_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_9
+review_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_10
+review_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_11
+review_008_dynamic_selection_p1_uninterrupted_delegation_3 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_12
+review_008_dynamic_selection_p1_uninterrupted_delegation_3 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_13
+verification_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_1
+verification_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_2
+verification_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_3
+verification_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_4
+verification_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_7
+verification_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_8
+verification_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_12
+verification_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|verificó| finding_008_dynamic_selection_p1_uninterrupted_delegation_13
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_1
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_2
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_3
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_4
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_7
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_8
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_9
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_5
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_6
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_10
+repair_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_11
+repair_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_12
+repair_008_dynamic_selection_p1_uninterrupted_delegation_2 -->|reparó| finding_008_dynamic_selection_p1_uninterrupted_delegation_13
+```
+<!-- /notas:auto -->
+
+## Notas propias
+
+_Lo que escribas fuera del bloque auto se preserva en cada regeneración._

@@ -126,6 +126,21 @@ deleted, or dual-written.
   descriptor-relative traversal, and per-authorization re-probing are approved exceptions (decision
   `r3-threat-model-amendment`); the enforceable guarantee is sealed production composition plus fail-closed
   behavior against accidents and non-UID attackers.
+  007-P1 amendment (2026-07-29): the DDL comparison against the canonical schema is a **version-drift and
+  corruption detector, not a tamper defence**, and must not be maintained as one. Anyone who can write the
+  database file can write a perfectly canonical DDL and then insert whatever rows they like — `CHECK`
+  constraints restrict the harness's future inserts and do not validate rows already present — so the
+  comparison buys nothing against that adversary, who by then already controls the harness's routing state
+  (the same exclusion as above). It is also structurally incomplete as a tamper defence: `_validate_schema`
+  enumerates only `type='table'` and the comparison covers only `type IN ('table','index')`, so a `TRIGGER` or
+  `VIEW` added to the file is invisible and the store still opens — verified live, recorded as decision
+  `routing-ddl-validation-blind-to-triggers` and deliberately not closed here, because closing it would not
+  change the adversary's reach. What the comparison does earn is real and is why it stays: it catches a schema
+  that drifted from the code that will operate it, and catches corruption, both fail-closed. Consequently
+  normalization discards SQL comments before comparing (comments are prose, not structure — a comment added to
+  the canonical DDL after a database was created used to block that database's migration permanently), and a
+  refusal now names which canonical object diverged. Only canonical object names, which are compile-time
+  constants, are ever emitted; a name that came from the file is counted and never echoed.
 
 ## Consecuencias
 

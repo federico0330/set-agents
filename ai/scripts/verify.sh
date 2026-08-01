@@ -50,4 +50,11 @@ for path in global_root.rglob("*"):
         raise SystemExit(f"GLOBAL_ABSOLUTE_PATH_RATCHET file={rel}")
 print("GLOBAL_PORTABILITY_OK")
 PY
+# Lives in its own script rather than a heredoc so a test can drive it against a
+# fixture tree: a guard whose failing path nothing exercises decays unnoticed.
+python3 "$ROOT/ai/scripts/check-canonical-paths.py" "$ROOT"
+# The only enforcement point the whole world sees: CI runs this on Linux and macOS,
+# a fresh clone runs this, a guest runs this.  A pre-commit hook would block sooner
+# and be invisible to all three, because .git/hooks is not versioned.
+python3 "$ROOT/ai/scripts/check-feature-state.py" "$ROOT"
 echo "VERIFY_PASS"

@@ -1,0 +1,1319 @@
+{
+  "acceptance_criteria": [
+    "AC-20",
+    "AC-21",
+    "AC-22",
+    "AC-23",
+    "AC-24",
+    "AC-25",
+    "AC-26",
+    "AC-27",
+    "AC-28",
+    "AC-29"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-30T03:18:57+00:00",
+    "hash": "8772b09bcb1b8b5e5c8083b01f6af16d0e0a7e34d360062d3c92fbeffc7e8b07",
+    "path": "docs/specs/006-execution-graph/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P3-graph-view",
+  "feature_id": "006-execution-graph",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "user",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/006-execution-graph/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T03:18:57+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Modelo de nodo/arista: build_execution_graph() con join estructural (AC-20, AC-26 blockers con las 3 ramas, AC-27 labels)",
+          "render_mermaid(): namespace disjunto subgraph/nodo, asserts estructurales, esqueleto vac\u00edo (AC-22, AC-23)",
+          "--commit opcional en record-repair, validaci\u00f3n fail-open 7-40 hex (AC-21)",
+          "Subcomando graph (--feature-id, --root, --out) en feature-state.py + gemelo PROYECTO/ (AC-22, AC-23)",
+          "Enganche en render_notes(): grafo.md, backlink [[grafo]], guard de nombre reservado (AC-24)",
+          "set-agents --graph: wrapper subprocess delgado en set_agents_app.py (AC-25)",
+          "Reestructurar los 4 grupos de test_feature_state_gate_fails... + test nuevo in-process del guard de shallow-clone (AC-28)",
+          "Tests AC-29: fixtures sint\u00e9ticos para historia legacy sin --commit, spawns fuera de alcance",
+          "ADR-0013 + fila en docs/adr/README.md + log-decision del primer init sin backfill"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T03:19:42+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Instanciamos al implementador del grafo de ejecuci\u00f3n.",
+        "purpose": "Implementar el paquete P3-graph-view completo: modelo nodo/arista, render_mermaid, subcomando graph, --commit, render_notes hook, --graph wrapper, ADR-0013",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "implementer, contra P3-graph-view, AC-20..AC-29, 9 tareas, adversarial-primero"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T03:21:14+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "implementer",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Modelo de nodo/arista: build_execution_graph() con join estructural (AC-20, AC-26 blockers con las 3 ramas, AC-27 labels)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:35+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Modelo de nodo/arista: build_execution_graph() con join estructural (AC-20, AC-26 blockers con las 3 ramas, AC-27 labels)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_graph_produjo_edges_join_structurally_across_all_three_review_sources tests.test_harness.HarnessTests.test_graph_verification_edges_and_waived_verification_node tests.test_harness.HarnessTests.test_graph_repair_edge_and_commit_chain tests.test_harness.HarnessTests.test_graph_blocker_edges_anchor_to_package_or_feature_in_all_three_cases -v -> OK (4 tests); manual adversarial smoke against the real ai/state/features/*.json (whole-repo scan, 714 lines) confirmed no crash and correct joins"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:35+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "render_mermaid(): namespace disjunto subgraph/nodo, asserts estructurales, esqueleto vac\u00edo (AC-22, AC-23)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "render_mermaid(): namespace disjunto subgraph/nodo, asserts estructurales, esqueleto vac\u00edo (AC-22, AC-23)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_graph_node_ids_and_labels_follow_ac22_ac27_exactly tests.test_harness.HarnessTests.test_graph_no_state_file_emits_ac23_skeleton_and_exits_zero tests.test_harness.HarnessTests.test_graph_partial_multi_feature_run_never_aborts tests.test_harness.HarnessTests.test_graph_whole_repo_scan_processes_every_state_file_when_no_feature_id_given -v -> OK (4 tests); validate_mermaid_structure adversarially fed 4 broken inputs (bad header, reserved word id, unbalanced subgraph, subgraph/node id collision) and confirmed each is caught"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "--commit opcional en record-repair, validaci\u00f3n fail-open 7-40 hex (AC-21)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "--commit opcional en record-repair, validaci\u00f3n fail-open 7-40 hex (AC-21)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_record_repair_commit_format_gate_rejects_before_any_git_lookup tests.test_harness.HarnessTests.test_record_repair_commit_fail_open_when_git_cannot_answer tests.test_harness.HarnessTests.test_record_repair_commit_accepted_when_git_verifies_it -v -> OK (3 tests, covers format-reject, fail-open with no .git, real-repo accept + real-repo reject)"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Subcomando graph (--feature-id, --root, --out) en feature-state.py + gemelo PROYECTO/ (AC-22, AC-23)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Subcomando graph (--feature-id, --root, --out) en feature-state.py + gemelo PROYECTO/ (AC-22, AC-23)",
+        "validations": [
+          "python3 ai/scripts/feature-state.py graph --feature-id nonexistent -> AC-23 skeleton exit 0; graph against real ai/state/features/*.json (whole repo, single feature) -> valid mermaid; PROYECTO/ai/scripts/feature-state.py kept byte-identical via cp + cmp; ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Enganche en render_notes(): grafo.md, backlink [[grafo]], guard de nombre reservado (AC-24)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Enganche en render_notes(): grafo.md, backlink [[grafo]], guard de nombre reservado (AC-24)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_render_notes_writes_grafo_md_reusing_graph_construction_with_backlink tests.test_harness.HarnessTests.test_create_package_rejects_literal_grafo_case_sensitive -v -> OK (2 tests); manual sync-notes run confirmed grafo.md content matches graph subcommand output verbatim and feature note carries the [[grafo]] backlink"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "set-agents --graph: wrapper subprocess delgado en set_agents_app.py (AC-25)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "set-agents --graph: wrapper subprocess delgado en set_agents_app.py (AC-25)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_set_agents_graph_wrapper_matches_feature_state_graph_output -v -> OK; manual: set-agents --graph --feature-id nonexistent-xyz reproduces the AC-23 skeleton byte-for-byte"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Reestructurar los 4 grupos de test_feature_state_gate_fails... + test nuevo in-process del guard de shallow-clone (AC-28)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Reestructurar los 4 grupos de test_feature_state_gate_fails... + test nuevo in-process del guard de shallow-clone (AC-28)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_feature_state_gate_fails_when_a_delivered_feature_has_no_state_file tests.test_harness.HarnessTests.test_stale_waivers_guard_survives_independent_of_which_feature_is_waived -v -> OK (2 tests); ./ai/scripts/verify.sh -> FEATURE_STATE_OK against the real repo post-retirement"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests AC-29: fixtures sint\u00e9ticos para historia legacy sin --commit, spawns fuera de alcance"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests AC-29: fixtures sint\u00e9ticos para historia legacy sin --commit, spawns fuera de alcance",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_graph_never_emits_spawn_nodes_and_survives_legacy_fixtures_without_commit -v -> OK; fixtures are synthetic (write_graph_fixture), never the live ai/state/features/*.json of other in-flight features, per AC-29"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0013 + fila en docs/adr/README.md + log-decision del primer init sin backfill"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0013 + fila en docs/adr/README.md + log-decision del primer init sin backfill",
+        "validations": [
+          "docs/adr/0013-execution-graph-view.md created (D1..D4, Rejected: sections, file:line citations verified against the tree); docs/adr/README.md row added; feature-state.py log-decision run for slug p3-graph-view-abre-el-tracking-de-la-feature-006-sin-backfillear-p1-p2, linked to feature-006-delivered-outside-state-machine and AC-07 of 009-self-application"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:11:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:23:51+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "verify.sh",
+        "status": "pass"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:02+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "unittest",
+        "status": "pass"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:02+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "build.sh--check",
+        "status": "pass"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:02+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "git-diff--check",
+        "status": "pass"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:02+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:08+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Gates verdes"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:08+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Ownership limpio, gates verdes"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:09+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al revisor independiente del grafo de ejecuci\u00f3n.",
+        "purpose": "Revisi\u00f3n profunda independiente del paquete P3-graph-view completo (build_execution_graph, render_mermaid, subcomando graph, --commit, render_notes hook, --graph wrapper)",
+        "role": "package-reviewer",
+        "spawns": 2,
+        "tech": "package-reviewer, contra P3-graph-view integrado, foco en joins estructurales (nunca heur\u00edsticos) y el or\u00e1culo de mermaid"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:26+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al auditor de seguridad del grafo de ejecuci\u00f3n.",
+        "purpose": "Auditor\u00eda de seguridad del paquete P3-graph-view: subprocess de git para --commit, escaping de labels mermaid, superficie del subcomando graph",
+        "role": "security-auditor",
+        "spawns": 3,
+        "tech": "security-auditor, contra P3-graph-view integrado, foco en injection via git subprocess y escaping de mermaid"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:24:26+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 8,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:40:44+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 5,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:40:44+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:40:49+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Instanciamos al reparador del grafo de ejecuci\u00f3n.",
+        "purpose": "Reparaci\u00f3n consolidada de 13 hallazgos (8 package-reviewer + 5 security-auditor, 2 cr\u00edticos) sobre el grafo de ejecuci\u00f3n",
+        "role": "repair-agent",
+        "spawns": 4,
+        "tech": "repair-agent, consolidado, foco en los 2 cr\u00edticos de seguridad primero"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T04:40:57+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 10
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T05:17:05+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-001",
+          "SEC-002",
+          "PR-01",
+          "PR-02",
+          "PR-03",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "PR-04",
+          "PR-05"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T05:17:24+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al reparador de los \u00faltimos 3 hallazgos menores del grafo.",
+        "purpose": "Cerrar los 3 hallazgos bajos restantes: PR-06 (anuncio modo sin estado), PR-07 (tests shallow-clone/git-ausente), PR-08 (formas legacy de packages)",
+        "role": "repair-agent",
+        "spawns": 5,
+        "tech": "repair-agent, tercera ronda, solo low severity"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T05:29:54+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T05:31:28+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "PR-06",
+          "PR-07",
+          "PR-08"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T05:47:21+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al revisor final del grafo de ejecuci\u00f3n.",
+        "purpose": "Confirmar la reparaci\u00f3n de los 13 hallazgos del panel (10 grandes + 3 low) sobre el grafo de ejecuci\u00f3n",
+        "role": "delta-reviewer",
+        "spawns": 6,
+        "tech": "delta-reviewer, foco adversarial en los 2 fixes de seguridad cr\u00edticos (escaping mermaid) y en PR-01 (atribuci\u00f3n de actor)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T05:47:59+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T06:19:52+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Instanciamos al reparador de los \u00faltimos hallazgos del delta-review del grafo.",
+        "purpose": "Cerrar D-01 (ya resuelto por orquestador v\u00eda sync-notes, falta registrar) y reparar D-02..D-05 (c\u00f3digo chico: .gitignore de PROYECTO, re-validaci\u00f3n de la l\u00ednea PR-06, TypeError en modo whole-repo, guard de lockstep en verificaciones waived)",
+        "role": "repair-agent",
+        "spawns": 7,
+        "tech": "repair-agent, cuarta ronda, 5 findings (1 ya resuelto sin c\u00f3digo, 4 chicos)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T06:20:31+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T06:39:12+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "D-01",
+          "D-02",
+          "D-03",
+          "D-04",
+          "D-05"
+        ]
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T06:39:23+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al revisor final del grafo, \u00faltima ronda.",
+        "purpose": "Confirmar la cuarta ronda de reparaci\u00f3n (D-01..D-05) antes de accept-package",
+        "role": "delta-reviewer",
+        "spawns": 8,
+        "tech": "delta-reviewer, foco en D-03 (re-validaci\u00f3n) y D-04 (degradaci\u00f3n whole-repo)"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T06:48:32+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T07:38:18+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T07:38:38+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-07-30T07:38:47+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 3,
+    "human_questions_after_approval": 0,
+    "package_reviews": 1,
+    "repair_batches": 3,
+    "task_deep_reviews": 0,
+    "verifications": 2
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-20",
+        "AC-21",
+        "AC-22",
+        "AC-23",
+        "AC-24",
+        "AC-25",
+        "AC-26",
+        "AC-27",
+        "AC-28",
+        "AC-29"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "PROYECTO/ai/scripts/feature-state.py",
+          "reason": "gemelo byte-id\u00e9ntico exigido por build.sh --check (SELF_SCAFFOLD_SYNC_OK); omitido del create-package inicial por error del orquestador",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 3,
+        "spawns": 8,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "high",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-30T05:31:28+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [],
+          "reason": "Cerrando los 3 findings low restantes de la ronda anterior (PR-06, PR-07, PR-08), que quedaron abiertos por presupuesto agotado del repair-agent previo",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-30T06:19:52+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [
+            "D-01",
+            "D-02",
+            "D-03",
+            "D-04",
+            "D-05"
+          ],
+          "reason": "delta-reviewer independiente: repair_required. SEC-001/SEC-002/PR-01 y el resto de la ronda anterior confirmados cerrados con PoCs re-ejecutados. D-01 (medium) bloquea aceptaci\u00f3n: 6 de 8 grafo.md ya escritos en el vault son artefactos del escaper viejo, rechazados por el propio or\u00e1culo -- no requiere c\u00f3digo, requiere sync-notes. D-02..D-05 (low) son ediciones chicas de c\u00f3digo. D-06 (informativo) solo necesita quedar registrado, no bloquea.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-30T07:38:18+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [],
+          "reason": "delta-reviewer independiente, cuarta pasada: pass. D-01..D-05 verificados cerrados con evidencia reproducible (8/8 grafo.md limpios y frescos -- comparados byte a byte contra lo que el c\u00f3digo de hoy produce; gemelo PROYECTO/ byte-id\u00e9ntico; 457 tests OK). requires_full_review=false. Encontr\u00f3 3 hallazgos derivados nuevos (D-07/D-08/D-09), los tres low, y recomend\u00f3 expl\u00edcitamente NO abrir una quinta ronda por ellos: D-07 (degradado de D-04 puede emitir un grafo.md parcial/contradictorio para una feature con datos malformados dentro del walk, en vez de abortar limpio esa feature), D-08 (el except de D-04 es m\u00e1s ancho de lo necesario -- fuzz de 90 casos mostr\u00f3 que solo TypeError es alcanzable desde datos, AttributeError/KeyError solo tapar\u00edan bugs de programaci\u00f3n propios), D-09 (informativo: la revalidaci\u00f3n de D-03 puede fallar con un --root degenerado, pero devuelve JSON legible con ok:false, nunca traceback). Registrados como deuda aceptada v\u00eda log-decision, no bloquean accept-package.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6",
+      "findings": [
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-01",
+          "line": "1412-1419 (causa raiz 2015-2028)",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El join de actor de reviews[] es por posicion contra history, no estructural: con verdict blocked, cmd_record_review appendea el review antes de emitir el evento record-review, desincronizando los indices para siempre y atribuyendo el actor equivocado a reviews posteriores -- fabrica una atribucion falsa, viola AC-20 never a fabricated one.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-02",
+          "line": "1317-1366",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "45 de 195 findings reales (23%) sin arista produjo: son exactamente los de delta_reviews[], fuente no incluida en el join de AC-20/AC-22 aunque el dato existe (new_or_reopened_findings + actor del evento record-delta-review).",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-03",
+          "line": "1272-1288,1491-1548",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Colision de ids de nodo y subgraph: dos package_id/feature_id que normalizan igual (ej. P1-a b vs P1-a-b) generan el mismo id, un finding desaparece del documento y hay dos subgraphs con id duplicado; validate_mermaid_structure no detecta unicidad de ids.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-04",
+          "line": "1235-1242",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Escaping con backslash no es el mecanismo de Mermaid (usa entidades); ya visible en el vault real como backslashes literales en 195 labels, y un label con comilla real corta la cadena antes de tiempo sin que el oraculo lo detecte.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-05",
+          "line": "1253,1457",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "render_notes re-deriva la raiz del grafo por convencion de path (out_dir.parent.parent) en vez de usar el features_dir ya resuelto -- misma clase de bug que el out_dir.parent ya reparado.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-06",
+          "line": "458-463",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Modo whole-repo sin --feature-id y sin ai/state/features no anuncia nada (flowchart TD vacio, exit 0), indistinguible de un proyecto real sin features -- AC-23 cita CONTEXT_VAULT_NOT_FOUND como precedente, que si anuncia."
+        },
+        {
+          "file": "tests/test_harness.py",
+          "id": "PR-07",
+          "line": "5813",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "La rama shallow-clone y la rama git-ausente (OSError) de AC-21 no tienen test, solo la rama no-repo esta cubierta."
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "PR-08",
+          "line": "1422-1431",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "build_execution_graph no acepta las formas legacy de packages (dict indexado, id en vez de package_id, camelCase) que _note_packages si normaliza -- con esas formas el grafo descarta todos los paquetes en silencio. Latente, ningun state file real las tiene hoy."
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "SEC-001",
+          "line": "1299,1545",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "El escaping de labels Mermaid usa backslash, que Mermaid no implementa (usa entidades #quot; etc) -- un finding id adversarial via record-subreview/record-verification hace breakout de string y permite inyectar sentencias mermaid completas (click, aristas forjadas) en notas que se commitean y renderiza GitHub/Obsidian; el oraculo AC-22 modela una gramatica de escapes distinta a la real y certifica en verde documentos invalidos/maliciosos.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "SEC-002",
+          "line": "1632",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "La linea %% no data for {fid} es la unica interpolacion de render_mermaid sin pasar por _mermaid_escape -- un feature_id con salto de linea (alcanzable via init con --state-file desacoplado del contenido) inyecta lineas Mermaid arbitrarias sin necesitar breakout de comillas.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "SEC-003",
+          "line": "2593-2631,2678-2682",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "El fail-open de --commit (decision de producto ya aceptada) no deja ninguna senal auditable: a diferencia del precedente citado explicitamente por AC-21 (check-feature-state.py, que anuncia FEATURE_STATE_UNCHECKED+reason), aca un sha aceptado sin verificar queda indistinguible para siempre de uno verificado -- ni marcador en el repair, ni metadata en el evento, ni una linea a stderr.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "SEC-004",
+          "line": "1183-1196",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "Log injection en _log_render_failure: context/exc no pasan por _short() antes de escribirse a ai/state/render-failures.log (que el repo commitea) -- un feature_id/label con salto de linea forja entradas de log creibles con timestamp propio.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "SEC-005",
+          "line": "1526",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "build_execution_graph deriva el path de lectura de features_dir/{fid}.json sin contencion -- un feature_id con path traversal (via init --state-file desacoplado) lee un .json fuera de ai/state/features/ y lo renderiza como si fuera una feature real.",
+          "verified_at": "2026-07-30T05:17:05+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "docs/notas/features/*/grafo.md",
+          "id": "D-01",
+          "line": "generado, no fuente",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "6 de 8 grafo.md ya escritos en el vault (002,003,004,007,008,009) son artefactos del escaper vulnerable pre-fix (backslash) y son rechazados por el propio oraculo del modulo hoy. No hace falta cambio de codigo: sync-notes los regenera (bloque dentro de notas:auto, machine-owned). Verificar con validate_mermaid_structure sobre los 8 despues.",
+          "verified_at": "2026-07-30T06:39:12+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "PROYECTO/.gitignore",
+          "id": "D-02",
+          "line": "n/a",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "SEC-004 agrego render-failures.log* a .gitignore del repo pero no al PROYECTO/.gitignore que bootstrap_project.py distribuye a cada proyecto scaffolded -- el hueco persiste ahi (que todavia tiene solo *.log, no matchea el sibling rotado)."
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "D-03",
+          "line": "~1836",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "La linea de PR-06 (%% no state directory at ...) se appendea DESPUES de que render_mermaid ya valido y retorno -- nada la re-valida. Ademas el regex alternativo es mas laxo (.* en vez del charset estricto), y el docstring de validate_mermaid_structure quedo desactualizado (dice que solo existe un tipo de linea %%)."
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "D-04",
+          "line": "_add_feature_to_graph / build_execution_graph / main()",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "cmd_graph en modo whole-repo (glob de *.json) no atrapa TypeError de un packages:null/123 o un commit no-string -- traceback crudo y exit 1 en vez de degradar como los otros casos malformados. Un solo archivo editado a mano tumba el comando entero."
+        },
+        {
+          "file": "ai/scripts/feature-state.py",
+          "id": "D-05",
+          "line": "_add_package_findings, pareo de verificaciones waived",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "El guard de lockstep de PR-01 (len(plain_reviews)==len(review_events)) se aplico al pareo de reviews[] pero no al pareo estructuralmente identico de verificaciones waived 30 lineas mas abajo (skip_events[index] sin chequeo de longitud). No alcanzable hoy (record-verification appendea registro+evento sin return entre medio), pero el invariante que PR-01 establecio queda asegurado en un solo lugar de dos."
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-30T04:24:02+00:00",
+          "evidence": "VERIFY_PASS, incluye FEATURE_STATE_OK",
+          "name": "verify.sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T04:24:02+00:00",
+          "evidence": "427 tests, OK, 0 skips (baseline 412)",
+          "name": "unittest",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T04:24:02+00:00",
+          "evidence": "SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "build.sh--check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T04:24:02+00:00",
+          "evidence": "git diff --check limpio",
+          "name": "git-diff--check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Grafo de ejecuci\u00f3n navegable: nodos/aristas derivados en lectura del estado existente, set-agents --graph emite mermaid, sin librer\u00edas de terceros",
+      "owned_paths": [
+        "ai/scripts/check-feature-state.py",
+        "docs/adr/0013-execution-graph-view.md",
+        "docs/adr/README.md"
+      ],
+      "package_id": "P3-graph-view",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-30T05:17:24+00:00",
+          "changed_files": [
+            "ai/scripts/feature-state.py",
+            "PROYECTO/ai/scripts/feature-state.py",
+            "tests/test_harness.py",
+            ".gitignore",
+            "docs/adr/0013-execution-graph-view.md"
+          ],
+          "finding_ids": [
+            "SEC-001",
+            "SEC-002",
+            "PR-01",
+            "PR-02",
+            "PR-03",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "PR-04",
+            "PR-05"
+          ],
+          "verification": [
+            "SEC-001: _mermaid_escape rewritten to mermaid HTML-entity escaping (single-pass regex sub, no backslash); _MERMAID_NODE_LINE_RE/_MERMAID_SUBGRAPH_LINE_RE tightened to [^\"\\\\]* ; test_graph_mermaid_injection_via_adversarial_finding_id_is_neutralized",
+            "SEC-002: charset gate _ID_CHARSET_RE on feature_id before any path/render use, fixed placeholder never raw value, %% line escaped + validator only accepts the exact no-data comment shape; test_render_notes_grafo_neutralizes_newline_and_directive_injection_via_feature_id, test_validate_mermaid_structure_rejects_a_mermaid_directive_disguised_as_the_missing_comment",
+            "PR-01: cmd_record_review stamps actor on the reviews[] record; positional history join now only used as fallback when list lengths match; ADR-0013 D5 documents the decision; test_record_review_stamps_actor_directly_on_the_reviews_record, test_graph_plain_review_actor_never_fabricated_when_history_desyncs",
+            "PR-02: delta_reviews[] joined into produjo edges via new_or_reopened_findings, mirroring late_reviews[]; test_graph_delta_review_new_finding_gets_produjo_edge",
+            "PR-03: _GraphState.disambiguated_norm assigns a numeric suffix to colliding raw feature/package ids, used by both add_node and render_mermaid subgraph ids; validate_mermaid_structure asserts node/subgraph id uniqueness; test_graph_colliding_normalized_package_ids_both_survive_with_unique_ids, test_validate_mermaid_structure_detects_duplicate_node_and_subgraph_ids",
+            "SEC-003: validate_commit_ref/_git_answer return (value, verified) with a reason; repair.commit_verified and the record-repair event metadata persist it; COMMIT_UNVERIFIED printed to stderr only; timeout=10 added to both git subprocess calls; extended test_record_repair_commit_fail_open_when_git_cannot_answer and test_record_repair_commit_accepted_when_git_verifies_it",
+            "SEC-004: _log_render_failure now writes _short(context)/_short(str(exc)); render-failures.log* added to .gitignore; test_log_render_failure_neutralizes_newline_injection_in_context_and_exception_text",
+            "SEC-005: build_execution_graph resolves the candidate path and requires it stay under features_dir.resolve() (defense in depth on top of SEC-002's charset gate); test_graph_path_traversal_feature_id_never_reads_outside_features_dir",
+            "PR-04: same mechanism as SEC-001, confirmed by the SEC-001 tests -- no separate fix needed",
+            "PR-05: build_execution_graph accepts an already-resolved features_dir param; render_notes passes its own status_root()-derived features_dir instead of re-deriving one from out_dir.parent.parent; covered by the existing test_render_notes_writes_grafo_md_reusing_graph_construction_with_backlink"
+          ]
+        },
+        {
+          "at": "2026-07-30T05:47:21+00:00",
+          "changed_files": [
+            "ai/scripts/feature-state.py",
+            "PROYECTO/ai/scripts/feature-state.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "PR-06",
+            "PR-07",
+            "PR-08"
+          ],
+          "verification": [
+            "PR-06: cmd_graph now appends '%% no state directory at <root>' (escaped via _mermaid_escape, added to _MERMAID_MISSING_COMMENT_RE's closed vocabulary) when whole-repo mode (no --feature-id) hits a root with no ai/state/features dir; new test test_graph_whole_repo_with_no_state_directory_announces_instead_of_silent_skeleton (red without the fix, green with it) plus its two complements (real empty dir, explicit --feature-id) confirm the announcement is scoped exactly to that case.",
+            "PR-07: added test_record_repair_commit_fail_open_in_real_shallow_clone (real depth-1 clone of this repo, --commit set to a real sha older than the shallow boundary, asserts commit_verified: False and reason=shallow-clone) and test_validate_commit_ref_fails_open_when_git_binary_is_unavailable (in-process, subprocess.run mocked with side_effect=OSError, asserts commit_verified: False and reason=git-unavailable) covering the two previously-untested branches of AC-21's validate_commit_ref/_git_answer; no production code change needed, both branches already behaved correctly.",
+            "PR-08: _add_feature_to_graph now builds packages via _note_packages(_normalize_note_state(data)) instead of assuming data.get('packages', []) is already a modern list of package_id-keyed dicts, reusing the same legacy-tolerant normalization the notes renderer already applies; new test test_graph_tolerates_legacy_dict_indexed_packages (packages as a dict indexed by package id) is red without the fix (package silently dropped, only the feature node emitted) and green with it."
+          ]
+        },
+        {
+          "at": "2026-07-30T06:39:23+00:00",
+          "changed_files": [
+            "ai/scripts/feature-state.py",
+            "PROYECTO/ai/scripts/feature-state.py",
+            "PROYECTO/.gitignore",
+            "tests/test_harness.py",
+            "docs/notas/features/002-adaptive-pi-orchestration/grafo.md",
+            "docs/notas/features/003-trusted-routing-pi-runtime/grafo.md",
+            "docs/notas/features/004-adaptive-dispatch/grafo.md",
+            "docs/notas/features/007-quota-visibility/grafo.md",
+            "docs/notas/features/008-dynamic-selection/grafo.md",
+            "docs/notas/features/009-self-application/grafo.md"
+          ],
+          "finding_ids": [
+            "D-01",
+            "D-02",
+            "D-03",
+            "D-04",
+            "D-05"
+          ],
+          "verification": [
+            "D-01: orchestrator already ran sync-notes and regenerated the 6 stale grafo.md files; re-verified myself and via record-verification (actor=orchestrator, upheld): extracting the fenced mermaid block from all 8 docs/notas/features/*/grafo.md and running validate_mermaid_structure on each returns zero problems for all 8",
+            "D-02: added render-failures.log* to PROYECTO/.gitignore (same line SEC-004 added to the repo root .gitignore); test_bootstrap_preserves_existing_content_and_is_idempotent now asserts the bootstrapped .gitignore contains it -- red (missing) before the edit, green after",
+            "D-03: tightened _MERMAID_MISSING_COMMENT_RE's 'no state directory' alternative from .* to a strict deny-list charset, updated validate_mermaid_structure's docstring to name both %% line shapes, and made cmd_graph re-run validate_mermaid_structure after appending the announcement line -- test_validate_mermaid_structure_no_state_directory_comment_charset_is_strict and test_cmd_graph_revalidates_no_state_directory_line_before_output both red before the fix (empty problems list / StateError not raised), green after",
+            "D-04: wrapped _add_feature_to_graph's call in build_execution_graph in try/except (TypeError, AttributeError, KeyError), degrading a malformed feature to missing instead of propagating; also reordered _add_feature_to_graph to compute packages before adding the feature node so the null/int-packages case leaves no orphan subgraph -- test_graph_whole_repo_survives_malformed_packages_field_in_one_state_file and test_graph_survives_non_string_repair_commit both red (uncaught TypeError, exit 1) before the fix, green after",
+            "D-05: applied the same len(waived_records) == len(skip_events) lockstep guard PR-01 gave the plain-reviews join to the waived-verification positional join -- test_graph_waived_verification_actor_never_fabricated_when_history_desyncs red (fabricated actor) before the fix, green after"
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-30T04:40:49+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-30T04:24:15+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-30T04:40:44+00:00",
+              "evidence": "Revision independiente: joins verificados contra los 8 state files reales, reproducciones ejecutadas via CLI documentado",
+              "findings": [
+                "PR-01",
+                "PR-02",
+                "PR-03",
+                "PR-04",
+                "PR-05",
+                "PR-06",
+                "PR-07",
+                "PR-08"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-30T04:40:44+00:00",
+              "evidence": "Auditoria de seguridad: PoC ejecutados end-to-end via CLI legitimo, sin editar estado a mano",
+              "findings": [
+                "SEC-001",
+                "SEC-002",
+                "SEC-003",
+                "SEC-004",
+                "SEC-005"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-30T04:40:49+00:00",
+          "evidence": "package-reviewer: repair_required (8 hallazgos, 1 high). security-auditor: repair_required (2 critical, 2 medium, 1 low). Consolidado: PR-01..08 + SEC-001..005",
+          "findings": [
+            "PR-01",
+            "PR-02",
+            "PR-03",
+            "PR-04",
+            "PR-05",
+            "PR-06",
+            "PR-07",
+            "PR-08",
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-30T07:38:38+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "ai/scripts/feature-state.py",
+        "ai/scripts/set_agents_app.py",
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Modelo de nodo/arista: build_execution_graph() con join estructural (AC-20, AC-26 blockers con las 3 ramas, AC-27 labels)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_graph_produjo_edges_join_structurally_across_all_three_review_sources tests.test_harness.HarnessTests.test_graph_verification_edges_and_waived_verification_node tests.test_harness.HarnessTests.test_graph_repair_edge_and_commit_chain tests.test_harness.HarnessTests.test_graph_blocker_edges_anchor_to_package_or_feature_in_all_three_cases -v -> OK (4 tests); manual adversarial smoke against the real ai/state/features/*.json (whole-repo scan, 714 lines) confirmed no crash and correct joins"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "render_mermaid(): namespace disjunto subgraph/nodo, asserts estructurales, esqueleto vac\u00edo (AC-22, AC-23)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_graph_node_ids_and_labels_follow_ac22_ac27_exactly tests.test_harness.HarnessTests.test_graph_no_state_file_emits_ac23_skeleton_and_exits_zero tests.test_harness.HarnessTests.test_graph_partial_multi_feature_run_never_aborts tests.test_harness.HarnessTests.test_graph_whole_repo_scan_processes_every_state_file_when_no_feature_id_given -v -> OK (4 tests); validate_mermaid_structure adversarially fed 4 broken inputs (bad header, reserved word id, unbalanced subgraph, subgraph/node id collision) and confirmed each is caught"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "--commit opcional en record-repair, validaci\u00f3n fail-open 7-40 hex (AC-21)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_record_repair_commit_format_gate_rejects_before_any_git_lookup tests.test_harness.HarnessTests.test_record_repair_commit_fail_open_when_git_cannot_answer tests.test_harness.HarnessTests.test_record_repair_commit_accepted_when_git_verifies_it -v -> OK (3 tests, covers format-reject, fail-open with no .git, real-repo accept + real-repo reject)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Subcomando graph (--feature-id, --root, --out) en feature-state.py + gemelo PROYECTO/ (AC-22, AC-23)",
+          "local_validations": [
+            "python3 ai/scripts/feature-state.py graph --feature-id nonexistent -> AC-23 skeleton exit 0; graph against real ai/state/features/*.json (whole repo, single feature) -> valid mermaid; PROYECTO/ai/scripts/feature-state.py kept byte-identical via cp + cmp; ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Enganche en render_notes(): grafo.md, backlink [[grafo]], guard de nombre reservado (AC-24)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_render_notes_writes_grafo_md_reusing_graph_construction_with_backlink tests.test_harness.HarnessTests.test_create_package_rejects_literal_grafo_case_sensitive -v -> OK (2 tests); manual sync-notes run confirmed grafo.md content matches graph subcommand output verbatim and feature note carries the [[grafo]] backlink"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "set-agents --graph: wrapper subprocess delgado en set_agents_app.py (AC-25)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_set_agents_graph_wrapper_matches_feature_state_graph_output -v -> OK; manual: set-agents --graph --feature-id nonexistent-xyz reproduces the AC-23 skeleton byte-for-byte"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Reestructurar los 4 grupos de test_feature_state_gate_fails... + test nuevo in-process del guard de shallow-clone (AC-28)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_feature_state_gate_fails_when_a_delivered_feature_has_no_state_file tests.test_harness.HarnessTests.test_stale_waivers_guard_survives_independent_of_which_feature_is_waived -v -> OK (2 tests); ./ai/scripts/verify.sh -> FEATURE_STATE_OK against the real repo post-retirement"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Tests AC-29: fixtures sint\u00e9ticos para historia legacy sin --commit, spawns fuera de alcance",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_graph_never_emits_spawn_nodes_and_survives_legacy_fixtures_without_commit -v -> OK; fixtures are synthetic (write_graph_fixture), never the live ai/state/features/*.json of other in-flight features, per AC-29"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "ADR-0013 + fila en docs/adr/README.md + log-decision del primer init sin backfill",
+          "local_validations": [
+            "docs/adr/0013-execution-graph-view.md created (D1..D4, Rejected: sections, file:line citations verified against the tree); docs/adr/README.md row added; feature-state.py log-decision run for slug p3-graph-view-abre-el-tracking-de-la-feature-006-sin-backfillear-p1-p2, linked to feature-006-delivered-outside-state-machine and AC-07 of 009-self-application"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-30T07:38:38+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests"
+          ],
+          "evidence": "457 tests, OK, 0 skips. VERIFY_PASS (incluye FEATURE_STATE_OK). SELF_SCAFFOLD_SYNC_OK files=2. git diff --check limpio. 8/8 grafo.md verificados frescos y limpios contra el or\u00e1culo.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-30T05:17:05+00:00",
+          "evidence": "repair-agent: reproduced each finding's PoC/mechanism directly against the CLI/module and confirmed real before fixing; see record-repair verification list for per-finding evidence",
+          "refuted": [],
+          "upheld": [
+            "SEC-001",
+            "SEC-002",
+            "PR-01",
+            "PR-02",
+            "PR-03",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "PR-04",
+            "PR-05"
+          ]
+        },
+        {
+          "at": "2026-07-30T06:39:12+00:00",
+          "evidence": "6/8 docs/notas/features/*/grafo.md (002,003,004,007,008,009) were pre-fix backslash-escaper artifacts rejected by validate_mermaid_structure; sync-notes regenerated them and all 8 now pass the oracle with zero problems (re-verified: extracted the fenced mermaid block from each and ran validate_mermaid_structure -> []).",
+          "refuted": [],
+          "upheld": [
+            "D-01"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 50,
+  "schema_version": 1,
+  "updated_at": "2026-07-30T07:38:47+00:00"
+}

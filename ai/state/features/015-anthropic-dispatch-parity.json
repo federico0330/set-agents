@@ -1,0 +1,1167 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-31T22:04:05+00:00",
+    "hash": "c0f814e031abf76c9654aa96e2362a2773224cc0a2600ea70e76e3a1f4f4373b",
+    "path": "docs/specs/015-anthropic-dispatch-parity/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-anthropic-dispatch-parity",
+  "feature_id": "015-anthropic-dispatch-parity",
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-01T22:46:10+00:00",
+      "evidence": "./ai/scripts/verify.sh -> VERIFY_PASS (558 tests, 0 failures, 0 skips inesperados). ./build.sh --check -> CHECK_PASS. Contra el \u00e1rbol de trabajo actual, HEAD sin commits nuevos (regla de la sesi\u00f3n: nada se commitea salvo pedido expl\u00edcito).",
+      "name": "integration verify",
+      "required": true,
+      "status": "pass"
+    }
+  ],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "user",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/015-anthropic-dispatch-parity/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-31T22:04:05+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "package-planner",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "AC-01: provider-aware effective-runtime redirect in RoutingService.route()'s exclusion loop (service.py, 8 sites) + hermetic 4-shape proof against live-machine-shaped inventory",
+          "AC-02: new SEPARATE Claude-Code-lane CLI subprocess spawn module (stdin delivery, CLI tool-ceiling by role class, mandatory --setting-sources user + cwd boundary + no --add-dir, writer/review lifecycle split, no double-decision) + subprocess-mocked spawn tests + argv-ceiling tests",
+          "AC-03: rewrite canonical orchestrator doctrine (same-lane/cross-lane-redirect/true-off-lane), regenerate via ./build.sh into every generated harness copy, update test_harness.py generically (not hardcoded to 3 files)",
+          "AC-04: add doctrine branch for verified-review shape spawning via AC-02; end-to-end pipeline test + D4-preservation test on non-vacuous day-13 fixture + diff-payload-reaches-reviewer assertion",
+          "AC-05: confirm/name residual benign/unverified review path exposure; regression test for unchanged benign path (balanced-tier .claude residual withdrawn by AC-06(b))",
+          "AC-06: models.toml values-only collision fixes (go-zen a; [areas.audit/judge].claude opus->fable b) + generic (non-hardcoded) collision-detection regression tests",
+          "AC-07: zero-catalog-diff restated as a regression test (build_snapshot already admits claude-code/anthropic identities, catalog.py untouched)",
+          "AC-08: new docs/adr/0019-anthropic-dispatch-parity.md recording items (a)-(e) + docs/adr/README.md row"
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-07-31T22:10:42+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "package-planner",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Single-package plan (budgets.max_package_subdivisions=1, unchanged): AC-01..AC-08 are one cohesive vertical slice (routing-service redirect -> spawn module -> doctrine wiring -> config collision fixes -> ADR), never subdividable without breaking the auth/security narrative that spans them. Early checkpoint declared (security-auditor on AC-02's composed argv) before doctrine wiring proceeds."
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-07-31T22:11:03+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-01: provider-aware effective-runtime redirect in RoutingService.route()'s exclusion loop (service.py, 8 sites) + hermetic 4-shape proof against live-machine-shaped inventory"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-07-31T22:18:11+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-01: provider-aware effective-runtime redirect in RoutingService.route()'s exclusion loop (service.py, 8 sites) + hermetic 4-shape proof against live-machine-shaped inventory",
+        "validations": [
+          "python3 -m unittest tests.test_routing -v -k test_ac01 => OK (5 tests: new-pairs unrelated + 4 AC-01 shapes a/b/c/d, all green). service.py: 8/8 facts.selected_runtime-keyed sites (137,144,145,195,200,201,206,208) addressed -- 137/145/195/200/201/206/208 now key on the per-route effective runtime via new _effective_runtime()/identity[1]/fallback[1]; 144 (PI_SIMULATION_ONLY guard) intentionally left reading facts.selected_runtime, counted+commented. :128 conflict check untouched. py_compile clean."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-07-31T22:30:52+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-02: new SEPARATE Claude-Code-lane CLI subprocess spawn module (stdin delivery, CLI tool-ceiling by role class, mandatory --setting-sources user + cwd boundary + no --add-dir, writer/review lifecycle split, no double-decision) + subprocess-mocked spawn tests + argv-ceiling tests"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-07-31T22:30:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-02: new SEPARATE Claude-Code-lane CLI subprocess spawn module (stdin delivery, CLI tool-ceiling by role class, mandatory --setting-sources user + cwd boundary + no --add-dir, writer/review lifecycle split, no double-decision) + subprocess-mocked spawn tests + argv-ceiling tests",
+        "validations": [
+          "New module ai/scripts/claude_code_spawn.py (never calls set_agents_spawn.route_and_spawn, structural precedent only). 27 new tests in tests.test_routing.ClaudeCodeSpawnTests, all green: argv-ceiling both role classes, forbidden-flag fail-closed guard, stdin delivery (never positional), cwd containment, success/model_mismatch/failure classification (incl. R2-08 overload/empty-modelUsage shape), dispatch_writer lifecycle (dispatched->spawn->terminal, never --route-decide, exception-safe close), dispatch_review (zero routing-store bookkeeping, diff payload reaches stdin). Full suite: python3 -m unittest discover -s tests -v => 521 tests, OK, 0 failures, 0 skips (baseline 494 + 27 new). ./ai/scripts/verify.sh => VERIFY_PASS."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-07-31T23:04:42+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-03: rewrite canonical orchestrator doctrine (same-lane/cross-lane-redirect/true-off-lane), regenerate via ./build.sh into every generated harness copy, update test_harness.py generically (not hardcoded to 3 files)"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:44:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-03: rewrite canonical orchestrator doctrine (same-lane/cross-lane-redirect/true-off-lane), regenerate via ./build.sh into every generated harness copy, update test_harness.py generically (not hardcoded to 3 files)",
+        "validations": [
+          "Global/_canonical/agents/orchestrator.md:160-247 rewritten: step 2 now branches same-lane/cross-lane-redirect/true-off-lane on data.runtime, runtime-agnostic (never hardcodes opencode as host harness); step 3's hard-denial letter 'c' preserved unchanged so ADR-0011 D4's citation of 'step 3c' stays accurate. ./build.sh regenerated all 3 currently-generated copies (opencode/claude-code/codex .toml) clean, CHECK_PASS. test_harness.py::test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy rewritten to discover every Global/*/agents/orchestrator.* copy generically (excluding _canonical), asserting >=3 found and the new doctrine text. python3 -m unittest tests.test_harness -k test_orchestrator_doctrine_branches -v => OK."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-04: add doctrine branch for verified-review shape spawning via AC-02; end-to-end pipeline test + D4-preservation test on non-vacuous day-13 fixture + diff-payload-reaches-reviewer assertion"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-04: add doctrine branch for verified-review shape spawning via AC-02; end-to-end pipeline test + D4-preservation test on non-vacuous day-13 fixture + diff-payload-reaches-reviewer assertion",
+        "validations": [
+          "Doctrine step 3b (new): verified review shape spawns via the same-lane/cross-lane rule, never BASE by default; benign REVIEW_IDENTITY_UNVERIFIED kept as 3b's second sub-case. tests/test_routing.py: test_ac04b_day13_fixture_writer_redirects_but_reviewer_still_hard_halts (non-vacuous day-13 fixture, writer genuinely redirects, reviewer still REVIEWER_INDEPENDENCE_UNAVAILABLE) and test_ac04a_verified_review_shape_dispatches_via_ac02_cross_lane_with_diff_payload_reaching_stdin (real diff text asserted present in stdin payload, not just dispatch mechanics). python3 -m unittest tests.test_routing -k test_ac04 -v => OK (2 tests)."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-05: confirm/name residual benign/unverified review path exposure; regression test for unchanged benign path (balanced-tier .claude residual withdrawn by AC-06(b))"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-05: confirm/name residual benign/unverified review path exposure; regression test for unchanged benign path (balanced-tier .claude residual withdrawn by AC-06(b))",
+        "validations": [
+          "Verified against real spec text: AC-05 requires only a confirming regression test, no new production code. tests/test_routing.py::test_ac05_benign_unverified_review_path_unchanged_and_claude_axis_residual_withdrawn: benign path unchanged, and [areas.audit]/[areas.judge].claude == 'fable', not in {haiku,sonnet,opus}. python3 -m unittest tests.test_routing -k test_ac05 -v => OK."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-06: models.toml values-only collision fixes (go-zen a; [areas.audit/judge].claude opus->fable b) + generic (non-hardcoded) collision-detection regression tests"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-06: models.toml values-only collision fixes (go-zen a; [areas.audit/judge].claude opus->fable b) + generic (non-hardcoded) collision-detection regression tests",
+        "validations": [
+          "models.toml:93,99 claude opus->fable. models.toml:96 areas.audit.opencode.go-zen -> openai/gpt-5.5; areas.judge.opencode.go-zen deliberately untouched (out of approved 2-cell scope), residual logged (log-decision slug areas-judge-go-zen-colisiona-residuo-fuera-de-alcance) and recorded in ADR-0019 D8. Updated pre-existing test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart literal expectation to match the approved value change. New generic tests test_ac06a_audit_go_zen_lane_value_no_longer_collides_with_any_implement_tier_ladder and test_ac06b_claude_axis_audit_judge_collide_with_nothing_generically. python3 -m unittest tests.test_routing -k test_ac06 tests.test_harness -k test_repo_go_zen -v => OK."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-07: zero-catalog-diff restated as a regression test (build_snapshot already admits claude-code/anthropic identities, catalog.py untouched)"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-07: zero-catalog-diff restated as a regression test (build_snapshot already admits claude-code/anthropic identities, catalog.py untouched)",
+        "validations": [
+          "Confirmed accurate: catalog.py has zero diff (git status shows none). New test test_ac07_build_snapshot_already_admits_claude_code_anthropic_identities_zero_catalog_diff proves build_snapshot already allows the claude-code/anthropic identity for all 3 anthropic routes across all 3 runtimes, and _PAIR_COMMANDS carries exactly the 3 pre-existing anthropic pairs. python3 -m unittest tests.test_routing -k test_ac07 -v => OK."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-08: new docs/adr/0019-anthropic-dispatch-parity.md recording items (a)-(e) + docs/adr/README.md row"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "AC-08: new docs/adr/0019-anthropic-dispatch-parity.md recording items (a)-(e) + docs/adr/README.md row",
+        "validations": [
+          "Re-verified live before writing: ls docs/adr/ lists through 0016 only, 013/014 still have no packages materializing 0017/0018 -- 0019 confirmed free. Wrote docs/adr/0019-anthropic-dispatch-parity.md (D1-D9 + Scale/Data/Security + Consecuencias) covering items (a)-(e), citing both pre-existing decisions-log 'record dont fix' notes verbatim-sourced, the new AC-06(a) judge/go-zen residual, and all 6 SEC-001..SEC-006 checkpoint findings by their inline comment markers. Added docs/adr/README.md index row."
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:45:57+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:46:06+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:46:06+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T00:46:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 3,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T01:12:34+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 7,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T01:12:35+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T01:12:35+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T19:29:54+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 10
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T20:43:24+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-P1-001",
+          "SEC-P1-002",
+          "SEC-P1-003",
+          "F-01",
+          "F-02",
+          "F-03",
+          "F-04",
+          "F-05",
+          "F-06",
+          "F-07"
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T20:43:40+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T21:12:55+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 5
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T21:13:04+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T21:24:32+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "DR-01",
+          "DR-02",
+          "DR-03",
+          "DR-04",
+          "DR-05"
+        ]
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T21:39:37+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:00:04+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh",
+          "./build.sh --check"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:10:35+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "fail",
+        "url": ""
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:15:59+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:42:47+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:43:03+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:43:03+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:45:47+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-anthropic-dispatch-parity",
+      "timestamp": "2026-08-01T22:45:57+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "global": true,
+        "name": "integration verify",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-01T22:46:10+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-01T22:46:54+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-01T22:46:55+00:00",
+      "to": "DONE"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 2,
+    "human_questions_after_approval": 0,
+    "package_reviews": 1,
+    "repair_batches": 2,
+    "task_deep_reviews": 0,
+    "verifications": 2
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/coord_policy.py",
+          "reason": "SEC-P1-002 repair: coord_policy.SAFE_ARGV needs the new claude_code_spawn.py CLI entry, a file outside this package's original owned_paths",
+          "status": "approved"
+        },
+        {
+          "path": "Global/claude-code/hooks/coord_policy.py",
+          "reason": "generated copy of ai/scripts/coord_policy.py via ./build.sh; same SEC-P1-002 justification",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/generate.py",
+          "reason": "DR-01 repair: generate.py's oc_permissions needs the new claude_code_spawn.py CLI allow-lines for the OpenCode-lane bash permission map, a file outside this package's original owned_paths -- the round-1 coord_policy.py exception covered only the Claude-Code lane",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/015-anthropic-dispatch-parity/context/P1-anthropic-dispatch-parity.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-01T21:12:55+00:00",
+          "closed_findings": [
+            "SEC-P1-001",
+            "SEC-P1-003",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07"
+          ],
+          "new_or_reopened_findings": [
+            "DR-01",
+            "DR-02",
+            "DR-03",
+            "DR-04",
+            "DR-05"
+          ],
+          "reason": "Delta-review de la ronda 1 de reparaci\u00f3n de RP-01: 9 de 10 hallazgos originales confirmados cerrados de forma independiente (evidencia rele\u00edda contra el c\u00f3digo real, no el auto-reporte). SEC-P1-002 (cr\u00edtico) reabierto: el fix real solo cubri\u00f3 la mitad del problema. 4 hallazgos nuevos, menores, encontrados en el barrido de regresi\u00f3n.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-08-01T22:00:04+00:00",
+          "closed_findings": [
+            "DR-01",
+            "DR-02",
+            "DR-03",
+            "DR-04",
+            "DR-05"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Delta-review ronda 2: los 5 hallazgos cerrados con verificaci\u00f3n independiente, incluyendo simulaci\u00f3n de reversi\u00f3n de DR-01 que confirma que el nuevo test es realmente load-bearing (fallar\u00eda si se revirtiera generate.py). 553 tests, VERIFY_PASS, CHECK_PASS. Una observaci\u00f3n informativa no bloqueante registrada (OBS-01, prosa de doctrina desactualizada, sin impacto de seguridad ni de ejecuci\u00f3n) \u2014 no amerita otro ciclo.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6",
+      "findings": [
+        {
+          "id": "SEC-P1-001",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "Doctrina permite incrustar el diff sin revisar directamente en el texto de instrucci\u00f3n, evadiendo el wrapper de nonce que protege supplementary",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "SEC-P1-002",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "El mecanismo que la doctrina manda invocar no tiene punto de entrada CLI ni entrada en la lista blanca de permisos del orquestador: camino sin salida",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "SEC-P1-003",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "El log de auditor\u00eda de SEC-002 nunca llega a ning\u00fan destino durable: no hay manejador de logging configurado",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-01",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "model_mismatch usa la tabla de alias del lane pi (PI_MODEL_MAP) para validar spawns de Claude Code; opus resuelve distinto en cada uno, as\u00ed que todo spawn real de tier frontier se clasifica como fallido",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-02",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El propio contrato (AC-06(i) vs Non-goals) es internamente inconsistente sobre el alcance del test de colisi\u00f3n; se resolvi\u00f3 unilateralmente en vez de escalar",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-03",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El redirect de AC-01 puede disparar en un caso no especificado para el lane pi (par genuinamente ausente), y el spawner de pi ignora el campo runtime",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-04",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "La rama same-lane de AC-03 tiene condici\u00f3n runtime-agnostic pero acci\u00f3n todav\u00eda shaped para OpenCode; falla en vivo cuando el orquestador corre sobre Claude Code",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-05",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El gate de ownership falla por razones no relacionadas (diff_ref desactualizado), sin se\u00f1al real",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-06",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El test de AC-04(a) no verifica que el archivo de doctrina generado realmente seleccione la rama cross-lane",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "F-07",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El checkpoint temprano de seguridad no qued\u00f3 registrado en el historial formal del paquete",
+          "verified_at": "2026-08-01T20:43:24+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "DR-01",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "SEC-P1-002 qued\u00f3 a medias: la entrada en coord_policy.SAFE_ARGV solo se propaga al lane de Claude Code, pero la rama cross-lane-redirect dispara justamente cuando el host NO es Claude Code (o sea, en OpenCode); el mapa de permisos generado por generate.py para OpenCode nunca gan\u00f3 la entrada. Mismo camino sin salida que SEC-P1-002 nombraba, en el \u00fanico lane donde la rama realmente se selecciona.",
+          "verified_at": "2026-08-01T21:13:04+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "DR-02",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "--routing-test-root qued\u00f3 en la lista blanca de coord_policy y accesible por el CLI real; permite que el binding de auditor\u00eda de SEC-P1-003 se escriba fuera del store de producci\u00f3n de forma autorizada",
+          "verified_at": "2026-08-01T21:13:04+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "DR-03",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "El archivo JSONL de auditor\u00eda se abre con open() plano (modo de proceso, t\u00edpicamente 0644) en vez de 0600 como el resto del store de ruteo",
+          "verified_at": "2026-08-01T21:13:04+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "DR-04",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "--task - junto con --supplementary - produce una revisi\u00f3n vac\u00eda y sin protecci\u00f3n de nonce, sin que nada lo reporte",
+          "verified_at": "2026-08-01T21:13:04+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "id": "DR-05",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "Los tests del CLI nuevo no interceptan stdout, contaminando la salida real de la suite (higiene, sin impacto de correctitud)",
+          "verified_at": "2026-08-01T21:13:04+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Redirect routed decisions resolving to provider anthropic onto a real Claude-Code CLI subprocess spawn (CLI-level read-only/bounded-write tool ceiling, mandatory --setting-sources user containment), close the review-independence gap for the 12-day two-provider window without relaxing ADR-0011 D4, update the shared orchestrator doctrine across harnesses, fix two static-config model collisions, and record the design in a new ADR.",
+      "owned_paths": [
+        "ai/scripts/routing_core/service.py",
+        "ai/scripts/claude_code_spawn.py",
+        "Global/_canonical/agents/orchestrator.md",
+        "Global/opencode/agents/orchestrator.md",
+        "Global/claude-code/agents/orchestrator.md",
+        "Global/codex/agents/orchestrator.toml",
+        "models.toml",
+        "docs/adr/0019-anthropic-dispatch-parity.md",
+        "tests/test_routing.py",
+        "tests/test_harness.py"
+      ],
+      "package_id": "P1-anthropic-dispatch-parity",
+      "read_only_paths": [
+        "ai/scripts/routing_core/catalog.py",
+        "ai/scripts/routing_core/domain.py",
+        "ai/scripts/set_agents_spawn.py",
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/models_config.py",
+        "ai/catalogs/routes.v1.toml",
+        "docs/adr/0007-pi-lane.md",
+        "docs/adr/0011-uninterrupted-delegation.md"
+      ],
+      "repairs": [
+        {
+          "at": "2026-08-01T20:43:40+00:00",
+          "changed_files": [
+            "ai/scripts/claude_code_spawn.py",
+            "ai/scripts/routing_core/service.py",
+            "ai/scripts/coord_policy.py",
+            "Global/claude-code/hooks/coord_policy.py",
+            "Global/_canonical/agents/orchestrator.md",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/agents/orchestrator.toml",
+            "models.toml",
+            "docs/adr/0019-anthropic-dispatch-parity.md",
+            "docs/adr/README.md",
+            "tests/test_routing.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "SEC-P1-001",
+            "SEC-P1-002",
+            "SEC-P1-003",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07"
+          ],
+          "verification": [
+            "549 tests (desde 540 base), VERIFY_PASS, CHECK_PASS, OWNERSHIP_PASS (con excepciones registradas para coord_policy.py y su copia generada, necesarias para SEC-P1-002). Los 3 hallazgos cr\u00edticos/altos de seguridad (SEC-P1-001, SEC-P1-002, F-01) cerrados con evidencia ejecutable: doctrina regenerada sin el canal alternativo de inyecci\u00f3n, CLI real con entrada en la lista blanca de coord_policy, tabla de canonicalizaci\u00f3n propia de Claude Code verificada en vivo contra el binario real. F-02 ampliado adem\u00e1s a una tercera colisi\u00f3n descubierta por su propio test gen\u00e9rico (areas.ops), cerrada con aprobaci\u00f3n del usuario en la misma pasada."
+          ]
+        },
+        {
+          "at": "2026-08-01T21:39:37+00:00",
+          "changed_files": [
+            "ai/scripts/generate.py",
+            "ai/scripts/claude_code_spawn.py",
+            "ai/scripts/coord_policy.py",
+            "Global/claude-code/hooks/coord_policy.py",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/agents/orchestrator.toml",
+            "docs/adr/0019-anthropic-dispatch-parity.md",
+            "tests/test_routing.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "DR-01",
+            "DR-02",
+            "DR-03",
+            "DR-04",
+            "DR-05"
+          ],
+          "verification": [
+            "DR-01 (HIGH, reabre SEC-P1-002): generate.py's oc_permissions ahora emite las dos allow-lines --dispatch-writer*/--dispatch-review* en el bash: map de Global/opencode/agents/orchestrator.md (lane OpenCode, donde la rama cross-lane-redirect realmente dispara); nueva excepcion de ownership para ai/scripts/generate.py registrada; nuevo test test_opencode_orchestrator_permission_map_actually_admits_the_spawn_cli lee el archivo generado real tras ./build.sh. DR-02 (MEDIUM): --routing-test-root eliminado de main()/argparse y de coord_policy.SAFE_ARGV; sigue disponible solo como parametro Python directo (dispatch_writer/_persist_audit_binding) para tests. DR-03 (LOW): _persist_audit_binding ahora hace os.chmod(path, 0o600) tras cada escritura. DR-04 (LOW): main() rechaza con parser.error la combinacion --task - + --supplementary -. DR-05 (LOW): los 3 tests de CLI que faltaban capturar stdout ahora usan mock.patch(\"sys.stdout\", buf), mismo patron que test_cli_reports_failure_exit_code_when_a_task_file_is_unreadable. Verificacion: 553 tests (antes 549), 0 failures, 0 skips inesperados; VERIFY_PASS; CHECK_PASS (./build.sh --check); allow-lines confirmadas leyendo Global/opencode/agents/orchestrator.md real tras ./build.sh; check-owned-paths.py confirma generate.py y coord_policy.py cubiertos por approved_exceptions (el OWNERSHIP_FAIL remanente es integramente el baseline stale F-05, ya nombrado como fuera de la autoridad de este paquete, no introducido por esta ronda)."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-08-01T01:12:35+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-08-01T00:46:15+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-08-01T01:12:34+00:00",
+              "evidence": "Revisi\u00f3n completa del panel RP-01 sobre el diff integrado de P1-anthropic-dispatch-parity, posterior al checkpoint temprano de AC-01/AC-02.",
+              "findings": [
+                "SEC-P1-001",
+                "SEC-P1-002",
+                "SEC-P1-003"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-08-01T01:12:35+00:00",
+              "evidence": "Revisi\u00f3n completa del panel RP-01 sobre el diff integrado de P1-anthropic-dispatch-parity; verificado independientemente: 540 tests OK, VERIFY_PASS, CHECK_PASS, footprint de archivos confirmado por mtime.",
+              "findings": [
+                "F-01",
+                "F-02",
+                "F-03",
+                "F-04",
+                "F-05",
+                "F-06",
+                "F-07"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-08-01T01:12:35+00:00",
+          "evidence": "",
+          "findings": [
+            "SEC-P1-001",
+            "SEC-P1-002",
+            "SEC-P1-003",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "SEC: headless Claude-Code spawn without --setting-sources user + cwd containment reopens R2-03/R3-01's tool-ceiling bypass via project-scope hook/agent-file shadowing",
+        "SEC: Bash must be categorically absent from every AC-02 argv, both role classes; no parameter may widen it (SEC-A02 precedent)",
+        "AUTHZ regression: AC-04 must not weaken ADR-0011 D4 -- day-13 fixture (only anthropic authenticated) must still hard-halt with REVIEWER_INDEPENDENCE_UNAVAILABLE",
+        "ADR-number race: 0017/0018 are soft-claimed by 013/014 but not materialized on disk -- re-verify docs/adr/ listing live immediately before creating 0019",
+        "Doctrine test regression: test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy must iterate every generated harness copy generically, not a hardcoded 3-tuple, so 013 landing a 4th copy later doesn't silently stop being covered",
+        "Scope creep: AC-06's models.toml edit must touch ONLY the two named cells -- any other [areas.*]/[roles.*] value change violates the approved contract's Non-goals"
+      ],
+      "routing_reason": "High complexity: auth/authz-adjacent review-independence fix, untrusted-code-execution containment (headless CLI spawn tool ceiling), and cross-harness doctrine regeneration on the priority feature with a real ~12-day deadline -- frontier tier for correctness on a security-critical, live-verified surface.",
+      "runtime_qa": [
+        {
+          "at": "2026-08-01T22:15:59+00:00",
+          "browser": "",
+          "checks": [
+            "dispatch_review end-to-end contra claude real (haiku, spend real de /bin/bash.0128 confirmado)",
+            "tool ceiling verificado via system/init: Read,Grep,Glob, sin Bash",
+            "--setting-sources user presente en el argv real",
+            "audit-binding persistence: archivo real, modo 600, review-class no escribe (por dise\u00f1o)",
+            "mapa de permisos de OpenCode: allow-lines confirmadas en el archivo generado real"
+          ],
+          "evidence": "HALLAZGO FUNCIONAL REAL: _classify_result descarta doc.get('result') en las ramas success/model_mismatch \u2014 un dispatch_review exitoso, con costo real incurrido, nunca devuelve el texto del veredicto del revisor al que lo llam\u00f3. Solo metadata de spawn (modelo, costo, session_id). Confirmado con una llamada paralela al binario real de claude con el mismo prompt, que s\u00ed trae contenido sustantivo. Ning\u00fan test de la suite afirma sobre el campo de veredicto porque nunca existi\u00f3. No es un problema de seguridad ni de doctrina \u2014 pas\u00f3 las 3 rondas de spec-challenge y las 2 rondas de repair/delta-review porque ninguna estaba mirando la completitud del payload de revisi\u00f3n.",
+          "screenshots": [],
+          "status": "fail",
+          "url": ""
+        },
+        {
+          "at": "2026-08-01T22:45:47+00:00",
+          "browser": "",
+          "checks": [
+            "dispatch_review real v\u00eda CLI, con veredicto completo del revisor presente en el JSON de salida (detect\u00f3 correctamente una inyecci\u00f3n de comandos en un diff de prueba, devolvi\u00f3 FAIL con justificaci\u00f3n)",
+            "review-class confirmado sin bookkeeping en el routing store (mtime del audit log sin cambios)",
+            "56/56 tests de ClaudeCodeSpawnTests en verde contra el m\u00f3dulo real"
+          ],
+          "evidence": "QA-01 (veredicto de revisor descartado) reparado y reverificado en vivo con una segunda llamada real e independiente al CLI. Gasto real incurrido: ~$0.013. El mecanismo completo (redirect, spawn, l\u00edmites de seguridad, veredicto) funciona de punta a punta.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": "frontier",
+      "selected_role": "implementer",
+      "shared_paths": [
+        "docs/adr/README.md"
+      ],
+      "spawns": [],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "AC-01: provider-aware effective-runtime redirect in RoutingService.route()'s exclusion loop (service.py, 8 sites) + hermetic 4-shape proof against live-machine-shaped inventory",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing -v -k test_ac01 => OK (5 tests: new-pairs unrelated + 4 AC-01 shapes a/b/c/d, all green). service.py: 8/8 facts.selected_runtime-keyed sites (137,144,145,195,200,201,206,208) addressed -- 137/145/195/200/201/206/208 now key on the per-route effective runtime via new _effective_runtime()/identity[1]/fallback[1]; 144 (PI_SIMULATION_ONLY guard) intentionally left reading facts.selected_runtime, counted+commented. :128 conflict check untouched. py_compile clean."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-02: new SEPARATE Claude-Code-lane CLI subprocess spawn module (stdin delivery, CLI tool-ceiling by role class, mandatory --setting-sources user + cwd boundary + no --add-dir, writer/review lifecycle split, no double-decision) + subprocess-mocked spawn tests + argv-ceiling tests",
+          "local_validations": [
+            "New module ai/scripts/claude_code_spawn.py (never calls set_agents_spawn.route_and_spawn, structural precedent only). 27 new tests in tests.test_routing.ClaudeCodeSpawnTests, all green: argv-ceiling both role classes, forbidden-flag fail-closed guard, stdin delivery (never positional), cwd containment, success/model_mismatch/failure classification (incl. R2-08 overload/empty-modelUsage shape), dispatch_writer lifecycle (dispatched->spawn->terminal, never --route-decide, exception-safe close), dispatch_review (zero routing-store bookkeeping, diff payload reaches stdin). Full suite: python3 -m unittest discover -s tests -v => 521 tests, OK, 0 failures, 0 skips (baseline 494 + 27 new). ./ai/scripts/verify.sh => VERIFY_PASS."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-03: rewrite canonical orchestrator doctrine (same-lane/cross-lane-redirect/true-off-lane), regenerate via ./build.sh into every generated harness copy, update test_harness.py generically (not hardcoded to 3 files)",
+          "local_validations": [
+            "Global/_canonical/agents/orchestrator.md:160-247 rewritten: step 2 now branches same-lane/cross-lane-redirect/true-off-lane on data.runtime, runtime-agnostic (never hardcodes opencode as host harness); step 3's hard-denial letter 'c' preserved unchanged so ADR-0011 D4's citation of 'step 3c' stays accurate. ./build.sh regenerated all 3 currently-generated copies (opencode/claude-code/codex .toml) clean, CHECK_PASS. test_harness.py::test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy rewritten to discover every Global/*/agents/orchestrator.* copy generically (excluding _canonical), asserting >=3 found and the new doctrine text. python3 -m unittest tests.test_harness -k test_orchestrator_doctrine_branches -v => OK."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-04: add doctrine branch for verified-review shape spawning via AC-02; end-to-end pipeline test + D4-preservation test on non-vacuous day-13 fixture + diff-payload-reaches-reviewer assertion",
+          "local_validations": [
+            "Doctrine step 3b (new): verified review shape spawns via the same-lane/cross-lane rule, never BASE by default; benign REVIEW_IDENTITY_UNVERIFIED kept as 3b's second sub-case. tests/test_routing.py: test_ac04b_day13_fixture_writer_redirects_but_reviewer_still_hard_halts (non-vacuous day-13 fixture, writer genuinely redirects, reviewer still REVIEWER_INDEPENDENCE_UNAVAILABLE) and test_ac04a_verified_review_shape_dispatches_via_ac02_cross_lane_with_diff_payload_reaching_stdin (real diff text asserted present in stdin payload, not just dispatch mechanics). python3 -m unittest tests.test_routing -k test_ac04 -v => OK (2 tests)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-05: confirm/name residual benign/unverified review path exposure; regression test for unchanged benign path (balanced-tier .claude residual withdrawn by AC-06(b))",
+          "local_validations": [
+            "Verified against real spec text: AC-05 requires only a confirming regression test, no new production code. tests/test_routing.py::test_ac05_benign_unverified_review_path_unchanged_and_claude_axis_residual_withdrawn: benign path unchanged, and [areas.audit]/[areas.judge].claude == 'fable', not in {haiku,sonnet,opus}. python3 -m unittest tests.test_routing -k test_ac05 -v => OK."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-06: models.toml values-only collision fixes (go-zen a; [areas.audit/judge].claude opus->fable b) + generic (non-hardcoded) collision-detection regression tests",
+          "local_validations": [
+            "models.toml:93,99 claude opus->fable. models.toml:96 areas.audit.opencode.go-zen -> openai/gpt-5.5; areas.judge.opencode.go-zen deliberately untouched (out of approved 2-cell scope), residual logged (log-decision slug areas-judge-go-zen-colisiona-residuo-fuera-de-alcance) and recorded in ADR-0019 D8. Updated pre-existing test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart literal expectation to match the approved value change. New generic tests test_ac06a_audit_go_zen_lane_value_no_longer_collides_with_any_implement_tier_ladder and test_ac06b_claude_axis_audit_judge_collide_with_nothing_generically. python3 -m unittest tests.test_routing -k test_ac06 tests.test_harness -k test_repo_go_zen -v => OK."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-07: zero-catalog-diff restated as a regression test (build_snapshot already admits claude-code/anthropic identities, catalog.py untouched)",
+          "local_validations": [
+            "Confirmed accurate: catalog.py has zero diff (git status shows none). New test test_ac07_build_snapshot_already_admits_claude_code_anthropic_identities_zero_catalog_diff proves build_snapshot already allows the claude-code/anthropic identity for all 3 anthropic routes across all 3 runtimes, and _PAIR_COMMANDS carries exactly the 3 pre-existing anthropic pairs. python3 -m unittest tests.test_routing -k test_ac07 -v => OK."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "AC-08: new docs/adr/0019-anthropic-dispatch-parity.md recording items (a)-(e) + docs/adr/README.md row",
+          "local_validations": [
+            "Re-verified live before writing: ls docs/adr/ lists through 0016 only, 013/014 still have no packages materializing 0017/0018 -- 0019 confirmed free. Wrote docs/adr/0019-anthropic-dispatch-parity.md (D1-D9 + Scale/Data/Security + Consecuencias) covering items (a)-(e), citing both pre-existing decisions-log 'record dont fix' notes verbatim-sourced, the new AC-06(a) judge/go-zen residual, and all 6 SEC-001..SEC-006 checkpoint findings by their inline comment markers. Added docs/adr/README.md index row."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-01T22:10:35+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh",
+            "./build.sh --check"
+          ],
+          "evidence": "Verificaci\u00f3n final independiente por el orquestador (no reutilizando el auto-reporte de ning\u00fan agente): 553 tests, OK, 0 failures, 0 skips inesperados. VERIFY_PASS (GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK). CHECK_PASS. Dos rondas de reparaci\u00f3n completas, panel RP-01 + 2 delta-reviews, veredicto final pass.",
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-01T22:43:03+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "Re-testing tras reparar QA-01 (veredicto de revisor descartado en dispatch_review exitoso). 558 tests, OK, VERIFY_PASS.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-01T20:43:24+00:00",
+          "evidence": "Los 10 hallazgos de RP-01 fueron reales, cada uno con reproducci\u00f3n en vivo (SEC-P1-001..003 y F-01..F-06 con evidencia ejecutable citada por los revisores; F-07 es un gap de proceso confirmado). Cada uno recibi\u00f3 una reparaci\u00f3n concreta y verificable: 549 tests (desde 540), VERIFY_PASS, CHECK_PASS, OWNERSHIP_PASS. Adem\u00e1s surgi\u00f3 y se cerr\u00f3 una tercera colisi\u00f3n no nombrada (areas.ops) descubierta por el propio test gen\u00e9rico de F-02, aprobada por el usuario y cerrada en la misma pasada.",
+          "refuted": [],
+          "upheld": [
+            "SEC-P1-001",
+            "SEC-P1-002",
+            "SEC-P1-003",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07"
+          ]
+        },
+        {
+          "at": "2026-08-01T21:13:04+00:00",
+          "evidence": "Los 5 hallazgos de la ronda 1 de delta-review vienen con evidencia ejecutable citada por el revisor (grep del mapa de permisos generado, trazado del flag --routing-test-root hasta su uso real, modo de archivo verificado, reproducci\u00f3n del caso --task -/--supplementary -, salida real de la suite contaminada). DR-01 confirmado el m\u00e1s grave: reabre SEC-P1-002.",
+          "refuted": [],
+          "upheld": [
+            "DR-01",
+            "DR-02",
+            "DR-03",
+            "DR-04",
+            "DR-05"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "DONE",
+  "revision": 43,
+  "schema_version": 1,
+  "updated_at": "2026-08-01T22:46:55+00:00"
+}

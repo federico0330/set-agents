@@ -103,12 +103,19 @@ corré `./build.sh --install`.
 
 ## El menú
 
-```
-[1] 📦 Instalar / Reparar    [5] 🔌 MCPs
-[2] 🔄 Actualizar            [6] 🧩 Plugins Claude Code
-[3] 🧠 Modelos               [7] 📊 Estado
-[4] 🧰 Herramientas (CLIs)   [8] ⏻  Salir
-```
+`./set-agents` abre un selector de flechas (stdlib puro, sin librerías de terceros): ↑↓ para
+moverte, Enter para elegir, `/` para buscar (con texto libre donde tiene sentido, ej. el picker
+de modelos), Esc o Ctrl-C para volver/cancelar sin dejar rastro de error. Las opciones, en orden:
+
+- 📦 Instalar / Reparar
+- 🔄 Actualizar
+- 🧠 Modelos
+- 🧰 Herramientas (CLIs)
+- 🔌 MCPs
+- 🧩 Plugins Claude Code
+- 📊 Estado
+- 🗒 Vault Obsidian
+- ⏻ Salir
 
 Todo tiene equivalente scripteable (`set-agents --help`): `--status`, `--update`,
 `--tools-install gcloud`, `--mcp-add supabase --harness opencode`, etc.

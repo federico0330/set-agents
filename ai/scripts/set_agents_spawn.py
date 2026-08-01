@@ -57,6 +57,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from routing_core import catalog
+from routing_core.domain import classify_pi_terminal_error
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_CLI = ROOT / "ai/scripts/set_agents_app.py"
@@ -263,22 +264,41 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
         # secret-free by default.
         return "failure", {"reason": "PI_CRASH", "exit_code": proc.returncode,
                            "stderr": _redact(proc.stderr.strip())[-500:]}
-    fallback = _model_fallback_marker(proc.stderr)
-    if fallback is not None:
-        return "model_mismatch", {"expected": target_id, "observed": target_id,
-                                  "reason": "PI_MODEL_FALLBACK", "detail": fallback}
+    # 007-P2 review finding (F-PR-02, upheld by finding-verifier): this loop used to run
+    # AFTER the `model_mismatch`/`PI_TURN_ERROR` returns below, so `last_assistant` did not
+    # exist yet at those points and none of the three non-success-but-settled outcomes ever
+    # reported usage — a spawn that burned real tokens and then mismatched or errored was
+    # recorded `usage_status='absent'` ("never spawned") instead of `ok`/`invalid`, the
+    # exact blindness this feature exists to end. Hoisted so every outcome below it can see
+    # whatever usage the last assistant turn actually reported, if any.
     last_assistant = None
     for event in events:
         message = event.get("message")
         if isinstance(message, dict) and message.get("role") == "assistant":
             last_assistant = message
+    fallback = _model_fallback_marker(proc.stderr)
+    if fallback is not None:
+        return "model_mismatch", {"expected": target_id, "observed": target_id,
+                                  "reason": "PI_MODEL_FALLBACK", "detail": fallback,
+                                  "usage": (last_assistant or {}).get("usage") or {}}
     if last_assistant is None:
         return "failure", {"reason": "PI_NO_ASSISTANT_MESSAGE"}
     observed = f"{last_assistant.get('provider')}/{last_assistant.get('model')}"
     if observed != target_id:
-        return "model_mismatch", {"expected": target_id, "observed": observed}
+        return "model_mismatch", {"expected": target_id, "observed": observed,
+                                  "usage": last_assistant.get("usage") or {}}
     if last_assistant.get("stopReason") == "error":
-        return "failure", {"reason": "PI_TURN_ERROR", "detail": _redact(last_assistant.get("errorMessage") or "")[:500]}
+        raw_error = last_assistant.get("error")
+        normalized = {"settled": True, "provider": provider}
+        if isinstance(raw_error, dict):
+            normalized.update({"http_status": raw_error.get("status"), "type": raw_error.get("type"),
+                               "marker": raw_error.get("message")})
+        detail = {"reason": "PI_TURN_ERROR", "detail": _redact(last_assistant.get("errorMessage") or "")[:500],
+                  "usage": last_assistant.get("usage") or {}}
+        if classify_pi_terminal_error(normalized) == "quota_exhausted":
+            # Only the fixed allowlist crosses the boundary; raw provider output is never stored.
+            detail["quota_error"] = normalized
+        return "failure", detail
     return "success", {"model": target_id, "usage": last_assistant.get("usage") or {}}
 
 
@@ -368,10 +388,42 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
                                 guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd)
         latency_ms = max(0, int((time.time() - started) * 1000))
         terminal_outcome = "success" if outcome == "success" else "failure"
-        terminal = _run_app_cli(
-            ["--route-terminal", run_id, terminal_outcome, "--latency-ms", str(latency_ms), "--json"], env=env,
-            cwd=routing_cwd,
-        )
+        terminal_args = ["--route-terminal", run_id, terminal_outcome, "--latency-ms", str(latency_ms), "--json"]
+        # AC-10: attach `--usage` whenever `detail` carries one, regardless of `outcome` —
+        # `spawn()` now reports usage for `model_mismatch`/`PI_TURN_ERROR` too (F-PR-02), not
+        # only `success`. A genuine `PI_CRASH`/missing-role-prompt/etc. `detail` has no
+        # "usage" key at all, so this naturally omits --usage for those, same as the two
+        # failure closes below that never reach this line at all.
+        #
+        # 007-P2 review finding (F-SEC-02, upheld by finding-verifier): `spawn()`'s contract
+        # promises `usage` is a dict (`usage or {}`), but nothing enforced it — a
+        # non-dict value here would reach `--usage`, which `parse_usage` correctly rejects
+        # at the CLI (ROUTING_INPUT_INVALID), but `--usage` and `--route-terminal` are the
+        # SAME call, so rejecting the usage rejected the ENTIRE close, leaving the run
+        # `dispatched` forever. `isinstance` is checked here, at the one place this argument
+        # is composed, so a malformed shape is simply never attached — the run still closes,
+        # with `usage_status='absent'` for that one field.
+        usage = detail.get("usage")
+        if detail.get("quota_error") and classify_pi_terminal_error(detail["quota_error"]) == "quota_exhausted":
+            terminal_args = ["--route-quota-exhausted", run_id, "--quota-error", json.dumps(detail["quota_error"]),
+                             "--latency-ms", str(latency_ms), "--json"]
+        if isinstance(usage, dict):
+            terminal_args += ["--usage", json.dumps(usage)]
+        terminal = _run_app_cli(terminal_args, env=env, cwd=routing_cwd)
+        quota_result = _last_json_line(terminal.stdout).get("data", {}) if detail.get("quota_error") else {}
+        replacement_id = quota_result.get("replacement_run_id") if isinstance(quota_result, dict) else None
+        replacement_provider = quota_result.get("replacement_provider") if isinstance(quota_result, dict) else None
+        replacement_model = quota_result.get("replacement_model") if isinstance(quota_result, dict) else None
+        if replacement_id and isinstance(replacement_provider, str) and isinstance(replacement_model, str):
+            replacement_outcome, replacement_detail = spawn(role, task, replacement_provider, replacement_model, role_prompt,
+                                                             guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd)
+            replacement_args = ["--route-terminal", replacement_id,
+                                "success" if replacement_outcome == "success" else "failure", "--json"]
+            if isinstance(replacement_detail.get("usage"), dict):
+                replacement_args += ["--usage", json.dumps(replacement_detail["usage"])]
+            replacement_terminal = _run_app_cli(replacement_args, env=env, cwd=routing_cwd)
+            detail = dict(detail, replacement_run_id=replacement_id, replacement_status=replacement_outcome,
+                          replacement_terminal_exit_code=replacement_terminal.returncode)
     except Exception as exc:  # noqa: BLE001 - SEC-A03/PKG-N01: no orphaned authorized run
         # Any exception past authorization (a lifecycle-CLI subprocess surprise or
         # anything else) must never leave `run_id` open. The best-effort close itself is

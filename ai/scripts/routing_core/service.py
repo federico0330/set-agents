@@ -4,7 +4,7 @@ from __future__ import annotations
 import secrets
 import time
 from pathlib import Path
-from .catalog import build_snapshot, probe_inventory
+from .catalog import build_snapshot, canonical_model, probe_inventory
 from .domain import (RISK_ORDER, TIER_ORDER, RoutingError, StaticRoute, TaskRequest, _ObservedTaskFacts,
                      combined_risk, required_tier, RouteDecision)
 
@@ -18,6 +18,35 @@ from .domain import (RISK_ORDER, TIER_ORDER, RoutingError, StaticRoute, TaskRequ
 # PROVIDER_UNAUTHENTICATED, never silently authorized. Flipping back to True is the whole
 # rollback — one line, no data migration, no other file touched.
 PI_SIMULATION_ONLY = False
+
+# AC-01 (015-anthropic-dispatch-parity): the ONLY provider-scoped runtime redirect this
+# contract configures. `anthropic` requested on whatever lane the caller asked for falls
+# through to `claude-code` ONLY when that REQUESTED `(runtime, provider)` pair has no
+# inventory entry at all (see `_effective_runtime` below for the exact, pair-level-
+# presence trigger) — `claude-code` is where Claude Code's real OAuth subscription is
+# already live-authenticated (`## Contexto` §C of the spec), never a metered API key.
+# A closed, single-entry map on purpose: extending this to another provider, or
+# widening it to override an already-authenticated pair (e.g. redirecting an
+# already-working `("pi","anthropic")` decision away from `pi`), is explicitly out of
+# scope (Non-goals: no widening of `openai-codex`'s reachable runtimes — that is
+# `011`'s quota-failover territory — and no change to `pi`'s own dispatch lane).
+_PROVIDER_RUNTIME_REDIRECTS = {"anthropic": "claude-code"}
+
+# F-03 (015 repair panel RP-01): the requested-pair-presence check above was the ONLY
+# guard AC-01 originally had, and it is silent about a requested pair that is
+# GENUINELY ABSENT from inventory on the `pi` lane specifically -- under the literal
+# original rule, that case redirects. `set_agents_spawn.route_and_spawn` (the REAL `pi`
+# lane spawner, ADR-0007) never reads `RouteDecision.runtime` at all -- it always spawns
+# on `pi` regardless of what this service decided. If the redirect fired for a `pi`
+# request, a decision authorized (post-redirect) for `claude-code` would get spawned on
+# `pi` instead by that ignorant caller -- converting a fail-closed `NO_ELIGIBLE_ROUTE`
+# into a fail-open authorization silently executed on the wrong lane, without ever
+# invoking `claude_code_spawn.py`'s CLI-level tool ceiling (D4/D5) at all. The safest,
+# most conservative fix: `pi` is a categorically redirect-EXEMPT requested lane,
+# regardless of pair presence/absence -- even when the redirect target
+# (`claude-code`/`anthropic`) is separately, fully authenticated. This is stricter than,
+# and supersedes, the pair-presence check alone for this one lane.
+_NEVER_REDIRECT_FROM_RUNTIMES = frozenset({"pi"})
 
 
 class _FactsIssuer:
@@ -101,6 +130,34 @@ class RoutingService:
         self._facts[id(facts)] = issuer
         return facts
 
+    def _effective_runtime(self, runtime: str, provider: str) -> str:
+        """AC-01: resolve the runtime a route's identity/auth is actually evaluated
+        against. Fires ONLY when the REQUESTED `(runtime, provider)` pair has NO
+        inventory entry AT ALL — `self.inventory` never stores an empty-model pair
+        (`catalog._probe_pairs`'s own `if models: result[pair] = models`, the pair is
+        simply absent otherwise), so this is a genuine pair-level PRESENCE check, never
+        a per-model completeness check (R3-05). A present-but-model-incomplete pair
+        (e.g. `("pi","anthropic")` probed but missing one tier's model) is left
+        untouched here — the ordinary per-model `PROVIDER_UNAUTHENTICATED` check at
+        the call site still excludes it correctly, on the requested lane, never
+        redirected. Never fires when the requested lane already IS the redirect
+        target (idempotent), and never fires for a provider absent from
+        `_PROVIDER_RUNTIME_REDIRECTS` (`openai-codex`'s behavior stays byte-identical
+        to before this AC). This is the one requirement that keeps AC-01's own
+        Non-goal true in code, not merely in prose: an already-authenticated
+        `("pi","anthropic")` decision is never redirected away from `pi`. F-03 (015
+        repair): `pi` is ALSO categorically redirect-EXEMPT as a REQUESTED lane even
+        when its own pair is GENUINELY ABSENT from inventory (not merely incomplete) —
+        `set_agents_spawn.route_and_spawn`, the real `pi`-lane spawner, never reads
+        `RouteDecision.runtime` and always spawns on `pi` regardless, so redirecting a
+        `pi`-requested decision to `claude-code` would authorize one lane and execute on
+        another — see `_NEVER_REDIRECT_FROM_RUNTIMES` above."""
+        redirect = _PROVIDER_RUNTIME_REDIRECTS.get(provider)
+        if (redirect is not None and redirect != runtime and runtime not in _NEVER_REDIRECT_FROM_RUNTIMES
+                and (runtime, provider) not in self.inventory):
+            return redirect
+        return runtime
+
     def route(self, request: TaskRequest, facts, review_of_run_id=None, unverified_review=False) -> RouteDecision:
         issuer = self._facts.pop(id(facts), None)
         if not isinstance(request, TaskRequest) or issuer is None or not issuer.consume(facts, set(self.roster)):
@@ -124,6 +181,10 @@ class RoutingService:
                 try: writer = self.store.implementation_identity(review_of_run_id)
                 except RoutingError: return RouteDecision(None,None,None,None,None,None,False,("REVIEW_IDENTITY_INVALID",))
         else: writer = None
+        # AC-01 non-goal: this conflict check governs a disjoint concern (whether the
+        # CALLER's own requested lane conflicts with the resolved one) and is
+        # deliberately left reading the raw, requested `facts.selected_runtime` — never
+        # the per-candidate effective runtime the exclusion loop below computes.
         conflicts = (request.role != facts.role or request.operation != facts.operation or request.task_class != facts.task_class
                      or request.selected_runtime not in (None, facts.selected_runtime))
         if conflicts:
@@ -134,18 +195,44 @@ class RoutingService:
         needs_context = facts.context_required or risk == "high" or bool(facts.criticality)
         candidates, exclusions = [], []
         for route in self.snapshot.routes:
-            identity=(route.route_id, facts.selected_runtime, route.provider, route.model, route.family, route.effort)
+            # AC-01: the identity/auth check below is evaluated against this route's
+            # own EFFECTIVE runtime, not blindly against the caller's requested
+            # `facts.selected_runtime` — `_effective_runtime` only ever differs from
+            # the requested one for `route.provider == "anthropic"`, and only when the
+            # requested pair has no inventory entry at all. `identity[1]` (this value)
+            # is what the final `RouteDecision.runtime` reports, so a decision that
+            # will actually execute on the redirected lane says so in its own audit
+            # trail (spec AC-01). `build_snapshot`/`identity_allowed` already admit
+            # the `claude-code`/`anthropic` identity with zero catalog change (§B).
+            effective_runtime = self._effective_runtime(facts.selected_runtime, route.provider)
+            identity=(route.route_id, effective_runtime, route.provider, route.model, route.family, route.effort)
             reason = None
             # F10: hard exclusions (identity/auth/role/tools/context/independence) filter
             # BEFORE tier ordering, so TIER_INSUFFICIENT never masks a more fundamental
             # reason on the same candidate set (contract 004 §Tier model, precedence).
             if not self.snapshot.identity_allowed(identity): reason="RUNTIME_UNAVAILABLE"
+            elif self.store is not None and self.store.provider_exhausted(route.provider): reason="PROVIDER_EXHAUSTED"
+            # AC-01 (counted, unchanged): this pi-specific simulation guard reads the
+            # caller's literal REQUESTED lane, never the effective/redirected one — it
+            # governs whether the caller is asking pi to run in ambient-auth simulation
+            # mode at all, a concern unrelated to provider-inventory redirect.
             elif PI_SIMULATION_ONLY and facts.selected_runtime == "pi": reason="PI_SIMULATION_ONLY"
-            elif route.model not in self.inventory.get((facts.selected_runtime, route.provider), frozenset()): reason="PROVIDER_UNAUTHENTICATED"
+            elif route.model not in self.inventory.get((effective_runtime, route.provider), frozenset()): reason="PROVIDER_UNAUTHENTICATED"
             elif facts.role not in route.roles: reason="ROLE_INCOMPATIBLE"
             elif not set(facts.required_tools).union(request.required_tools).issubset(route.tools): reason="TOOLS_MISSING"
             elif needs_context and (not facts.context_present or not facts.critical_coverage): reason="CONTEXT_MISSING"
             elif writer and route.family == writer.family: reason="REVIEW_FAMILY_CONFLICT"
+            # Repair SEC-001 (panel RP-01, security-auditor, critical, 012 repair):
+            # defense in depth, independent of AC-07's build_snapshot-time guard above. A
+            # reviewer candidate whose (provider, model) normalizes to the SAME canonical
+            # model as the writer's — even under a DIFFERENT provider string and a
+            # DIFFERENT curated `family` a curator got wrong — is excluded here too. This
+            # is the layer that actually closes the hole if the catalog-time guard is
+            # ever bypassed (a stale snapshot, a future code path that skips
+            # build_snapshot, or a curator mistake this repair's layer-1 fix does not
+            # anticipate): REVIEW_FAMILY_CONFLICT above only catches a matching curated
+            # `family`, which a wrong-but-differing curation defeats by construction.
+            elif writer and canonical_model(route.provider, route.model) == canonical_model(writer.provider, writer.model): reason="REVIEW_MODEL_CONFLICT"
             # F04: a reviewer sharing the writer's PROVIDER is excluded too — a repopulated,
             # per-model-family catalog otherwise lets a single authenticated provider satisfy
             # "independence" with a same-provider sibling model, degrading 003's fail-closed
@@ -163,7 +250,8 @@ class RoutingService:
         if self.simulate or role_class != "writer":
             # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
             # reason code — true only for a review decision that matched a real terminal writer and
-            # survived the family+provider hard exclusions above; an unverified reviewer never sets it.
+            # survived the family+model+provider hard exclusions above (REVIEW_MODEL_CONFLICT added
+            # 012 repair SEC-001); an unverified reviewer never sets it.
             verified = role_class == "review" and writer is not None and not unverified
             return RouteDecision(*identity, False, ("REVIEW_IDENTITY_UNVERIFIED",) if unverified else (), tuple(exclusions),
                                  fallback, independence_verified=verified)
@@ -179,20 +267,26 @@ class RoutingService:
             return RouteDecision(None,None,None,None,None,None,False,("CATALOG_INVALID",))
         if recomputed != selected.route_id or not fresh.identity_allowed(identity) or (fallback and not fresh.identity_allowed(fallback)):
             return RouteDecision(None,None,None,None,None,None,False,("AUTHORIZATION_INVALID",))
-        if selected.model not in self.inventory.get((facts.selected_runtime, selected.provider), frozenset()):
+        # AC-01: `identity[1]`/`fallback[1]` ARE the effective runtimes already computed
+        # per-candidate in the exclusion loop above (identity index 1 in the
+        # `(route_id, runtime, provider, model, family, effort)` tuple) — reused here
+        # rather than recomputed, so the post-selection re-check can never drift from
+        # what the candidate was actually authorized under, including for a fallback on
+        # a DIFFERENT provider than `selected` (each carries its own effective runtime).
+        if selected.model not in self.inventory.get((identity[1], selected.provider), frozenset()):
             return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",))
         # AM-2 fresh-selected: the cache only filtered candidates; the pair that is about to be
         # durably authorized (and the fallback's, if different) is re-probed fresh right now.
         if self._reprobe is not None:
-            pairs = {(facts.selected_runtime, selected.provider)}
-            if fallback: pairs.add((facts.selected_runtime, fallback[2]))
+            pairs = {(identity[1], selected.provider)}
+            if fallback: pairs.add((fallback[1], fallback[2]))
             try:
                 verified = self._reprobe(sorted(pairs))
             except Exception:
                 return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",))
-            if selected.model not in verified.get((facts.selected_runtime, selected.provider), set()):
+            if selected.model not in verified.get((identity[1], selected.provider), set()):
                 return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",))
-            if fallback and fallback[3] not in verified.get((facts.selected_runtime, fallback[2]), set()):
+            if fallback and fallback[3] not in verified.get((fallback[1], fallback[2]), set()):
                 fallback = None  # an unverified fallback is dropped, never durably offered
         run_id = self.store.new_run_id()
         nonce = self._issuer.mint(identity, fallback, facts.role, role_class, self.snapshot)

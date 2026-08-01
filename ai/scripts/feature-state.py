@@ -9,9 +9,12 @@ event history that lets the orchestrator resume without re-running prior steps.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import subprocess
+import sys
 import tempfile
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -68,6 +71,8 @@ MUTATING_COMMANDS = {
     "start-review-panel",
     "record-subreview",
     "finalize-review-panel",
+    "extend-review-panel",
+    "record-late-review",
     "record-verification",
     "record-repair",
     "record-delta-review",
@@ -191,12 +196,21 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "gates": [],
         "reviews": [],
         "review_panels": [],
+        # Deliberately not merged into `reviews`: that list is read both as a verdict and
+        # as the proof a deep review happened at all, so a late entry there would let the
+        # exception channel stand in for the panel it is an exception to.  Every read of
+        # this key uses .get(): nine state files on disk predate it.
+        "late_reviews": [],
         "findings": [],
         "verifications": [],
         "repairs": [],
         "delta_reviews": [],
         "testing": [],
         "runtime_qa": [],
+        # AC-01 (010-spawn-provenance): purely additive, same precedent this file already
+        # documents for `late_reviews` above -- every reader uses `.get()`, no backfill for
+        # the packages that predate this key.
+        "spawns": [],
         "attempts": {
             "deep_review_cycles": 0,
             "repair_batches": 0,
@@ -328,6 +342,24 @@ def task_by_id(package: dict[str, Any], task_id: str) -> dict[str, Any]:
     raise StateError(f"{package.get('package_id')}: unknown task_id {task_id}")
 
 
+def replayed(data: dict[str, Any], event: str, event_id: str | None) -> bool:
+    """Has *this exact call* already run?
+
+    Keyed on the command as well as the id, because "already applied" is a claim about a
+    call and not about a string.  Scoping it by `event_id` alone made an id reused across
+    two different commands read as a replay of the second one: the caller got
+    `{"ok": true, "changed": false}` and nothing happened — the silent success-shaped
+    no-op this feature exists to abolish, and on `record-late-review` it meant a verified
+    critical finding disappearing with exit 0.  Every guard that asks the question asks it
+    here, so the updaters and `record_event` can never disagree about the answer: if they
+    did, a call could pass its own guard and then have its history entry silently dropped.
+    """
+    if not event_id:
+        return False
+    return any(item.get("event_id") == event_id and item.get("event") == event
+               for item in data.get("history", []))
+
+
 def record_event(
     data: dict[str, Any],
     event: str,
@@ -338,7 +370,7 @@ def record_event(
     metadata: dict[str, Any] | None = None,
     event_id: str | None = None,
 ) -> bool:
-    if event_id and any(item.get("event_id") == event_id for item in data.get("history", [])):
+    if replayed(data, event, event_id):
         return False
     entry = {
         "timestamp": now(),
@@ -461,7 +493,11 @@ def done_ready(data: dict[str, Any]) -> list[str]:
         errors.append("at least one required global gate must be recorded")
     if any(gate.get("status") != "pass" for gate in required):
         errors.append("required global gates are missing or failing")
-    if data.get("blockers"):
+    # AC-04 (010-spawn-provenance): the same falsy filter summarize_feature() already
+    # applies below (`not b.get("resolved_at")`) -- a non-empty `blockers` list is not
+    # itself descalifying; a hand-written `"resolved_at": null` still counts as
+    # unresolved (a falsy check, not "key absent"), so it keeps blocking too.
+    if any(not blocker.get("resolved_at") for blocker in data.get("blockers", [])):
         errors.append("open blocker exists")
     covered = {ac for package in data.get("packages", []) for ac in package.get("acceptance_criteria", [])}
     required_criteria = set(data.get("acceptance_criteria") or [])
@@ -536,11 +572,28 @@ def next_transition(data: dict[str, Any]) -> dict[str, Any]:
                 return {"phase": phase, "next": "PACKAGE_REVIEW", "reason": "delta review requires full review"}
             return {"phase": phase, "next": "PACKAGE_TESTING" if verdict == "pass" else "PACKAGE_REPAIR", "reason": f"latest delta verdict={verdict}"}
     if phase == "PACKAGE_TESTING":
+        if package and has_open_findings(package, {"critical", "high", "medium"}):
+            # `next` is the machine advisor — leaving it on PACKAGE_RUNTIME_QA walks the
+            # orchestrator into an accept-package that package_accept_ready then refuses,
+            # which is verbatim the failure already fixed once for verification below.
+            # The reason names the state, not a cause: this branch was first written
+            # blaming record-late-review, and the review panel proved that wrong.
+            # `cmd_record_review` sets PACKAGE_TESTING on `pass` without checking
+            # has_open_findings — unlike finalize-review-panel and record-delta-review —
+            # so the same state is reachable with no late review anywhere in the history.
+            # That asymmetry is real and is registered as debt rather than repaired here:
+            # record-review is outside this package's criteria and every package in flight
+            # uses it.
+            return {"phase": phase, "next": "PACKAGE_REPAIR",
+                    "reason": "a blocking finding is open; repair or refute it before testing can advance"}
         if package and package.get("testing"):
             status = package["testing"][-1].get("status")
             return {"phase": phase, "next": "PACKAGE_RUNTIME_QA" if status == "pass" else "PACKAGE_REPAIR", "reason": f"latest testing status={status}"}
         return {"phase": phase, "next": "PACKAGE_TESTING", "reason": "run regression/integration tests"}
     if phase == "PACKAGE_RUNTIME_QA":
+        if package and has_open_findings(package, {"critical", "high", "medium"}):
+            return {"phase": phase, "next": "PACKAGE_REPAIR",
+                    "reason": "a blocking finding is open; acceptance refuses until it is repaired or refuted"}
         if package and package.get("runtime_qa"):
             status = package["runtime_qa"][-1].get("status")
             return {"phase": phase, "next": "PACKAGE_ACCEPTED" if status == "pass" else "PACKAGE_REPAIR", "reason": f"latest runtime QA status={status}"}
@@ -824,11 +877,17 @@ def slugify(text: str) -> str:
 
 
 def notes_root(state_file: Path, notes_dir: str | None = None) -> Path | None:
+    """Notes are mandatory for any harness-managed project (ADR-0012/AC-13): the marker is
+    `ai/state/` existing, never an arbitrary or third-party directory someone merely changed
+    into, and never "does docs/notas already exist" (that opt-in-by-directory rule is what let
+    a project silently go without notes forever). `write_note` creates the directory tree.
+    """
     if notes_dir:
         return Path(notes_dir)
     _, out_dir = status_root(state_file)
-    notes = out_dir.parent.parent / "docs" / "notas"
-    return notes if notes.is_dir() else None
+    if not (out_dir.is_dir() and out_dir.name == "state" and out_dir.parent.name == "ai"):
+        return None
+    return out_dir.parent.parent / "docs" / "notas"
 
 
 def merge_note(existing: str | None, title: str, body: str) -> str:
@@ -1034,7 +1093,7 @@ def _feature_body(
         "", "## Presupuestos", "",
         f"- spawns: {spawns} (máx {budgets.get('max_spawns_per_package', '?')}/paquete) · "
         f"deep review máx {budgets.get('max_deep_review_cycles', '?')} ciclos",
-        "", f"[[00 - Proyecto|⌂ Proyecto]] · bitácora: `{bitacora_path(out_dir, fid)}`",
+        "", f"[[00 - Proyecto|⌂ Proyecto]] · [[features/{fid}/grafo|grafo]] · bitácora: `{bitacora_path(out_dir, fid)}`",
         "", f"_Actualizado: {data.get('updated_at', '-')}_",
     ]
     return "\n".join(lines)
@@ -1079,6 +1138,12 @@ def _package_body(fid: str, package: dict[str, Any]) -> str:
     trail = []
     for review in _dicts(package.get("reviews")):
         trail.append(f"- review: {review.get('verdict')} ({len(review.get('findings', []))} hallazgos)")
+    for late in _dicts(package.get("late_reviews")):
+        # Listed as its own kind, not folded into `review`: the note is where a human
+        # looks to see that a finding arrived after the panel had already closed.
+        trail.append(
+            f"- review tardía ({late.get('role', '?')}): {len(late.get('findings', []))} hallazgos"
+        )
     for verification in _dicts(package.get("verifications")):
         if verification.get("skipped"):
             trail.append(f"- verificación: salteada ({_short(verification.get('reason', ''))})")
@@ -1120,6 +1185,32 @@ def _decision_body(entry: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+RENDER_FAILURE_LOG = "render-failures.log"
+RENDER_FAILURE_LOG_CAP = 200_000  # bytes; single-generation rotation past this
+
+
+def _log_render_failure(out_dir: Path, context: str, exc: BaseException) -> None:
+    """Best-effort, PER-PROJECT (out_dir is this project's own ai/state/, per AC-20's
+    cross-project isolation requirement — a render failure in project Y's ai/state/ can never
+    land in project X's log because each project's out_dir is its own directory). Never raises:
+    a broken logger must not break render_notes's own never-raises invariant.
+    """
+    try:
+        path = out_dir / RENDER_FAILURE_LOG
+        if path.exists() and path.stat().st_size > RENDER_FAILURE_LOG_CAP:
+            path.replace(path.with_name(path.name + ".1"))
+        # SEC-004: `context` carries a caller-supplied `feature_id` and `str(exc)` can
+        # carry arbitrary exception text (which, in turn, can embed a caller-supplied
+        # value) -- neither is bounded or newline-safe. `_short()` collapses whitespace
+        # (so a `\n` inside either can never forge a second, fake log entry with its own
+        # timestamp) and truncates, exactly like every other agent-authored field that
+        # lands in a generated file elsewhere in this module.
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{now()} {_short(context)}: {type(exc).__name__}: {_short(str(exc))}\n")
+    except OSError:
+        pass
+
+
 def render_notes(
     state_file: Path,
     notes_dir: str | None = None,
@@ -1137,6 +1228,10 @@ def render_notes(
     written: list[str] = []
     if RENDER_SKIP and not force:
         return written
+    try:
+        fallback_out_dir = status_root(state_file)[1]
+    except Exception:
+        fallback_out_dir = None
     try:
         notes = notes_root(state_file, notes_dir)
         if notes is None:
@@ -1164,16 +1259,655 @@ def render_notes(
                     pid = package.get("package_id", "?")
                     if write_note(notes / "features" / fid / f"{pid}.md", f"{fid} · {pid}", _package_body(fid, package)):
                         written.append(f"features/{fid}/{pid}.md")
-            except Exception:  # one malformed feature must not block the rest
+                # AC-24: same construction the `graph` subcommand uses (build_execution_graph
+                # + render_mermaid), never a second copy of the join logic. Best-effort on
+                # the same terms as every other note above -- a broken graph render lands in
+                # the `except` below with the rest of this feature's notes, never raises.
+                # PR-05: `features_dir` is THIS function's own, from `status_root()` above --
+                # passed straight through rather than re-derived from `out_dir.parent.parent`
+                # a second time by convention-chasing a DIFFERENT path.
+                graph_state, graph_missing = build_execution_graph(
+                    out_dir.parent.parent, [fid], features_dir=features_dir)
+                grafo_body = "```mermaid\n" + render_mermaid(graph_state, graph_missing) + "```\n"
+                if write_note(notes / "features" / fid / "grafo.md", f"{fid} · grafo", grafo_body):
+                    written.append(f"features/{fid}/grafo.md")
+            except Exception as exc:  # one malformed feature must not block the rest
+                _log_render_failure(out_dir, f"feature={data.get('feature_id', '?')}", exc)
                 continue
         if not only_feature:
             for entry in decisions:
                 name = _decision_name(entry)
                 if write_note(notes / "decisiones" / f"{name}.md", entry.get("title", "Decisión"), _decision_body(entry)):
                     written.append(f"decisiones/{name}.md")
-    except Exception:  # the living docs are best-effort by contract
-        pass
+    except Exception as exc:  # the living docs are best-effort by contract
+        if fallback_out_dir is not None:
+            _log_render_failure(fallback_out_dir, "render_notes", exc)
     return written
+
+
+# --------------------------------------------------------------------------- P3-graph-view
+#
+# AC-20..AC-27, AC-29: the execution graph is derived in READ from the state files that
+# already exist -- no new store, no materialized index (see ADR-0013). `build_execution_graph`
+# walks one or more `ai/state/features/<fid>.json` files and produces nodes/edges by
+# STRUCTURAL join only (membership in a list, an id matching another record's id) -- never
+# by timestamp proximity, even when two entries share a timestamp by construction.
+# `render_mermaid` is the one place that turns that graph into text; both `graph` (AC-22)
+# and `render_notes` (AC-24) call the same two functions, never a second copy of either.
+
+GRAPH_NODE_TYPES = ("feature", "package", "finding", "review", "verification", "repair", "commit", "blocker",
+                    "spawn")
+# The closed, five-member edge vocabulary this feature promises. Spanish on purpose --
+# these are the verbs the spec and the ADR name, and inventing an English pair for the
+# same concept would just be a second vocabulary nobody asked for.
+GRAPH_EDGE_TYPES = ("produjo", "verificó", "refutó", "reparó", "bloqueó")
+# Mermaid keywords a bare (unquoted) id can never collide with. Checked in lowercase
+# because `_norm()` already lowercases every id this module mints.
+MERMAID_RESERVED_WORDS = frozenset({"end", "graph", "subgraph", "o", "x"})
+
+
+def _norm(text: Any) -> str:
+    """AC-22's `norm()`: lowercase, then every character outside [a-z0-9] becomes `_`."""
+    return re.sub(r"[^a-z0-9]", "_", str(text if text is not None else "").lower())
+
+
+# SEC-001/PR-04: mermaid has NO backslash-escape mechanism inside a quoted label -- a
+# `"` "escaped" with a leading backslash still closes the string exactly as if the
+# backslash were not there (the previous implementation of this function relied on a
+# Python/JS-only convention mermaid never implements, which let a crafted label break
+# out of its `["..."]`/`subgraph ...["..."]` quotes and inject arbitrary mermaid text,
+# including `click` directives, into a committed, rendered document). Mermaid's actual
+# escape mechanism is HTML entities.
+_MERMAID_ESCAPE_MAP = {
+    "#": "#35;",
+    '"': "#quot;",
+    "\\": "#92;",
+    "[": "#91;",
+    "]": "#93;",
+    "(": "#40;",
+    ")": "#41;",
+    "<": "#60;",
+    ">": "#62;",
+    "%": "#37;",
+    ";": "#59;",
+    "|": "#124;",
+}
+# A SINGLE pass over the ORIGINAL text, substituting every matched character for its
+# entity via a callback -- `re.sub` never re-scans the replacement text it just
+# produced. Every entity above contains `#` and/or `;`, both themselves in the escape
+# table; a sequence of independent `str.replace()` calls (the first cut of this fix)
+# re-escaped the `;`/`#` an EARLIER replacement in the same pass had just inserted,
+# corrupting labels containing more than one escaped character. One pass closes that.
+_MERMAID_ESCAPE_RE = re.compile("[" + re.escape("".join(_MERMAID_ESCAPE_MAP)) + "]")
+
+
+def _mermaid_escape(text: Any) -> str:
+    """Escape a value for a quoted mermaid label using mermaid's OWN escape mechanism
+    (HTML entities), never backslashes. `_short()` runs first -- the same truncation
+    every other agent-authored field rendered into a generated document gets, and its
+    whitespace collapse also removes newlines before the entity table below ever sees
+    them, so a label can never smuggle a real line break into the document either.
+    """
+    value = _short(text)
+    return _MERMAID_ESCAPE_RE.sub(lambda m: _MERMAID_ESCAPE_MAP[m.group(0)], value)
+
+
+class _GraphState:
+    """Accumulates nodes/edges and their feature/package grouping while
+    `build_execution_graph` walks one or more state files. One small object instead of a
+    handful of dicts threaded by hand through every join helper below.
+    """
+
+    def __init__(self) -> None:
+        self.nodes: dict[str, dict[str, str]] = {}       # node_id -> {"type": ..., "label": ...}
+        self.edges: list[tuple[str, str, str]] = []       # (src_id, dst_id, edge_label)
+        self._counters: dict[tuple[str, str, str | None], int] = {}
+        self.feature_order: list[str] = []
+        # feature_id -> {"members": [node_id, ...] (feature-scoped only),
+        #                "packages": {package_id: {"members": [node_id, ...], "order": int}}}
+        self.features: dict[str, dict[str, Any]] = {}
+        # PR-03: `_norm()` is lossy by design (AC-22) -- two distinct raw ids like
+        # "P1-a b" and "P1-a-b" both norm to "p1_a_b". `scope -> norm text -> {raw: index}`
+        # remembers, per disambiguation scope, which raw value first claimed a given
+        # norm text (index 0, no suffix -- every existing id shape is unchanged) and
+        # assigns any later, DISTINCT raw value that collides with it a numeric suffix
+        # instead of silently reusing the first value's node/subgraph id.
+        self._collision_index: dict[tuple[Any, ...], dict[str, dict[str, int]]] = {}
+
+    def disambiguated_norm(self, scope: tuple[Any, ...], raw: Any) -> str:
+        table = self._collision_index.setdefault(scope, {})
+        normed = _norm(raw)
+        seen = table.setdefault(normed, {})
+        raw_key = str(raw)
+        if raw_key not in seen:
+            seen[raw_key] = len(seen)
+        index = seen[raw_key]
+        return normed if index == 0 else f"{normed}_dup{index}"
+
+    def _feature_slot(self, feature_id: str) -> dict[str, Any]:
+        if feature_id not in self.features:
+            self.features[feature_id] = {"members": [], "packages": {}}
+            self.feature_order.append(feature_id)
+        return self.features[feature_id]
+
+    def _package_slot(self, feature_id: str, package_id: str) -> dict[str, Any]:
+        feature = self._feature_slot(feature_id)
+        if package_id not in feature["packages"]:
+            feature["packages"][package_id] = {"members": [], "order": len(feature["packages"])}
+        return feature["packages"][package_id]
+
+    def add_node(self, node_type: str, feature_id: str, package_id: str | None, label: str) -> str:
+        """AC-22's id scheme: `{type}_{norm(feature_id)}[_{norm(package_id)}]_{ordinal}` --
+        an explicit ordinal, never reliance on `norm()`/`slugify()` alone, which collides
+        distinct raw ids inside the same package. PR-03: the feature/package components
+        themselves go through `disambiguated_norm` rather than bare `_norm()`, so two
+        raw ids that collide under `_norm()` alone still mint distinct node ids."""
+        key = (node_type, feature_id, package_id)
+        self._counters[key] = self._counters.get(key, 0) + 1
+        ordinal = self._counters[key]
+        node_id = f"{node_type}_{self.disambiguated_norm(('feature',), feature_id)}"
+        if package_id is not None:
+            node_id += f"_{self.disambiguated_norm(('package', feature_id), package_id)}"
+        node_id += f"_{ordinal}"
+        self.nodes[node_id] = {"type": node_type, "label": label}
+        if package_id is not None:
+            self._package_slot(feature_id, package_id)["members"].append(node_id)
+        else:
+            self._feature_slot(feature_id)["members"].append(node_id)
+        return node_id
+
+    def add_edge(self, src_id: str, dst_id: str, label: str) -> None:
+        self.edges.append((src_id, dst_id, label))
+
+
+def _review_label(role: str, verdict: str | None) -> str:
+    """AC-27: role+verdict for a record that carries a role (subreview/late-review);
+    `late_reviews[]` entries carry no `verdict` field at all, so this degrades to the
+    role alone rather than printing a label that promises data the record doesn't have.
+    """
+    role = role or "?"
+    return f"{role}: {verdict}" if verdict else role
+
+
+def _add_package_findings(state: _GraphState, fid: str, pid: str, package: dict[str, Any],
+                          data: dict[str, Any]) -> None:
+    findings_by_id = {
+        item["id"]: item for item in package.get("findings", []) or []
+        if isinstance(item, dict) and item.get("id")
+    }
+    finding_nodes: dict[str, str] = {}
+    for finding_id, finding in findings_by_id.items():
+        # AC-27: id + severity always; verified_by only once the finding has one.
+        label = f"{finding_id} ({finding.get('severity', '?')})"
+        if finding.get("verified_by"):
+            label += f" verified_by={finding['verified_by']}"
+        finding_nodes[finding_id] = state.add_node("finding", fid, pid, label)
+
+    # produjo: review_panels[].subreviews[] -- AC-20's primary source, always carries a role.
+    for panel in package.get("review_panels", []) or []:
+        if not isinstance(panel, dict):
+            continue
+        for subreview in panel.get("subreviews", []) or []:
+            if not isinstance(subreview, dict):
+                continue
+            ids = [i for i in subreview.get("findings", []) or [] if i in finding_nodes]
+            if not ids:
+                continue
+            review_node = state.add_node(
+                "review", fid, pid, _review_label(subreview.get("role", "?"), subreview.get("verdict")))
+            for finding_id in ids:
+                state.add_edge(review_node, finding_nodes[finding_id], "produjo")
+
+    # produjo: late_reviews[] -- a reviewer that returned after its panel closed (AC-10 of
+    # the P2 contract this package extends); always carries a role, never a verdict.
+    for late in package.get("late_reviews", []) or []:
+        if not isinstance(late, dict):
+            continue
+        ids = [i for i in late.get("findings", []) or [] if i in finding_nodes]
+        if not ids:
+            continue
+        review_node = state.add_node("review", fid, pid, _review_label(late.get("role", "?"), None))
+        for finding_id in ids:
+            state.add_edge(review_node, finding_nodes[finding_id], "produjo")
+
+    # produjo: delta_reviews[] -- PR-02: a delta review can raise NEW or reopened
+    # findings (`new_or_reopened_findings`), and until now this was the one AC-20 source
+    # with a real finding-producing field that never fed the join at all (45/195 real
+    # findings, 23%, had no produjo edge for exactly this reason). Same shape as
+    # late_reviews[] above: the record itself carries everything the label needs, no
+    # history join required.
+    for delta in package.get("delta_reviews", []) or []:
+        if not isinstance(delta, dict):
+            continue
+        ids = [i for i in delta.get("new_or_reopened_findings", []) or [] if i in finding_nodes]
+        if not ids:
+            continue
+        review_node = state.add_node("review", fid, pid, f"delta: {delta.get('verdict', '?')}")
+        for finding_id in ids:
+            state.add_edge(review_node, finding_nodes[finding_id], "produjo")
+
+    # produjo: reviews[] entries with no panel_id -- the plain `record-review` path (no
+    # panel, no role field on the record itself). `finalize-review-panel` also appends to
+    # `reviews[]`, but WITH a panel_id and listing every still-open finding at close time
+    # (a summary, not a production event) -- already covered above via subreviews, so
+    # panel-tagged entries are skipped here to avoid a second, misleading produjo edge.
+    # PR-01: `cmd_record_review` now stamps `actor` directly on the record it appends to
+    # `reviews[]`, so that is the primary, per-record source -- never fabricated by
+    # pairing with something else. Older records from before that stamp existed (or a
+    # future record written by a caller that skips it) have no `actor` key at all;
+    # for THOSE, and only when the two lists are still in lockstep (`len` equal), a
+    # positional join against the `record-review` history events degrades to the
+    # legacy behaviour. When a `verdict: blocked` call appended to `reviews[]` and then
+    # returned before emitting its own `record-review` history event (see
+    # `cmd_record_review`), the two lists permanently diverge in length -- and rather
+    # than let every review after that point pair against the WRONG history event, the
+    # positional fallback is skipped entirely and the label just omits the actor.
+    plain_reviews = [item for item in package.get("reviews", []) or []
+                     if isinstance(item, dict) and not item.get("panel_id")]
+    review_events = [event for event in data.get("history", []) or []
+                     if isinstance(event, dict) and event.get("event") == "record-review"
+                     and event.get("package_id") == pid]
+    positional_join_safe = len(plain_reviews) == len(review_events)
+    for index, review in enumerate(plain_reviews):
+        ids = [i for i in review.get("findings", []) or [] if i in finding_nodes]
+        if not ids:
+            continue
+        actor = review.get("actor")
+        if not actor and positional_join_safe:
+            actor = review_events[index].get("actor")
+        verdict = review.get("verdict")
+        label = f"{verdict} ({actor})" if actor else str(verdict)
+        review_node = state.add_node("review", fid, pid, label)
+        for finding_id in ids:
+            state.add_edge(review_node, finding_nodes[finding_id], "produjo")
+
+    # verificó/refutó: verifications[]. A normal verification call stamps EVERY finding it
+    # touches with the same `verified_by` (the same `--actor`), so any touched finding's
+    # own field is the structural source for the node's label -- no history join needed.
+    for verification in package.get("verifications", []) or []:
+        if not isinstance(verification, dict) or verification.get("skipped"):
+            continue
+        refuted = [i for i in verification.get("refuted", []) or []]
+        upheld = [i for i in verification.get("upheld", []) or []]
+        touched = [i for i in (*refuted, *upheld) if i in finding_nodes]
+        if not touched:
+            continue
+        actor = findings_by_id[touched[0]].get("verified_by")
+        verification_node = state.add_node(
+            "verification", fid, pid, f"verified_by={actor}" if actor else "verification")
+        for finding_id in refuted:
+            if finding_id in finding_nodes:
+                state.add_edge(verification_node, finding_nodes[finding_id], "refutó")
+        for finding_id in upheld:
+            if finding_id in finding_nodes:
+                state.add_edge(verification_node, finding_nodes[finding_id], "verificó")
+
+    # A waived verification (`record-verification --skip-reason`) touches no finding at
+    # all, so AC-27's actor comes from the triggering `record-verification` history event
+    # instead -- paired by position against the skip records, same structural join as the
+    # plain-reviews case above. AC-22 still requires the node to exist (no finding edges).
+    # D-05: same divergence guard PR-01 gave the plain-reviews join above -- today
+    # `cmd_record_verification` always appends the record and its history event in the
+    # same call with no early return between them, so the two lists stay in lockstep in
+    # practice, but the invariant this join relies on (index N of one list is the SAME
+    # call as index N of the other) belongs at every positional-join site, not only the
+    # one where a divergence is currently reachable.
+    skip_records = [item for item in package.get("verifications", []) or []
+                    if isinstance(item, dict) and item.get("skipped")]
+    skip_events = [event for event in data.get("history", []) or []
+                   if isinstance(event, dict) and event.get("event") == "record-verification"
+                   and event.get("package_id") == pid and (event.get("metadata") or {}).get("skipped")]
+    skip_positional_join_safe = len(skip_records) == len(skip_events)
+    for index, _skip in enumerate(skip_records):
+        actor = skip_events[index].get("actor") if skip_positional_join_safe else None
+        label = f"waived verified_by={actor}" if actor else "verification: waived"
+        state.add_node("verification", fid, pid, label)
+
+    # reparó: repairs[], and its commit when AC-21 declared one. "stops at the finding"
+    # (AC-21) is not a special case here: the second edge is simply not added when there
+    # is no commit sha on the record.
+    for repair in package.get("repairs", []) or []:
+        if not isinstance(repair, dict):
+            continue
+        changed_files = repair.get("changed_files", []) or []
+        repair_node = state.add_node("repair", fid, pid, f"{len(changed_files)} changed files")
+        for finding_id in repair.get("finding_ids", []) or []:
+            if finding_id in finding_nodes:
+                state.add_edge(repair_node, finding_nodes[finding_id], "reparó")
+        commit_sha = repair.get("commit")
+        if commit_sha:
+            commit_node = state.add_node("commit", fid, pid, commit_sha[:7])
+            state.add_edge(repair_node, commit_node, "reparó")
+
+
+def _add_package_spawns(state: _GraphState, fid: str, pid: str, package: dict[str, Any]) -> None:
+    """AC-02 (010-spawn-provenance): a `spawn` node per `package["spawns"]` entry --
+    inventory only, no edges. `--caused-by-spawn` and the provenance chain it would join
+    are out of this feature's scope (see ADR-0014); this makes a package's spawn spend
+    visible next to its findings/reviews/repairs in the same graph, nothing more. A
+    package with no `spawns` key at all (every package written before this feature)
+    contributes zero nodes here, never an error -- same posture AC-29 already established
+    for legacy history predating `--commit`.
+    """
+    for spawn in package.get("spawns", []) or []:
+        if not isinstance(spawn, dict):
+            continue
+        # AC-02: spawn_id + role are the label floor; purpose is appended only when
+        # non-empty (the CLI's own default is ""), never as a dangling empty segment.
+        label = f"{spawn.get('spawn_id', '?')} {spawn.get('role', '?')}"
+        purpose = spawn.get("purpose")
+        if purpose:
+            label += f" {purpose}"
+        state.add_node("spawn", fid, pid, label)
+
+
+def _add_feature_to_graph(state: _GraphState, fid: str, data: dict[str, Any]) -> None:
+    # D-04: computed BEFORE the feature node is added -- `packages` can be a malformed
+    # non-list/non-dict shape (e.g. `null` or an int from a hand-edited state file),
+    # which raises `TypeError` inside `_note_packages`/`_normalize_note_state`. Doing
+    # this first means that TypeError (caught by `build_execution_graph`, which then
+    # treats the whole feature as `missing`) propagates before any node for this
+    # feature exists, instead of leaving a dangling empty feature subgraph behind.
+    # PR-08: the SAME legacy-tolerant normalization the notes renderer already applies
+    # (`_normalize_note_state` for camelCase keys, `_note_packages` for `packages` as a
+    # dict indexed by id or `id` instead of `package_id`) -- never a second, narrower
+    # assumption that `packages` is always a modern list of `package_id`-keyed dicts.
+    # Without this, every one of those legacy shapes made this function silently drop
+    # every package (only the feature node was ever emitted).
+    packages = _note_packages(_normalize_note_state(data))
+    feature_node = state.add_node("feature", fid, None, f"feature: {fid}")
+    package_nodes: dict[str, str] = {}
+    for package in packages:
+        if not isinstance(package, dict):
+            continue
+        pid = package.get("package_id")
+        if not pid:
+            continue
+        package_nodes[pid] = state.add_node("package", fid, pid, f"package: {pid}")
+        _add_package_findings(state, fid, pid, package, data)
+        _add_package_spawns(state, fid, pid, package)
+
+    # bloqueó: AC-26. Feature-level `data["blockers"]` alone, never `history`, and never
+    # conditioned on resolution state -- every entry gets an edge, resolved or not.
+    for entry in data.get("blockers", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        label = "resolved" if entry.get("resolved_at") else "open"
+        entry_pid = entry.get("package_id")
+        if entry_pid and entry_pid in package_nodes:
+            container = package_nodes[entry_pid]
+            blocker_node = state.add_node("blocker", fid, entry_pid, f"blocker: {label}")
+        else:
+            # AC-26's three feature-anchored cases: package_id is None, unset, or set
+            # but matching no known package -- all real, none silently dropped.
+            container = feature_node
+            blocker_node = state.add_node("blocker", fid, None, f"blocker: {label}")
+        state.add_edge(container, blocker_node, "bloqueó")
+
+
+# SEC-002/SEC-005: the closed charset a `feature_id` must satisfy before it is ever
+# used to build a filesystem path or interpolated into the generated document. Nothing
+# in `validate_state` constrains `feature_id`'s charset (only non-empty), and `graph`'s
+# `--feature-id`/`render_notes`'s `data.get("feature_id")` are both reachable with a
+# value that never went through `validate_state` at all (an explicit `init --state-file`
+# decouples the on-disk filename from the `feature_id` field the JSON body carries) --
+# so this module enforces its own gate rather than trusting either source.
+_ID_CHARSET_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# Charset-safe on purpose (see _ID_CHARSET_RE): never the raw out-of-charset value, so
+# this placeholder always round-trips through `_mermaid_escape` and the `%%` line
+# oracle below unchanged, and it can never itself carry an injection.
+_INVALID_FEATURE_ID_PLACEHOLDER = "invalid-feature-id"
+
+
+def build_execution_graph(root: Path, feature_ids: list[str] | None,
+                          features_dir: Path | None = None) -> tuple[_GraphState, list[str]]:
+    """AC-22/AC-23. With no `feature_ids`, every `<root>/ai/state/features/*.json` present
+    is processed. A requested feature with no state file contributes nothing to `state`
+    and its id to the returned `missing` list -- the caller renders the AC-23 skeleton
+    comment for it instead of aborting the whole run (AC-22's partial-multi-feature rule).
+
+    PR-05: `features_dir` is optional and, when given, used AS-IS instead of being
+    re-derived from `root`. `render_notes` already has its own `features_dir` from
+    `status_root()` -- the one function that owns "where does this project's state
+    live" -- so passing it straight through here means this function's own
+    `root / "ai" / "state" / "features"` convention only has to be right in the one
+    place that still relies on it, `cmd_graph`'s CLI entry point, instead of being
+    re-derived a second time by chaining `.parent` off a DIFFERENT path
+    (`render_notes`'s `out_dir`) and trusting the two conventions to stay in lockstep.
+    """
+    if features_dir is None:
+        features_dir = root / "ai" / "state" / "features"
+    if feature_ids:
+        wanted = list(dict.fromkeys(feature_ids))  # de-dup, preserve caller order
+    elif features_dir.is_dir():
+        wanted = sorted(path.stem for path in features_dir.glob("*.json"))
+    else:
+        wanted = []
+    state = _GraphState()
+    missing: list[str] = []
+    resolved_features_dir = features_dir.resolve() if features_dir.exists() else None
+    for fid in wanted:
+        if not _ID_CHARSET_RE.fullmatch(fid):
+            # SEC-002: a feature_id this shape is either a mermaid-injection attempt
+            # (quotes, `%`, newlines -- newlines already collapsed by `_short` inside
+            # `_mermaid_escape`, but this gate stops it before it is even considered
+            # "missing data" rather than relying on escaping alone) or SEC-005's path
+            # traversal attempt. Never echoed, escaped or not: a fixed placeholder.
+            missing.append(_INVALID_FEATURE_ID_PLACEHOLDER)
+            continue
+        path = features_dir / f"{fid}.json"
+        try:
+            resolved_path = path.resolve()
+        except OSError:
+            missing.append(fid)
+            continue
+        if resolved_features_dir is None or not resolved_path.is_relative_to(resolved_features_dir):
+            # SEC-005 defense in depth: the charset gate above already forbids `/` and
+            # rules out traversal through this exact join, but a symlink inside
+            # `features_dir` (or a future looser charset) must not be trusted either --
+            # the resolved path must still land inside `features_dir`.
+            missing.append(fid)
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError:
+            missing.append(fid)
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            missing.append(fid)
+            continue
+        if not isinstance(data, dict):
+            missing.append(fid)
+            continue
+        try:
+            _add_feature_to_graph(state, fid, data)
+        except (TypeError, AttributeError, KeyError):
+            # D-04: a state file with a malformed `packages` (e.g. `null` or an int
+            # instead of a list/dict) or a non-string `repairs[].commit` raises here
+            # rather than degrading like every other malformed-input case above. In
+            # whole-repo mode (glob of every `*.json`), one hand-edited file must not
+            # be able to take the entire `graph` command down -- treated the same way
+            # as "missing" (unreadable/undecodable/non-dict) rather than propagating.
+            missing.append(fid)
+            continue
+    return state, missing
+
+
+_MERMAID_ID_RE = re.compile(r"^[a-z0-9_]+$")
+# SEC-001: no `\\.` alternative -- mermaid has no backslash-escape mechanism, so a raw
+# `"` or `\` inside a label is a structural violation, never an accepted escaped form.
+_MERMAID_NODE_LINE_RE = re.compile(r'^(?P<id>[a-z0-9_]+)\["(?P<label>[^"\\]*)"\]$')
+_MERMAID_SUBGRAPH_LINE_RE = re.compile(r'^subgraph\s+(?P<id>\S+)\["(?P<label>[^"\\]*)"\]$')
+_MERMAID_EDGE_LINE_RE = re.compile(r'^(?P<src>[a-z0-9_]+)\s*-->\|(?P<label>[^|]+)\|\s*(?P<dst>[a-z0-9_]+)$')
+# SEC-002: the ONLY two shapes of `%%` line this module ever emits. Any other `%%`
+# line -- including a `%%{init: ...}%%` directive -- is a structural violation, not
+# silently skipped, so an out-of-band comment can never smuggle mermaid syntax past
+# this oracle. PR-06: the second alternative is `cmd_graph`'s whole-repo-with-no-state-
+# directory announcement; its `root` interpolation always goes through `_mermaid_escape`
+# first (never the raw value). D-03: `.*` there used to accept ANY text -- strictly
+# looser than "no data for"'s `[A-Za-z0-9._-]+` charset for no real reason, since a
+# properly-escaped `root` can never contain `"`, `\\`, or `%` (all three are in
+# `_MERMAID_ESCAPE_MAP`). Denying exactly those three keeps the common case (a real
+# filesystem path, which can legitimately contain `/`, spaces, `:`, etc. that an
+# allow-list charset would reject) working while still refusing an unescaped or
+# mis-escaped value outright instead of rubber-stamping it.
+_MERMAID_MISSING_COMMENT_RE = re.compile(
+    r'^%% no data for [A-Za-z0-9._-]+$|^%% no state directory at [^"\\%]*$'
+)
+
+
+def validate_mermaid_structure(text: str) -> list[str]:
+    """AC-22's oracle for "valid mermaid": concrete structural assertions, not the
+    unfalsifiable phrase alone. Returns a list of violations (empty means valid):
+    first non-empty line is exactly `flowchart TD`; every node id matches [a-z0-9_]+ and
+    is never a mermaid reserved word; every `subgraph` has a matching `end` (balanced);
+    labels are quoted with their `"`, `[`, `(`, and newlines escaped; no `subgraph` id
+    equals any node id (the disjoint `sg_` prefix exists exactly to make that impossible);
+    the only `%%` lines this module ever emits are `%% no data for <id>` (per-feature,
+    AC-23) and `%% no state directory at <root>` (PR-06, whole-repo mode with no state
+    directory at all) -- any other comment line, including a mermaid directive, is a
+    structural violation.
+    """
+    problems: list[str] = []
+    lines = text.split("\n")
+    non_empty = [line for line in lines if line.strip()]
+    if not non_empty or non_empty[0] != "flowchart TD":
+        problems.append("first non-empty line must be exactly 'flowchart TD'")
+    node_ids: set[str] = set()
+    subgraph_ids: set[str] = set()
+    duplicate_node_ids: set[str] = set()
+    duplicate_subgraph_ids: set[str] = set()
+    depth = 0
+    for raw_line in lines[1:]:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("%%"):
+            if not _MERMAID_MISSING_COMMENT_RE.fullmatch(line):
+                problems.append(f"disallowed comment line: {raw_line!r}")
+            continue
+        if line == "end":
+            depth -= 1
+            if depth < 0:
+                problems.append(f"unbalanced 'end' with no open subgraph: {raw_line!r}")
+            continue
+        if line.startswith("subgraph"):
+            match = _MERMAID_SUBGRAPH_LINE_RE.match(line)
+            depth += 1
+            if not match:
+                problems.append(f"malformed subgraph line: {raw_line!r}")
+                continue
+            sg_id = match.group("id")
+            if not sg_id.startswith("sg_"):
+                problems.append(f"subgraph id not in the disjoint sg_ prefix: {sg_id}")
+            if sg_id in subgraph_ids:  # PR-03: a repeated subgraph id is a real collision
+                duplicate_subgraph_ids.add(sg_id)
+            subgraph_ids.add(sg_id)
+            continue
+        edge = _MERMAID_EDGE_LINE_RE.match(line)
+        if edge:
+            for node_id in (edge.group("src"), edge.group("dst")):
+                if not _MERMAID_ID_RE.fullmatch(node_id) or node_id in MERMAID_RESERVED_WORDS:
+                    problems.append(f"invalid edge endpoint id: {node_id}")
+            if edge.group("label") not in GRAPH_EDGE_TYPES:
+                problems.append(f"edge label outside the closed vocabulary: {edge.group('label')}")
+            continue
+        node = _MERMAID_NODE_LINE_RE.match(line)
+        if node:
+            node_id = node.group("id")
+            if node_id in MERMAID_RESERVED_WORDS:
+                problems.append(f"node id is a mermaid reserved word: {node_id}")
+            if node_id in node_ids:  # PR-03: a repeated node id means one node's
+                duplicate_node_ids.add(node_id)  # data silently overwrote another's
+            node_ids.add(node_id)
+            continue
+        problems.append(f"unrecognized line: {raw_line!r}")
+    if depth != 0:
+        problems.append(f"unbalanced subgraph/end: {depth} still open at end of document")
+    if duplicate_node_ids:
+        problems.append(f"duplicate node id: {sorted(duplicate_node_ids)}")
+    if duplicate_subgraph_ids:
+        problems.append(f"duplicate subgraph id: {sorted(duplicate_subgraph_ids)}")
+    collisions = subgraph_ids & node_ids
+    if collisions:
+        problems.append(f"subgraph id collides with a node id: {sorted(collisions)}")
+    return problems
+
+
+def render_mermaid(state: _GraphState, missing: list[str]) -> str:
+    """AC-22/AC-23: the one renderer both `graph` and `render_notes` call. With nothing
+    to render at all (no feature processed, none missing) this degrades to the bare
+    `flowchart TD\\n` header, which is itself valid per `validate_mermaid_structure`.
+    """
+    lines = ["flowchart TD"]
+    for fid in state.feature_order:
+        feature = state.features[fid]
+        # PR-03: the SAME disambiguated components `add_node` used for this instance's
+        # node ids, never a fresh bare `_norm()` call -- otherwise a colliding raw id
+        # pair could still mint two identical subgraph ids even after add_node's own
+        # node ids were disambiguated.
+        fid_component = state.disambiguated_norm(("feature",), fid)
+        lines.append(f'subgraph sg_{fid_component}["{_mermaid_escape(fid)}"]')
+        for node_id in feature["members"]:
+            node = state.nodes[node_id]
+            lines.append(f'  {node_id}["{_mermaid_escape(node["label"])}"]')
+        for pid, package_slot in feature["packages"].items():
+            pid_component = state.disambiguated_norm(("package", fid), pid)
+            lines.append(f'  subgraph sg_{fid_component}_{pid_component}["{_mermaid_escape(pid)}"]')
+            for node_id in package_slot["members"]:
+                node = state.nodes[node_id]
+                lines.append(f'    {node_id}["{_mermaid_escape(node["label"])}"]')
+            lines.append("  end")
+        lines.append("end")
+    for fid in missing:
+        # AC-23's skeleton, folded into the same combined document AC-22 requires for a
+        # partial multi-feature run instead of a second code path. SEC-002: escaped like
+        # every other interpolation in this function -- `build_execution_graph` already
+        # gates `fid`'s charset before it ever reaches `missing`, so this is defense in
+        # depth, not the only thing standing between `fid` and the document.
+        lines.append("%% no data for " + _mermaid_escape(fid))
+    for src_id, dst_id, label in state.edges:
+        lines.append(f"{src_id} -->|{label}| {dst_id}")
+    text = "\n".join(lines) + "\n"
+    problems = validate_mermaid_structure(text)
+    if problems:
+        # This module's own generator producing structurally-invalid mermaid is a real
+        # bug, never a caller error -- surfaced loudly instead of shipped silently.
+        raise StateError("generated an invalid mermaid document: " + "; ".join(problems))
+    return text
+
+
+def cmd_graph(args: argparse.Namespace) -> int:
+    root = Path(args.root) if args.root else Path.cwd()
+    explicit_feature_ids = args.feature_id or None
+    state, missing = build_execution_graph(root, explicit_feature_ids)
+    text = render_mermaid(state, missing)
+    if not explicit_feature_ids and not (root / "ai" / "state" / "features").is_dir():
+        # PR-06: whole-repo mode (no --feature-id) against a root with no state
+        # directory at all used to degrade silently to the bare `flowchart TD`
+        # skeleton with exit 0 -- indistinguishable from a real project that
+        # legitimately has zero features yet. AC-23 already sets the precedent for
+        # this exact "nothing to read" case: `cmd_context`'s CONTEXT_VAULT_NOT_FOUND
+        # announces it instead of staying silent. `root` is escaped like every other
+        # interpolated value in this document (SEC-002); the line's shape is part of
+        # `_MERMAID_MISSING_COMMENT_RE`'s closed vocabulary, so this stays a
+        # structurally valid comment rather than an unchecked special case.
+        text += "%% no state directory at " + _mermaid_escape(str(root)) + "\n"
+        # D-03: this append happens AFTER `render_mermaid` already ran its own
+        # self-check, so without a second check here the appended line would be the
+        # one piece of this command's output the oracle never actually validates.
+        # Same defense-in-depth posture as `render_mermaid`'s own check: this
+        # module's own output failing its own oracle is a real bug, surfaced loudly.
+        problems = validate_mermaid_structure(text)
+        if problems:
+            raise StateError("generated an invalid mermaid document: " + "; ".join(problems))
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+    else:
+        print(text, end="")
+    return 0
 
 
 def output_state(data: dict[str, Any], changed: bool = False, path: Path | None = None) -> int:
@@ -1189,10 +1923,36 @@ def state_file_arg(args: argparse.Namespace) -> Path:
     raise StateError("--state-file or feature_id is required")
 
 
+def verify_spec_hash(spec_path: str, spec_hash: str) -> None:
+    """Refuse to open a record that attests bytes nobody can produce.
+
+    `PHASES` holds REQUIREMENTS, SPEC_DRAFT, SPEC_CHALLENGE and USER_APPROVAL, and
+    `LEGAL_TRANSITIONS` has an entry for none of them, so the `"from": "USER_APPROVAL"`
+    this command writes was a label nothing could check -- 009's own state file carried
+    an approval timestamp while its spec still read "Not yet challenged".  Whether a
+    human said yes is not observable from a file.  *Which bytes* they said it about is,
+    and that is the part this enforces.
+    """
+    spec = Path(spec_path)
+    if not spec.is_file():
+        raise StateError(
+            f"SPEC_NOT_FOUND: {spec_path} — init records the approval of concrete bytes, "
+            "and there are none here to hash"
+        )
+    digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+    if digest != spec_hash:
+        raise StateError(
+            f"SPEC_HASH_MISMATCH: recorded={spec_hash} disk={digest} path={spec_path} — "
+            f"run `sha256sum {spec_path}`; if the spec changed after approval, it needs "
+            "approving again rather than a record that attests the old bytes"
+        )
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     path = Path(args.state_file) if args.state_file else state_path(args.feature_id)
     if path.exists() and not args.force:
         raise StateError(f"state exists: {path}")
+    verify_spec_hash(args.spec_path, args.spec_hash)
     data = base_state(args.feature_id, args.spec_path, args.spec_hash)
     data["acceptance_criteria"] = args.ac or []
     data["mode"] = args.mode
@@ -1201,7 +1961,14 @@ def cmd_init(args: argparse.Namespace) -> int:
         value = getattr(args, key)
         if value is not None:
             data["budgets"][key] = value
-    record_event(data, "init", "USER_APPROVAL", "PACKAGE_PLANNING", args.actor, metadata={"spec_path": args.spec_path})
+    record_event(
+        data, "init", "USER_APPROVAL", "PACKAGE_PLANNING", args.actor,
+        metadata={
+            "spec_path": args.spec_path,
+            "spec_hash_verified": True,
+            "approved_by": args.approved_by,
+        },
+    )
     atomic_write(path, data)
     render_status(path)
     render_bitacora(path, only_feature=args.feature_id)
@@ -1260,6 +2027,12 @@ def cmd_transition(args: argparse.Namespace) -> int:
 
 def cmd_create_package(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
+    if args.package_id == "grafo":
+        # AC-24: package notes are written at docs/notas/features/<fid>/<pid>.md with
+        # the RAW package_id, never slugified -- "grafo" is the only string that can
+        # actually collide with the execution-graph note render_notes() also writes
+        # there. Case-sensitive on purpose: that is how the raw path is compared too.
+        raise StateError("package_id 'grafo' is reserved for the execution-graph note (AC-24)")
 
     def update(data: dict[str, Any]) -> bool:
         if data["phase"] not in {"PACKAGE_PLANNING", "PACKAGE_ACCEPTED"}:
@@ -1450,6 +2223,14 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
 
     def update(data: dict[str, Any]) -> bool:
+        if replayed(data, "record-spawn", args.event_id):
+            # AC-01 (010-spawn-provenance): FIRST, before the phase gate and the budget
+            # check -- a retried --event-id that arrives after the spawn already minted
+            # its id must not re-spend the spawn budget or mint a second SPAWN-NNN. Same
+            # guard, same position, same reason as cmd_start_review_panel's replayed()
+            # guard: between the phase gate and the mint sits the budget check, which
+            # could BLOCK the whole feature a second time on a pure retry.
+            return False
         if data["phase"] in TERMINAL:
             raise StateError(f"cannot record spawn from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
@@ -1458,7 +2239,27 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         if attempts.get("spawns", 0) >= budget:
             return block_with_reason(data, args.actor, args.package_id, "spawn budget exhausted")
         attempts["spawns"] = attempts.get("spawns", 0) + 1
-        metadata = {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"]}
+        # AC-01: the id is always derived from the counter, never from
+        # len(package["spawns"]) -- a package that already had spawns recorded before
+        # this feature existed (e.g. attempts.spawns=8, no spawns[] key at all, the
+        # exact shape of 006's own P3 package) continues the SAME counter: its next
+        # spawn is SPAWN-009, not SPAWN-001.
+        spawn_id = f"SPAWN-{attempts['spawns']:03d}"
+        spawns = package.setdefault("spawns", [])
+        if any(item.get("spawn_id") == spawn_id for item in spawns):
+            # Defense in depth against a desynced counter. Reachable only by a
+            # hand-corrupted fixture -- no real caller ever provides spawn_id, only
+            # this command mints it.
+            raise StateError(f"spawn {spawn_id} already exists on {args.package_id}: counter out of sync")
+        spawns.append({
+            "spawn_id": spawn_id,
+            "role": args.role,
+            "purpose": args.purpose,
+            "client": args.client,
+            "tech": args.tech,
+            "at": now(),
+        })
+        metadata = {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"], "spawn_id": spawn_id}
         # The two registers of the opening narration block. Optional so older
         # callers keep working, but the orchestrator doctrine requires them:
         # they are what render_bitacora turns into the durable story.
@@ -1496,7 +2297,15 @@ def cmd_record_review(args: argparse.Namespace) -> int:
         if attempts.get("deep_review_cycles", 0) >= data["budgets"]["max_deep_review_cycles"]:
             return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted")
         findings = normalize_findings(args.finding or [])
-        review = {"verdict": args.verdict, "findings": [item["id"] for item in findings], "at": now(), "evidence": args.evidence}
+        # PR-01: the record carries its own actor now -- additive, so nothing that reads
+        # `reviews[]` for its existing keys breaks. `_add_package_findings`'s join to the
+        # `record-review` history event (below, by POSITION) was the only place that ever
+        # desynced: a `blocked` verdict appends this record and then returns via
+        # `block_with_reason` BEFORE the `record-review` history event is emitted a few
+        # lines down, permanently shifting every later positional pairing by one. The
+        # actor stamped directly here is never subject to that.
+        review = {"verdict": args.verdict, "findings": [item["id"] for item in findings], "at": now(),
+                  "evidence": args.evidence, "actor": args.actor}
         package.setdefault("reviews", []).append(review)
         attempts["deep_review_cycles"] = attempts.get("deep_review_cycles", 0) + 1
         data["metrics"]["package_reviews"] += 1
@@ -1517,10 +2326,46 @@ def cmd_record_review(args: argparse.Namespace) -> int:
     return output_state(data, changed, path)
 
 
+def panel_roles(raw: list[str] | None) -> list[str]:
+    """The panel's membership: declared explicitly, or not at all.
+
+    argparse's own `required=True` would refuse an empty list too — on stderr, with a
+    usage dump and no `{"ok": false, "error": ...}` envelope, which is the one output
+    shape every caller and every test in this repo parses (`main`).  A refusal the
+    machine cannot read is not a refusal.  Raising here also lets the message name where
+    the list legitimately comes from, which argparse cannot.
+    """
+    roles: list[str] = []
+    for raw_role in raw or []:
+        role = raw_role.strip()
+        if not role:
+            raise StateError("review panel role cannot be empty")
+        if role not in roles:
+            # A repeated role is satisfied by a single subreview anyway; keeping the
+            # duplicate only makes `missing` in finalize-review-panel report it twice.
+            roles.append(role)
+    if not roles:
+        raise StateError(
+            "start-review-panel requires at least one --role: a panel cannot be opened without "
+            "naming who will review (package-planner declares them in required_reviewers)"
+        )
+    return roles
+
+
 def cmd_start_review_panel(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
+    # Outside the updater: validating an argument should not need a loadable state file.
+    roles = panel_roles(args.role)
 
     def update(data: dict[str, Any]) -> bool:
+        if replayed(data, "start-review-panel", args.event_id):
+            # FIRST, before the phase gate: a replayed open legitimately arrives after the
+            # panel it created has already closed, and `cannot start review panel from
+            # phase PACKAGE_REPAIR` is indistinguishable from a real precondition failure.
+            # Same guard, same position, same reason as cmd_record_verification, and the
+            # same shared `replayed()` as record_event — which is what stops the updater
+            # and the history from disagreeing about whether this call is a retry.
+            return False
         if data["phase"] != "PACKAGE_REVIEW":
             raise StateError(f"cannot start review panel from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
@@ -1532,11 +2377,22 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
             return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted")
         panel_id = args.panel_id or f"RP-{attempts.get('deep_review_cycles', 0) + 1:02d}"
         if any(panel.get("panel_id") == panel_id for panel in package.get("review_panels", [])):
-            return False
+            # Not a no-op: a second open against a live panel_id is either a lost update
+            # or an attempt to grow the panel, and both have to say so.  Measured before
+            # this existed: with an auto-generated id the silence was worse than silent,
+            # because the id derives from the counter this command bumps — the retry
+            # minted RP-02, spent the last deep-review cycle, stranded RP-01 in_progress
+            # where record-subreview would never reach it again, and left the next
+            # legitimate open to BLOCK the feature on `deep review budget exhausted`.
+            raise StateError(
+                f"review panel {panel_id} already exists on {package['package_id']}; to add a member "
+                "to an open panel use extend-review-panel, and to retry a timed-out call pass the "
+                "original --event-id"
+            )
         panel = {
             "panel_id": panel_id,
             "status": "in_progress",
-            "roles": args.role or ["package-reviewer"],
+            "roles": roles,
             "subreviews": [],
             "started_at": now(),
             "completed_at": None,
@@ -1629,6 +2485,160 @@ def cmd_finalize_review_panel(args: argparse.Namespace) -> int:
     return output_state(data, changed, path)
 
 
+def cmd_extend_review_panel(args: argparse.Namespace) -> int:
+    """Add a member to an OPEN panel instead of opening a second one.
+
+    `orchestrator.md` already orders a specialist that becomes necessary mid-panel to be
+    recorded "as a subreview of the same bounded panel" — impossible unless it was named
+    at open time, and AC-08 makes that dead end permanent.  This is that verb.  It never
+    touches `deep_review_cycles`, `metrics.package_reviews` or the deep-review budget: the
+    panel is ONE cycle no matter how it grows, which is the whole reason it exists.
+    """
+    path = state_file_arg(args)
+    roles = panel_roles(args.role)
+    if not (args.reason or "").strip():
+        # Without this, a grown panel is indistinguishable in the record from one that
+        # named all its members up front — precisely what AC-08 exists to prevent.
+        # Extending is the sanctioned loophole, so it has to document itself.
+        raise StateError(
+            "extend-review-panel requires --reason: why this member became necessary mid-panel"
+        )
+
+    def update(data: dict[str, Any]) -> bool:
+        if replayed(data, "extend-review-panel", args.event_id):
+            return False
+        if data["phase"] != "PACKAGE_REVIEW":
+            raise StateError(f"cannot extend review panel from phase {data['phase']}")
+        package = package_by_id(data, args.package_id)
+        panels = package.get("review_panels", [])
+        if args.panel_id:
+            panel = next((item for item in panels if item.get("panel_id") == args.panel_id), None)
+            if panel is None:
+                raise StateError(f"unknown panel_id: {args.panel_id}")
+            if panel.get("status") != "in_progress":
+                raise StateError(
+                    f"panel {args.panel_id} is {panel.get('status')}; a review that returns after its "
+                    "panel closed is recorded with record-late-review"
+                )
+        else:
+            panel = next((item for item in reversed(panels) if item.get("status") == "in_progress"), None)
+            if not panel:
+                raise StateError("no active review panel")
+        existing = panel.setdefault("roles", [])
+        already = [role for role in roles if role in existing]
+        if already:
+            # Silence would let a retry look like a successful extension while the member
+            # it named was never added: the same failure shape AC-09 closes one command up.
+            raise StateError(f"already on panel {panel['panel_id']}: {', '.join(already)}")
+        existing.extend(roles)
+        panel.setdefault("extensions", []).append(
+            {"roles": roles, "reason": args.reason.strip(), "at": now()}
+        )
+        record_event(
+            data, "extend-review-panel", "PACKAGE_REVIEW", "PACKAGE_REVIEW", args.actor, args.package_id,
+            {"panel_id": panel["panel_id"], "added_roles": roles}, args.event_id,
+        )
+        return True
+
+    data, changed = mutate(path, args, "extend-review-panel", update)
+    return output_state(data, changed, path)
+
+
+def cmd_record_late_review(args: argparse.Namespace) -> int:
+    """An independent review that returned after its panel closed (AC-10).
+
+    Phase-agnostic on purpose: `cmd_record_review` and `cmd_record_subreview` both
+    hard-gate on `PACKAGE_REVIEW` and `LEGAL_TRANSITIONS["PACKAGE_REPAIR"]` has no edge
+    back, so a reviewer that returns late has no door at all — five verified architect
+    findings ended up in `decisions-log.jsonl`, where a reader looking at the package will
+    never find them.  It consumes NO deep-review cycle: the concurrent panel is one cycle
+    by rule, and counting a straggler as a second one would misrepresent the process in
+    the opposite direction.  What makes it safe without a new phase is that its findings
+    land on `package["findings"]`, which `package_accept_ready` already reads through
+    `has_open_findings` — a blocking late finding stops acceptance with no new machinery.
+    """
+    path = state_file_arg(args)
+    role = (args.role or "").strip()
+    if not role:
+        raise StateError("record-late-review requires a non-empty role")
+    evidence = (args.evidence or "").strip()
+    if len(evidence) < MIN_EVIDENCE_LEN:
+        # This is the one record in the harness that no panel witnessed and no phase gate
+        # guarded, so its evidence IS the audit trail — required here even though
+        # `record-subreview --evidence` defaults to empty.  The EVIDENCE_SHAPES burden
+        # stays where it belongs: on the verb that RETIRES findings, not the one that
+        # files them.
+        raise StateError(
+            f"record-late-review requires --evidence of at least {MIN_EVIDENCE_LEN} characters: "
+            "nothing else witnessed this review"
+        )
+
+    def update(data: dict[str, Any]) -> bool:
+        if replayed(data, "record-late-review", args.event_id):
+            return False
+        package = package_by_id(data, args.package_id)
+        if package.get("status") == "accepted":
+            # `package_accept_ready` has already run, so a finding recorded here would be
+            # read by nobody, ever: PACKAGE_ACCEPTED has no edge to PACKAGE_REPAIR and
+            # `reopen` only applies from BLOCKED.  Recording it anyway would produce a
+            # package showing an open blocking finding and an `accepted` status at the
+            # same time, which is a worse lie than the refusal.  The gap is registered as
+            # debt rather than simulated closed.
+            raise StateError(
+                f"{package['package_id']} is already accepted and has no path back to repair "
+                "(PACKAGE_ACCEPTED has no edge to PACKAGE_REPAIR, and reopen only applies from "
+                "BLOCKED); raise this against the integration or block the feature"
+            )
+        open_panel = next((item for item in package.get("review_panels", [])
+                           if item.get("status") == "in_progress"), None)
+        if open_panel:
+            # While a panel is live the sanctioned channel is the panel; without this the
+            # late verb is simply a way around its membership gate.  Checked before the
+            # "no closed review" guard below because both fire on an open first panel and
+            # this is the one that names what to do instead.
+            raise StateError(
+                f"panel {open_panel.get('panel_id')} is still open; use record-subreview, or "
+                "extend-review-panel first if this role is not yet a member"
+            )
+        if not package.get("reviews"):
+            # Otherwise this is a back door that files findings on a package that never
+            # passed package_review_ready and never entered PACKAGE_REVIEW at all.
+            raise StateError(
+                f"{package['package_id']} has no closed review to be late to"
+            )
+        if args.panel_id and not any(item.get("panel_id") == args.panel_id
+                                     for item in package.get("review_panels", [])):
+            raise StateError(f"unknown panel_id: {args.panel_id}")
+        findings = normalize_findings(args.finding or [])
+        for finding in findings:
+            # The same attribution record-subreview stamps.  Without it,
+            # cmd_record_verification has nothing to compare and a late reviewer can file
+            # a finding and then refute its own.
+            finding.setdefault("source_role", role)
+        package.setdefault("late_reviews", []).append({
+            "role": role,
+            "findings": [item["id"] for item in findings],
+            "panel_id": args.panel_id,
+            "evidence": evidence,
+            "at": now(),
+        })
+        for finding in findings:
+            # merge_finding, never a blind append: re-raising a finding the verifier
+            # refuted is legitimate here — half the point of a late reviewer — and merging
+            # archives the stale verdict so the finding re-enters unjudged.
+            merge_finding(package, finding)
+        # from == to on purpose: this moves no phase, and saying so keeps the event out of
+        # every reader that looks for an entry INTO a phase.
+        record_event(
+            data, "record-late-review", data["phase"], data["phase"], args.actor, args.package_id,
+            {"role": role, "finding_count": len(findings)}, args.event_id,
+        )
+        return True
+
+    data, changed = mutate(path, args, "record-late-review", update)
+    return output_state(data, changed, path)
+
+
 def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, reason: str) -> bool:
     from_phase = data["phase"]
     data["phase"] = "BLOCKED"
@@ -1713,8 +2723,15 @@ def _repair_entered_from_review(data: dict[str, Any], package_id: str | None) ->
 # is raised again, a cycle-1 verdict authorises a cycle-2 repair against a different diff:
 # a reusable credential.  Archive it and reset, so the finding re-enters unjudged.
 # Fields owned by the lifecycle, never by whoever files the finding.
+# `source_role` belongs here for the same reason the rest do, and it was missing: the
+# commands that file findings stamp it with `setdefault`, which only fills a key that is
+# absent, so a filer could name someone else as the raiser inside the `--finding` JSON and
+# then refute the finding itself — `cmd_record_verification`'s self-refutation guard reads
+# exactly this field.  Attribution is assigned by the command from the role it was handed,
+# never accepted from the payload.
 FINDING_BOOKKEEPING = frozenset({"verified_verdict", "verified_by", "verified_at", "verdict_reason",
-                                 "verdict_evidence", "verification_history", "repair_attempts"})
+                                 "verdict_evidence", "verification_history", "repair_attempts",
+                                 "source_role"})
 VERIFICATION_AXIS = ("verified_verdict", "verified_by", "verified_at", "verdict_reason", "verdict_evidence")
 
 
@@ -1759,7 +2776,7 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         raise StateError("record-verification requires an explicit --actor")
 
     def update(data: dict[str, Any]) -> bool:
-        if args.event_id and any(item.get("event_id") == args.event_id for item in data.get("history", [])):
+        if replayed(data, "record-verification", args.event_id):
             # Replay of a timed-out call is a no-op, like start-review-panel and
             # record-subreview.  Without this the per-finding guards below fire first and
             # a retry cannot tell "already applied" from "state corrupt".
@@ -1862,8 +2879,81 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
     return output_state(data, changed, path)
 
 
+# AC-21. `git`'s own abbreviation floor (7) and the full sha length (40); `abcd` is
+# well-formed hex but not a plausible sha, so format is gated before any git lookup.
+COMMIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+
+
+# A read-only git call's own budget: SEC-003 -- neither call in this module carried a
+# timeout before, so a hung git process (a stale lock, a network-backed credential
+# helper prompting for input it will never get) hung the entire CLI. Treated the same
+# as "git cannot answer at all" everywhere it is caught below.
+GIT_TIMEOUT_SECONDS = 10
+
+
+def _git_answer(args: list[str]) -> tuple[str | None, str | None]:
+    """A read-only git call. Returns `(stdout, None)` on success, or `(None, reason)`
+    when git could not answer: `"git-unavailable"` (the `git` binary itself could not be
+    invoked, or it hung past `GIT_TIMEOUT_SECONDS`) or `"not-a-repo"` (git ran and
+    reported failure -- no repository at this cwd, or any other rejection of the
+    read-only query itself). SEC-003: the caller needs to know WHY, not just that it
+    could not, so a fail-open acceptance leaves an auditable trail instead of being
+    indistinguishable from a verified one.
+    """
+    try:
+        proc = subprocess.run(["git", *args], cwd=Path.cwd(), capture_output=True, text=True,
+                              check=False, timeout=GIT_TIMEOUT_SECONDS)
+    except OSError:
+        return None, "git-unavailable"
+    except subprocess.TimeoutExpired:
+        return None, "git-unavailable"
+    if proc.returncode != 0:
+        return None, "not-a-repo"
+    return proc.stdout, None
+
+
+def validate_commit_ref(commit: str | None) -> tuple[str | None, bool]:
+    """AC-21: format-gate first, then a best-effort, fail-open git lookup.
+
+    Returns `(accepted sha or None, verified)`. `verified` is `False` exactly when the
+    sha was accepted WITHOUT git confirming it (SEC-003's fail-open path) so the caller
+    can persist which is which, rather than a bare sha string that looks identical
+    whether or not anything actually checked it. Raises `StateError` when the format is
+    wrong or git affirmatively says the sha does not exist. `--is-shallow-repository` is
+    checked BEFORE `cat-file`, on purpose: in a shallow clone `cat-file -e` fails for any
+    commit older than the shallow boundary even though it is real -- the exact
+    false-rejection shape `check-feature-state.py:79-90` already documents and works
+    around for its own git checks. Same posture here: absent git, a non-repo cwd, and a
+    shallow clone all mean "cannot answer", never "does not exist".
+    """
+    if commit is None:
+        return None, True
+    commit = commit.strip()
+    if not COMMIT_SHA_RE.fullmatch(commit):
+        raise StateError(f"--commit must be 7-40 hex characters: {commit!r}")
+    shallow, reason = _git_answer(["rev-parse", "--is-shallow-repository"])
+    if shallow is None:
+        print(f"COMMIT_UNVERIFIED {commit} reason={reason}", file=sys.stderr)
+        return commit, False
+    if shallow.strip() == "true":
+        print(f"COMMIT_UNVERIFIED {commit} reason=shallow-clone", file=sys.stderr)
+        return commit, False
+    try:
+        proc = subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=Path.cwd(), capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        print(f"COMMIT_UNVERIFIED {commit} reason=git-unavailable", file=sys.stderr)
+        return commit, False
+    if proc.returncode == 0:
+        return commit, True
+    raise StateError(f"--commit does not resolve to a real commit in this repo: {commit}")
+
+
 def cmd_record_repair(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
+    commit, commit_verified = validate_commit_ref(getattr(args, "commit", None))
 
     def update(data: dict[str, Any]) -> bool:
         if data["phase"] != "PACKAGE_REPAIR":
@@ -1905,6 +2995,15 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
                 return block_with_reason(data, args.actor, args.package_id, f"repair budget exhausted for {finding['id']}")
             finding["status"] = "closed"
         repair = {"finding_ids": ids, "changed_files": changed_files, "verification": args.verification or [], "at": now()}
+        if commit:
+            # AC-21: absent when `--commit` was not declared -- the graph's `reparó`
+            # edge never extends past the finding for this repair (AC-20, never a
+            # guessed commit).
+            repair["commit"] = commit
+            # SEC-003: fail-open acceptance is legitimate (D4) but must leave an
+            # auditable trail of WHICH shas were actually checked against git and which
+            # were accepted on trust alone -- never indistinguishable in the state file.
+            repair["commit_verified"] = commit_verified
         if args.skip_delta:
             repair["delta_waived"] = True
             repair["waiver_reason"] = "all findings <= medium and <= 3 changed files"
@@ -1917,8 +3016,11 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
         else:
             data["phase"] = "DELTA_REVIEW"
             package["status"] = "delta_review_required"
+        repair_metadata = {"finding_ids": ids, "delta_waived": bool(args.skip_delta)}
+        if commit:
+            repair_metadata["commit_verified"] = commit_verified
         record_event(data, "record-repair", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
-                     {"finding_ids": ids, "delta_waived": bool(args.skip_delta)}, args.event_id)
+                     repair_metadata, args.event_id)
         return True
 
     data, changed = mutate(path, args, "record-repair", update)
@@ -2378,6 +3480,9 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("spec_hash")
     init.add_argument("--state-file")
     init.add_argument("--force", action="store_true")
+    # Required, like `reopen --authorized-by`: an assertion that defaults to a value
+    # nobody chose is exactly the assertion this command used to make for free.
+    init.add_argument("--approved-by", required=True)
     init.add_argument("--actor", default="orchestrator")
     init.add_argument("--ac", action="append")
     init.add_argument("--max-deep-review-cycles", type=int)
@@ -2508,6 +3613,29 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--evidence", default="")
     finalize.set_defaults(func=cmd_finalize_review_panel)
 
+    extend = sub.add_parser("extend-review-panel")
+    add_common_state_args(extend)
+    extend.add_argument("package_id")
+    extend.add_argument("--feature-id")
+    extend.add_argument("--panel-id")
+    extend.add_argument("--role", action="append")
+    extend.add_argument("--reason")
+    extend.set_defaults(func=cmd_extend_review_panel)
+
+    late = sub.add_parser("record-late-review")
+    add_common_state_args(late)
+    late.add_argument("package_id")
+    late.add_argument("role")
+    late.add_argument("--feature-id")
+    late.add_argument("--panel-id")
+    late.add_argument("--finding", action="append")
+    # No `verdict` positional, unlike every other review verb: a verdict in this CLI is a
+    # token that drives a phase, and this command drives none.  Offering `blocked` without
+    # blocking would be a lie, and `pass` would invite the readers of `reviews[-1]` to
+    # trust a record that is deliberately not one of them.
+    late.add_argument("--evidence", default="")
+    late.set_defaults(func=cmd_record_late_review)
+
     verification = sub.add_parser("record-verification")
     add_common_state_args(verification)
     verification.add_argument("package_id")
@@ -2528,6 +3656,7 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--changed-file", action="append")
     repair.add_argument("--verification", action="append")
     repair.add_argument("--skip-delta", action="store_true")
+    repair.add_argument("--commit", help="AC-21: sha of the commit that repaired this finding (7-40 hex)")
     repair.set_defaults(func=cmd_record_repair)
 
     delta = sub.add_parser("record-delta-review")
@@ -2628,6 +3757,12 @@ def build_parser() -> argparse.ArgumentParser:
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")
     dry.set_defaults(func=cmd_dry_run)
+
+    graph = sub.add_parser("graph")
+    graph.add_argument("--feature-id", action="append")
+    graph.add_argument("--root")
+    graph.add_argument("--out")
+    graph.set_defaults(func=cmd_graph)
 
     # Available on every subcommand: defer STATUS/bitacora/notes regeneration
     # for high-frequency intra-phase writes; sync-notes always renders anyway.

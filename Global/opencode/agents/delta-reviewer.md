@@ -1,7 +1,7 @@
 ---
 description: "Delta-Reviewer \u2014 focused review after package repair"
 mode: subagent
-model: openai/gpt-5.6-sol
+model: openai/gpt-5.5
 temperature: 0.0
 steps: 12
 hidden: true

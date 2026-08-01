@@ -81,7 +81,7 @@ done
 
 # 3. Conocimiento global por dominio: se refresca SIEMPRE (es de solo lectura en el proyecto).
 #    El conocimiento del proyecto (docs/ai/knowledge/*.md) no se toca: lo escribe memory-scribe.
-GLOBAL_KNOWLEDGE="$ROOT/knowledge"
+GLOBAL_KNOWLEDGE="$ROOT/docs/ai/knowledge/_global"
 if compgen -G "$GLOBAL_KNOWLEDGE/*.md" >/dev/null; then
   mkdir -p "$PROJECT/docs/ai/knowledge/_global"
   synced_knowledge=0

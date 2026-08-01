@@ -2,80 +2,90 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-07-28T02:05:38+00:00
+Actualizado: 2026-08-01T22:46:55+00:00
 
 ## Features
 
 | Feature | Modo | Fase | Paquete | Aceptados | Spawns | Reviews | Findings abiertos | Blocker | Próximo paso | Último evento |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 002-adaptive-pi-orchestration | feature | BLOCKED | P1-routing-core (repair_required) | 0/1 | 12/12 | 2/2 | 5 | HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. | - | 2026-07-24T16:16:04+00:00 block |
-| 003-trusted-routing-pi-runtime | feature | PACKAGE_ACCEPTED | P1R-trusted-routing (accepted) | 1/1 | 16/16 | 3/3 | 0 | - | INTEGRATION | 2026-07-25T03:01:53+00:00 accept-package |
+| 002-adaptive-pi-orchestration | feature | BLOCKED | P1-routing-core (repair_required) | 0/1 | 12/12 | 2/2 | 5 | HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles… | - | 2026-07-24T16:16:04+00:00 block |
+| 003-trusted-routing-pi-runtime | feature | DONE | P1R-trusted-routing (accepted) | 1/1 | 16/16 | 3/3 | 0 | - | - | 2026-07-29T17:13:45+00:00 transition |
 | 004-adaptive-dispatch | feature | DONE | P3-pi-lane (accepted) | 3/3 | 20/12 | 1/2 | 0 | - | - | 2026-07-27T14:04:38+00:00 transition |
-| 005-portable-harness | feature | PACKAGE_ACCEPTED | P1-portable-core (accepted) | 1/1 | 12/12 | 2/2 | 0 | - | INTEGRATION | 2026-07-27T17:58:36+00:00 accept-package |
+| 005-portable-harness | feature | DONE | P3-tui (accepted) | 3/3 | 20/12 | 1/2 | 0 | - | - | 2026-07-30T16:16:18+00:00 transition |
+| 006-execution-graph | feature | PACKAGE_ACCEPTED | P3-graph-view (accepted) | 1/1 | 8/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-30T07:38:47+00:00 accept-package |
+| 007-quota-visibility | feature | DONE | P3-correct-record (accepted) | 3/3 | 13/12 | 1/2 | 0 | - | - | 2026-07-29T17:10:45+00:00 transition |
+| 008-dynamic-selection | feature | PACKAGE_ACCEPTED | P1-uninterrupted-delegation (accepted) | 1/1 | 5/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-28T14:49:14+00:00 accept-package |
+| 009-self-application | feature | DONE | P3-panel-integrity (accepted) | 3/3 | 13/12 | 1/2 | 0 | - | - | 2026-07-29T17:10:45+00:00 transition |
+| 010-spawn-provenance | feature | PACKAGE_ACCEPTED | P1-spawn-provenance (accepted) | 1/1 | 10/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-30T16:15:59+00:00 accept-package |
+| 011-quota-failover | feature | BLOCKED | P1-quota-failover (package_gates) | 0/1 | 3/12 | 0/2 | 0 | HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está v… | - | 2026-07-30T17:04:39+00:00 block |
+| 012-discovered-inventory | feature | PACKAGE_ACCEPTED | P1-discovered-inventory (accepted) | 1/1 | 7/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-31T00:53:17+00:00 accept-package |
+| 013-pi-interactive-target | feature | PACKAGE_PLANNING | - | 0/0 | 0/12 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-07-31T14:26:21+00:00 init |
+| 015-anthropic-dispatch-parity | feature | DONE | P1-anthropic-dispatch-parity (accepted) | 1/1 | 0/12 | 1/2 | 0 | - | - | 2026-08-01T22:46:55+00:00 transition |
 
 ## Quick-fixes recientes
 
-- _sin quick-fixes registrados_
+- [2026-07-30T01:22:42+00:00] P2-vault-mandatory (accepted): exclude_notes_from_git/_notes_currently_excluded chequeaban (project/'.git').is_dir(), falso para un git worktree enlazado (.git es archivo ahi) -- docs/notas quedaba trackeado por git en vez de excluido, contradiciendo DEC-5. Fix: resolver via 'git rev-parse --show-toplevel/--git-common-dir' anclado a que el proyecto SEA el top-level (no solo estar dentro de un repo), con env purgado de GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR/GIT_INDEX_FILE, timeout y manejo de git ausente. Bono: vault_doctor_report ahora distingue dangling de un symlink cuyo target fue borrado (antes reportaba healthy). Encontrado migrando ~/iey de verdad; revisado por un segundo agente (package-reviewer) que encontro 7 hallazgos adicionales sobre el primer fix, todos reparados y re-verificados con pass. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass (2da pasada) — resultado: done
+- [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
 
-[2026-07-27T17:57:30+00:00] P1-portable-core · delta-reviewer · done
-Cliente: La última revisión confirmó que el arreglo no recorta la prueba: el proyecto invitado sigue instalándose, ruteándose y verificando su identidad guardada; sólo se evitó repetir toda la suite desde adentro.
-Ingeniería: Independent focused delta review PASS: direct guest AC-09 in 22.189s, explicit cwd lifecycle including failure close, absolute APP_CLI/read-only Pi guards, full verify behavior, and delta-scoped ownership all confirmed. No new findings.
+[2026-07-31T00:22:55+00:00] P1-discovered-inventory · delta-reviewer · started
+Cliente: Última verificación antes de cerrar el paquete.
+Ingeniería: delta-reviewer, contexto limpio, acotado a los 3 fixes de la ronda 2.
 
-[2026-07-27T17:55:36+00:00] P1-portable-core · debugger · done
-Cliente: Se encontró y corrigió la causa: la prueba invitada estaba haciendo otra prueba completa adentro y por eso superaba el límite. Ahora valida lo necesario para una instalación invitada y termina rápido, sin perder ninguna comprobación de identidad ni portabilidad.
-Ingeniería: Expanded diagnosis proved a nested full 181-test suite, not a deadlock. Minimal repair: verify.sh detects SET_AGENTS_GUEST_VERIFY and runs only the portable smoke assertions already complemented by the outer scaffold/install/routing/SQLite proof; normal verify remains unchanged. Added a 90s guest subprocess timeout regression. Direct guest, guest verify, full verify, and diff check passed.
+[2026-07-30T23:59:05+00:00] P1-discovered-inventory · repair-agent · started
+Cliente: El mismo agujero de seguridad que se cerró para Opus/Sonnet/Haiku se filtró para Fable, el modelo más nuevo. Se cierra ahora, acotado.
+Ingeniería: repair-agent, segunda ronda, alcance mínimo: 3 hallazgos.
 
-[2026-07-27T17:55:36+00:00] P1-portable-core · delta-reviewer · started
-Cliente: Una revisión final independiente va a comprobar que el arreglo acelera sólo el control interno invitado y no deja ningún proyecto sin validar ni mezcla identidades.
-Ingeniería: Reusing the prior independent gate instance without creating a new package spawn (the physical P1 spawn budget is exhausted). Read-only delta review: inspect only the guest verify-mode repair and DLT-001/002 behavior, reproduce guest/full gates, and audit cross-project isolation.
+[2026-07-30T23:35:12+00:00] P1-discovered-inventory · delta-reviewer · started
+Cliente: Un tercer revisor, que no vio ni la implementación original ni el panel, confirma que las reparaciones cierran los problemas sin abrir otros nuevos.
+Ingeniería: delta-reviewer, contexto limpio, acotado al diff de la reparación (catalog.py, service.py, models.toml, models_config.py, ADR-0016, README, test_routing.py).
 
-[2026-07-27T17:48:35+00:00] P1-portable-core · debugger · started
-Cliente: Con tu autorización, se amplía el diagnóstico para mirar el proceso invitado por dentro y encontrar exactamente qué espera antes de corregirlo.
-Ingeniería: Expanded debugging scope after explicit user authorization. This is the 12th and final P1 instantiation budget: debugger may instrument subprocess execution with bounded diagnostics, identify the exact waiter, and make the minimal repair; subsequent independent delta/gate work will reuse existing agents without creating another state instantiation.
+[2026-07-30T22:39:33+00:00] P1-discovered-inventory · repair-agent · started
+Cliente: El panel de revisión encontró un agujero real de seguridad (un modelo podría revisarse a sí mismo bajo dos nombres de proveedor) y varios problemas menores. Se repara todo en una sola pasada.
+Ingeniería: repair-agent consolidado, orden por severidad: SEC-001 (critical) primero, F-01/F-02 (high, tests que no discriminan) segundo, resto después.
 
-[2026-07-27T17:43:19+00:00] P1-portable-core · debugger · blocked
-Cliente: La prueba invitada sigue quedando esperando y el diagnóstico no pudo ver con certeza qué paso interno se frena. Para no dar por terminado algo que no pasó su control final, el paquete queda detenido con el detalle registrado.
-Ingeniería: debugging-loop hard stop: direct AC-09 guest test reproduced timeout 124 twice; verify.sh likewise did not terminate in the nested guest test. No root cause was proven, so no code/test change was made. Per project policy, ambiguous repeated deterministic gate failure requires human decision rather than speculative repair.
+[2026-07-30T20:53:58+00:00] P1-discovered-inventory · security-auditor · started
+Cliente: Un segundo revisor, de seguridad, audita específicamente si la lógica que evita que un modelo se revise a sí mismo bajo dos nombres de proveedor es realmente sólida.
+Ingeniería: security-auditor, contexto limpio, panel RP-01, concurrente con package-reviewer.
 
-[2026-07-27T17:37:37+00:00] P1-portable-core · debugger · started
-Cliente: La prueba invitada tarda más de lo permitido. Un diagnóstico acotado va a identificar qué paso se queda esperando y corregir únicamente esa causa, sin aflojar la prueba.
-Ingeniería: debugging-loop: timeout 90 on the guest test is reproducible. Debugger owns only the affected implementation/test/docs paths and must prove root cause before editing; no test weakening, no unrelated refactor. One spawn remains for independent delta/security review.
+[2026-07-30T20:53:58+00:00] P1-discovered-inventory · package-reviewer · started
+Cliente: Un revisor que nunca vio la implementación audita si el catálogo dinámico está bien construido.
+Ingeniería: package-reviewer, contexto limpio, panel RP-01.
 
-[2026-07-27T17:33:32+00:00] P1-portable-core · gate-runner · blocked
-Cliente: La validación independiente confirmó las pruebas principales, pero la verificación completa quedó cortada mientras repetía la prueba invitada. Se repetirá hasta tener un resultado definitivo.
-Ingeniería: Independent gate: unittest discover (181 tests), py_compile, build --check and diff --check passed. verify.sh was interrupted without terminal result during the nested AC-09 guest test. A baseline ownership check also mixed prior worktree artifacts; the authorized delta paths must be checked explicitly.
+[2026-07-30T20:07:45+00:00] P1-discovered-inventory · implementer · started
+Cliente: Arranca la implementación del catálogo dinámico de modelos.
+Ingeniería: implementer sobre P1-discovered-inventory, contrato ya verificado en 3 rondas de spec-challenge, ready_for_user_approval.
 
-[2026-07-27T17:26:15+00:00] P1-portable-core · implementer · done
-Cliente: El ruteo Pi ya usa el proyecto correcto en sus tres pasos y la prueba ahora revisa la identidad que quedó guardada. Se confirmó el ciclo de ruteo; falta repetir en forma independiente la prueba invitada completa.
-Ingeniería: Implementer completed the approved DLT-001/002 delta: optional app-CLI cwd defaults to ROOT, a single routing_cwd is threaded through all lifecycle calls (including failure close), APP_CLI remains absolute and Pi keeps spawn_cwd. Added real hermetic SQLite lifecycle evidence plus guest dispatches.project_key assertion; py_compile, five focused lifecycle tests, and diff check passed. Guest focal wrapper ended without a terminal result, so independent gate owns its rerun.
+[2026-07-30T19:46:48+00:00] started
+Cliente: Última vuelta del contrato de P2: el único punto flojo que quedaba era cómo evitar que el mismo modelo, ofrecido bajo dos proveedores con nombres distintos, se revisara a sí mismo creyendo que era independiente.
+Ingeniería: product-analyst reescribió AC-17/AC-18 quirúrgicamente (contract 1.3.0): family pasa a ser curada con regla de colisión para ids compartidos entre providers, subscription/metered pasa a mapa curado por provider en vez de columna de fila (evita el esquema cerrado de catalog.py). Tercera pasada del mismo spec-challenger, acotada.
 
-[2026-07-27T17:26:15+00:00] P1-portable-core · gate-runner · started
-Cliente: Una validación independiente repetirá el recorrido completo como proyecto invitado y verificará que no se mezclen identidades entre proyectos.
-Ingeniería: PACKAGE_GATES: gate-runner is read-only and independent of the implementer. It must rerun the non-conclusive guest focal plus full unittest discovery, py_compile, build --check, verify.sh, diff --check, and check-owned-paths; explicitly prove cross-project isolation in the new Pi cwd lifecycle.
+[2026-07-30T19:29:30+00:00] started
+Cliente: El contrato de P2 volvió corregido: el mapa de nombres estaba al revés (el par nuevo hubiera quedado invisible en toda máquina), dos afirmaciones 'verificadas en vivo' resultaron mal medidas, y se agregó el campo que distingue suscripción de pago-por-uso que me confirmaste vos.
+Ingeniería: product-analyst entregó contract 1.2.0 resolviendo los 3 bloqueantes + 4 highs + 6 mediums + 6 lows del primer challenge. Mando al mismo spec-challenger (contexto ya cargado) a una segunda pasada, acotada a verificar que las correcciones sean reales y no haya nada nuevo.
 
-[2026-07-27T17:18:39+00:00] P1-portable-core · implementer · started
-Cliente: Vamos a cerrar el último desvío del ruteo Pi: al trabajar dentro de tu proyecto, sus tres pasos usarán siempre ese proyecto y la prueba invitada comprobará la identidad guardada realmente en la base.
-Ingeniería: P1 was reopened from HUMAN_DECISION_REQUIRED under explicit user authorization. The approved exception is exactly ai/scripts/set_agents_spawn.py: add optional cwd to the lifecycle CLI helper and thread one routing_cwd through decide/dispatched/terminal including exception close. Update D5/spec/plan and test the persisted dispatches.project_key without altering store, allowlist, metric_rollups, or Pi read-only guards.
+[2026-07-30T17:58:01+00:00] done
+Cliente: El contrato de P2 (catálogo dinámico) ya está escrito con reglas concretas — incluida una fricción real que encontró al probar en vivo: el nombre de la credencial de OpenCode no coincide con el id que pide su propio comando para listar modelos.
+Ingeniería: product-analyst entregó AC-11..AC-20 en docs/specs/008-dynamic-selection/spec.md (1.0.0->1.1.0), verificado contra catalog.py/domain.py/service.py y una corrida real de 'opencode auth list'/'opencode models'. No tocó P1/P1b/P3. Mando un spec-challenger de contexto limpio antes de iniciar el paquete.
 
-[2026-07-27T17:12:50+00:00] P1-portable-core · delta-reviewer · blocked
-Cliente: La revisión de delta confirmó que todo lo demás quedó cerrado, pero queda un problema que no puedo decidir por mi cuenta: para que la lane Pi use el proyecto correcto hay que modificar el spawner, un archivo que el alcance aprobado excluyó expresamente. Además falta que la prueba invitada observe la identidad efectivamente escrita por el ruteo.
-Ingeniería: Delta review repair_required: P1-DLT-001 proves a subprocess environment export cannot propagate to parent set_agents_spawn; fixing Pi project scope requires expanding P1 ownership to that excluded file. P1-DLT-002 requires guest DB-level identity evidence. Stop for human scope decision.
+[2026-07-30T17:57:23+00:00] P1-quota-failover · started
+Cliente: Antes de seguir, encontré que la suite completa tiene 2 pruebas rojas que la verificación acotada de la sesión anterior no corrió.
+Ingeniería: verify.sh (suite completa, 473 tests) -> FAILED (failures=2): test_routing_migrate_uses_harness_identity_and_test_store espera 'to=6' y el schema real ya es 7; test_the_usage_columns_sit_exactly_where_alter_table_puts_them compara contra un DDL canónico que no incluye replacement_of_run_id. Ambos son literales desactualizados por el propio paquete P1-quota-failover (SCHEMA=7, columna agregada cor…
 
-[2026-07-27T17:04:51+00:00] P1-portable-core · delta-reviewer · started
-Cliente: Un revisor independiente comprueba punto por punto que los ocho problemas detectados quedaron cerrados, sin introducir otros nuevos.
-Ingeniería: Focused DELTA_REVIEW after one consolidated repair. Reproduce all original attacks/failures, inspect only repair delta and verify no new scope/security regression.
+[2026-07-30T17:44:00+00:00] started
+Cliente: Arrancamos el catálogo dinámico de modelos: hoy el orquestador solo conoce dos proveedores escritos a mano, y no ve los modelos propios de OpenCode ni los que agregues en el futuro.
+Ingeniería: product-analyst redacta P2-discovered-inventory como enmienda real de 008 (hoy es un párrafo sin ACs). No depende de 007-P2 ni de 011/P1b — solo de sondear el entorno. Ownership acotado a docs/specs/008-dynamic-selection/spec.md; sin tocar código todavía.
 
-[2026-07-27T17:04:38+00:00] P1-portable-core · repair-agent · done
-Cliente: La reparación del primer ciclo está terminada: se cerraron las acciones cruzadas entre proyectos, el manejo de archivos externos inseguros, los conflictos de scaffold y la prueba invitada real. Un revisor de delta verificará estos ocho puntos uno por uno.
-Ingeniería: Consolidated repair covers P1-REV-001..008 plus FIFO finding, limited to routing store/app/tests. Focal routing, scaffold, guest, py_compile and diff checks pass. Delta-review is mandatory; one deep-review cycle remains.
+[2026-07-30T17:04:50+00:00] P1-quota-failover · runtime-verifier · blocked
+Cliente: La prueba real no puede hacerse de forma segura sin una suscripción agotada controlada; el sistema quedó detenido sin gastar ni modificar nada.
+Ingeniería: AC-06 requiere precondición externa verificable. Runner validado devuelve BLOCKED/HUMAN_DECISION_REQUIRED antes de abrir DB o invocar Pi; feature state quedó BLOCKED.
 
-[2026-07-27T16:53:34+00:00] P1-portable-core · repair-agent · started
-Cliente: Un agente corrige en un solo paquete los problemas de aislamiento entre proyectos, validación de archivos externos, scaffold y prueba invitada. Después una revisión de delta comprobará cada corrección.
-Ingeniería: PACKAGE_REPAIR cycle 1. Ownership limited to P1 paths. Fix all eight findings with regressions; no scope expansion. Must preserve AC contracts, use project_key in every lifecycle mutation, and make untrusted project data fail closed/degrade.
+[2026-07-30T17:02:28+00:00] P1-quota-failover · implementer · done
+Cliente: El reemplazo seguro y su comprobación real quedaron implementados; sin precondición controlada, el sistema informa un bloqueo seguro.
+Ingeniería: Core schema-7, transición atómica, adaptador Pi, pruebas AC-01..05 y runner AC-06 documentados; cinco pruebas focalizadas PASS.
 
-[2026-07-27T16:52:48+00:00] P1-portable-core · security-auditor · done
-Cliente: La auditoría confirmó que los datos de un proyecto externo necesitan validación estricta y que ninguna acción de un proyecto puede afectar a otro.
-Ingeniería: SEC-A02 audit: confirmed cross-project mutable lifecycle, malformed structure crash, FIFO blocking, and fallback semantics risks; repair must prove negative cases.
+[2026-07-30T16:58:41+00:00] P1-quota-failover · implementer · started
+Cliente: Se completa la comprobación real que debe bloquearse honestamente si falta la precondición controlada.
+Ingeniería: Instancia focalizada para runner credencial-gated AC-06 y evidencia, sin expandir el núcleo de routing.
 

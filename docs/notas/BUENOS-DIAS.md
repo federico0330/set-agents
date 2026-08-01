@@ -1,6 +1,8 @@
 # Buenos días, Fede
 
 Escrito la noche del 2026-07-27. Todo lo de abajo está commiteado, con gate verde y pusheado a `origin/main`.
+**Enmienda 2026-07-29 (feature 007-P3):** la sección 3 y la fila 4 de la cola de trabajo (sección 5) se
+corrigieron ese día — esas dos partes específicas no estaban commiteadas al momento de la corrección.
 
 ---
 
@@ -95,7 +97,10 @@ hecho las tres rondas anteriores.
 
 ## 3. ¿Está listo para usar pi-agent como querés?
 
-**Casi. Falta un comando tuyo, de una línea, y te explico por qué no lo corrí solo.**
+**Sí, sin nada pendiente de tu parte.** El bloqueante que describía esta sección cuando la escribí ya no
+existe — corrección registrada el 2026-07-29 (decisión
+`buenos-dias-anthropic-surcharge-claim-was-wrong-supersedes-first-pass`, feature 007-P3): ver más abajo qué
+decía antes y qué se verificó.
 
 ### Lo que sí está
 
@@ -111,41 +116,23 @@ hecho las tres rondas anteriores.
   orquestador corriendo dentro de Claude Code). Lo pasé a `sonnet`. El router adaptativo nunca lo elegía —
   fable no existe en `routes.v1.toml`. Verificado: ningún agente compilado lo menciona.
 
-### Lo que falta, y es el bloqueante real
+### Lo que decía acá y ya no es cierto (corregido 2026-07-29)
 
-**El ruteo adaptativo está APAGADO en esta máquina.** `--route-decide` devuelve `ROUTING_UNAVAILABLE` con
-`ROUTING_SCHEMA_MIGRATION_REQUIRED`. Sin eso, el arnés degrada a agentes base con modelos estáticos por rol:
-funciona, pero **no es "que el plugin elija modelo y effort"** — que es justo lo que pediste.
+Esta sección afirmaba que el ruteo adaptativo estaba apagado por una base `routing.db` en schema 4
+irrecuperable (`routing-db-schema4-unmigratable`), y ofrecía `rm
+~/.local/state/set-agentes/routing-v2/routing.db` como remediación de una línea. **La remediación está
+retirada, y no por lo que esta sección decía antes.** Verificado hoy contra el disco: `routing.db` **sí
+existe**, pero en **schema 6** — la creó la propia verificación en vivo de 007-P2 (un spawn real por el carril
+Pi), con un dispatch registrado. `--route-decide` la abre sin problema; no hay nada que borrar ni que migrar
+en esta máquina.
 
-La causa la diagnostiqué y está registrada en `ai/state/decisions-log.jsonl` como
-`routing-db-schema4-unmigratable`:
-
-> `~/.local/state/set-agentes/routing-v2/routing.db` está en schema 4; la feature 005-P1 introdujo la columna
-> `project_key` (schema 5). El comando sancionado `--routing-migrate` **falla y hace rollback correcto** — la
-> DB quedó intacta, lo verifiqué. `store.py:281` compara el DDL post-migración contra el canónico exigiendo
-> igualdad **byte-exacta**, pero `ALTER TABLE ADD COLUMN` conserva el **texto original** del `CREATE TABLE`
-> guardado en `sqlite_master`. Esta DB se creó con una versión cuyo `CREATE TABLE` no tenía unos comentarios
-> SQL que el DDL canónico actual sí tiene. El desvío arranca en el carácter 2082.
->
-> **Por construcción, ninguna DB creada antes de que se agregaran esos comentarios puede migrarse.** No es un
-> problema de tu máquina: es un bug de la 005 que afecta a cualquier instalación previa.
-
-**No la borré yo.** Tiene 2 filas en `dispatches` y 7 en `metric_rollups` — historial despreciable, pero es
-estado tuyo y la regla de la casa es que una migración sobre datos de auditoría es decisión humana. Dejé copia
-en el scratchpad de la sesión.
-
-**Para encenderlo, una línea:**
-
-```bash
-rm ~/.local/state/set-agentes/routing-v2/routing.db
-```
-
-El store la recrea en schema 5 en el próximo uso. Perdés 2 dispatches y 7 rollups de prueba. Después de eso,
-`--route-decide` empieza a decidir de verdad.
-
-La otra opción, la correcta a nivel producto, es abrir un paquete de reparación en la 005 que arregle
-`migrate_from_v4` para que normalice el DDL en vez de exigir igualdad byte-exacta contra un texto que `ALTER`
-no puede reescribir. Eso arregla a todos los que ya instalaron, no solo a vos.
+Los dos backups schema-4 reales que sí existían (`~/.local/state/set-agentes/routing-v2/backups/routing-v4-*.db`)
+siguen intactos y siguen **rechazados a propósito**: no difieren del canónico solo en comentarios (el caso que
+007-P1 arregló, AC-03) sino que además les falta el `CHECK` que documenta el bloque `-- N03:` — eso es AC-04/
+AC-05, y esa clase de divergencia se sigue rechazando por diseño, con un diagnóstico que nombra qué objeto
+diverge. Por decisión del usuario (2026-07-28) esos dos backups se descartan, no se recuperan; 007-P1 es
+"future-proofing y diagnóstico honesto", no recuperación de esa base puntual. No hay ningún comando tuyo
+pendiente.
 
 ### Sobre tu presupuesto y las sesiones largas
 
@@ -158,9 +145,20 @@ cuota, no capacidad. Dos cosas a favor y una advertencia:
 - El verificador nuevo es **+1 spawn de tier audit por paquete**, y solo cuando el bundle tiene algo por encima
   de `low`. Si el paquete es todo-`low` se saltea con waiver registrado. Vale la pena medirlo en tu primer
   paquete real antes de dar por buena la relación costo/beneficio.
-- **Advertencia honesta:** el carril `anthropic` de Pi cobra por token como extra-usage y ya te agotó cuota una
-  vez. Para correr features enteras conviene el carril `openai-codex`, y dejar Claude para los roles de
-  planificación y auditoría, que es exactamente el reparto que pediste.
+- **Corregido 2026-07-29 (antes decía que el carril `anthropic` de Pi "cobra por token como extra-usage"; era
+  incorrecto, decisión `buenos-dias-anthropic-surcharge-claim-was-wrong-supersedes-first-pass`):** no hay
+  sobrecargo por token —
+  `~/.pi/agent/auth.json` entra por `anthropic → {"type": "oauth"}`, la misma suscripción y el mismo bucket de
+  cuota que el resto. El `"You're out of extra usage"` que viste solo prueba que la cuota incluida se agotó en
+  ese momento. Lo asimétrico, medido, es el consumo por unidad de trabajo: el carril Pi es un subprocess CLI
+  por spawn (ADR-0007), conversación fría sin caché entre spawns — dos muestras en vivo lo confirman, 3221
+  tokens de entrada por 6 de salida (feature 004) y 3321 por 5 (spawn real de verificación de 007-P2). Cuánto
+  pesa eso comparado entre `anthropic` y `openai-codex` **no está medido y queda fuera de alcance a
+  propósito** (contrato 007, "Alcance explícitamente excluido"): en esta máquina `routes.v1.toml` le da
+  prioridad a `openai-codex` sobre `anthropic` en todos los tiers y el catálogo habilita proveedores
+  todo-o-nada, así que un `--route-decide` de producción no **selecciona** `anthropic` como carril primario —
+  sigue existiendo como `fallback_provider` (así quedó registrado en el único dispatch real que hay), pero eso
+  no es una elección comparable a propósito, es un plan B que no se llegó a usar.
 
 ---
 
@@ -222,7 +220,7 @@ diffeable y offline. Ningún arnés SaaS lo tiene, porque su estado es el transc
 | 1 | **005-P2 `vault-mandatory`** | pendiente, y ahora es el que desbloquea todo. Ojo: migra notas reales de 4 proyectos, 29 archivos que son única copia. Dry-run + backup + confirmación tuya antes de tocar `~/iey` |
 | 2 | **005-P3 `tui`** | pendiente, va último del 005 |
 | 3 | **006-P3 `graph-view`** | bloqueado por (1) |
-| 4 | Reparación de `migrate_from_v4` en la 005 | nueva, sale del hallazgo de esta noche |
+| 4 | ~~Reparación de `migrate_from_v4` en la 005~~ | **entregada** por 007-P1 `schema-normalize` (2026-07-29): `_normalize_ddl()` ignora comentarios y es delimiter-aware en los tres sitios de comparación |
 | 5 | Deuda de la auditoría (`audit-debt-006-p2`) | 6 ítems registrados; los más valiosos son `repair_entry` como campo autoritativo y el compare-and-swap en `mutate` |
 
 **Deuda registrada, sin paquete:** `Global/_canonical/opencode-agents/package-gate-runner.md` sigue con paths

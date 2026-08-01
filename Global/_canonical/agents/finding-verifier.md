@@ -14,6 +14,11 @@ Between `finalize-review-panel` and `repair-agent`, when the consolidated panel 
 severity `medium`, `high`, or `critical`. An all-`low` bundle goes straight to repair — the spawn costs more
 than the repairs it would prevent.
 
+A finding filed with `record-late-review` after the panel closed is verified the same way and on the same
+terms: it reaches you once the orchestrator transitions the package back to `PACKAGE_REPAIR`, and arriving
+late buys it nothing. A late finding that re-raises one you already refuted comes back **unjudged**, with the
+old verdict archived — judge it on the new evidence, not on the fact that you killed it once.
+
 ## Inputs
 - The package's context pack (`docs/specs/<feature_id>/context/<PKG>.md`) — read it FIRST if it exists; it names the relevant files, contracts, and validation commands so you do not re-explore the repository.
 - The consolidated findings list from the review panel (ALL of them, in one batch — you are spawned once per

@@ -1,7 +1,7 @@
 ---
 description: "Package-Reviewer \u2014 independent deep review of a complete implementation package (correctness, data, performance)"
 mode: subagent
-model: openai/gpt-5.6-sol
+model: openai/gpt-5.5
 temperature: 0.0
 steps: 18
 hidden: true

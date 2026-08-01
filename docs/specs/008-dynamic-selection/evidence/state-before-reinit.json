@@ -1,0 +1,185 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-28T12:55:35+00:00",
+    "hash": "cecd909c89298bd1776e2e39cbcb6caca3e32b26b03e0cf6097bdcaad9e7404b",
+    "path": "docs/specs/008-dynamic-selection/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-quota-failover",
+  "feature_id": "008-dynamic-selection",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/008-dynamic-selection/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-28T12:55:35+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Clasificar el agotamiento de plan como causa propia, distinta de rate limit y de error generico",
+          "Reinstanciar en la identidad de fallback como corrida nueva enlazada, sin mutar la corrida fallida",
+          "Recordar el proveedor agotado por lo que resta de la sesion, por proveedor y con expiracion",
+          "Topar el failover en una reinstanciacion por corrida",
+          "Preservar la independencia del reviewer a traves del failover",
+          "ADR-0011"
+        ]
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-28T12:55:46+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "client": "Antes de tocar codigo, alguien independiente busca el agujero en el plan: si de verdad se puede distinguir quedarse sin cuota de fallar, si reintentar en otro modelo puede romper alguna garantia, y que pasa si los dos planes se agotan.",
+        "purpose": "Challenge the quota-failover contract before implementation",
+        "role": "spec-challenger",
+        "spawns": 1,
+        "tech": "Pre-implementation read-only challenge of contract 1.0.0 (AC-01..AC-08). The package touches the dispatch state machine, which IS the routing audit record; feature 007's challenge returned 4 blocking findings before a line was written, for one read-only spawn."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-28T12:55:53+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 1,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "complexity": "high",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "objective": "Que agotar el plan de un proveedor a mitad de un spawn no mate el trabajo: se clasifica como causa propia, se cierra honestamente, y la tarea continua en otro modelo",
+      "owned_paths": [
+        "ai/scripts/set_agents_spawn.py",
+        "ai/scripts/routing_core/store.py",
+        "ai/scripts/routing_core/service.py",
+        "docs/adr/0011-quota-failover.md"
+      ],
+      "package_id": "P1-quota-failover",
+      "read_only_paths": [],
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [
+        "Toca la maquina de estados de dispatches, que es el registro de auditoria del ruteo. Reabrir la ventana de fallback sobre una corrida despachada esta prohibido por el CHECK de store.py:144 y ademas reescribiria historia."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_routing.py",
+        "tests/test_harness.py"
+      ],
+      "status": "planned",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Clasificar el agotamiento de plan como causa propia, distinta de rate limit y de error generico",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Reinstanciar en la identidad de fallback como corrida nueva enlazada, sin mutar la corrida fallida",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Recordar el proveedor agotado por lo que resta de la sesion, por proveedor y con expiracion",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Topar el failover en una reinstanciacion por corrida",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Preservar la independencia del reviewer a traves del failover",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "ADR-0011",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 2,
+  "schema_version": 1,
+  "updated_at": "2026-07-28T12:55:53+00:00"
+}

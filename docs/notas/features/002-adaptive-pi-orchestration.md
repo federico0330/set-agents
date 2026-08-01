@@ -39,6 +39,7 @@
 - [2026-07-24] package-reviewer: P1-R2 package-reviewer repair_required: DR2-004/005/006 closed; DR2-001/002/003/007/008 open con probes.
 - [2026-07-24] security-auditor: P1-R2 security subreview errored por policy del proveedor; sin hallazgos inventados, evidencia registrada como blocked.
 - decisión: [[decisiones/2026-07-24 p1-third-repair-authorization|Excepción autorizada: tercer ciclo de reparación P1]]
+- decisión: [[decisiones/2026-07-30 002-retirado-superseded-por-003-trusted-routing-pi-runtime|002 retirado, superseded por 003-trusted-routing-pi-runtime]]
 
 ## Qué falta
 
@@ -49,7 +50,7 @@
 
 - spawns: 12 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/002-adaptive-pi-orchestration/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/002-adaptive-pi-orchestration/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/002-adaptive-pi-orchestration/bitacora.md`
 
 _Actualizado: 2026-07-24T16:16:04+00:00_
 <!-- /notas:auto -->
@@ -57,3 +58,10 @@ _Actualizado: 2026-07-24T16:16:04+00:00_
 ## Notas propias
 
 _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
+
+**2026-07-30 — Feature retirada.** El bloqueo de arriba (`P1-routing-core`, 5 hallazgos altos) quedó
+superado: el rediseño que pedía (catálogo de confianza, observations, identidad de implementador, telemetría
+crash-safe) se construyó y aceptó bajo [[../../003-trusted-routing-pi-runtime/spec|003-trusted-routing-pi-runtime]]
+(`DONE`, 2026-07-29). Ver la decisión de retiro arriba y `docs/specs/002-adaptive-pi-orchestration/spec.md`
+(nota de supersesión). No hay más trabajo de código previsto bajo esta feature; `phase`/`final_state` quedan
+`BLOCKED` a propósito (el arnés no tiene un estado `SUPERSEDED` propio — ver la decisión para el detalle).

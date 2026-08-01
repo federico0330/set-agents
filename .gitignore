@@ -4,6 +4,9 @@
 .backups/
 *.tmp
 *.log
+# SEC-004: *.log above does not match the rotated `render-failures.log.1` sibling
+# _log_render_failure (ai/scripts/feature-state.py) writes past RENDER_FAILURE_LOG_CAP.
+render-failures.log*
 
 # Local credentials and environment overrides
 .env

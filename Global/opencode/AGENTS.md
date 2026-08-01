@@ -58,6 +58,23 @@ product decisions, major scope changes, irreversible operations, missing credent
 retry budget. Routine test failures, gate reruns, required repairs, and continuing approved work do not require
 questions.
 
+## Turn continuity
+- The coordinator must never end a turn to report progress. A turn ends only for a question the Question policy
+  authorizes, for finished work, or to record a `HUMAN_DECISION_REQUIRED` blocker. If the pending-decision line
+  would read "nada", the turn is not over: the next link runs in the same turn.
+- Provider quota exhaustion is not a failed task and does not consume the retry budget. You
+  relaunch it once with a different model, without asking, and persist the cause. One relaunch per
+  assignment; a second exhaustion is a real blocker.
+- One usable provider left: warn once with `log-decision` and keep working inside that provider. Degraded is not
+  stopped.
+- Reviewer independence is primarily a **clean context**, so a same-provider reviewer is acceptable when it runs
+  on a different model than the writer. Record that degradation in the review evidence
+  (`record-subreview --evidence` / `finalize-review-panel --evidence`) so it lands on the package record —
+  correlated blind spots survive it, and that cost must stay legible.
+- The relaxation covers delegation that carries no routing decision. A `--route-decide` returning
+  `REVIEWER_INDEPENDENCE_UNAVAILABLE` stays a hard denial that halts, in every runtime — that check is
+  runtime-agnostic. See `docs/adr/0011-uninterrupted-delegation.md`.
+
 ## Execution discipline
 - One role, one step. Do the bounded task and stop.
 - Read only the named artifacts for the task.
@@ -65,8 +82,6 @@ questions.
 - Checkpoint before a step-budget cutoff: a mutating agent that senses it is near its step limit writes partial
   progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply
   instead of re-deriving everything.
-- If acceptance conflicts, a migration risks money/identity/audit data, the same failure repeats after budget, or
-  secrets/prod access are required, return `HUMAN_DECISION_REQUIRED` or `BLOCKED` with the exact blocker.
 
 ## MCP discipline
 All MCP servers start disabled. Ask the user before enabling any MCP, use it only for the task, then turn it off.
@@ -74,3 +89,8 @@ The automatic exception is the runtime/E2E gate: the harness may enable `playwri
 `ai/scripts/mcp.sh` or `ai/scripts/e2e.sh`, use it only for observable runtime QA, and disable it on exit. Do not
 ask the user to toggle browser MCP when the harness script can do it; ask only for credentials/login or if the
 connector is absent from the session.
+
+## Human decision required
+Stop with `HUMAN_DECISION_REQUIRED` or `BLOCKED`, quoting the exact blocker, when acceptance criteria conflict, a
+finding changes intended behavior, a migration risks money/identity/audit data, the same failure repeats after
+budget, secrets/prod access are required, or every provider is exhausted.

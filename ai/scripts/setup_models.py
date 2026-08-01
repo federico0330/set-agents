@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config
+import tui
 from models_config import LANES, ModelsError, die
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -78,21 +79,27 @@ def dropped_cells(config, roster, subscription):
     return affected
 
 
-def status(config, roster, profile):
+def _status_lines(config, roster, profile):
+    """The lines `status()` prints -- factored out so `wizard()` can ALSO pass them as the
+    WIZARD_ITEMS picker's `header=` (F-03): the config table used to be print()ed to the normal
+    screen right before `run_picker` cleared it into the alternate screen, invisible exactly
+    while the user is choosing what to change."""
     subs = ", ".join(f"{k}={'on' if v else 'off'}" for k, v in sorted(config["subscriptions"].items()))
-    print(f"profile: {profile}    subscriptions: {subs}")
-    print(f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]")
+    lines = [
+        f"profile: {profile}    subscriptions: {subs}",
+        f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]",
+    ]
     duties = [d for d in models_config.DUTY_ORDER if d in config["areas"]]
     duties += sorted(set(config["areas"]) - set(duties))
     for duty in duties:
         area = config["areas"][duty]
-        print(
+        lines.append(
             f"{duty:<10} {area.get('claude', '-'):<8} {area.get('codex', '-'):<14} "
             f"{area.get('codex_effort', '-'):<7} {area.get('opencode', {}).get(profile, '-')}"
         )
     overrides = config.get("roles", {})
     if overrides:
-        print("overrides:")
+        lines.append("overrides:")
         for role in sorted(overrides):
             fields = []
             for key, value in overrides[role].items():
@@ -100,7 +107,13 @@ def status(config, roster, profile):
                     fields += [f"opencode.{lane}={model}" for lane, model in value.items()]
                 else:
                     fields.append(f"{key}={value}")
-            print(f"  {role}: " + ", ".join(fields))
+            lines.append(f"  {role}: " + ", ".join(fields))
+    return lines
+
+
+def status(config, roster, profile):
+    for line in _status_lines(config, roster, profile):
+        print(line)
 
 
 def atomic_write(path, content):
@@ -133,16 +146,28 @@ def available_opencode_models(config):
     return sorted(models)
 
 
+def _safe_input(prompt):
+    """`input()` that exits cleanly instead of a traceback on EOFError/KeyboardInterrupt
+    (AC-29) — used by wizard()'s post-save build.sh confirmations, which run after their
+    picker step has already closed (cooked mode already restored by then)."""
+    try:
+        return input(prompt)
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return ""
+
+
 def choose(prompt, options):
-    """Numbered menu with free-text fallback. Returns None on empty input."""
-    for index, option in enumerate(options, 1):
-        print(f"  [{index}] {option}")
-    answer = input(f"{prompt} (número o texto libre, Enter cancela): ").strip()
-    if not answer:
+    """Arrow-key picker with an explicit `/`-triggered free-text fallback (AC-24, P3-tui):
+    same "pick a listed option, or type a value that isn't listed" contract the old numbered
+    menu + input() line had -- `/` then Enter on an unmatched query is accepted as free text,
+    Esc/Ctrl-C/EOF is the new empty-input-cancels equivalent (returns `None` either way)."""
+    result = tui.run_picker(options, freetext_allowed=True, prompt=f"{prompt}:")
+    if result is None:
         return None
-    if answer.isdigit() and 1 <= int(answer) <= len(options):
-        return options[int(answer) - 1]
-    return answer
+    if isinstance(result, tui.Selected):
+        return options[result.index]
+    return result.value or None
 
 
 def wizard(config, roster, profile, roles_path, models_out):
@@ -150,12 +175,19 @@ def wizard(config, roster, profile, roles_path, models_out):
         print("Sin cambios pedidos y sin TTY: usá --status/--check/--set (ver --help).", file=sys.stderr)
         return 2
     dirty = False
+    WIZARD_ITEMS = ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar")
     while True:
         print()
-        status(config, roster, profile)
+        status_lines = _status_lines(config, roster, profile)
+        for line in status_lines:
+            print(line)
         print()
-        print("[1] cambiar un área  [2] cambiar un rol  [3] suscripciones  [4] guardar  [5] salir sin guardar")
-        option = input("> ").strip()
+        # AC-24/AC-29: Esc/Ctrl-C/EOF resolve to `None` inside run_picker itself -- treated
+        # the same as "salir sin guardar", never a raised EOFError/KeyboardInterrupt here.
+        # F-03: `header=` carries the same table into the picker's own frame so it survives
+        # the alternate-screen switch instead of being erased right when deciding.
+        choice = tui.run_picker(WIZARD_ITEMS, header="\n".join(status_lines))
+        option = str(choice.index + 1) if isinstance(choice, tui.Selected) else "5"
         if option == "1" or option == "2":
             if option == "1":
                 duties = [d for d in models_config.DUTY_ORDER if d in config["areas"]]
@@ -199,7 +231,11 @@ def wizard(config, roster, profile, roles_path, models_out):
                     print(f"AFFECTED={len(affected)} — celdas que usan '{subscription}':")
                     for role, lane, model in affected:
                         print(f"  {role} [{lane}] {model}")
-                    print("Reasignalas primero (opción 1/2) y después dala de baja.")
+                    # D-05: same defect as F-09 (fixed in set_agents_app.py) -- "opción 1/2"
+                    # stopped meaning anything the day the numbered grid was replaced by the
+                    # arrow selector. Reference the actual WIZARD_ITEMS labels directly so this
+                    # can't go stale again if their order/wording ever changes.
+                    print(f"Reasignalas primero ({WIZARD_ITEMS[0]!r} / {WIZARD_ITEMS[1]!r}) y después dala de baja.")
                     continue
             config["subscriptions"][subscription] = not enabled
             dirty = True
@@ -215,11 +251,11 @@ def wizard(config, roster, profile, roles_path, models_out):
                 continue
             models_config.emit_atomic(models_out, config)
             print(f"MODELS_WRITTEN {models_out}")
-            if input("¿Correr ./build.sh --check ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
+            if _safe_input("¿Correr ./build.sh --check ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
                 if subprocess.run([str(ROOT / "build.sh"), "--check"], check=False).returncode != 0:
                     print("BUILD_CHECK_FAIL — el archivo quedó escrito; corré ./build.sh --check para ver el detalle")
                     return 1
-                if input("¿Instalar globalmente (./build.sh --install)? [y/N] ").strip().lower() in {"y", "yes", "s", "si"}:
+                if _safe_input("¿Instalar globalmente (./build.sh --install)? [y/N] ").strip().lower() in {"y", "yes", "s", "si"}:
                     subprocess.run([str(ROOT / "build.sh"), "--install"], check=False)
             return 0
         elif option == "5":

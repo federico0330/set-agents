@@ -20,6 +20,26 @@ TIER_ORDER = {"fast": 0, "balanced": 1, "frontier": 2}
 SELECTED_RUNTIMES = {"opencode", "claude-code", "codex", "pi"}
 _FAST_ELIGIBLE = {"mechanical", "documentation", "inspection"}
 
+# Feature 011 deliberately recognizes one *normalized* Pi result only.  Keeping this
+# pure and allowlisted prevents error wording, raw stderr, or a partial event from ever
+# becoming a paid failover decision.
+def classify_pi_terminal_error(error) -> str:
+    """Return ``quota_exhausted`` only for the fixed settled Anthropic signature.
+
+    ``error`` is a bounded normalized facts object assembled at the Pi adapter; raw
+    provider payloads are intentionally neither accepted nor persisted here.
+    """
+    if not isinstance(error, dict):
+        return "unknown_failure"
+    if (error.get("settled") is True and error.get("provider") == "anthropic"
+            and error.get("http_status") == 400
+            and error.get("type") == "invalid_request_error"
+            and error.get("marker") == "out of extra usage"):
+        return "quota_exhausted"
+    if error.get("rate_limited") is True:
+        return "rate_limited"
+    return "unknown_failure"
+
 
 def required_tier(task_class: str, risk: str) -> str:
     """Pure required-tier resolution over validated facts (contract 004 §Tier model)."""

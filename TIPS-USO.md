@@ -93,8 +93,8 @@ and merge require separate confirmations, with green remote checks before merge.
 ## Measuring consumption
 
 `ai/scripts/cost-report.py` aggregates token usage per project across the three harnesses' own session
-stores (OpenCode sqlite, Claude Code transcripts, Codex threads). Tokens only — with subscription plans the
-number that matters is quota, not dollars.
+stores (OpenCode sqlite, Claude Code transcripts, Codex threads), plus a fourth `pi` lane read from the
+routing database. Tokens only — with subscription plans the number that matters is quota, not dollars.
 
 ```bash
 ai/scripts/cost-report.py                                         # everything
@@ -102,6 +102,11 @@ ai/scripts/cost-report.py --project ~/iey/ScrappingML --since 2026-07-01
 ai/scripts/cost-report.py --project . --md                        # markdown (e.g. into evidence/)
 ai/scripts/cost-report.py --deep                                  # Codex cached/reasoning split (slower)
 ```
+
+The `pi` lane only covers spawns this harness itself dispatched through `set_agents_spawn.py` — a `pi`
+session started by hand is invisible to it. Its stored `project_key` is a one-way hash, not invertible to a
+directory, so it is only attributed to a project when `--project` is given (the key is recomputed and
+matched); without it, the lane is reported unattributed rather than guessed.
 
 Read it after every feature: cost per deliverable is margin. If one role/model dominates without matching
 value, that is a roles.tsv routing decision waiting to happen.

@@ -30,9 +30,18 @@
     "max_repairs_per_finding": 2,
     "max_spawns_per_package": 12
   },
-  "current_package_id": "P1-portable-core",
+  "current_package_id": "P3-tui",
   "feature_id": "005-portable-harness",
-  "global_gates": [],
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-07-30T13:06:30+00:00",
+      "evidence": "verify.sh -> VERIFY_PASS (457 tests, 0 skips, GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK); build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2. Corrido contra el \u00e1rbol de trabajo vivo, no contra un commit: HEAD sigue en 898c539669b840e5b5d78a97f484b9abef0df9a6 (desactualizado, anterior a P2/P3 de 005). P1-portable-core registra diff_ref literal 'HEAD' (no un sha real); P2/P3 registran el sha de HEAD aunque el trabajo real es posterior y sigue sin commitear. Nada se commite\u00f3 esta sesi\u00f3n salvo pedido expl\u00edcito del usuario -- no hay un commit real contra el cual diffear. Ver docs/specs/005-portable-harness/evidence/integration.md para el detalle AC-por-AC.",
+      "name": "integration verify",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -950,14 +959,1344 @@
       "package_id": "P1-portable-core",
       "timestamp": "2026-07-27T17:58:36+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1-portable-core accepted; opening P2-vault-mandatory per docs/specs/005-portable-harness/plan.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-29T17:17:18+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "T-200 ADR-0009: DEC-5/6/7, backup/rollback doctrine, merge-case algorithm",
+          "T-201 tools.toml multi-OS obsidian install (apt/dnf/zypper/winget/choco) + platform_pm() + CI windows-latest full suite",
+          "T-202 persisted vault-link intent-marker registry",
+          "T-203 notes_root() scoped to ai/state/-marked dirs; flip opt-in-by-directory to opt-in-by-ai/state/, re-run P1's drift check",
+          "T-204 managed .obsidian/{app,appearance,core-plugins}.json seeds",
+          "T-205 app_config()[vault] persistence via read-merge-write, fix first_run() raw write",
+          "T-206 reverse-direction migration vault-resident->hybrid: full case universe, copy-verify-then-delete, dry-run + separate confirmation, exclude_notes_from_git for the four real ~/iey/ projects",
+          "T-207 --vault-doctor: new distinct report-only surface, --repair requires explicit flag + dry-run-confirmed marker",
+          "T-208 --context [--project DIR] [--json]: read-only, COMPANY resolution, degrade paths, byte caps, never reads credential surfaces",
+          "T-209 orchestrator doctrine: unconditional --context/sync-notes, allowlist --context* read-only in coord_policy.py/generate.py",
+          "T-210 render_notes(): log both swallowed exceptions, cross-project isolation",
+          "T-211 headless degrade: no Obsidian/no manager keeps file vault working, WARNING not blocking exit"
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:17:54+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Starting P2 implementation with T-200 (ADR-0009)"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:18:40+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-200 ADR-0009: DEC-5/6/7, backup/rollback doctrine, merge-case algorithm"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:21:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-200 ADR-0009: DEC-5/6/7, backup/rollback doctrine, merge-case algorithm",
+        "validations": [
+          "docs/adr/0012-mandatory-vault.md escrito: DEC-5/6/7, backup/rollback doctrine, algoritmo de merge en 7 pasos grounded en evidence/vault-migration-inventory.md. Numero real 0012 (0009 lo tomo 006-P2), registrado como decision. Fila agregada a docs/adr/README.md."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:21:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-201 tools.toml multi-OS obsidian install (apt/dnf/zypper/winget/choco) + platform_pm() + CI windows-latest full suite"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:23:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-201 tools.toml multi-OS obsidian install (apt/dnf/zypper/winget/choco) + platform_pm() + CI windows-latest full suite",
+        "validations": [
+          "tools.toml: [cli.obsidian.install] gano apt/dnf/zypper/winget/choco, con doc citando obsidian.md/download. platform_pm() en set_agents_app.py:839-849 extendido: win32 (winget/choco), linux gano dnf/zypper preservando el orden pacman->apt existente. tests/test_harness.py: 3 tests nuevos, table-driven, shutil.which y sys.platform mockeados en proceso (test_platform_pm_covers_seven_managers_and_none, test_obsidian_catalog_has_all_seven_pm_identifiers_plus_doc, test_tools_install_dry_run_plan_per_manager) mas el pre-existente test_set_agents_tools_catalog, los 4 en verde. .github/workflows/ci.yml: windows-bootstrap gano el paso 'Full unittest suite' (python -m unittest discover), dejando de ser parse-only. Riesgo registrado: la suite completa nunca corrio en Windows real; es esperable que revele fallos preexistentes no relacionados a este paquete (bash/symlinks/chmod), lo cual es la informacion que DEC-7 busca, no un blocker de este work item."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:23:43+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-202 persisted vault-link intent-marker registry"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:25:47+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-202 persisted vault-link intent-marker registry",
+        "validations": [
+          "set_agents_app.py: VAULT_REGISTRY=.set-agentes-vault.json + vault_registry_path/read_vault_registry/write_vault_registry_entry (read-merge-write, keyed por repo_path.resolve() completo, nunca basename). Wireado en cmd_vault_link (modo hybrid, OK y SKIP) y vault_link_private (modo private, OK y SKIP). 3 tests nuevos + 2 existentes extendidos con aserciones de registro, los 4 en verde: basename-colision disambiguada por path completo, degrade a {} en archivo ausente/corrupto, read-merge-write sobrevive la corrupcion."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:25:48+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-203 notes_root() scoped to ai/state/-marked dirs; flip opt-in-by-directory to opt-in-by-ai/state/, re-run P1's drift check"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:35:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-203 notes_root() scoped to ai/state/-marked dirs; flip opt-in-by-directory to opt-in-by-ai/state/, re-run P1's drift check",
+        "validations": [
+          "notes_root() en ambas copias byte-identicas (ai/scripts/ y PROYECTO/ai/scripts/feature-state.py, diff confirma identidad) cambio el gate de 'docs/notas ya existe' a 'ai/state/ existe' (chequeo estructural: out_dir.name==state y out_dir.parent.name==ai, no solo is_dir() para no gatillar en layouts ad-hoc de test). write_note() ya hacia mkdir(parents=True), no hizo falta tocarlo. Test test_notes_autorender_on_state_mutation_and_optin_by_dir renombrado a _optin_by_ai_state: primera mitad preservada verbatim (mutacion refresca notas sin sync-notes), segunda mitad invertida a su opuesto documentado (ai/state/ sin docs/notas -> ahora SI se crea), tercer caso nuevo agregado (directorio arbitrario sin marcador ai/state -> nunca se crea, conteo de asserts sube en vez de bajar). Suite completa: 288 tests (base 284 + 4 nuevos de este paquete: 3 de T-201 + 1 de T-202), todos en verde, sin ninguna regresion en el resto de la suite por el cambio de comportamiento."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:35:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-204 managed .obsidian/{app,appearance,core-plugins}.json seeds"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:36:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-204 managed .obsidian/{app,appearance,core-plugins}.json seeds",
+        "validations": [
+          "cmd_vault_init seeds .obsidian/{app,appearance,core-plugins}.json (create-if-missing, igual que los otros seeds). Ids de plugin verificados contra el vault Obsidian real de la maquina (~/iey/obsidian/.obsidian/core-plugins.json), no adivinados: graph, backlink, outline, global-search, tag-pane -- corrige la redaccion coloquial del spec (backlinks/search/tags no son los ids reales). Sin community-plugins.json. Test extendido: valores esperados + re-run no clobbea ediciones manuales (create-if-missing, igual doctrina que el hub)."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:36:36+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-205 app_config()[vault] persistence via read-merge-write, fix first_run() raw write"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:38:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-205 app_config()[vault] persistence via read-merge-write, fix first_run() raw write",
+        "validations": [
+          "write_app_config(**updates) factorizado como el UNICO escritor de config.toml (read-merge-write); set_auto_update y menu()'s first_run() (antes un APP_CONFIG.write_text raw) lo usan ahora. cmd_vault_init y cmd_vault_link persisten app_config()['vault'] tras resolver un vault valido, cerrando el fallback que find_vault() ya leia pero nadie escribia. 2 tests nuevos en verde: los 3 escritores no se pisan entre si; --vault-init/--vault-link persisten vault sin clobbear auto_update, y un proyecto fuera de la cadena de ancestros resuelve via el fallback configurado."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:38:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-206 reverse-direction migration vault-resident->hybrid: full case universe, copy-verify-then-delete, dry-run + separate confirmation, exclude_notes_from_git for the four real ~/iey/ projects"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:42:40+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-206 reverse-direction migration vault-resident->hybrid: full case universe, copy-verify-then-delete, dry-run + separate confirmation, exclude_notes_from_git for the four real ~/iey/ projects",
+        "validations": [
+          "Motor de migracion: vault_migration_plan() (puro, solo lectura, 7 acciones: repo-missing/already-linked/symlink-conflict/repo-side-conflict/conflict/pure-move/merge) + apply_vault_migration() (copy-verify-then-delete POR archivo, nunca shutil.move, nunca borrado en lote; reutiliza cmd_vault_link para el symlink final en vez de duplicar logica). 7 tests con fixtures sinteticas que espejan el inventario real (3 pure-move + 1 merge con subdirectorio anidado features/<name>/, 0 colisiones): pure-move, merge con nested dirs, conflicto de bytes aborta el proyecto entero con cero archivos movidos, repo-missing, symlink colgante/outward reportado nunca sobreescrito, ejecucion interrumpida-y-resumida idempotente (archivo ya copiado en las dos puntas se limpia sin re-copiar), exclude_notes_from_git aplicado cuando exclude_notes=True. Bug encontrado y corregido en el propio desarrollo: la primera version de vault_migration_plan no detectaba que el lado vault YA es un symlink tras una migracion previa (solo chequeaba el lado repo), lo que hacia un re-run tratar el symlink como directorio real -- corregido antes de continuar. NO se corrio todavia contra los datos reales de ~/iey (eso es el dry-run explicito, pendiente como verificacion en vivo antes de aceptar el paquete)."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:42:40+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-207 --vault-doctor: new distinct report-only surface, --repair requires explicit flag + dry-run-confirmed marker"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:45:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-207 --vault-doctor: new distinct report-only surface, --repair requires explicit flag + dry-run-confirmed marker",
+        "validations": [
+          "Nuevo flag --vault-doctor (nunca extiende --doctor --harness pi, que sigue byte-identico). cmd_vault_doctor: sin --project -> reporte read-only de topologia/salud (healthy/dangling/drift) de cada entrada del registro + deteccion de directorios reales bajo Proyectos/ sin entrada (unregistered), nunca muta nada. Con --project --dry-run: computa vault_migration_plan(), imprime el plan, escribe un marcador de un solo uso con el fingerprint del plan bajo STATE_DIR/vault-doctor-pending/. Con --project --repair: exige el marcador (si no existe, rechaza reason=no-dry-run), lo consume siempre (single-use, nunca presupuesto de reintento), rechaza si el fingerprint no coincide con el plan actual (el disco cambio desde el dry-run), rechaza sin --project (nunca headless). 4 tests en verde: reporte no muta nada; ciclo completo dry-run->repair single-use con deteccion de disco-cambiado-desde-el-dry-run; rechazo sin --project; un conflicto real se rechaza aun con dry-run previo, cero archivos movidos."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:45:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-208 --context [--project DIR] [--json]: read-only, COMPANY resolution, degrade paths, byte caps, never reads credential surfaces"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:47:51+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-208 --context [--project DIR] [--json]: read-only, COMPANY resolution, degrade paths, byte caps, never reads credential surfaces",
+        "validations": [
+          "cmd_context(): resuelve vault via find_vault, COMPANY como el unico hijo no reservado (Proyectos/Casos excluidos) del vault root, nota del proyecto via el registro (topologia private -> vault_path, si no docs/notas del repo). Degrade en cada punto: sin vault -> los 4 campos null (nunca crash); sin company dir -> hub-only; sin nota de proyecto -> project/pending null, reportado no inventado. --json con schema fijo {hub,company,project,pending}. Byte cap 4000/seccion completa, 2000 para 'pending' (extraido de la seccion '## Que falta' del propio note, no fabricado). 4 tests en verde: schema completo feliz, tres degradaciones en un solo test, spy sobre Path.read_text confirma cero lecturas de superficies de credenciales, cap de bytes verificado con un hub de 50k caracteres."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:47:51+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-209 orchestrator doctrine: unconditional --context/sync-notes, allowlist --context* read-only in coord_policy.py/generate.py"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:50:11+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-209 orchestrator doctrine: unconditional --context/sync-notes, allowlist --context* read-only in coord_policy.py/generate.py",
+        "validations": [
+          "orchestrator.md (canonico): la obligacion de notas vivas dropea la condicion 'when the directory exists' (ahora el marcador es ai/state/, coherente con T-203); nuevo parrafo: correr --context [--project][--json] incondicionalmente en apertura de turno/feature, nunca condicionado, leer hub/company/project/pending antes de delegar. coord_policy.py: --context* agregado a SAFE_ARGV (tercera entrada, comentario explicito de que es de solo lectura, nunca fusionada con las mutantes). generate.py: misma entrada --context* agregada al bloque bash de OpenCode. ./build.sh corrido, Global/{opencode,claude-code,codex}/** regenerados. 2 tests en verde: coord_policy acepta --context y sigue bloqueando composicion de shell alrededor; la doctrina y el permiso llegan a los tres runtimes."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:50:11+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-210 render_notes(): log both swallowed exceptions, cross-project isolation"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:52:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-210 render_notes(): log both swallowed exceptions, cross-project isolation",
+        "validations": [
+          "_log_render_failure() (ambas copias byte-identicas): destino documentado ai/state/render-failures.log, cap 200KB con rotacion de una generacion (.1), never-raises (OSError atrapado). Ambos puntos de swallow ahora loguean antes de continue/pass: el interno con contexto feature=<id>, el externo con contexto render_notes. Aislamiento cross-proyecto es estructural (out_dir siempre es el ai/state/ del propio state_file, nunca compartido). 2 tests en verde: falla interna se loguea sin bloquear el resto y sin propagar; falla externa se loguea; un render sano en OTRO proyecto nunca crea su log (aislamiento probado, no solo afirmado); rotacion verificada pasando el cap."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:52:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-211 headless degrade: no Obsidian/no manager keeps file vault working, WARNING not blocking exit"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:55:03+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-211 headless degrade: no Obsidian/no manager keeps file vault working, WARNING not blocking exit",
+        "validations": [
+          "_scaffold_attempt_obsidian_once(): marcador ai/state/obsidian-install.json, un solo intento por proyecto para siempre (create-if-missing, nunca re-intenta en un --scaffold posterior); el outcome (ok/declined/already-installed) nunca afecta el codigo de salida de --scaffold. cmd_vault_doctor imprime VAULT_DOCTOR_WARNING (steady, no bloqueante, rc sin cambios) cuando falta el binario de obsidian, en el pase report-only y en el de --project. 2 tests en verde: decline/fallo de instalacion nunca hace fallar scaffold + segundo scaffold no re-intenta (call_count verificado); vault-doctor avisa pero no bloquea. Regresion verificada: los tests de scaffold preexistentes (incluido el E2E hermetico de invitado, 31s) siguen en verde -- en el entorno aislado platform_pm() no encuentra gestor y cmd_tools_install degrada a TOOL_MANUAL sin colgar ni tocar red."
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T17:55:03+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "All 12 tasks completed; verify.sh/build.sh green"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:10+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:49+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:03:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:22+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:22+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:23+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Gates pass: verify VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, ownership OWNERSHIP_PASS"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:37+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Antes de aceptar el paquete del vault, dos revisores independientes miran todo el codigo: uno busca errores concretos y mantenibilidad, el otro se enfoca en seguridad (dado que este paquete toca datos reales unica-copia y agrega comandos nuevos que leen archivos).",
+        "purpose": "",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel RP-01, package-reviewer + security-auditor declarados juntos en la apertura (12 work items, riesgo alto declarado en el plan.md original por real-data migration + superficie CLI nueva)."
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:37+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "-",
+        "purpose": "",
+        "role": "security-auditor",
+        "spawns": 2,
+        "tech": "Segundo miembro del mismo panel acotado RP-01: revisa vault_migration_plan/apply_vault_migration (borrado de datos reales), cmd_context (nunca debe leer superficies de credenciales), y la nueva entrada SAFE_ARGV en coord_policy.py."
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:38+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T18:04:38+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 10,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T20:58:57+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T20:59:02+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de arreglar nada, alguien de afuera intenta tirar abajo cada uno de los 10 problemas de seguridad que se encontraron, para confirmar cu\u00e1les son reales.",
+        "purpose": "Adversarial refutation of the 10 security-auditor findings (SEC-001..SEC-010) before repair, per ADR-0009 doctrine",
+        "role": "finding-verifier",
+        "spawns": 3,
+        "tech": "finding-verifier adversarial pass sobre P2-vault-mandatory; PACKAGE_REVIEW ya cerr\u00f3 con verdict repair_required y next_transition exige record-verification antes de entrar a PACKAGE_REPAIR."
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T20:59:20+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 10
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T21:18:33+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T21:54:34+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T21:56:07+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "DELTA_REVIEW",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:48:26+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:51:44+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 3
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:51:57+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "DR-001",
+          "DR-002",
+          "DR-004",
+          "DR-005",
+          "DR-006"
+        ]
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:52:11+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:52:21+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests -v",
+          "./ai/scripts/verify.sh",
+          "./build.sh --check"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:52:56+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:54:37+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P2-vault-mandatory",
+      "timestamp": "2026-07-29T22:54:42+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "Abrir P3-tui: siguiente paquete de la feature, contrato ya aprobado con AC-22..AC-30"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T01:53:49+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Core puro PickerState/KeyEvent/reduce() en tui.py, testeable sin pty (AC-22)",
+          "Key decoder de bytes crudos a eventos l\u00f3gicos, flechas/UTF-8/bracketed-paste (AC-23)",
+          "TerminalSession: raw mode/alt screen con restauraci\u00f3n en finally + SIGTERM/SIGHUP (AC-27)",
+          "run_picker loop de render + suspend_terminal para prompts in-process (AC-25, AC-26)",
+          "Reemplazar menu()/tools_menu()/mcp_menu()/plugins_menu()/vault_menu()/choose()/wizard() por adaptadores sobre run_picker (AC-24)",
+          "Separar datos de impresi\u00f3n en cmd_status/cmd_tools/cmd_mcp/cmd_plugins preservando stdout m\u00e1quina (AC-28)",
+          "Cerrar deuda de men\u00fa: orden [9] Vault, validaci\u00f3n mcp_menu, plugins_menu legible, EOFError/KeyboardInterrupt limpio (AC-29)",
+          "Actualizar README.md/INSTALACION.md con la descripci\u00f3n del nuevo selector (AC-30)"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T01:54:12+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Contrato ya aprobado, ACs claros, sin bloqueantes"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T01:54:17+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Instanciamos al implementador que construye el nuevo men\u00fa con flechas.",
+        "purpose": "Implementar el paquete P3-tui completo: core puro, decoder, TerminalSession, adaptadores de men\u00fa, separaci\u00f3n de datos en cmd_*, deuda de men\u00fa, docs",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "implementer, contra P3-tui, AC-22..AC-30, 8 tareas, adversarial-primero"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T01:54:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Core puro PickerState/KeyEvent/reduce() en tui.py, testeable sin pty (AC-22)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Core puro PickerState/KeyEvent/reduce() en tui.py, testeable sin pty (AC-22)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.TuiTests -v -k test_reduce -> 14 tests passed, cero I/O/termios importado en el m\u00f3dulo probado"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Key decoder de bytes crudos a eventos l\u00f3gicos, flechas/UTF-8/bracketed-paste (AC-23)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:40+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Key decoder de bytes crudos a eventos l\u00f3gicos, flechas/UTF-8/bracketed-paste (AC-23)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.TuiTests -v -k test_decode_keys -> 12 tests passed (arrow variants, utf8 split, paste immunity, unknown CSI, empty=EOF)"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "TerminalSession: raw mode/alt screen con restauraci\u00f3n en finally + SIGTERM/SIGHUP (AC-27)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "TerminalSession: raw mode/alt screen con restauraci\u00f3n en finally + SIGTERM/SIGHUP (AC-27)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.TuiTests -v -k test_terminal_session -> 6 tests passed (finally restores on forced exception, SIGTERM/SIGHUP handlers invoked directly restore+SystemExit(128+signum), no-op on non-tty stdin, suspended() exits/reenters raw mode)"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "run_picker loop de render + suspend_terminal para prompts in-process (AC-25, AC-26)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "run_picker loop de render + suspend_terminal para prompts in-process (AC-25, AC-26)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.TuiTests -v -k 'test_run_picker or test_suspend_terminal' -> 7 tests passed (navigate+select, freetext fallback end-to-end v\u00eda render loop real con termios mockeado, Esc por timeout-flush, Ctrl-C, freetext puro sin items, suspend_terminal no-op sin sesi\u00f3n y delegando con sesi\u00f3n activa)"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:10:50+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Reemplazar menu()/tools_menu()/mcp_menu()/plugins_menu()/vault_menu()/choose()/wizard() por adaptadores sobre run_picker (AC-24)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:23:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Reemplazar menu()/tools_menu()/mcp_menu()/plugins_menu()/vault_menu()/choose()/wizard() por adaptadores sobre run_picker (AC-24)",
+        "validations": [
+          "python3 -m unittest -k tools_menu -k mcp_menu -k plugins_menu -v tests.test_harness -> 6 tests passed; python3 -m unittest tests.test_harness.HarnessTests.test_set_agents_tools_catalog tests.test_harness.HarnessTests.test_set_agents_mcp_across_harnesses tests.test_harness.HarnessTests.test_set_agents_plugins -v -> 3 passed (subprocess CLI surface untouched); choose()/wizard() migrados en setup_models.py preservando fallback de texto libre"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:23:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Separar datos de impresi\u00f3n en cmd_status/cmd_tools/cmd_mcp/cmd_plugins preservando stdout m\u00e1quina (AC-28)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:23:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Separar datos de impresi\u00f3n en cmd_status/cmd_tools/cmd_mcp/cmd_plugins preservando stdout m\u00e1quina (AC-28)",
+        "validations": [
+          "python3 -m unittest -k stdout_is_byte_exact -v tests.test_harness -> 5 tests passed (baseline capturado ANTES del refactor a _tools_data/_mcp_data/_plugins_data/_status_data, confirmado byte-id\u00e9ntico despu\u00e9s)"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:23:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Cerrar deuda de men\u00fa: orden [9] Vault, validaci\u00f3n mcp_menu, plugins_menu legible, EOFError/KeyboardInterrupt limpio (AC-29)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:23:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Cerrar deuda de men\u00fa: orden [9] Vault, validaci\u00f3n mcp_menu, plugins_menu legible, EOFError/KeyboardInterrupt limpio (AC-29)",
+        "validations": [
+          "python3 -m unittest -k menu_orders -k mcp_menu -k plugins_menu -k safe_input -v tests.test_harness -> 8 tests passed (Vault reordenado antes de Salir, action/harness de mcp_menu son enums cerrados sin freetext, plugins_menu nunca imprime formato m\u00e1quina, EOFError/KeyboardInterrupt no producen traceback)"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:23:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Actualizar README.md/INSTALACION.md con la descripci\u00f3n del nuevo selector (AC-30)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:36:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Actualizar README.md/INSTALACION.md con la descripci\u00f3n del nuevo selector (AC-30)",
+        "validations": [
+          "grep confirm\u00f3 las grillas [1]..[8] en README.md/INSTALACION.md (les faltaba [9] Vault); reemplazadas por prosa del selector de flechas con las 9 opciones en orden (Vault antes de Salir); python3 -m unittest tests.test_harness.HarnessTests.test_readme_covers_all_oses -v -> 1 passed; grep -c '\\[1\\]\\|\\[8\\]\\|\\[9\\] ' README.md INSTALACION.md -> 0"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T02:36:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "verify.sh",
+        "status": "pass"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:03:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "unittest",
+        "status": "pass"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:03:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "build.sh--check",
+        "status": "pass"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:03:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "git-diff--check",
+        "status": "pass"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:03:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:04:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Gates verdes: 384 tests, verify.sh, build.sh --check, git diff --check, ownership"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:04:29+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Gates verdes, ownership limpio"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:04:34+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:04:43+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al revisor independiente del nuevo men\u00fa.",
+        "purpose": "Revisi\u00f3n profunda independiente del paquete P3-tui completo (tui.py, adaptadores de men\u00fa, AC-22..AC-30)",
+        "role": "package-reviewer",
+        "spawns": 2,
+        "tech": "package-reviewer, contra P3-tui integrado, foco adversarial en AC-26/27 (handoff de terminal + se\u00f1ales)"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:04:50+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 10,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:20:46+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:20:53+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Instanciamos al reparador de los bugs que encontr\u00f3 el revisor.",
+        "purpose": "Reparaci\u00f3n consolidada de los 10 hallazgos del panel RP-01 sobre P3-tui (4 bloqueantes, 6 no-bloqueantes)",
+        "role": "repair-agent",
+        "spawns": 3,
+        "tech": "repair-agent, consolidado, F-01..F-10, tests de regresi\u00f3n rojo-primero por hallazgo"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:21:05+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 7
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:59:02+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T03:59:12+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T04:10:11+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-02",
+          "F-03",
+          "F-04",
+          "F-05",
+          "F-06",
+          "F-07",
+          "F-08",
+          "F-09",
+          "F-10"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T04:10:36+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T04:40:14+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Instanciamos al reparador de la segunda ronda de hallazgos del TUI.",
+        "purpose": "Segunda ronda de reparaci\u00f3n: F-01 reabierto (CI Windows), D-02 (men\u00fa ciego con pipe), D-03 (header sin clamp), F-08 reabierto (filtro search), D-05/D-06 menores",
+        "role": "repair-agent",
+        "spawns": 4,
+        "tech": "repair-agent, consolidado, 1 llamada record-repair al final"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T04:40:57+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 4
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T05:10:46+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01",
+          "D-02",
+          "D-03",
+          "F-08",
+          "D-05",
+          "D-06"
+        ]
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T05:13:59+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Instanciamos al revisor final del TUI, segunda ronda.",
+        "purpose": "Confirmar la segunda ronda de reparaci\u00f3n (F-01, D-02, D-03, F-08, D-05, D-06)",
+        "role": "delta-reviewer",
+        "spawns": 5,
+        "tech": "delta-reviewer, foco en si D-02/D-03/F-08 (mecanismos nuevos: render a stderr, clamp de header, filtro de search) quedaron genuinamente cerrados"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T05:29:54+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T05:53:55+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T05:54:06+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P3-tui",
+      "timestamp": "2026-07-30T05:54:43+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "global": true,
+        "name": "integration verify",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T13:06:30+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1/P2/P3 aceptados e integrados; gate global registrado; corriendo hacia DONE una vez cerrado el fix de done_ready() en 006-P3.1"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T13:07:03+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Gate global registrado, blockers resueltos, sin gap de ACs; done_ready AC-04 de 010 ya aceptado"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T16:16:18+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
-    "delta_reviews": 2,
+    "delta_reviews": 7,
     "human_questions_after_approval": 0,
-    "package_reviews": 2,
-    "repair_batches": 2,
-    "task_deep_reviews": 0
+    "package_reviews": 4,
+    "repair_batches": 7,
+    "task_deep_reviews": 0,
+    "verifications": 4
   },
   "mode": "feature",
   "packages": [
@@ -1377,10 +2716,1147 @@
           "status": "pass"
         }
       ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-10",
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15",
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-19",
+        "AC-20",
+        "AC-21"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/feature-state.py",
+          "reason": "T-203/T-210 edit the harness's own live copy directly (not only the PROYECTO/ template declared as shared_path) so the two stay byte-identical per AC-07's drift check -- same pattern as every prior package that touched this file.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/coord_policy.py",
+          "reason": "T-209/AC-19: --context* added to SAFE_ARGV as the third sanctioned read-only channel. Not declared upfront because the exact allowlist mechanism (coord_policy.py vs a hypothetical new file) was UNVERIFIED at planning time per the spec's own audit.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/generate.py",
+          "reason": "T-209/AC-19: mirrors the same --context* allow entry into the OpenCode permission block generate.py emits, so all three runtimes agree.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/opencode/**",
+          "reason": "T-209: regenerated by ./build.sh after editing Global/_canonical/agents/orchestrator.md and ai/scripts/coord_policy.py/generate.py -- never hand-edited, but the regenerated tree is what verify.sh's frost-check compares.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/claude-code/**",
+          "reason": "Same as Global/opencode/** -- regenerated output of the same ./build.sh run.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/codex/**",
+          "reason": "Same as Global/opencode/** -- regenerated output of the same ./build.sh run.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/architecture/overview.md",
+          "reason": "T-400/AC-31 explicitly requires updating docs/architecture/ with the two-roots model and vault topology, including the SCHEMA 4->5 backward-incompatibility note. Not declared upfront because P1 never touched this file either, so it was not identified as in-scope until T-400.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0012-mandatory-vault.md",
+          "reason": "Citation correction: the approved contract's AC-10 names docs/adr/0009-mandatory-vault.md, but 0009 was already claimed by 006-P2's ADR (accepted after 005's spec was written, before P2 implemented). The real file is 0012-mandatory-vault.md, per the ADR's own citation-correction note and decision adr-0009-slot-taken-by-006-p2-vault-adr-is-0012.",
+          "status": "approved"
+        },
+        {
+          "path": "PROYECTO/.gitignore",
+          "reason": "SEC-010 repair: the harness template shipped with no .gitignore at all, so any project scaffolded/synced from PROYECTO/ inherited none of the hygiene rules (render-failures.log, credentials, editor noise) the harness repo itself relies on. New file, not declared upfront because it wasn't identified as in-scope until the security-auditor's SEC-010 finding.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/bootstrap_project.py",
+          "reason": "DR-005 (delta-review of the security repair): the .gitignore fix (PROYECTO/.gitignore) was inert without a distribution path -- bootstrap_project.py's FILES-equivalent create-if-missing loop is that path. Not declared upfront because the delta review is what surfaced that PROYECTO/.gitignore alone never reaches a bootstrapped project.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 3,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/005-portable-harness/context/P2-vault-mandatory.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-29T22:51:44+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [
+            "DR-001",
+            "DR-002",
+            "DR-004",
+            "DR-005",
+            "DR-006"
+          ],
+          "reason": "First delta-review pass over the SEC-001..010 repair surfaced 6 new issues (DR-001..006) introduced by or adjacent to the repair itself; already fixed in code and tests before this call, formalizing via new-finding/verify/repair/re-review per the harness's own two-cycle delta pattern (same shape as 007-P2's second cycle). DR-003 is documented debt (log-decision), not entered here -- it isn't a code defect, it's a pre-existing architectural gap the delta-reviewer explicitly declined to hold as blocking.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-29T22:52:21+00:00",
+          "closed_findings": [
+            "DR-001",
+            "DR-002",
+            "DR-004",
+            "DR-005",
+            "DR-006"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "DR-001, DR-002, DR-004, DR-005, DR-006 verified and repaired (already-applied code fixes formalized this cycle); delta-reviewer independently re-confirmed all six DR items (five closed, DR-003 accepted as documented debt) with its own test/gate re-runs, verdict pass.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [
+        "P1-portable-core"
+      ],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6",
+      "findings": [
+        {
+          "file": "ai/scripts/coord_policy.py",
+          "id": "SEC-001",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "coord_policy.py SAFE_ARGV --context* entry and generate.py's mirrored OpenCode permission bypass the allowlist entirely: _argv_allowed only inspects argv[0:3] and main() has no mutual-exclusion guard for --context (unlike --rout*, guarded via _mode_flags/other_mode). PoC executed: '--context --scaffold /tmp/pwn' passes the allowlist and creates files.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-002",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "cmd_context's private-topology branch reads vault_path from the registry with no containment check and no symlink rejection, violating AC-18's credential-surface exclusion. PoC executed: exfiltrated fake ~/.pi/agent/auth.json content via --context --json.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-003",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "The vault migration engine follows symlinks on both source and destination ends. PoC executed both directions: exfiltration into the repo and arbitrary write outside the intended tree.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-004",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "--vault-doctor --repair locates the vault-side project directory by basename instead of consulting VAULT_REGISTRY, demonstrated cross-repo data leakage between two same-basename projects in different directories.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-005",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "--exclude-notes defaults to False, inverting DEC-5's intended privacy-by-default for the --private vault topology.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-006",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "cmd_context returns vault content to the orchestrator with no marker distinguishing it as untrusted, an unmitigated prompt-injection surface given --context is called unconditionally every turn.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "tools.toml",
+          "id": "SEC-007",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "tools.toml's apt/dnf/zypper Obsidian package identifiers are likely fabricated/unverified against real distro repositories.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-008",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "--vault-doctor --repair's dry-run marker/fingerprint gate has no TTL, a fingerprint that omits file content/inode/symlink state, an unguarded json.loads, and a non-atomic consume-then-check race between reading and deleting the marker.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-009",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "_read_capped reads the entire file into memory before truncating to the byte cap, a DoS risk given --context is invoked unconditionally on every orchestrator turn (AC-18/AC-19).",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "SEC-010",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "summary": "No blocking secret/PII finding, but the vault registry file exposes absolute host paths (synced via Syncthing across machines) and render-failures.log could end up committed if not gitignored.",
+          "verified_at": "2026-07-29T21:18:33+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "DR-001",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "Off-by-one in the multibyte back-off range in _read_capped/_cap_text_bytes: range(cap, max(cap-3,0), -1) never tried cap-3, so a valid UTF-8 file whose cap boundary landed 3 bytes into a 4-byte codepoint decoded as None/empty instead of the correct truncated text.",
+          "verified_at": "2026-07-29T22:51:57+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "DR-002",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "_mark_untrusted interpolated vault text verbatim; the same vault-write actor SEC-006 defends against could write the literal marker strings into a note, forging a fake close/re-open pair that moves injected instructions outside the trusted fence.",
+          "verified_at": "2026-07-29T22:51:57+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "tools.toml",
+          "id": "DR-004",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "tools.toml's apt/dnf/zypper removal (SEC-007 repair) left approved contract text (acceptance.md AC-11, ADR-0012 DEC-7) asserting the old, now-false 7-manager/source-verified claims, undocumented.",
+          "verified_at": "2026-07-29T22:51:57+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "PROYECTO/.gitignore",
+          "id": "DR-005",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "PROYECTO/.gitignore (SEC-010 repair) was never actually distributed to any bootstrapped/scaffolded project -- no copy path referenced it, so the fix was inert for downstream projects."
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "DR-006",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "_read_vault_doctor_marker's marker.read_text() raised UnicodeDecodeError on a non-UTF-8 marker BEFORE the unlink() ran, both crashing the CLI and leaving the marker in place (breaking the single-use invariant) on exactly the corrupt-input path SEC-008 exists to handle."
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-29T18:04:22+00:00",
+          "evidence": "verify.sh -> VERIFY_PASS, 310 tests, 324.8s, GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK",
+          "name": "verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T18:04:22+00:00",
+          "evidence": "build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T18:04:23+00:00",
+          "evidence": "check-owned-paths.py against the 20 files actually changed for P2 -> OWNERSHIP_PASS, out_of_scope=[]",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Vault de Obsidian obligatorio: instalacion multiplataforma, registro de vault-link, notes_root scoped a proyectos del arnes, config .obsidian gestionada, persistencia de app_config, migracion real vault-resident->hibrido con dry-run/backup/rollback, superficie --vault-doctor, comando --context de solo lectura, doctrina incondicional del orquestador, logging de fallos silenciosos de render_notes, degrade headless",
+      "owned_paths": [
+        "tools.toml",
+        "docs/adr/0009-mandatory-vault.md",
+        "docs/adr/README.md",
+        ".github/workflows/ci.yml",
+        "ai/state/features/005-portable-harness.json",
+        "ai/state/STATUS.md",
+        "ai/state/decisions-log.jsonl",
+        "ai/state/narrative-log.jsonl",
+        "docs/notas/**"
+      ],
+      "package_id": "P2-vault-mandatory",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-29T21:56:07+00:00",
+          "changed_files": [
+            "ai/scripts/set_agents_app.py",
+            "ai/scripts/coord_policy.py",
+            "tools.toml",
+            "tests/test_harness.py",
+            "PROYECTO/.gitignore",
+            "Global/_canonical/agents/orchestrator.md",
+            "Global/opencode/AGENTS.md",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/CLAUDE.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/AGENTS.md",
+            "Global/codex/agents/orchestrator.toml"
+          ],
+          "finding_ids": [
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007",
+            "SEC-008",
+            "SEC-009",
+            "SEC-010"
+          ],
+          "verification": [
+            "SEC-001: main() gained a --context total-mode exclusivity guard (mirrors --rout*'s _mode_flags/other_mode); coord_policy._argv_allowed now validates argv[3:] against a small {--json,--project} modifier set. PoC re-run: '--context --scaffold /tmp/pwn' now returns rc=2 CONTEXT_INPUT_INVALID, no file created, both directly and through the installed baked-root coord_policy.py.",
+            "SEC-002: cmd_context's private-topology branch now resolves the note path and rejects it (treats as absent) unless contained within the vault via a new _resolve_within() symlink-following containment check. PoC re-run (fake vault_path outside vault; symlinked note file inside a legit vault_path): both now return project=null, no credential content in the payload.",
+            "SEC-003: vault_migration_plan now scans for any symlink under the vault-side project dir and returns action=unsafe-symlink instead of treating it as a file to migrate; apply_vault_migration re-checks containment (_resolve_within) on both src and dest, including rejecting a dest that is itself a symlink, before every copy. PoC re-run (source symlink to a secret; dangling dest symlink): both raise VaultMigrationError, nothing copied/written outside the tree.",
+            "SEC-004: new _vault_side_for_doctor() always uses the basename convention for vault_side (matching what vault_migration_plan's already-linked detection needs) but now cross-checks the registry for a DIFFERENT repo already occupying that same conventional path, refusing with path-claimed-by-other-project. PoC re-run (clientB unregistered, same basename as registered clientA): dry-run refused, nothing touched.",
+            "SEC-005: apply_vault_migration's exclude_notes default flipped to True; the CLI flag inverted from --exclude-notes (opt-in) to --include-notes (opt-out), matching AC-16/DEC-5's unconditional wording. Verified: a --vault-doctor --repair with no flags now leaves docs/notas excluded from git by default.",
+            "SEC-006: every non-null --context value (hub/company/project/pending) is now wrapped in an explicit UNTRUSTED VAULT CONTENT marker, in-band within the existing 4-key JSON schema (AC-18 unchanged); orchestrator.md's --context doctrine paragraph updated to instruct treating the wrapped text as data, never instructions.",
+            "SEC-007: removed the non-functional apt/dnf/zypper obsidian.install entries from tools.toml (verified against real Debian/Ubuntu package APIs: no such package exists) and pointed the doc fallback at the real Flatpak/Snap channels obsidian.md actually offers; cmd_tools_install now falls through to TOOL_MANUAL with that link instead of running a command that would fail or do the wrong thing.",
+            "SEC-008: added a 15-minute TTL to the --vault-doctor --repair dry-run marker, guarded the marker's json.loads against corruption, and made read+unlink a single _read_vault_doctor_marker() call so a stale/corrupt marker degrades to a clean refusal instead of an uncaught JSONDecodeError. The symlink-swap-between-dry-run-and-repair sub-claim is separately closed by SEC-003's fresh-plan symlink detection (verified: a plan recomputed at repair time now returns action=unsafe-symlink, refused before the marker is even consulted).",
+            "SEC-009: _read_capped now reads at most CONTEXT_BYTE_CAP+1 bytes (never the whole file) and both it and _extract_section's section cap operate on UTF-8 BYTES with multibyte-safe boundary backoff, not characters. PoC re-run (67MB file; 5000-emoji section): memory bounded, byte cap honored within the multibyte backoff margin.",
+            "SEC-010: PROYECTO/.gitignore created (previously absent entirely) covering *.log and the same hygiene rules as the harness's own root .gitignore, so a project scaffolded/synced from the template inherits protection for render-failures.log and other artifacts. The claim that THIS repo's render-failures.log could be committed was already refuted by the finding-verifier (covered by root .gitignore); this closes the downstream-project half."
+          ]
+        },
+        {
+          "at": "2026-07-29T22:52:11+00:00",
+          "changed_files": [
+            "ai/scripts/set_agents_app.py",
+            "ai/scripts/bootstrap_project.py",
+            "tests/test_harness.py",
+            "docs/adr/0012-mandatory-vault.md"
+          ],
+          "finding_ids": [
+            "DR-001",
+            "DR-002",
+            "DR-004",
+            "DR-005",
+            "DR-006"
+          ],
+          "verification": [
+            "DR-001: range widened to include cap-3 in both _read_capped and _cap_text_bytes; two new tests pin the exact worst-case boundary the delta-reviewer reproduced.",
+            "DR-002: _mark_untrusted now neutralizes any literal occurrence of the open/close marker strings inside the body before wrapping; new test pins a forged close+inject+reopen payload staying inert inside the fence.",
+            "DR-004: ADR-0012 DEC-7 got an inline dated amendment correcting the false source-verified claim; acceptance.md AC-11 deliberately left unedited per this session's spec-integrity practice, with a log-decision (tools-toml-obsidian-apt-dnf-zypper-were-fabricated) recording the divergence and handing the AC-11 prose correction to a future feature.",
+            "DR-005: bootstrap_project.py now copies PROYECTO/.gitignore to the target, create-if-missing, single-sourced; extended existing bootstrap test covers creation, byte-equality with the template, and never-overwrite.",
+            "DR-006: _read_vault_doctor_marker now reads bytes and unlinks before decoding, catching UnicodeDecodeError alongside JSONDecodeError; new test pins a non-UTF-8 marker being consumed cleanly with no traceback."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-29T20:59:02+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-29T18:04:38+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-29T20:58:57+00:00",
+              "evidence": "Full adversarial review with 2 executed PoCs (SEC-001 argv bypass writing files outside allowlist scope; SEC-002 exfiltrating fake credential content via --context --json). 10 findings SEC-001..SEC-010, none touched real ~/iey data.",
+              "findings": [
+                "SEC-001",
+                "SEC-002",
+                "SEC-003",
+                "SEC-004",
+                "SEC-005",
+                "SEC-006",
+                "SEC-007",
+                "SEC-008",
+                "SEC-009",
+                "SEC-010"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-29T20:59:02+00:00",
+          "evidence": "package-reviewer interrupted by user mid-execution before returning findings; proceeding with security-auditor's completed subreview per orchestrator judgment call (user asked to continue with the repair round, not to re-run the missing reviewer). Verdict inherited: repair_required (2 critical PoC-demonstrated findings).",
+          "findings": [
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007",
+            "SEC-008",
+            "SEC-009",
+            "SEC-010"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Migracion de datos reales unica-copia en ~/iey (4 proyectos, 29 archivos), requiere dry-run + backup/rollback + confirmacion separada, nunca shutil.move bare",
+        "Cambio de signo de test (opt-in-by-directory -> opt-in-by-ai/state/), autorizado por el spec, debe documentarse en la evidencia",
+        "Matriz CI de 3 plataformas + 7 gestores de paquetes mockeados; windows-latest deja de ser parse-only"
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-29T22:54:37+00:00",
+          "browser": "",
+          "checks": [
+            "vault-init creates hub/company/.obsidian seeds in a throwaway vault",
+            "vault-link (hybrid) creates docs/notas + registry entry",
+            "--context --json returns the 4-key schema with every value wrapped in the untrusted-content marker",
+            "--vault-doctor (headless report-only) lists the linked project without mutating anything",
+            "SEC-001 PoC re-run against the live CLI: --context --scaffold <dir> returns rc=2 CONTEXT_INPUT_INVALID, no directory created"
+          ],
+          "evidence": "No browser surface -- this package is CLI-only (ORQ-1). Live smoke run against a throwaway vault/project under /var/tmp (never ~/iey): vault-init, vault-link, --context --json, --vault-doctor report-only all worked end to end; the SEC-001 exploit was re-run against the actual installed CLI (not just unit tests) and confirmed blocked.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "ai/scripts/set_agents_app.py",
+        "PROYECTO/ai/scripts/feature-state.py",
+        "Global/_canonical/agents/orchestrator.md",
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "T-200 ADR-0009: DEC-5/6/7, backup/rollback doctrine, merge-case algorithm",
+          "local_validations": [
+            "docs/adr/0012-mandatory-vault.md escrito: DEC-5/6/7, backup/rollback doctrine, algoritmo de merge en 7 pasos grounded en evidence/vault-migration-inventory.md. Numero real 0012 (0009 lo tomo 006-P2), registrado como decision. Fila agregada a docs/adr/README.md."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-201 tools.toml multi-OS obsidian install (apt/dnf/zypper/winget/choco) + platform_pm() + CI windows-latest full suite",
+          "local_validations": [
+            "tools.toml: [cli.obsidian.install] gano apt/dnf/zypper/winget/choco, con doc citando obsidian.md/download. platform_pm() en set_agents_app.py:839-849 extendido: win32 (winget/choco), linux gano dnf/zypper preservando el orden pacman->apt existente. tests/test_harness.py: 3 tests nuevos, table-driven, shutil.which y sys.platform mockeados en proceso (test_platform_pm_covers_seven_managers_and_none, test_obsidian_catalog_has_all_seven_pm_identifiers_plus_doc, test_tools_install_dry_run_plan_per_manager) mas el pre-existente test_set_agents_tools_catalog, los 4 en verde. .github/workflows/ci.yml: windows-bootstrap gano el paso 'Full unittest suite' (python -m unittest discover), dejando de ser parse-only. Riesgo registrado: la suite completa nunca corrio en Windows real; es esperable que revele fallos preexistentes no relacionados a este paquete (bash/symlinks/chmod), lo cual es la informacion que DEC-7 busca, no un blocker de este work item."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-202 persisted vault-link intent-marker registry",
+          "local_validations": [
+            "set_agents_app.py: VAULT_REGISTRY=.set-agentes-vault.json + vault_registry_path/read_vault_registry/write_vault_registry_entry (read-merge-write, keyed por repo_path.resolve() completo, nunca basename). Wireado en cmd_vault_link (modo hybrid, OK y SKIP) y vault_link_private (modo private, OK y SKIP). 3 tests nuevos + 2 existentes extendidos con aserciones de registro, los 4 en verde: basename-colision disambiguada por path completo, degrade a {} en archivo ausente/corrupto, read-merge-write sobrevive la corrupcion."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-203 notes_root() scoped to ai/state/-marked dirs; flip opt-in-by-directory to opt-in-by-ai/state/, re-run P1's drift check",
+          "local_validations": [
+            "notes_root() en ambas copias byte-identicas (ai/scripts/ y PROYECTO/ai/scripts/feature-state.py, diff confirma identidad) cambio el gate de 'docs/notas ya existe' a 'ai/state/ existe' (chequeo estructural: out_dir.name==state y out_dir.parent.name==ai, no solo is_dir() para no gatillar en layouts ad-hoc de test). write_note() ya hacia mkdir(parents=True), no hizo falta tocarlo. Test test_notes_autorender_on_state_mutation_and_optin_by_dir renombrado a _optin_by_ai_state: primera mitad preservada verbatim (mutacion refresca notas sin sync-notes), segunda mitad invertida a su opuesto documentado (ai/state/ sin docs/notas -> ahora SI se crea), tercer caso nuevo agregado (directorio arbitrario sin marcador ai/state -> nunca se crea, conteo de asserts sube en vez de bajar). Suite completa: 288 tests (base 284 + 4 nuevos de este paquete: 3 de T-201 + 1 de T-202), todos en verde, sin ninguna regresion en el resto de la suite por el cambio de comportamiento."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-204 managed .obsidian/{app,appearance,core-plugins}.json seeds",
+          "local_validations": [
+            "cmd_vault_init seeds .obsidian/{app,appearance,core-plugins}.json (create-if-missing, igual que los otros seeds). Ids de plugin verificados contra el vault Obsidian real de la maquina (~/iey/obsidian/.obsidian/core-plugins.json), no adivinados: graph, backlink, outline, global-search, tag-pane -- corrige la redaccion coloquial del spec (backlinks/search/tags no son los ids reales). Sin community-plugins.json. Test extendido: valores esperados + re-run no clobbea ediciones manuales (create-if-missing, igual doctrina que el hub)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-205 app_config()[vault] persistence via read-merge-write, fix first_run() raw write",
+          "local_validations": [
+            "write_app_config(**updates) factorizado como el UNICO escritor de config.toml (read-merge-write); set_auto_update y menu()'s first_run() (antes un APP_CONFIG.write_text raw) lo usan ahora. cmd_vault_init y cmd_vault_link persisten app_config()['vault'] tras resolver un vault valido, cerrando el fallback que find_vault() ya leia pero nadie escribia. 2 tests nuevos en verde: los 3 escritores no se pisan entre si; --vault-init/--vault-link persisten vault sin clobbear auto_update, y un proyecto fuera de la cadena de ancestros resuelve via el fallback configurado."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-206 reverse-direction migration vault-resident->hybrid: full case universe, copy-verify-then-delete, dry-run + separate confirmation, exclude_notes_from_git for the four real ~/iey/ projects",
+          "local_validations": [
+            "Motor de migracion: vault_migration_plan() (puro, solo lectura, 7 acciones: repo-missing/already-linked/symlink-conflict/repo-side-conflict/conflict/pure-move/merge) + apply_vault_migration() (copy-verify-then-delete POR archivo, nunca shutil.move, nunca borrado en lote; reutiliza cmd_vault_link para el symlink final en vez de duplicar logica). 7 tests con fixtures sinteticas que espejan el inventario real (3 pure-move + 1 merge con subdirectorio anidado features/<name>/, 0 colisiones): pure-move, merge con nested dirs, conflicto de bytes aborta el proyecto entero con cero archivos movidos, repo-missing, symlink colgante/outward reportado nunca sobreescrito, ejecucion interrumpida-y-resumida idempotente (archivo ya copiado en las dos puntas se limpia sin re-copiar), exclude_notes_from_git aplicado cuando exclude_notes=True. Bug encontrado y corregido en el propio desarrollo: la primera version de vault_migration_plan no detectaba que el lado vault YA es un symlink tras una migracion previa (solo chequeaba el lado repo), lo que hacia un re-run tratar el symlink como directorio real -- corregido antes de continuar. NO se corrio todavia contra los datos reales de ~/iey (eso es el dry-run explicito, pendiente como verificacion en vivo antes de aceptar el paquete)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-207 --vault-doctor: new distinct report-only surface, --repair requires explicit flag + dry-run-confirmed marker",
+          "local_validations": [
+            "Nuevo flag --vault-doctor (nunca extiende --doctor --harness pi, que sigue byte-identico). cmd_vault_doctor: sin --project -> reporte read-only de topologia/salud (healthy/dangling/drift) de cada entrada del registro + deteccion de directorios reales bajo Proyectos/ sin entrada (unregistered), nunca muta nada. Con --project --dry-run: computa vault_migration_plan(), imprime el plan, escribe un marcador de un solo uso con el fingerprint del plan bajo STATE_DIR/vault-doctor-pending/. Con --project --repair: exige el marcador (si no existe, rechaza reason=no-dry-run), lo consume siempre (single-use, nunca presupuesto de reintento), rechaza si el fingerprint no coincide con el plan actual (el disco cambio desde el dry-run), rechaza sin --project (nunca headless). 4 tests en verde: reporte no muta nada; ciclo completo dry-run->repair single-use con deteccion de disco-cambiado-desde-el-dry-run; rechazo sin --project; un conflicto real se rechaza aun con dry-run previo, cero archivos movidos."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-208 --context [--project DIR] [--json]: read-only, COMPANY resolution, degrade paths, byte caps, never reads credential surfaces",
+          "local_validations": [
+            "cmd_context(): resuelve vault via find_vault, COMPANY como el unico hijo no reservado (Proyectos/Casos excluidos) del vault root, nota del proyecto via el registro (topologia private -> vault_path, si no docs/notas del repo). Degrade en cada punto: sin vault -> los 4 campos null (nunca crash); sin company dir -> hub-only; sin nota de proyecto -> project/pending null, reportado no inventado. --json con schema fijo {hub,company,project,pending}. Byte cap 4000/seccion completa, 2000 para 'pending' (extraido de la seccion '## Que falta' del propio note, no fabricado). 4 tests en verde: schema completo feliz, tres degradaciones en un solo test, spy sobre Path.read_text confirma cero lecturas de superficies de credenciales, cap de bytes verificado con un hub de 50k caracteres."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-209 orchestrator doctrine: unconditional --context/sync-notes, allowlist --context* read-only in coord_policy.py/generate.py",
+          "local_validations": [
+            "orchestrator.md (canonico): la obligacion de notas vivas dropea la condicion 'when the directory exists' (ahora el marcador es ai/state/, coherente con T-203); nuevo parrafo: correr --context [--project][--json] incondicionalmente en apertura de turno/feature, nunca condicionado, leer hub/company/project/pending antes de delegar. coord_policy.py: --context* agregado a SAFE_ARGV (tercera entrada, comentario explicito de que es de solo lectura, nunca fusionada con las mutantes). generate.py: misma entrada --context* agregada al bloque bash de OpenCode. ./build.sh corrido, Global/{opencode,claude-code,codex}/** regenerados. 2 tests en verde: coord_policy acepta --context y sigue bloqueando composicion de shell alrededor; la doctrina y el permiso llegan a los tres runtimes."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-210 render_notes(): log both swallowed exceptions, cross-project isolation",
+          "local_validations": [
+            "_log_render_failure() (ambas copias byte-identicas): destino documentado ai/state/render-failures.log, cap 200KB con rotacion de una generacion (.1), never-raises (OSError atrapado). Ambos puntos de swallow ahora loguean antes de continue/pass: el interno con contexto feature=<id>, el externo con contexto render_notes. Aislamiento cross-proyecto es estructural (out_dir siempre es el ai/state/ del propio state_file, nunca compartido). 2 tests en verde: falla interna se loguea sin bloquear el resto y sin propagar; falla externa se loguea; un render sano en OTRO proyecto nunca crea su log (aislamiento probado, no solo afirmado); rotacion verificada pasando el cap."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-211 headless degrade: no Obsidian/no manager keeps file vault working, WARNING not blocking exit",
+          "local_validations": [
+            "_scaffold_attempt_obsidian_once(): marcador ai/state/obsidian-install.json, un solo intento por proyecto para siempre (create-if-missing, nunca re-intenta en un --scaffold posterior); el outcome (ok/declined/already-installed) nunca afecta el codigo de salida de --scaffold. cmd_vault_doctor imprime VAULT_DOCTOR_WARNING (steady, no bloqueante, rc sin cambios) cuando falta el binario de obsidian, en el pase report-only y en el de --project. 2 tests en verde: decline/fallo de instalacion nunca hace fallar scaffold + segundo scaffold no re-intenta (call_count verificado); vault-doctor avisa pero no bloquea. Regresion verificada: los tests de scaffold preexistentes (incluido el E2E hermetico de invitado, 31s) siguen en verde -- en el entorno aislado platform_pm() no encuentra gestor y cmd_tools_install degrada a TOOL_MANUAL sin colgar ni tocar red."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-29T22:52:56+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests -v",
+            "./ai/scripts/verify.sh",
+            "./build.sh --check"
+          ],
+          "evidence": "326 tests green (up from 310 pre-repair), verify.sh -> VERIFY_PASS, build.sh --check -> SELF_SCAFFOLD_SYNC_OK. Covers the original 12-task implementation plus 21 new/updated tests from the two-round security repair (10 SEC findings + 6 DR findings).",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-29T21:18:33+00:00",
+          "evidence": "Adversarial refutation pass over the 10 security-auditor findings; 10/10 confirmed at HEAD via executed PoCs (throwaway /tmp fixtures, no mutation of real state or ~/iey). SEC-010 upheld in part with its second sub-claim (render-failures.log commit risk in THIS repo) refuted -- risk narrowed to downstream scaffolded projects.",
+          "refuted": [],
+          "upheld": [
+            "SEC-001",
+            "SEC-002",
+            "SEC-003",
+            "SEC-004",
+            "SEC-005",
+            "SEC-006",
+            "SEC-007",
+            "SEC-008",
+            "SEC-009",
+            "SEC-010"
+          ]
+        },
+        {
+          "at": "2026-07-29T22:51:57+00:00",
+          "evidence": "Delta-reviewer (round 2, resumed via SendMessage) independently re-ran the full test suite (326 tests), verify.sh, and build.sh --check against the fixes for DR-001/002/004, and confirmed each closure with its own reproduction of the original boundary case, injection payload, and doc-drift check, before returning verdict pass.",
+          "refuted": [],
+          "upheld": [
+            "DR-001",
+            "DR-002",
+            "DR-004"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-22",
+        "AC-23",
+        "AC-24",
+        "AC-25",
+        "AC-26",
+        "AC-27",
+        "AC-28",
+        "AC-29",
+        "AC-30"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 3,
+        "spawns": 5,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-30T04:10:11+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [],
+          "reason": "record-repair transiciona PACKAGE_REPAIR->DELTA_REVIEW en cada llamada (por dise\u00f1o: una llamada = un lote consolidado). Se instruy\u00f3 al repair-agent a llamarlo una vez por finding (error del orquestador en el brief), as\u00ed que solo F-01 qued\u00f3 registrado en repairs[]; F-02..F-10 est\u00e1n reparados en c\u00f3digo con test rojo->verde confirmado (261+ tests, py_compile y git diff --check limpios, verificado independientemente por el orquestador con la suite completa: 427 tests OK) pero no registrados. Se vuelve a PACKAGE_REPAIR para registrar los 9 restantes en una sola llamada consolidada, como corresponde.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-30T04:40:14+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [
+            "F-01",
+            "D-02",
+            "D-03",
+            "F-08",
+            "D-05",
+            "D-06"
+          ],
+          "reason": "delta-reviewer independiente: repair_required. F-01 reabierto (CI de windows sigue colgado, falta mock de msvcrt en 8/9 call sites). D-02 regresion nueva del fix de F-05 (menu invisible pero operable con stdout pipeado -- riesgo real de lanzar el instalador a ciegas). D-03 regresion de la interaccion F-03xF-08 (header sin clampear). F-08 reabierto (clausula de filtrado en modo search nunca se atendio). D-05/D-06 menores. Ademas (fuera del mecanismo de findings, ya resuelto por el orquestador): ai/scripts/tui.py estaba sin trackear en git -- staged con git add, no commiteado.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-30T05:53:55+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [],
+          "reason": "delta-reviewer independiente: pass. Los 6 hallazgos de la segunda ronda (F-01, D-02, D-03, F-08, D-05, D-06) verificados cerrados de forma independiente (F-01 emulando windows-bootstrap: 62 tests OK; D-02 probado con las 4 combinaciones de tty; D-03 barrido rows 1-4 x 3 modos; F-08 los dos fallbacks de freetext confirmados). 4 residuales low no bloqueantes registrados como deuda (N-01..N-04: sesiones ambiente de vault_menu/mcp_menu no heredan el fallback de stderr; guard condicionado a stdin tty, defensa en profundidad; header puede desplazar al prompt en vez de al header; F-08 angost\u00f3 el fallback de texto libre para substrings de items listados). requires_full_review=false: cambios aditivos y compatibles hacia atr\u00e1s.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6",
+      "findings": [
+        {
+          "file": "tests/test_harness.py",
+          "id": "F-01",
+          "line": "6441-6443 y otros 7 call sites",
+          "repair_attempts": 2,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Reabierto: el fix de F-01 arreglo el busy-spin del loop win32 pero 8 de 9 call sites de run_picker en TuiTests no mockean tui.msvcrt=None, asi que _drive_loop sigue ruteando al branch win32 en windows-bootstrap y los bytes POSIX scripteados nunca se consultan -- el job de CI sigue colgado/rojo.",
+          "verification_history": [
+            {
+              "archived_at": "2026-07-30T04:40:14+00:00",
+              "verified_at": "2026-07-30T03:59:02+00:00",
+              "verified_by": "repair-agent",
+              "verified_verdict": "upheld"
+            }
+          ],
+          "verified_at": "2026-07-30T05:10:46+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "F-02",
+          "line": "159-181,223,366",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "decode_keys emits a PASTE event but reduce() has no branch for it in any mode; bracketed-paste payloads are silently discarded in search/freetext, breaking the primary input path for vault_menu paths and setup_models free-text model id on any terminal honoring bracketed paste.",
+          "verified_at": "2026-07-30T03:59:02+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "F-03",
+          "line": "2107-2114,2338-2346,2370-2371,2040-2042; ai/scripts/setup_models.py:169-173",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Menu context (server/harness state tables, status output, drift banner) is printed to the normal screen just before run_picker switches to the alternate screen, which clears it; the decision context is invisible exactly while the user is choosing.",
+          "verified_at": "2026-07-30T03:59:02+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "F-04",
+          "line": "756-768,771-772,734-745,748-753",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "_status_data() is called unconditionally by cmd_status even for human=False (scripted/--json callers), adding 6 subprocess probes (~5.4s measured) with no timeout on auth_state, so a scripted --status that used to be instant can now hang indefinitely.",
+          "verified_at": "2026-07-30T03:59:02+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "F-05",
+          "line": "345-349,358-366,505-530",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "TerminalSession bases the TTY decision on stdin.isatty() but writes ANSI unconditionally to stdout; set-agents | tee dumps alternate-screen/ANSI bytes into a non-TTY stdout pipe, violating AC-25 zero-ANSI-without-TTY for the menu path.",
+          "verified_at": "2026-07-30T03:59:02+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "F-06",
+          "line": "390-399",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "TerminalSession.__enter__ enters raw mode/alternate screen before installing SIGTERM/SIGHUP handlers; an exception between them (e.g. signal.signal ValueError off-main-thread) leaves the terminal raw with no __exit__ called. Latent, not live today."
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "F-07",
+          "line": "2038-2058",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "vault_menu (the riskiest of the 5 rewritten menus -- feeds paths into mutating cmd_vault_init/cmd_vault_link, private-topology switch is a bare index comparison) has zero test coverage, unlike the other 4 menus.",
+          "verified_at": "2026-07-30T03:59:02+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "F-08",
+          "line": "196-204,612-620",
+          "repair_attempts": 2,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "F-08 cerrado a medias: el viewport se entrego pero la segunda clausula del finding (\"search mode does not filter the list\") no se toco -- / exige tipear el nombre completo del item, no filtra la lista visible.",
+          "verification_history": [
+            {
+              "archived_at": "2026-07-30T04:40:14+00:00",
+              "verified_at": "2026-07-30T03:59:02+00:00",
+              "verified_by": "repair-agent",
+              "verified_verdict": "upheld"
+            }
+          ],
+          "verified_at": "2026-07-30T05:10:46+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py",
+          "id": "F-09",
+          "line": "785,847,849",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Three user-facing strings still reference stale menu numbers (opci\u00f3n [1], opci\u00f3n [2]) after the numbered grid was replaced by the arrow selector."
+        },
+        {
+          "file": "tests/test_harness.py",
+          "id": "F-10",
+          "line": "5703-5713",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "TuiTests scripted-bytes helper treats None as pending forever, so an unresolved picker hangs the test run instead of failing; the ambient-session-reuse branch of run_picker is never exercised by any test."
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "D-02",
+          "line": "399,584-585",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "summary": "Regresion nueva por el fix de F-05: _render ahora no escribe nada si stdout no es TTY, pero _enter_raw decide raw mode solo por stdin -- con set-agents | tee, el picker queda invisible pero vivo y resuelve una seleccion real; Enter a ciegas en la posicion default del cursor puede lanzar el instalador (MENU_ITEMS[0]).",
+          "verified_at": "2026-07-30T05:10:46+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "D-03",
+          "line": "588-599",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "El header de F-03 no se clampea contra la altura de terminal; _viewport_slice solo clampea items, no el header, asi que con header alto (ej. mcp_menu con catalogo largo) el cursor y el hint se scrollean fuera de pantalla -- reintroduce el modo de falla de F-08.",
+          "verified_at": "2026-07-30T05:10:46+00:00",
+          "verified_by": "repair-agent",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/setup_models.py",
+          "id": "D-05",
+          "line": "234",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "Residual de F-09 en un archivo que el propio repair edito: setup_models.py:234 todavia dice opcion 1/2 despues de que el wizard 40 lineas arriba ya reemplazo esos numeros por labels reales."
+        },
+        {
+          "file": "ai/scripts/tui.py",
+          "id": "D-06",
+          "line": "444-449",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "Nit del fix de F-06: el cleanup del except BaseException en __enter__ vuelve a llamar signal.signal, que si fallo por la misma razon original enmascara la excepcion (During handling of...); el objetivo del finding se cumple igual (terminal restaurada, mismo tipo de excepcion propaga), pero el traceback queda confuso."
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-30T03:03:53+00:00",
+          "evidence": "VERIFY_PASS, ver ai/state/verify.log",
+          "name": "verify.sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T03:03:53+00:00",
+          "evidence": "384 tests, OK, 0 skips (baseline 331)",
+          "name": "unittest",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T03:03:53+00:00",
+          "evidence": "SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "build.sh--check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T03:03:53+00:00",
+          "evidence": "git diff --check limpio",
+          "name": "git-diff--check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Reemplazar los men\u00fas numerados por un selector de flechas stdlib-only, con core puro testeable, decoder de teclas crudo, y handoff de terminal seguro para cada prompt in-process",
+      "owned_paths": [
+        "ai/scripts/tui.py",
+        "README.md",
+        "INSTALACION.md"
+      ],
+      "package_id": "P3-tui",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-30T03:59:12+00:00",
+          "changed_files": [
+            "ai/scripts/tui.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "F-01"
+          ],
+          "verification": [
+            "Root cause: _run_loop_win32 had 'while PENDING: render(); event=read(); if event is None: continue' -- zero wait, busy-spins 100% CPU and never yields for the real windows-bootstrap CI job (msvcrt real, kbhit() never True there). Fix: added time.sleep(_WIN32_POLL_SECONDS) on every empty poll, renders only on an actual state change (not every poll). Also pinned tests._run_with_scripted_bytes to force msvcrt=None (POSIX loop) regardless of the platform running the tests, and changed its EOF sentinel from None to b\"\" (see F-10) -- both needed because _drive_loop routes on sys.platform==\"win32\" and msvcrt is not None, true on the real CI job, where the scripted POSIX bytes were never even consulted. Red-before-fix verified two ways: (1) reviewer's own repro (mock sys.platform=win32, msvcrt.kbhit()->False, timeout 12 -> exit 124); (2) reconstructed the pre-fix tui.py from the original Read output, swapped it into place, and reran TuiTests -- 3 new tests failed/errored (test_run_loop_win32_backs_off_with_sleep_instead_of_busy_spinning, test_run_picker_never_hangs_when_the_platform_looks_like_windows_and_no_key_ever_arrives, plus header/viewport tests sharing the file). Restored the fix -> all 52 TuiTests green. New tests: test_run_loop_win32_backs_off_with_sleep_instead_of_busy_spinning, test_run_picker_never_hangs_when_the_platform_looks_like_windows_and_no_key_ever_arrives."
+          ]
+        },
+        {
+          "at": "2026-07-30T04:10:36+00:00",
+          "changed_files": [
+            "ai/scripts/tui.py",
+            "ai/scripts/set_agents_app.py",
+            "ai/scripts/setup_models.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-10"
+          ],
+          "verification": [
+            "F-02: PASTE ignorado en navigate (intencional, AC-23) pero descartado tambien en search/freetext por reduce() sin rama PASTE; agregada sanitizacion + rama PASTE en _reduce_text_entry. Rojo/verde confirmado contra tui.py reconstruido pre-fix.",
+            "F-03: contexto se imprimia a pantalla normal justo antes de que run_picker entrara a pantalla alterna y lo borrara. Agregado header= a run_picker/_render; mcp_menu/vault_menu comparten una sola TerminalSession para sus pickers encadenados. Rojo/verde confirmado.",
+            "F-04: _status_data() calculaba las 6 probes por-CLI incluso para human=False; auth_state sin timeout podia colgar --status scripteado. Fix: rows lazy + timeout de 15s en auth_state. Rojo/verde confirmado, byte-exactitud de stdout preservada.",
+            "F-05: TerminalSession escribia ANSI a stdout sin chequear su propio isatty(). Agregado _is_tty(stream) compartido, gateado en _write/_render. Rojo/verde confirmado.",
+            "F-06: __enter__ entraba a raw mode antes de instalar SIGTERM/SIGHUP. Envuelto en try/except BaseException que restaura y re-lanza. Rojo/verde confirmado.",
+            "F-07: vault_menu sin tests; Esc en paso de privacidad caia a private=False en vez de cancelar. Agregado guard de cancelacion + 5 tests de adaptador. Rojo/verde confirmado.",
+            "F-08: _render sin viewport/scroll/altura de terminal. Agregados _terminal_rows y _viewport_slice. Rojo/verde confirmado.",
+            "F-09: opcion [1]/[2] residuales reemplazadas por las etiquetas reales. Rojo/verde confirmado.",
+            "F-10: helper de tests usaba None como sentinel post-script, colgaba en vez de fallar. Cambiado a b'' (EOF real) + test de la rama de reuso de sesion ambiente. Rojo/verde confirmado."
+          ]
+        },
+        {
+          "at": "2026-07-30T05:13:59+00:00",
+          "changed_files": [
+            "ai/scripts/tui.py",
+            "ai/scripts/setup_models.py",
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "F-01",
+            "D-02",
+            "D-03",
+            "F-08",
+            "D-05",
+            "D-06"
+          ],
+          "verification": [
+            "F-01 (reopened, high): 8 de 9 usos de tui.run_picker(...) en TuiTests ya mockeaban tui.msvcrt=None (via _run_with_scripted_bytes o parche propio); el UNICO restante era test_run_picker_real_eof_while_holding_an_incomplete_sequence_never_hangs, confirmado con timeout 8 -> exit 124 al simular sys.platform=win32 + msvcrt real con kbhit()=False. Migrado al helper compartido (que ya pinea msvcrt=None), y agregado test_every_direct_run_picker_call_in_tuitests_pins_msvcrt_to_none: un lint AST sobre TuiTests que falla si algun call site directo de tui.run_picker queda sin ese parche. Rojo confirmado contra el tui.py de la ronda anterior (exit 124), verde despues.",
+            "D-02 (high): TerminalSession._enter_raw solo miraba stdin.isatty(); con stdout no-tty (set-agents | tee log.txt) el picker quedaba invisible pero vivo, resolviendo una seleccion real (riesgo: Enter a ciegas lanzando install.sh via MENU_ITEMS[0]). Fix en run_picker(): nuevo parametro stderr, fallback de renderizado a stderr cuando stdout no es tty pero stderr si, y refusal total (retorna None sin leer ninguna tecla) cuando ni stdout ni stderr son tty con stdin tty. Tests nuevos: test_run_picker_renders_to_stderr_when_stdout_is_piped_but_stderr_is_still_a_tty, test_run_picker_refuses_to_resolve_a_live_selection_when_nothing_visible_can_show_it (con _read_chunk_posix que revienta si se llega a leer una tecla). Rojo confirmado (TypeError: unexpected keyword 'stderr' contra el codigo previo), verde despues.",
+            "D-03 (medium): _render metia el header sin limite en el frame; con header mas alto que la terminal (ej. mcp_menu con catalogo largo) el cursor y la linea de hint se scrolleaban fuera de pantalla -- reproducido con header de 30 lineas en terminal de 10 filas -> 32 lineas renderizadas. Fix: _clamp_prefix(prefix, rows, min_trailer=N) trunca header/prompt ANTES de decidir el viewport, reservando 2 lineas en navigate (hint + >=1 item) y 3 en search/freetext (query + hint + >=1 fila). Tests nuevos: test_render_clamps_a_header_taller_than_the_terminal_and_keeps_the_cursor_visible, test_render_clamps_a_header_taller_than_the_terminal_in_search_mode_too. Rojo confirmado (32 lineas > 10), verde despues.",
+            "F-08 (reopened, medium): la clausula 'search mode no filtra la lista' del finding original nunca se atendio -- / exigia el nombre completo del item tipeado de memoria, casefold exacto. Fix: _search_matches(items, query) filtra por substring/casefold; _reduce_text_entry en modo search navega SOLO los matches con flechas (wrap dentro del subconjunto), _retarget_cursor mantiene el cursor sobre un match valido tras cada tecla, Enter selecciona el resaltado (Selected(cursor)) en vez de exigir match exacto; fallback a texto libre preservado sin tocar. _render agrega rama search con lista filtrada navegable + '(sin coincidencias)'. Tests nuevos: test_reduce_search_mode_filters_items_by_substring_and_navigates_only_matches, test_reduce_search_mode_up_down_wrap_within_the_filtered_matches_only, test_reduce_search_mode_still_falls_back_to_free_text_when_nothing_matches, test_render_search_mode_only_shows_matching_items_and_hides_the_rest. Rojo confirmado (AttributeError: module tui has no attribute _search_matches / lista sin filtrar), verde despues.",
+            "D-05 (low): setup_models.py:234 tenia el mismo defecto que F-09 (ya arreglado en set_agents_app.py) -- 'opcion 1/2' en vez de las etiquetas reales del wizard. Fix: referencia directa a WIZARD_ITEMS[0]/WIZARD_ITEMS[1] ('Cambiar un area'/'Cambiar un rol') para que no pueda volver a quedar obsoleto. Test nuevo: test_wizard_drop_subscription_hint_references_menu_labels_not_stale_numbers (importa setup_models, mockea tui.run_picker y dropped_cells, corre wizard() de punta a punta). Rojo confirmado revirtiendo solo esa linea (opcion 1/2 unexpectedly found), verde despues.",
+            "D-06 (low): en TerminalSession.__enter__, si signal.signal() fallaba durante el registro Y el mismo motivo hacia fallar tambien la restauracion de handlers previos dentro del except, la segunda excepcion reemplazaba/enmascaraba la original (During handling of the above exception...). Fix: la llamada de restauracion en el except queda envuelta en contextlib.suppress(ValueError). Test nuevo (con excepciones DISTINTAS por llamada, no la misma instancia reutilizada -- una version anterior del test con instancia compartida no detectaba el bug por como Python evita el auto-chaining): test_terminal_session_enter_reraises_the_original_exception_even_if_cleanup_signal_restore_also_fails. Rojo confirmado (propagaba 'call #2 failed' encadenado sobre 'call #1 failed'), verde despues."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-30T03:20:53+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer"
+          ],
+          "started_at": "2026-07-30T03:04:43+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-30T03:20:46+00:00",
+              "evidence": "Revisi\u00f3n independiente completa, 43 tool-uses, findings reproducidos a mano con evidencia concreta (no inferidos)",
+              "findings": [
+                "F-01",
+                "F-02",
+                "F-03",
+                "F-04",
+                "F-05",
+                "F-06",
+                "F-07",
+                "F-08",
+                "F-09",
+                "F-10"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-30T03:20:53+00:00",
+          "evidence": "package-reviewer: repair_required, 4 bloqueantes (F-01..F-04) + 6 no-bloqueantes (F-05..F-10)",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-10"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-30T05:54:06+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/setup_models.py",
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Core puro PickerState/KeyEvent/reduce() en tui.py, testeable sin pty (AC-22)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.TuiTests -v -k test_reduce -> 14 tests passed, cero I/O/termios importado en el m\u00f3dulo probado"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Key decoder de bytes crudos a eventos l\u00f3gicos, flechas/UTF-8/bracketed-paste (AC-23)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.TuiTests -v -k test_decode_keys -> 12 tests passed (arrow variants, utf8 split, paste immunity, unknown CSI, empty=EOF)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "TerminalSession: raw mode/alt screen con restauraci\u00f3n en finally + SIGTERM/SIGHUP (AC-27)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.TuiTests -v -k test_terminal_session -> 6 tests passed (finally restores on forced exception, SIGTERM/SIGHUP handlers invoked directly restore+SystemExit(128+signum), no-op on non-tty stdin, suspended() exits/reenters raw mode)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "run_picker loop de render + suspend_terminal para prompts in-process (AC-25, AC-26)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.TuiTests -v -k 'test_run_picker or test_suspend_terminal' -> 7 tests passed (navigate+select, freetext fallback end-to-end v\u00eda render loop real con termios mockeado, Esc por timeout-flush, Ctrl-C, freetext puro sin items, suspend_terminal no-op sin sesi\u00f3n y delegando con sesi\u00f3n activa)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Reemplazar menu()/tools_menu()/mcp_menu()/plugins_menu()/vault_menu()/choose()/wizard() por adaptadores sobre run_picker (AC-24)",
+          "local_validations": [
+            "python3 -m unittest -k tools_menu -k mcp_menu -k plugins_menu -v tests.test_harness -> 6 tests passed; python3 -m unittest tests.test_harness.HarnessTests.test_set_agents_tools_catalog tests.test_harness.HarnessTests.test_set_agents_mcp_across_harnesses tests.test_harness.HarnessTests.test_set_agents_plugins -v -> 3 passed (subprocess CLI surface untouched); choose()/wizard() migrados en setup_models.py preservando fallback de texto libre"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Separar datos de impresi\u00f3n en cmd_status/cmd_tools/cmd_mcp/cmd_plugins preservando stdout m\u00e1quina (AC-28)",
+          "local_validations": [
+            "python3 -m unittest -k stdout_is_byte_exact -v tests.test_harness -> 5 tests passed (baseline capturado ANTES del refactor a _tools_data/_mcp_data/_plugins_data/_status_data, confirmado byte-id\u00e9ntico despu\u00e9s)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Cerrar deuda de men\u00fa: orden [9] Vault, validaci\u00f3n mcp_menu, plugins_menu legible, EOFError/KeyboardInterrupt limpio (AC-29)",
+          "local_validations": [
+            "python3 -m unittest -k menu_orders -k mcp_menu -k plugins_menu -k safe_input -v tests.test_harness -> 8 tests passed (Vault reordenado antes de Salir, action/harness de mcp_menu son enums cerrados sin freetext, plugins_menu nunca imprime formato m\u00e1quina, EOFError/KeyboardInterrupt no producen traceback)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Actualizar README.md/INSTALACION.md con la descripci\u00f3n del nuevo selector (AC-30)",
+          "local_validations": [
+            "grep confirm\u00f3 las grillas [1]..[8] en README.md/INSTALACION.md (les faltaba [9] Vault); reemplazadas por prosa del selector de flechas con las 9 opciones en orden (Vault antes de Salir); python3 -m unittest tests.test_harness.HarnessTests.test_readme_covers_all_oses -v -> 1 passed; grep -c '\\[1\\]\\|\\[8\\]\\|\\[9\\] ' README.md INSTALACION.md -> 0"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-30T05:54:06+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests"
+          ],
+          "evidence": "452 tests, OK, 0 skips. verify.sh -> VERIFY_PASS. build.sh --check -> SELF_SCAFFOLD_SYNC_OK. git diff --check limpio.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-30T03:59:02+00:00",
+          "evidence": "All 7 findings above low severity were reproduced by hand with concrete file:line evidence by an independent package-reviewer (per orchestrator brief) and independently re-confirmed by repair-agent by reading the exact cited lines before writing each fix and, where practical, executing the buggy code path directly (e.g. F-01/F-10 hang reproduced via 'timeout 3 ...' -> exit 124 against the pre-fix code). No findings refuted.",
+          "refuted": [],
+          "upheld": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-07",
+            "F-08"
+          ]
+        },
+        {
+          "at": "2026-07-30T05:10:46+00:00",
+          "evidence": "Cada finding reproducido a mano contra el codigo pre-reparacion antes de tocarlo: F-01 (timeout 8 sobre test_run_picker_real_eof_while_holding_an_incomplete_sequence_never_hangs con sys.platform/msvcrt simulados a win32 real -> exit 124, unico call site de run_picker en TuiTests sin mock.patch.object(tui,\"msvcrt\",None)); D-02 (run_picker sin parametro stderr -> TypeError, y con stdout/stderr ambos no-tty el loop consumia un Enter guionado sin refusal); D-03 (header de 30 lineas en terminal de 10 filas desborda 32 lineas renderizadas, cursor/hint fuera de pantalla); F-08 (tui no tiene _search_matches, / exige nombre exacto typeado de memoria, no filtra items visibles). Los cuatro confirmados rojo contra tui.py pre-repair (git show :ai/scripts/tui.py / diff de la ronda anterior) y verdes despues del fix.",
+          "refuted": [],
+          "upheld": [
+            "F-01",
+            "D-02",
+            "D-03",
+            "F-08"
+          ]
+        }
+      ]
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 71,
+  "phase": "DONE",
+  "revision": 176,
   "schema_version": 1,
-  "updated_at": "2026-07-27T17:58:36+00:00"
+  "updated_at": "2026-07-30T16:16:18+00:00"
 }

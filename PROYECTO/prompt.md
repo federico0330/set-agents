@@ -86,8 +86,12 @@ especialistas y lo registra como una sola iteración de auditoría.
 > 5. Después de aprobar, inicializá estado:
 >
 >    ```bash
->    python3 ai/scripts/feature-state.py init <feature_id> <spec_path> <spec_hash> --ac AC-1 --ac AC-2
+>    python3 ai/scripts/feature-state.py init <feature_id> <spec_path> <sha256sum del spec> \
+>      --approved-by <quién aprobó> --ac AC-1 --ac AC-2
 >    ```
+>
+>    El hash se verifica contra el archivo: si no coincide sale `SPEC_HASH_MISMATCH` y no escribe nada.
+>    Si la spec cambió después de aprobarse, hay que volver a aprobarla.
 >
 > 6. `@package-planner` crea paquetes coherentes y registralos con `create-package`. Cada paquete normal debe
 >    tener varias tareas relacionadas; sólo usá `complexity=small` para scopes mínimos.
@@ -95,8 +99,12 @@ especialistas y lo registra como una sola iteración de auditoría.
 > 8. Corré gates deterministas del paquete y ownership check; registralos con `record-gate`.
 > 9. Recién si `feature-state.py next` indica `PACKAGE_REVIEW`, armá el panel necesario:
 >    `@package-reviewer` más `@security-auditor`, `@db-auditor`, `@performance-auditor`, `@red-team`,
->    `@blue-team` o `@ux-ui-designer` cuando la superficie lo justifique. Registrá `start-review-panel`,
->    `record-subreview` y `finalize-review-panel`.
+>    `@blue-team` o `@ux-ui-designer` cuando la superficie lo justifique. Registrá `start-review-panel`
+>    nombrando a cada miembro con `--role` (es obligatorio), un `record-subreview` por especialista, y
+>    `finalize-review-panel`. Si a mitad del panel aparece un especialista necesario, agregalo con
+>    `extend-review-panel --role <rol> --reason <por qué>`; si una revisión independiente vuelve después de
+>    cerrado el panel, va con `record-late-review <PKG> <rol> --finding '<json>' --evidence <texto>`. Ninguno
+>    de los dos consume un ciclo extra, y reabrir un `panel_id` existente es error, no una corrección.
 > 10. Si hay findings, primero se refutan y recién después se reparan. `@finding-verifier` recibe el conjunto
 >     COMPLETO en un solo spawn con la consigna invertida (matar cada hallazgo, no confirmarlo) y devuelve
 >     `upheld|refuted` por hallazgo; se registra con `record-verification --actor finding-verifier`. Sólo lo que

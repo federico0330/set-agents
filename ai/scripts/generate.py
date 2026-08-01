@@ -207,10 +207,26 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
         # closes runs it owns (`--route-dispatched`/`--route-terminal`, e.g. the
         # model-mismatch and worker-death doctrines below) — documented here as an
         # explicitly MUTATING-capable coord exception, narrated on use like every spawn.
+        # ADR-0012/AC-19: --context is a THIRD, DISTINCT sanctioned channel — read-only
+        # (cmd_context never writes, never reads a credential surface), never merged into the
+        # two mutating-capable entries above.
+        # SEC-P1-002/DR-01 (015 repair, delta-review round 2): a FOURTH sanctioned channel —
+        # the Claude-Code-lane cross-process spawn CLI. This is the OpenCode-lane half of the
+        # SAME paired fix `coord_policy.SAFE_ARGV` already carries (ai/scripts/coord_policy.py's
+        # own `CLAUDE_SPAWN_CLI` entry): on any lane whose OWN host harness is OpenCode, the
+        # orchestrator's Bash surface is THIS generated permission map, not coord_policy.py —
+        # coord_policy.py alone (the round-1 repair) never reached the one lane where the
+        # cross-lane-redirect doctrine branch actually fires. Two entries, enumerated to match
+        # `claude_code_spawn.main()`'s own two mutually-exclusive modes exactly (never a bare
+        # `claude_code_spawn.py*` catch-all) — the same one-entry-per-sanctioned-shape
+        # granularity `--route*`/`--context*` already use above.
         lines += ["  bash:", '    "*": deny', *safe,
                   '    "python3 ai/scripts/feature-state.py *": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --context*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-review*": allow',
                   *hard_denies]
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]

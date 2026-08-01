@@ -13,6 +13,18 @@ zen = true
 claude = ["fable", "haiku", "opus", "sonnet"]
 codex = ["gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]
 codex_effort = ["high", "low", "medium", "xhigh"]
+# 012 discovered-inventory AC-04: declared allowlist ceiling for the two new probeable
+# OpenCode-lane pairs (routing_core/catalog.py's `_PAIR_COMMANDS`, AC-01) — bare model ids
+# (no provider prefix, same convention as claude/codex above), re-measured live 2026-07-30
+# against `opencode models opencode --pure` (60 ids) / `opencode models opencode-go --pure`
+# (16 ids). Probeable only (AC-01..AC-06); NOT routable — no routes.v1.toml row exists for
+# either provider (contract 012's non-goals paragraph, "no curated routes.v1.toml
+# rows for the new models" -- corrected 012 repair F-07, this is NOT AC-11, which
+# is the cache/decision-trail AC and says nothing about routes.v1.toml rows), and
+# neither is in [routing].enabled_providers or
+# models_config.ROUTING_PROVIDERS (AC-05, all four selectability gates, none opened here).
+opencode_zen = ["big-pickle", "claude-fable-5", "claude-haiku-4-5", "claude-opus-4-1", "claude-opus-4-5", "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-4", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-sonnet-5", "deepseek-v4-flash", "deepseek-v4-flash-free", "deepseek-v4-pro", "gemini-3-flash", "gemini-3.1-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "glm-5", "glm-5.1", "glm-5.2", "gpt-5", "gpt-5-codex", "gpt-5-nano", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini", "gpt-5.2", "gpt-5.2-codex", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-pro", "gpt-5.5", "gpt-5.5-pro", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "grok-4.5", "grok-build-0.1", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "laguna-s-2.1-free", "ling-3.0-flash-free", "mimo-v2.5-free", "minimax-m2.5", "minimax-m2.7", "minimax-m3", "nemotron-3-ultra-free", "north-mini-code-free", "qwen3.5-plus", "qwen3.6-plus"]
+opencode_go = ["deepseek-v4-flash", "deepseek-v4-pro", "glm-5.1", "glm-5.2", "grok-4.5", "hy3", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "mimo-v2.5", "mimo-v2.5-pro", "minimax-m2.7", "minimax-m3", "qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus"]
 
 [session]
 opencode_small_model = { "go-zen" = "opencode/north-mini-code-free", "zen" = "opencode/north-mini-code-free", "local" = "opencode/north-mini-code-free" }
@@ -78,16 +90,37 @@ codex_effort = "low"
 opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "opencode/deepseek-v4-flash-free", "local" = "openai/gpt-5.4-mini" }
 
 [areas.audit]
-claude = "opus"
+# 015-anthropic-dispatch-parity AC-06(b) (round 3, decision 1): was "opus" -- collided with the
+# anthropic-frontier route's curated "opus" model once claude-code became a real dispatch target
+# (`## Contexto` §G-bis). "fable" collides with NOTHING on this tree: not the three curated
+# anthropic route models (haiku/sonnet/opus), not [areas.implement].claude ("sonnet", the
+# collision round 2's rejected "sonnet" fix would have introduced), and not any other
+# [areas.*]/[roles.*].claude value -- live-verified `fable` -> `claude-fable-5`, distinct from
+# `opus` -> `claude-opus-5`. See docs/adr/0019-anthropic-dispatch-parity.md.
+claude = "fable"
 codex = "gpt-5.6-sol"
 codex_effort = "xhigh"
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.5", "local" = "openai/gpt-5.5" }
+# 015 AC-06(a): go-zen was "openai/gpt-5.6-sol" -- an exact same-provider-and-same-model collision
+# with [roles.implementer.tiers.balanced].opencode."go-zen" (also "openai/gpt-5.6-sol"), letting a
+# BASE (non-routed) audit reviewer on OpenCode coincide with a DYNAMICALLY tiered implementer@balanced
+# writer. Realigned to "openai/gpt-5.5", matching this area's own zen/local lanes, which collides with
+# no [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree.
+opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "openai/gpt-5.5", "local" = "openai/gpt-5.5" }
 
 [areas.judge]
-claude = "opus"
+# 015 AC-06(b): same fix, same reason as [areas.audit].claude above.
+claude = "fable"
 codex = "gpt-5.6-sol"
 codex_effort = "xhigh"
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.5", "local" = "openai/gpt-5.5" }
+# 015 repair (panel RP-01, F-02, user decision: widen AC-06(a)): go-zen was
+# "openai/gpt-5.6-sol" -- the IDENTICAL same-provider-and-same-model collision AC-06(a)
+# already closed for [areas.audit] above, left open here because the original AC-06(i)
+# regression test's role-side universe (`models_config.IMPLEMENT_DUTIES`) never covered
+# the four audit-duty tiered roles at all. Realigned to "openai/gpt-5.5", the SAME value
+# and SAME reasoning as [areas.audit].opencode."go-zen" -- collides with no
+# [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value
+# is one of luna/sol/terra, never "gpt-5.5"). See docs/adr/0019-anthropic-dispatch-parity.md D8.
+opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "openai/gpt-5.5", "local" = "openai/gpt-5.5" }
 
 [areas.release]
 claude = "haiku"
@@ -105,7 +138,19 @@ opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "opencode/deepseek-v4-fla
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.4-mini", "local" = "openai/gpt-5.4-mini" }
+# 015 repair, round 2 (user decision: fix the named [areas.ops] residual from AC-06(a)'s
+# widened generic scan -- see docs/adr/0019-anthropic-dispatch-parity.md D8): go-zen was
+# "openai/gpt-5.6-terra", an exact same-provider-and-same-model collision with
+# [roles.<tiered-role>.tiers.frontier].opencode."go-zen" (also "openai/gpt-5.6-terra") across
+# all six tiered-role ladders, letting a BASE (non-routed) ops area coincide with a
+# DYNAMICALLY tiered frontier writer -- the same collision class already closed for
+# [areas.audit] and [areas.judge] this session. Realigned to "openai/gpt-5.4-mini", matching
+# this area's own zen/local lanes AND its sibling operational areas ([areas.gate],
+# [areas.release], [areas.memory], which share this area's claude/codex/codex_effort triplet
+# and already used this exact go-zen value) -- collides with no
+# [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value is
+# one of luna/sol/terra, never "gpt-5.4-mini").
+opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "openai/gpt-5.4-mini", "local" = "openai/gpt-5.4-mini" }
 
 [roles.agent-factory]
 claude = "opus"

@@ -1,0 +1,305 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-28T13:28:24+00:00",
+    "hash": "70954fe7cd05f755be1196c06d4bdca367b10e630aa59c36d67897f843aa3b1d",
+    "path": "docs/specs/009-self-application/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P3-panel-integrity",
+  "feature_id": "009-self-application",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/009-self-application/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-28T13:28:24+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Resolver el domicilio unico de la capa de conocimiento en el arnes",
+          "Guard en verify.sh: un prompt canonico no puede apuntar a una ruta inexistente",
+          "Test que prueba que lo que memory-scribe escribe es lo que los lectores leen"
+        ]
+      },
+      "package_id": "P1-knowledge-home",
+      "timestamp": "2026-07-28T13:28:41+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Gate que exige ai/state/features/<id>.json cuando el commit toca docs/specs/<id>/, nombrando el comando remedio"
+        ]
+      },
+      "package_id": "P2-state-machine-required",
+      "timestamp": "2026-07-28T13:28:42+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "start-review-panel exige miembros declarados",
+          "start-review-panel contra un panel-id existente es error, nunca no-op",
+          "Canal sancionado para un hallazgo independiente que vuelve despues de cerrado el panel, sin contarlo como segundo ciclo",
+          "Corregir la deriva de registro: ADR-0009 ausente del indice y design.md:455 obsoleto"
+        ]
+      },
+      "package_id": "P3-panel-integrity",
+      "timestamp": "2026-07-28T13:28:42+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "objective": "Que la capa de conocimiento exista donde los diez prompts la buscan, con un solo domicilio, y que verify.sh falle si un prompt canonico apunta a una ruta inexistente",
+      "owned_paths": [
+        "ai/scripts/verify.sh",
+        "knowledge"
+      ],
+      "package_id": "P1-knowledge-home",
+      "read_only_paths": [],
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [
+        "Resolver el domicilio duplicado implica dejar de trackear archivos; hay que decidir cual sobrevive sin perder el contenido del otro."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py"
+      ],
+      "status": "planned",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Resolver el domicilio unico de la capa de conocimiento en el arnes",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Guard en verify.sh: un prompt canonico no puede apuntar a una ruta inexistente",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Test que prueba que lo que memory-scribe escribe es lo que los lectores leen",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "objective": "Que entregar una feature por fuera de la maquina de estados sea un error y no silencio",
+      "owned_paths": [
+        "ai/scripts/verify.sh"
+      ],
+      "package_id": "P2-state-machine-required",
+      "read_only_paths": [],
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [
+        "Bajo. El unico cuidado es no backfillear la 006."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py"
+      ],
+      "status": "planned",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Gate que exige ai/state/features/<id>.json cuando el commit toca docs/specs/<id>/, nombrando el comando remedio",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "objective": "Cerrar los tres agujeros del ciclo de review que aparecieron al usarlo: panel sin miembros declarados, no-op silencioso, y hallazgo tardio sin canal",
+      "owned_paths": [
+        "PROYECTO/ai/scripts/feature-state.py",
+        "ai/scripts/feature-state.py",
+        "docs/adr/README.md"
+      ],
+      "package_id": "P3-panel-integrity",
+      "read_only_paths": [],
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [
+        "Toca feature-state.py, que 007-P2 no reclama pero 005-P2 si va a tocar (notes_root). Secuenciar."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py"
+      ],
+      "status": "planned",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "start-review-panel exige miembros declarados",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "start-review-panel contra un panel-id existente es error, nunca no-op",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Canal sancionado para un hallazgo independiente que vuelve despues de cerrado el panel, sin contarlo como segundo ciclo",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Corregir la deriva de registro: ADR-0009 ausente del indice y design.md:455 obsoleto",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 3,
+  "schema_version": 1,
+  "updated_at": "2026-07-28T13:28:42+00:00"
+}

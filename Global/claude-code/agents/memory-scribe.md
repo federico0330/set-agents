@@ -25,9 +25,12 @@ When the orchestrator hands you finding/report files at feature close (or after 
    root causes, and decisions with their why.
 2. Append each item to the matching domain file under the right section (`## Invariantes`,
    `## Errores conocidos y causas raíz`, `## Decisiones y porqués`), prefixed `[YYYY-MM][feature-id]`.
-   Use `python3 ai/scripts/save_memory.py "<entry>" --domain <domain>` or edit the file directly.
+   Use `python3 ai/scripts/save_memory.py "<entry>" --domain <domain> --section "<one of those three>"
+   --feature-id <feature-id>` or edit the file directly. The script writes the prefix for you and refuses a
+   section the file does not have, so a mis-typed heading is an error and never an entry appended nowhere.
 3. If an item generalizes beyond this project's stack, also list it under `## Candidatos a global` —
-   the human promotes those to the harness-level `knowledge/` layer.
+   the human promotes those into the harness repo's own `docs/ai/knowledge/_global/`, which is the source
+   `sync-project.sh` distributes from. You never write that tier here or there; see rule 5.
 4. Compaction, same pass: if a domain file exceeds ~120 lines, dedupe, generalize entries that repeat,
    and delete what is obsolete. The file is a curated department memory, not an append-only log.
 5. Never touch `docs/ai/knowledge/_global/*.md` — that layer is distributed read-only from the harness repo.

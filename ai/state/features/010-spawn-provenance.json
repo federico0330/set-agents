@@ -1,0 +1,942 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-30T13:46:09+00:00",
+    "hash": "e1e9da058144c8e8ed1e5e8be3e1b94f78fb2b06186a1727cc2d2af3f66d2f2b",
+    "path": "docs/specs/010-spawn-provenance/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-spawn-provenance",
+  "feature_id": "010-spawn-provenance",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "orchestrator",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/010-spawn-provenance/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T13:46:09+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "T-01-spawn-id-mint-and-replay-guard",
+          "T-02-spawns-list-schema-and-setdefault",
+          "T-03-graph-spawn-node-type-and-label",
+          "T-04-rename-repoint-legacy-spawn-test",
+          "T-05-done-ready-blockers-fix",
+          "T-06-adr-0014-and-index-supersession-note",
+          "T-07-regression-coverage-ac05"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:46:31+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Contrato aprobado tras 4 pasadas de spec-challenger; arrancando implementaci\u00f3n"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:46:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Instanciamos al implementador que conecta los spawns al grafo de ejecuci\u00f3n (010-spawn-provenance).",
+        "purpose": "AC-01..AC-05, 7 tareas, adversarial-primero",
+        "role": "implementer",
+        "spawns": 1,
+        "tech": "implementer, contra P1-spawn-provenance, AC-01..AC-05, 7 tareas"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:46:49+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-01-spawn-id-mint-and-replay-guard"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:51:05+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-01-spawn-id-mint-and-replay-guard",
+        "validations": [
+          "unittest: test_record_spawn_mints_sequential_spawn_ids_from_the_counter, test_record_spawn_on_a_package_with_a_precedent_counter_but_no_spawns_list_continues_the_counter, test_record_spawn_replay_guard_is_first_and_produces_exactly_one_entry, test_record_spawn_rejects_duplicate_spawn_id_against_a_desynced_counter (red->green)"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:53:59+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-02-spawns-list-schema-and-setdefault"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:54:00+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-02-spawns-list-schema-and-setdefault",
+        "validations": [
+          "compact_package()['spawns']==[]; covered by same T-01 tests + PROYECTO/ai byte-identical"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:54:00+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-03-graph-spawn-node-type-and-label"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:54:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-03-graph-spawn-node-type-and-label",
+        "validations": [
+          "unittest: test_graph_spawn_node_type_renders_label_and_no_edges, test_graph_spawn_node_absent_when_package_has_no_spawns_key (red->green); full graph suite (-k graph) green, 27 tests"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:55:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-04-rename-repoint-legacy-spawn-test"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:55:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-04-rename-repoint-legacy-spawn-test",
+        "validations": [
+          "renamed test_graph_never_emits_spawn_nodes_and_survives_legacy_fixtures_without_commit -> test_graph_omits_spawn_nodes_for_a_package_lacking_spawns_list_and_survives_legacy_fixtures_without_commit, comment repointed to AC-02's surviving invariant; unittest green"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:55:50+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-05-done-ready-blockers-fix"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:55:55+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-05-done-ready-blockers-fix",
+        "validations": [
+          "unittest: test_done_ready_reaches_done_after_a_real_block_and_reopen_cycle (real CLI), test_done_ready_still_blocks_when_any_blocker_lacks_resolved_at_fixture, test_done_ready_passes_when_every_blocker_has_resolved_at_fixture (red->green)"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:57:55+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-06-adr-0014-and-index-supersession-note"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T13:57:55+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-06-adr-0014-and-index-supersession-note",
+        "validations": [
+          "docs/adr/0014-spawn-provenance-node.md created; docs/adr/0013 status line annotated; docs/adr/README.md rows updated; unittest: test_every_adr_on_disk_has_a_row_in_the_index, test_the_adr_index_never_lists_a_file_that_is_not_there green"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T14:01:05+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-07-regression-coverage-ac05"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T14:01:05+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "T-07-regression-coverage-ac05",
+        "validations": [
+          "unittest discover: 467 tests OK; ./ai/scripts/verify.sh -> VERIFY_PASS; ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2; git diff --check clean; check-owned-paths.py flags exactly docs/adr/0013-execution-graph-view.md as read_only_violations (expected, see evidence)"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T14:12:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Antes de cerrar 010, una verificaci\u00f3n independiente confirma que lo ya implementado sigue funcionando en el \u00e1rbol actual.",
+        "purpose": "Independent package gate verification before review",
+        "role": "gate-runner",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "gate-runner verifica los cuatro gates del paquete P1-spawn-provenance; su resultado ser\u00e1 evidencia durable previa a PACKAGE_GATES y no modifica c\u00f3digo."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Mientras se confirman los tests, dejamos asentada la excepci\u00f3n documental necesaria para que el control de alcance no castigue una l\u00ednea que el contrato exige.",
+        "purpose": "Record approved ownership exception and AC-04 decision before package gates",
+        "role": "integrator",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "Un integrador de estado registrar\u00e1 exclusivamente la excepci\u00f3n aprobada sobre ADR-0013 y la decisi\u00f3n AC-04; no toca c\u00f3digo ni cambia fases."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:47:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:48:27+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Con los tests y el alcance validados, 010 pasa a la revisi\u00f3n de alguien que no particip\u00f3 de su implementaci\u00f3n.",
+        "purpose": "Persist gates and enter independent package review",
+        "role": "integrator",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "Se persistir\u00e1n los cuatro gates, se integrar\u00e1 el diff de trabajo como HEAD y se abrir\u00e1 un panel con package-reviewer; el paquete no toca una superficie runtime y no requiere navegador."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "unittest-discover",
+        "status": "pass"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:34+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "verify.sh",
+        "status": "pass"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:34+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:34+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:34+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Cuatro gates independientes del gate-runner registrados en pass."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:42+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:43+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Implementacion completa, gates verdes e integracion registrada; listo para revision independiente."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:43+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:50:56+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una persona independiente revisa ahora que los cambios de 010 cumplan el contrato y no rompan nada alrededor.",
+        "purpose": "Independent deep review of integrated 010 package",
+        "role": "package-reviewer",
+        "spawn_id": "SPAWN-005",
+        "spawns": 5,
+        "tech": "package-reviewer revisa AC-01..AC-05, l\u00edmites de replay, compatibilidad legada, nodo spawn sin edges y done_ready(); rol read-only dentro de RP-01."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:51:18+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "La primera revisi\u00f3n no devolvi\u00f3 resultado; reiniciamos una sola vez con contexto limpio para no dejar el paquete a mitad de camino.",
+        "purpose": "One relaunch of stalled independent package review in RP-01",
+        "role": "package-reviewer",
+        "spawn_id": "SPAWN-006",
+        "spawns": 6,
+        "tech": "La primera instancia fue interrumpida sin hallazgos ni mutaciones; se relanza un package-reviewer dentro del mismo panel RP-01 y se deja constancia de la degradaci\u00f3n operativa."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:55:14+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Sumamos una prueba puntual para que un reintento no quede bloqueado al llegar al l\u00edmite de intentos.",
+        "purpose": "Repair consolidated medium review finding P1-REV-001",
+        "role": "repair-agent",
+        "spawn_id": "SPAWN-007",
+        "spawns": 7,
+        "tech": "repair-agent modifica \u00fanicamente tests/test_harness.py para probar replay-before-budget y replay-before-phase; luego entrega evidencia de regresi\u00f3n."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:58:57+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 1,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:59:17+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T15:59:17+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Confirmamos toda la bater\u00eda antes de dar por reparada la mejora encontrada en la revisi\u00f3n.",
+        "purpose": "Independent full-suite verification of P1-REV-001 repair",
+        "role": "gate-runner",
+        "spawn_id": "SPAWN-008",
+        "spawns": 8,
+        "tech": "gate-runner ejecuta suite completa con timeout expl\u00edcito, verify.sh y diff-check sobre el delta de tests; no cambia c\u00f3digo."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:03:32+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Investigamos por qu\u00e9 la prueba completa qued\u00f3 esperando antes de seguir con el cierre.",
+        "purpose": "Diagnose full-suite hang after P1-REV-001 test repair",
+        "role": "debugger",
+        "spawn_id": "SPAWN-009",
+        "spawns": 9,
+        "tech": "debugger inspecciona el proceso/test colgado y corrige s\u00f3lo la causa ra\u00edz dentro de tests/test_harness.py si corresponde; luego aporta un comando reproducible."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:07:38+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:12:50+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P1-REV-001"
+        ]
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:12:51+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una \u00faltima revisi\u00f3n confirma que la nueva prueba cubre exactamente el caso que faltaba.",
+        "purpose": "Focused independent delta review of P1-REV-001 repair",
+        "role": "delta-reviewer",
+        "spawn_id": "SPAWN-010",
+        "spawns": 10,
+        "tech": "delta-reviewer revisa exclusivamente el delta en tests/test_harness.py: replay antes de phase/budget y no-op byte-estable; read-only."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:13:05+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:15:58+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh",
+          "./build.sh --check",
+          "git diff --check"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:15:59+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-07-30T16:15:59+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 1,
+    "human_questions_after_approval": 0,
+    "package_reviews": 1,
+    "repair_batches": 1,
+    "task_deep_reviews": 0,
+    "verifications": 1
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "docs/adr/0013-execution-graph-view.md",
+          "reason": "AC-03 exige anotar la status line de 0013 con la nota de supersesi\u00f3n parcial que su propio README de ADRs prescribe (nunca reescribir el contenido, solo la nota); el paquete lo declar\u00f3 read_only_paths en planning por error de alcance del propio orquestador -- se aprueba la \u00fanica l\u00ednea que el contrato ya exige.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 10,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-30T16:15:58+00:00",
+          "closed_findings": [
+            "P1-REV-001"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "P1-REV-001 covered by exhausted budget + DONE phase replay, byte-identical state; 1 focused test OK.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "HEAD",
+      "findings": [
+        {
+          "evidence": "tests/test_harness.py:2557 only replays below default budget; it does not prove replay precedes budget/phase gates.",
+          "id": "P1-REV-001",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Replay guard order is not proved at exhausted spawn budget",
+          "verified_at": "2026-07-30T16:12:50+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-30T15:50:34+00:00",
+          "evidence": "Independent gate-runner: python3 -m unittest discover -s tests -> 467 tests OK, 0 failures, 0 skips.",
+          "name": "unittest-discover",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T15:50:34+00:00",
+          "evidence": "Independent gate-runner: ./ai/scripts/verify.sh -> VERIFY_PASS.",
+          "name": "verify.sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T15:50:34+00:00",
+          "evidence": "Independent gate-runner: ./build.sh --check -> CHECK_PASS; SELF_SCAFFOLD_SYNC_OK files=2.",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T15:50:34+00:00",
+          "evidence": "Independent gate-runner: git diff --check -> exit 0, no output.",
+          "name": "diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Mintear spawn_id determin\u00edstico en record-spawn, nodo spawn (sin edges) en el grafo de 006, y el fix de done_ready() sobre blockers resueltos",
+      "owned_paths": [
+        "ai/scripts/feature-state.py",
+        "PROYECTO/ai/scripts/feature-state.py",
+        "tests/test_harness.py",
+        "docs/adr/0014-spawn-provenance-node.md",
+        "docs/adr/README.md",
+        "docs/specs/010-spawn-provenance/evidence/**",
+        "docs/specs/010-spawn-provenance/context/**",
+        "ai/state/features/010-spawn-provenance.json",
+        "ai/state/STATUS.md",
+        "ai/state/narrative-log.jsonl",
+        "ai/state/decisions-log.jsonl",
+        "docs/notas/**"
+      ],
+      "package_id": "P1-spawn-provenance",
+      "read_only_paths": [
+        "Global/**",
+        "docs/specs/010-spawn-provenance/spec.md",
+        "docs/specs/006-execution-graph/**",
+        "docs/adr/0013-execution-graph-view.md"
+      ],
+      "repairs": [
+        {
+          "at": "2026-07-30T16:12:51+00:00",
+          "changed_files": [
+            "tests/test_harness.py"
+          ],
+          "finding_ids": [
+            "P1-REV-001"
+          ],
+          "verification": [
+            "Focused replay regression PASS; full unittest discover completed exit 0 in persistent terminal; verify.sh CHECK_PASS/SELF_SCAFFOLD_SYNC_OK; git diff --check clean."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-30T15:59:17+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer"
+          ],
+          "started_at": "2026-07-30T15:50:56+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-30T15:59:17+00:00",
+              "evidence": "",
+              "findings": [
+                "P1-REV-001"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-30T15:59:17+00:00",
+          "evidence": "",
+          "findings": [
+            "P1-REV-001"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-30T16:15:59+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-07-30T15:47:37+00:00",
+          "client": "Antes de cerrar 010, una verificaci\u00f3n independiente confirma que lo ya implementado sigue funcionando en el \u00e1rbol actual.",
+          "purpose": "Independent package gate verification before review",
+          "role": "gate-runner",
+          "spawn_id": "SPAWN-002",
+          "tech": "gate-runner verifica los cuatro gates del paquete P1-spawn-provenance; su resultado ser\u00e1 evidencia durable previa a PACKAGE_GATES y no modifica c\u00f3digo."
+        },
+        {
+          "at": "2026-07-30T15:47:53+00:00",
+          "client": "Mientras se confirman los tests, dejamos asentada la excepci\u00f3n documental necesaria para que el control de alcance no castigue una l\u00ednea que el contrato exige.",
+          "purpose": "Record approved ownership exception and AC-04 decision before package gates",
+          "role": "integrator",
+          "spawn_id": "SPAWN-003",
+          "tech": "Un integrador de estado registrar\u00e1 exclusivamente la excepci\u00f3n aprobada sobre ADR-0013 y la decisi\u00f3n AC-04; no toca c\u00f3digo ni cambia fases."
+        },
+        {
+          "at": "2026-07-30T15:50:04+00:00",
+          "client": "Con los tests y el alcance validados, 010 pasa a la revisi\u00f3n de alguien que no particip\u00f3 de su implementaci\u00f3n.",
+          "purpose": "Persist gates and enter independent package review",
+          "role": "integrator",
+          "spawn_id": "SPAWN-004",
+          "tech": "Se persistir\u00e1n los cuatro gates, se integrar\u00e1 el diff de trabajo como HEAD y se abrir\u00e1 un panel con package-reviewer; el paquete no toca una superficie runtime y no requiere navegador."
+        },
+        {
+          "at": "2026-07-30T15:51:18+00:00",
+          "client": "Una persona independiente revisa ahora que los cambios de 010 cumplan el contrato y no rompan nada alrededor.",
+          "purpose": "Independent deep review of integrated 010 package",
+          "role": "package-reviewer",
+          "spawn_id": "SPAWN-005",
+          "tech": "package-reviewer revisa AC-01..AC-05, l\u00edmites de replay, compatibilidad legada, nodo spawn sin edges y done_ready(); rol read-only dentro de RP-01."
+        },
+        {
+          "at": "2026-07-30T15:55:14+00:00",
+          "client": "La primera revisi\u00f3n no devolvi\u00f3 resultado; reiniciamos una sola vez con contexto limpio para no dejar el paquete a mitad de camino.",
+          "purpose": "One relaunch of stalled independent package review in RP-01",
+          "role": "package-reviewer",
+          "spawn_id": "SPAWN-006",
+          "tech": "La primera instancia fue interrumpida sin hallazgos ni mutaciones; se relanza un package-reviewer dentro del mismo panel RP-01 y se deja constancia de la degradaci\u00f3n operativa."
+        },
+        {
+          "at": "2026-07-30T15:58:57+00:00",
+          "client": "Sumamos una prueba puntual para que un reintento no quede bloqueado al llegar al l\u00edmite de intentos.",
+          "purpose": "Repair consolidated medium review finding P1-REV-001",
+          "role": "repair-agent",
+          "spawn_id": "SPAWN-007",
+          "tech": "repair-agent modifica \u00fanicamente tests/test_harness.py para probar replay-before-budget y replay-before-phase; luego entrega evidencia de regresi\u00f3n."
+        },
+        {
+          "at": "2026-07-30T16:03:32+00:00",
+          "client": "Confirmamos toda la bater\u00eda antes de dar por reparada la mejora encontrada en la revisi\u00f3n.",
+          "purpose": "Independent full-suite verification of P1-REV-001 repair",
+          "role": "gate-runner",
+          "spawn_id": "SPAWN-008",
+          "tech": "gate-runner ejecuta suite completa con timeout expl\u00edcito, verify.sh y diff-check sobre el delta de tests; no cambia c\u00f3digo."
+        },
+        {
+          "at": "2026-07-30T16:07:38+00:00",
+          "client": "Investigamos por qu\u00e9 la prueba completa qued\u00f3 esperando antes de seguir con el cierre.",
+          "purpose": "Diagnose full-suite hang after P1-REV-001 test repair",
+          "role": "debugger",
+          "spawn_id": "SPAWN-009",
+          "tech": "debugger inspecciona el proceso/test colgado y corrige s\u00f3lo la causa ra\u00edz dentro de tests/test_harness.py si corresponde; luego aporta un comando reproducible."
+        },
+        {
+          "at": "2026-07-30T16:13:05+00:00",
+          "client": "Una \u00faltima revisi\u00f3n confirma que la nueva prueba cubre exactamente el caso que faltaba.",
+          "purpose": "Focused independent delta review of P1-REV-001 repair",
+          "role": "delta-reviewer",
+          "spawn_id": "SPAWN-010",
+          "tech": "delta-reviewer revisa exclusivamente el delta en tests/test_harness.py: replay antes de phase/budget y no-op byte-estable; read-only."
+        }
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "T-01-spawn-id-mint-and-replay-guard",
+          "local_validations": [
+            "unittest: test_record_spawn_mints_sequential_spawn_ids_from_the_counter, test_record_spawn_on_a_package_with_a_precedent_counter_but_no_spawns_list_continues_the_counter, test_record_spawn_replay_guard_is_first_and_produces_exactly_one_entry, test_record_spawn_rejects_duplicate_spawn_id_against_a_desynced_counter (red->green)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-02-spawns-list-schema-and-setdefault",
+          "local_validations": [
+            "compact_package()['spawns']==[]; covered by same T-01 tests + PROYECTO/ai byte-identical"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-03-graph-spawn-node-type-and-label",
+          "local_validations": [
+            "unittest: test_graph_spawn_node_type_renders_label_and_no_edges, test_graph_spawn_node_absent_when_package_has_no_spawns_key (red->green); full graph suite (-k graph) green, 27 tests"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-04-rename-repoint-legacy-spawn-test",
+          "local_validations": [
+            "renamed test_graph_never_emits_spawn_nodes_and_survives_legacy_fixtures_without_commit -> test_graph_omits_spawn_nodes_for_a_package_lacking_spawns_list_and_survives_legacy_fixtures_without_commit, comment repointed to AC-02's surviving invariant; unittest green"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-05-done-ready-blockers-fix",
+          "local_validations": [
+            "unittest: test_done_ready_reaches_done_after_a_real_block_and_reopen_cycle (real CLI), test_done_ready_still_blocks_when_any_blocker_lacks_resolved_at_fixture, test_done_ready_passes_when_every_blocker_has_resolved_at_fixture (red->green)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-06-adr-0014-and-index-supersession-note",
+          "local_validations": [
+            "docs/adr/0014-spawn-provenance-node.md created; docs/adr/0013 status line annotated; docs/adr/README.md rows updated; unittest: test_every_adr_on_disk_has_a_row_in_the_index, test_the_adr_index_never_lists_a_file_that_is_not_there green"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "T-07-regression-coverage-ac05",
+          "local_validations": [
+            "unittest discover: 467 tests OK; ./ai/scripts/verify.sh -> VERIFY_PASS; ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2; git diff --check clean; check-owned-paths.py flags exactly docs/adr/0013-execution-graph-view.md as read_only_violations (expected, see evidence)"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-30T16:15:59+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh",
+            "./build.sh --check",
+            "git diff --check"
+          ],
+          "evidence": "Persistent full suite exit 0; verify.sh VERIFY_PASS; build-check CHECK_PASS and SELF_SCAFFOLD_SYNC_OK files=2; git diff --check clean.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-30T16:12:50+00:00",
+          "evidence": "Focused replay regression PASS; full unittest discover completed exit 0 in persistent terminal; verify.sh CHECK_PASS/SELF_SCAFFOLD_SYNC_OK; git diff --check clean.",
+          "refuted": [],
+          "upheld": [
+            "P1-REV-001"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 42,
+  "schema_version": 1,
+  "updated_at": "2026-07-30T16:15:59+00:00"
+}

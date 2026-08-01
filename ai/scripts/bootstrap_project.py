@@ -127,6 +127,16 @@ for name in SCRIPT_TEMPLATES:
     dest.chmod(0o755)
     created.append(f"ai/scripts/{name}")
 
+# 2b. DR-005 (005-P2 delta review): .gitignore, single-source from PROYECTO/.gitignore so it
+#     never drifts from the harness's own -- create-if-missing, never overwrite. Without this
+#     a bootstrapped project inherited none of the hygiene rules the harness repo relies on
+#     (e.g. ai/state/render-failures.log had nothing keeping it out of git).
+GITIGNORE_TEMPLATE = Path(__file__).resolve().parents[2] / "PROYECTO" / ".gitignore"
+gitignore_dest = root / ".gitignore"
+if not gitignore_dest.exists() and GITIGNORE_TEMPLATE.exists():
+    gitignore_dest.write_text(GITIGNORE_TEMPLATE.read_text())
+    created.append(".gitignore")
+
 # 3. Per-domain knowledge seeds (create-if-missing, never overwrite: memory-scribe grows them,
 #    so an existing file with more content is the expected state, not a conflict).
 for tpl in sorted(KNOWLEDGE_TEMPLATE_DIR.glob("*.md")) if KNOWLEDGE_TEMPLATE_DIR.is_dir() else []:

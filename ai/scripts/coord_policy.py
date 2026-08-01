@@ -9,6 +9,11 @@ import sys
 # sequence only when writing the installed policy, while verify.sh can prove the
 # tracked Global/** tree never baked a builder-specific root.
 APP_CLI = "__SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py"
+# SEC-P1-002 (015 repair, panel RP-01): the Claude-Code-lane cross-process spawn CLI
+# (`ai/scripts/claude_code_spawn.py --dispatch-writer`/`--dispatch-review`) -- the ONLY
+# execution surface AC-03/AC-04's doctrine has for actually invoking this module, since
+# the orchestrator's Bash is deny-by-default and nothing allowlisted it before this fix.
+CLAUDE_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py"
 
 SAFE = [
     r"git (status|diff|log|show)(\s|$)",
@@ -36,8 +41,52 @@ SAFE = [
 # into a permissive raw-string/glob rule.  The tracked copy intentionally matches no
 # local invocation until install.py substitutes HARNESS_HOME.
 SAFE_ARGV = [
-    ({"python3", "python"}, APP_CLI, re.compile(r"--rout(e|ing)-\S+")),
+    # `modifiers=None` means "argv[2] alone decides", exactly as before: set_agents_app.py's
+    # own routing-mode-exclusivity guard in main() (_mode_flags/other_mode) is the thing that
+    # keeps a routing invocation from carrying an unrelated flag, so this entry doesn't need
+    # to re-derive that flag's full grammar here.
+    ({"python3", "python"}, APP_CLI, re.compile(r"--rout(e|ing)-\S+"), None),
+    # ADR-0012/AC-19: a THIRD sanctioned channel, distinct from the one above. --context is
+    # read-only (cmd_context never writes anything, never reads a credential surface) --
+    # justified precisely because of that, never merged into the mutating-capable entry.
+    # SEC-001: unlike --route*, --context takes no value of its own, so its rest-of-argv CAN
+    # be exhaustively enumerated instead of trusted blind: argv[2] matching used to be treated
+    # as clearance for the whole command, which let `--context --scaffold X` (or --update
+    # --yes, --tools-install, ...) through this allowlist -- demonstrated writing real files.
+    # main() now also refuses that combination on its own, but this keeps coord_policy from
+    # claiming a command is safe when it never actually looked past argv[2].
+    ({"python3", "python"}, APP_CLI, re.compile(r"--context\S*"), {"--json": 0, "--project": 1}),
+    # SEC-P1-002: a FOURTH sanctioned channel, distinct from the three above -- the
+    # Claude-Code-lane cross-process spawn CLI. Exhaustively enumerated `modifiers` (the
+    # `--context` precedent's form, never `modifiers=None`, never a trailing-wildcard
+    # regex): every flag `claude_code_spawn.main()` actually defines, and no other. The
+    # untrusted content itself (a diff, a task) never appears as an argv VALUE this
+    # allowlist has to reason about -- `--task`/`--supplementary` only ever carry a file
+    # path or the literal `-` (stdin), never inline text, so a diff containing shell
+    # metacharacters can never smuggle itself into what this policy inspects.
+    # DR-02 (015 repair, delta-review round 2): `--routing-test-root` is deliberately
+    # ABSENT from this modifier map -- `claude_code_spawn.main()` no longer defines that
+    # flag at all (it was a hermetic test-only seam on `dispatch_writer` itself, never
+    # meant to be reachable via a real, allowlisted invocation of this CLI; exposing it
+    # here let an allowlisted command redirect the SEC-P1-003 audit binding away from the
+    # routing store's real 0700 production root). Every entry below must keep matching
+    # `claude_code_spawn.main()`'s real, current flag set exactly -- no more, no less.
+    ({"python3", "python"}, CLAUDE_SPAWN_CLI, re.compile(r"--dispatch-(writer|review)"), {
+        "--role": 1, "--provider": 1, "--model": 1, "--task": 1, "--run-id": 1,
+        "--supplementary": 1, "--spawn-cwd": 1, "--cwd": 1,
+        "--timeout": 1,
+    }),
 ]
+
+
+def _rest_allowed(rest: list[str], modifiers: dict[str, int]) -> bool:
+    i = 0
+    while i < len(rest):
+        nargs = modifiers.get(rest[i])
+        if nargs is None:
+            return False
+        i += 1 + nargs
+    return True
 
 FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")
 FORBIDDEN_OPTIONS = re.compile(r"(?:--output(?:=|\s)|--ext-diff|--pre(?:=|\s)|--exec(?:=|\s)|--exec-batch(?:=|\s)|(?:^|\s)-x(?:\s|$)|(?:^|\s)-e(?:\s|$))")
@@ -60,8 +109,12 @@ def always_denied(command: str) -> bool:
 def _argv_allowed(argv: list[str]) -> bool:
     if len(argv) < 3:
         return False
-    return any(argv[0] in interpreters and argv[1] == script and flag.fullmatch(argv[2])
-               for interpreters, script, flag in SAFE_ARGV)
+    for interpreters, script, flag, modifiers in SAFE_ARGV:
+        if argv[0] not in interpreters or argv[1] != script or not flag.fullmatch(argv[2]):
+            continue
+        if modifiers is None or _rest_allowed(argv[3:], modifiers):
+            return True
+    return False
 
 
 def allowed(command: str) -> bool:

@@ -122,6 +122,16 @@ def load_config(models_path=None):
         values = config["catalog"].get(key)
         if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
             die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
+    # 012 discovered-inventory AC-04: optional declared allowlist ceiling for the two
+    # probeable-only OpenCode-lane providers (routing_core/catalog.py consumes these via
+    # _configured_models; absent entirely is valid — a repo with neither subscription
+    # simply never populates them, and probe_inventory then finds nothing configured).
+    for key in ("opencode_zen", "opencode_go"):
+        values = config["catalog"].get(key)
+        if values is not None and (not isinstance(values, list) or not values
+                                    or not all(isinstance(item, str) and item for item in values)
+                                    or len(values) != len(set(values))):
+            die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
     small = config["session"].get("opencode_small_model")
     if not isinstance(small, dict) or set(small) != set(LANES):
         die("models.toml: [session].opencode_small_model must cover exactly the lanes " + ", ".join(LANES))
@@ -392,6 +402,12 @@ def emit(config):
     for key in ("claude", "codex", "codex_effort"):
         values = ", ".join(_value(item) for item in sorted(config["catalog"][key]))
         lines.append(f"{key} = [{values}]")
+    # 012 AC-04: optional, so only emitted when present — round-trips without inventing an
+    # empty allowlist for a repo that never configured either OpenCode-lane provider.
+    for key in ("opencode_zen", "opencode_go"):
+        if key in config["catalog"]:
+            values = ", ".join(_value(item) for item in sorted(config["catalog"][key]))
+            lines.append(f"{key} = [{values}]")
     if config.get("providers"):
         lines.append("")
         lines.append("[providers]")

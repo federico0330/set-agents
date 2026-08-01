@@ -1,0 +1,287 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-30T16:41:31+00:00",
+    "hash": "280c60a041c4e054c8f096be8d14926868ed465b771f6493ca68e40f4fa0441c",
+    "path": "docs/specs/011-quota-failover/spec.md"
+  },
+  "blockers": [
+    {
+      "at": "2026-07-30T17:04:39+00:00",
+      "package_id": "P1-quota-failover",
+      "reason": "HUMAN_DECISION_REQUIRED: AC-06 exige una suscripci\u00f3n Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondici\u00f3n no est\u00e1 verificada en esta sesi\u00f3n. El runner fail-closed fue verificado y no ejecut\u00f3 Pi ni mut\u00f3 DB sin ella."
+    }
+  ],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-quota-failover",
+  "feature_id": "011-quota-failover",
+  "final_state": "BLOCKED",
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "user-2026-07-30-implement-the-approved-plan",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/011-quota-failover/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T16:41:31+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "additive schema/migration and invariants",
+          "narrow classifier + Pi terminal plumbing",
+          "BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion",
+          "deterministic routing/migration/concurrency tests",
+          "credential-gated real exhausted-provider E2E runner/evidence"
+        ]
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T16:45:01+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Paquete P1 aprobado para implementar el lifecycle atomico de failover de cuota."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T16:45:01+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Se implementa el reemplazo \u00fanico y seguro tras un agotamiento real de cuota.",
+        "purpose": "Implement Feature 011 atomic quota exhaustion failover",
+        "role": "implementer",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "Implementaci\u00f3n acotada de esquema, transacci\u00f3n BEGIN IMMEDIATE, integraci\u00f3n Pi y pruebas deterministas para AC-01..AC-06."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T16:45:16+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Se retoma el n\u00facleo ya guardado para cerrar pruebas y el runner real sin perder el avance.",
+        "purpose": "Continue Feature 011 implementation from durable checkpoint",
+        "role": "implementer",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Nueva instancia implementa exclusivamente los pendientes documentados: tests deterministas AC-01..05 y runner/evidencia AC-06."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T16:52:23+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Se completa la comprobaci\u00f3n real que debe bloquearse honestamente si falta la precondici\u00f3n controlada.",
+        "purpose": "Complete only AC-06 runner and evidence after implementation checkpoint",
+        "role": "implementer",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "Instancia focalizada para runner credencial-gated AC-06 y evidencia, sin expandir el n\u00facleo de routing."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T16:58:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Implementaci\u00f3n P1 entregada con evidencia y pruebas focalizadas; ejecutar gates independientes."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T17:02:41+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "block",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "HUMAN_DECISION_REQUIRED: AC-06 exige una suscripci\u00f3n Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondici\u00f3n no est\u00e1 verificada en esta sesi\u00f3n. El runner fail-closed fue verificado y no ejecut\u00f3 Pi ni mut\u00f3 DB sin ella."
+      },
+      "package_id": "P1-quota-failover",
+      "timestamp": "2026-07-30T17:04:39+00:00",
+      "to": "BLOCKED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 3,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/011-quota-failover",
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "objective": "Atomically classify the exact settled Anthropic/Pi quota exhaustion, preserve its failed dispatch and authorize at most one stored-fallback linked replacement while globally excluding the exhausted provider until next UTC day.",
+      "owned_paths": [
+        "ai/scripts/routing_core/store.py",
+        "ai/scripts/routing_core/service.py",
+        "ai/scripts/routing_core/domain.py",
+        "ai/scripts/set_agents_spawn.py",
+        "ai/scripts/set_agents_app.py",
+        "tests/test_routing.py",
+        "tests/test_harness.py",
+        "docs/specs/011-quota-failover/evidence/"
+      ],
+      "package_id": "P1-quota-failover",
+      "read_only_paths": [
+        "docs/specs/011-quota-failover/spec.md",
+        "acceptance.md",
+        "design.md",
+        "plan.md",
+        "tasks.md",
+        "docs/adr/0015-quota-failover.md"
+      ],
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [
+        "SQLite migration/schema integrity",
+        "transaction concurrency/idempotency",
+        "accounting integrity",
+        "reviewer independence",
+        "external-E2E precondition"
+      ],
+      "routing_reason": "atomic routing lifecycle and accounting require high-capability implementation",
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": "hosted coding model",
+      "selected_role": "implementer",
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-07-30T16:45:16+00:00",
+          "client": "Se implementa el reemplazo \u00fanico y seguro tras un agotamiento real de cuota.",
+          "purpose": "Implement Feature 011 atomic quota exhaustion failover",
+          "role": "implementer",
+          "spawn_id": "SPAWN-001",
+          "tech": "Implementaci\u00f3n acotada de esquema, transacci\u00f3n BEGIN IMMEDIATE, integraci\u00f3n Pi y pruebas deterministas para AC-01..AC-06."
+        },
+        {
+          "at": "2026-07-30T16:52:23+00:00",
+          "client": "Se retoma el n\u00facleo ya guardado para cerrar pruebas y el runner real sin perder el avance.",
+          "purpose": "Continue Feature 011 implementation from durable checkpoint",
+          "role": "implementer",
+          "spawn_id": "SPAWN-002",
+          "tech": "Nueva instancia implementa exclusivamente los pendientes documentados: tests deterministas AC-01..05 y runner/evidencia AC-06."
+        },
+        {
+          "at": "2026-07-30T16:58:41+00:00",
+          "client": "Se completa la comprobaci\u00f3n real que debe bloquearse honestamente si falta la precondici\u00f3n controlada.",
+          "purpose": "Complete only AC-06 runner and evidence after implementation checkpoint",
+          "role": "implementer",
+          "spawn_id": "SPAWN-003",
+          "tech": "Instancia focalizada para runner credencial-gated AC-06 y evidencia, sin expandir el n\u00facleo de routing."
+        }
+      ],
+      "status": "package_gates",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "additive schema/migration and invariants",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "narrow classifier + Pi terminal plumbing",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "deterministic routing/migration/concurrency tests",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "credential-gated real exhausted-provider E2E runner/evidence",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "BLOCKED",
+  "revision": 7,
+  "schema_version": 1,
+  "updated_at": "2026-07-30T17:04:39+00:00"
+}

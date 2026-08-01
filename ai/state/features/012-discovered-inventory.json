@@ -1,0 +1,1432 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-30T20:06:51+00:00",
+    "hash": "fd507fcb13f2973e679d09a4e786e03b91109a03eee065bcb6f18b93ba5f6726",
+    "path": "docs/specs/012-discovered-inventory/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-discovered-inventory",
+  "feature_id": "012-discovered-inventory",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "orchestrator",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/012-discovered-inventory/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-30T20:06:51+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Extender _OPENCODE_PROVIDER_KEYS y agregar el mapa provider->id-CLI (AC-02/AC-03)",
+          "Mover el allowlist de [catalog] a los 3 sitios de lockstep + agregar ROUTING_PROVIDERS (AC-04/AC-05)",
+          "Regla de colisi\u00f3n de family entre providers para ids compartidos (AC-07)",
+          "Mapa curado subscription/metered a nivel de provider (AC-08)",
+          "Property test de route_id estable con fixture sint\u00e9tico (AC-09)",
+          "Tests deterministas AC-01..AC-10 (exit codes, cache, gates fail-closed)",
+          "P2 local live-parity gate credential-gated (AC-10 verificaci\u00f3n)",
+          "docs/adr/0016-discovered-inventory.md + fila en README"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:07:07+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:07:38+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:07:41+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Arranca la implementaci\u00f3n del cat\u00e1logo din\u00e1mico de modelos.",
+        "purpose": "Implementar el cat\u00e1logo din\u00e1mico sondeado (AC-01..AC-12) contra routing_core/catalog.py, models.toml y models_config.py",
+        "role": "implementer",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "implementer sobre P1-discovered-inventory, contrato ya verificado en 3 rondas de spec-challenge, ready_for_user_approval."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:07:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Extender _OPENCODE_PROVIDER_KEYS y agregar el mapa provider->id-CLI (AC-02/AC-03)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:38:59+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Extender _OPENCODE_PROVIDER_KEYS y agregar el mapa provider->id-CLI (AC-02/AC-03)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac01_new_pairs_are_registered_in_the_closed_pair_table_only",
+          "unittest tests.test_routing.RoutingTests.test_ac02_ac03_credential_and_cli_id_maps_are_independently_addressable"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:38:59+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Mover el allowlist de [catalog] a los 3 sitios de lockstep + agregar ROUTING_PROVIDERS (AC-04/AC-05)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Mover el allowlist de [catalog] a los 3 sitios de lockstep + agregar ROUTING_PROVIDERS (AC-04/AC-05)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac04_allowlist_ceiling_moved_in_lockstep_across_the_three_sites",
+          "unittest tests.test_routing.RoutingTests.test_ac05_new_providers_are_probeable_not_routable_today",
+          "models_config.load_config round-trip check (opencode_zen/opencode_go emit)"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Regla de colisi\u00f3n de family entre providers para ids compartidos (AC-07)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Regla de colisi\u00f3n de family entre providers para ids compartidos (AC-07)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac07_family_collision_rule_is_pure_and_wired_into_build_snapshot"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Mapa curado subscription/metered a nivel de provider (AC-08)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Mapa curado subscription/metered a nivel de provider (AC-08)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac08_subscription_metered_map_is_provider_keyed_not_a_row_field"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Property test de route_id estable con fixture sint\u00e9tico (AC-09)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Property test de route_id estable con fixture sint\u00e9tico (AC-09)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac09_route_id_identity_is_provider_agnostic_for_a_synthetic_discovered_row"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests deterministas AC-01..AC-10 (exit codes, cache, gates fail-closed)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests deterministas AC-01..AC-10 (exit codes, cache, gates fail-closed)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac10_probe_fails_closed_on_nonzero_exit_for_the_new_pairs",
+          "python3 -m unittest discover -s tests (482 tests, OK)"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P2 local live-parity gate credential-gated (AC-10 verificaci\u00f3n)"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "P2 local live-parity gate credential-gated (AC-10 verificaci\u00f3n)",
+        "validations": [
+          "unittest tests.test_routing.RoutingTests.test_ac10_p2_local_live_parity_gate (ran LIVE, credentials present, ok)"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "docs/adr/0016-discovered-inventory.md + fila en README"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "docs/adr/0016-discovered-inventory.md + fila en README",
+        "validations": [
+          "docs/adr/0016-discovered-inventory.md created; docs/adr/README.md row added; 0016 confirmed next free number"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:39:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Implementaci\u00f3n completa (AC-01..AC-12): catalog.py/models.toml/models_config.py + ADR-0016 + 9 tests nuevos, suite verde 473->482, verify.sh VERIFY_PASS, ownership sin violaciones. Listo para gates."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:40:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify.sh",
+        "status": "pass"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:40:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:40:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership-check",
+        "status": "pass"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:40:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:40:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:53:46+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:53:47+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:53:50+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor que nunca vio la implementaci\u00f3n audita si el cat\u00e1logo din\u00e1mico est\u00e1 bien construido.",
+        "purpose": "Revisi\u00f3n independiente del paquete P1-discovered-inventory completo",
+        "role": "package-reviewer",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "package-reviewer, contexto limpio, panel RP-01."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:53:58+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un segundo revisor, de seguridad, audita espec\u00edficamente si la l\u00f3gica que evita que un modelo se revise a s\u00ed mismo bajo dos nombres de proveedor es realmente s\u00f3lida.",
+        "purpose": "Auditor\u00eda de seguridad de la regla de colisi\u00f3n de family y el mapa de doble traducci\u00f3n",
+        "role": "security-auditor",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "security-auditor, contexto limpio, panel RP-01, concurrente con package-reviewer."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T20:53:58+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 13,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T22:18:31+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 1,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T22:39:13+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T22:39:25+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "El panel de revisi\u00f3n encontr\u00f3 un agujero real de seguridad (un modelo podr\u00eda revisarse a s\u00ed mismo bajo dos nombres de proveedor) y varios problemas menores. Se repara todo en una sola pasada.",
+        "purpose": "Reparaci\u00f3n consolidada de 14 hallazgos del panel RP-01 (1 critical, 2 high, 4 medium, 7 low)",
+        "role": "repair-agent",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "repair-agent consolidado, orden por severidad: SEC-001 (critical) primero, F-01/F-02 (high, tests que no discriminan) segundo, resto despu\u00e9s."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T22:39:33+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T23:34:55+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T23:35:03+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un tercer revisor, que no vio ni la implementaci\u00f3n original ni el panel, confirma que las reparaciones cierran los problemas sin abrir otros nuevos.",
+        "purpose": "Delta-review acotado a los archivos tocados en la reparaci\u00f3n de los 14 hallazgos de RP-01",
+        "role": "delta-reviewer",
+        "spawn_id": "SPAWN-005",
+        "spawns": 5,
+        "tech": "delta-reviewer, contexto limpio, acotado al diff de la reparaci\u00f3n (catalog.py, service.py, models.toml, models_config.py, ADR-0016, README, test_routing.py)."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T23:35:12+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "El mismo agujero de seguridad que se cerr\u00f3 para Opus/Sonnet/Haiku se filtr\u00f3 para Fable, el modelo m\u00e1s nuevo. Se cierra ahora, acotado.",
+        "purpose": "Reparaci\u00f3n ronda 2: SEC-002 (medium, mismo patr\u00f3n que SEC-001 pero con claude-fable-5), F-10 reabierto, N-02 (ADR autocontradictorio)",
+        "role": "repair-agent",
+        "spawn_id": "SPAWN-006",
+        "spawns": 6,
+        "tech": "repair-agent, segunda ronda, alcance m\u00ednimo: 3 hallazgos."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-30T23:59:05+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "\u00daltima verificaci\u00f3n antes de cerrar el paquete.",
+        "purpose": "Confirmaci\u00f3n final de la ronda 2 (SEC-002, F-10, N-02)",
+        "role": "delta-reviewer",
+        "spawn_id": "SPAWN-007",
+        "spawns": 7,
+        "tech": "delta-reviewer, contexto limpio, acotado a los 3 fixes de la ronda 2."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:22:55+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:51:37+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 14
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:52:01+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-001",
+          "F-01",
+          "F-02",
+          "F-03",
+          "F-04",
+          "F-05",
+          "F-06",
+          "F-07",
+          "F-08",
+          "F-09",
+          "F-11",
+          "F-12",
+          "F-13"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:52:08+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:52:27+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 2
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:52:42+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-002",
+          "F-10",
+          "N-02"
+        ]
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:52:48+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:52:53+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:53:04+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-07-31T00:53:17+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 2,
+    "human_questions_after_approval": 0,
+    "package_reviews": 1,
+    "repair_batches": 2,
+    "task_deep_reviews": 0,
+    "verifications": 2
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "models.toml",
+          "reason": "Error de tipeo del orquestador al crear el paquete: declare ai/catalogs/models.toml en owned_paths, pero el archivo real vive en la raiz del repo (models.toml), no en ai/catalogs/ (que solo contiene routes.v1.toml, que este paquete no toca por non-goal explicito). Se aprueba la ruta real; el patron incorrecto en owned_paths queda inerte (no matchea ningun archivo).",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/service.py",
+          "reason": "SEC-001 (critical, panel RP-01, security-auditor) exige una segunda capa de defensa en profundidad: la exclusion dura REVIEW_MODEL_CONFLICT entre REVIEW_FAMILY_CONFLICT (service.py:149) y REVIEW_PROVIDER_CONFLICT (service.py:155). No estaba en owned_paths original porque el paquete se planeo antes de saber que la normalizacion de family sola no alcanzaba. Verificado independientemente: el PoC original del auditor (poc_e2e.py) ahora es rechazado por build_snapshot (CATALOG_FAMILY_COLLISION) antes incluso de llegar a la exclusion de service.py.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 7,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "medium",
+      "context_pack": "docs/specs/012-discovered-inventory/spec.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-31T00:52:27+00:00",
+          "closed_findings": [
+            "SEC-001",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-11",
+            "F-12",
+            "F-13"
+          ],
+          "new_or_reopened_findings": [
+            "SEC-002",
+            "N-02"
+          ],
+          "reason": "Delta-review ronda 1: 13 de 14 hallazgos originales cerrados y verificados por mutacion/PoC propios. F-10 permanece abierto. 2 hallazgos nuevos: SEC-002 (medium) y N-02 (low).",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-31T00:52:53+00:00",
+          "closed_findings": [
+            "SEC-002",
+            "F-10",
+            "N-02"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Delta-review ronda 2 (contexto limpio, independiente): los 3 hallazgos cerrados y verificados por PoC + mutacion propia sobre copia espejo, sin tocar el repo real. 490/490 tests, VERIFY_PASS. Un nit informativo (N-03, resto de redaccion 'exact-id' en una frase del ADR) no requiere reparacion.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "HEAD",
+      "findings": [
+        {
+          "acceptance_criterion": "AC-07",
+          "category": "testing",
+          "evidence": "Fixture colisionante usa roles=[\"implementer\"] con roster completo (28 roles); la verificacion de cobertura de roster en catalog.py:458 levanta RoutingError igual. Experimento: cargando catalog.py con la llamada a _check_family_collisions reemplazada por pass, el mismo fixture sigue levantando RoutingError(CATALOG_INVALID).",
+          "file": "tests/test_routing.py",
+          "id": "F-01",
+          "line": 2683,
+          "repair_attempts": 1,
+          "reproduction": "Reemplazar catalog.py:457 por pass y correr test_ac07_family_collision_rule_is_pure_and_wired_into_build_snapshot -> sigue verde.",
+          "required_outcome": "El fixture colisionante debe usar cobertura total del roster para que la unica causa posible del raise sea _check_family_collisions.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "tests/test_routing.py:2683-2692",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-10",
+          "category": "testing",
+          "evidence": "assertTrue(probed_models <= ceiling) pasa trivialmente con probed_models vacio, que es exactamente el modo de falla que la Verificacion dice que el gate debe sobrevivir. Medido en vivo: probed == ceiling == 60/16.",
+          "file": "tests/test_routing.py",
+          "id": "F-02",
+          "line": 2781,
+          "repair_attempts": 1,
+          "reproduction": "Romper _OPENCODE_CLI_IDS y correr el gate en una maquina con credenciales -> probed={} y el gate sigue en verde.",
+          "required_outcome": "assertEqual(probed_models, ceiling) mas assertTrue(ceiling) no vacio para los dos providers.",
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "tests/test_routing.py:2769-2781",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-04",
+          "category": "testing",
+          "evidence": "El test 'lockstep across the three sites' solo asserta sitios 1 y 2. El sitio 3 (catalog.py:422-423) es load-bearing (verificado por mutacion) pero ningun test lo cubre.",
+          "file": "tests/test_routing.py",
+          "id": "F-03",
+          "line": 2628,
+          "repair_attempts": 1,
+          "reproduction": "Revertir catalog.py:422-423 a la tupla de dos providers -> suite completa sigue en 482 OK.",
+          "required_outcome": "Test que cubra el sitio 3 sin abrir compuertas reales.",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "tests/test_routing.py:2628-2647",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-04",
+          "category": "integration",
+          "evidence": "Comentarios y ADR dicen tres sitios; el paquete agrego dos mas (models_config.py:125-133,405-410). Nueve listas hardcodeadas por provider, ninguna cross-checkeada.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "F-04",
+          "line": 417,
+          "repair_attempts": 1,
+          "reproduction": "Agregar un provider nuevo siguiendo los comentarios (tres sitios) deja emit borrando su allowlist en el proximo setup-models.sh.",
+          "required_outcome": "Actualizar comentarios/ADR al conteo real + test de coherencia.",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "catalog.py:108-113,417-423; models_config.py:125-133,405-410; docs/adr/0016-discovered-inventory.md:41-49",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-02",
+          "category": "correctness",
+          "evidence": "El argv de _PAIR_COMMANDS hardcodea el id-CLI en vez de derivarlo de _OPENCODE_CLI_IDS, que solo se usa para el parser.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "F-05",
+          "line": 69,
+          "repair_attempts": 1,
+          "reproduction": "Cambiar _OPENCODE_CLI_IDS['opencode-zen'] sin tocar el argv -> par ausente en silencio, no detectado por ningun test ni por el gate live.",
+          "required_outcome": "Derivar el argv del mapa o test de coherencia cruzada.",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "catalog.py:66-70,89-90",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-01",
+          "category": "scalability",
+          "evidence": "Medido +69% (+10.5s) en el sondeo sin cache al agregar los 2 pares. En una maquina sin credenciales Zen/Go, el atajo de cache nunca se dispara porque los negativos no se persisten.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "F-06",
+          "line": 300,
+          "repair_attempts": 1,
+          "reproduction": "_probe_pairs sobre 6 pares = 15.2s; sobre 8 = 25.7s.",
+          "required_outcome": "No versionar los allowlists en models.toml o mover el chequeo de credencial antes del segundo comando del par.",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "catalog.py:296-334; models.toml:16-24",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-11",
+          "category": "integration",
+          "evidence": "Cita 'AC-11 non-goal' esta mal atribuida (AC-11 es cache/traza, no non-goals). Se repite en catalog.py y en la evidencia. El contenido real de AC-11 nunca se verifica.",
+          "file": "models.toml",
+          "id": "F-07",
+          "line": 18,
+          "repair_attempts": 1,
+          "reproduction": "Comparar AC-11 del spec contra las citas embarcadas.",
+          "required_outcome": "Corregir citas y verificar el contenido real de AC-11.",
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "models.toml:18-19; catalog.py:417-421; evidence/P1-implementation.md:53-54",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-12",
+          "category": "integration",
+          "evidence": "El ADR se auto-declara Accepted antes de PACKAGE_REVIEW.",
+          "file": "docs/adr/0016-discovered-inventory.md",
+          "id": "F-08",
+          "line": 3,
+          "repair_attempts": 1,
+          "reproduction": "git diff HEAD -- docs/adr/",
+          "required_outcome": "Estado Proposed hasta aceptacion del paquete.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "docs/adr/0016-discovered-inventory.md:3; docs/adr/README.md",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-12",
+          "category": "integration",
+          "evidence": "El diff rellena filas 0009-0016, AC-12 solo pide la 0016.",
+          "file": "docs/adr/README.md",
+          "id": "F-09",
+          "line": 16,
+          "repair_attempts": 1,
+          "reproduction": "git diff HEAD -- docs/adr/README.md",
+          "required_outcome": "Limitar el cambio a la fila 0016.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "docs/adr/README.md",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-09",
+          "category": "testing",
+          "evidence": "No ejercita la revalidacion de service.py que AC-09 nombra explicitamente.",
+          "file": "tests/test_routing.py",
+          "id": "F-10",
+          "line": 2706,
+          "repair_attempts": 1,
+          "reproduction": "Comparar AC-09 con el cuerpo del test.",
+          "required_outcome": "Agregar la asercion o acotar el alcance declarado.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "tests/test_routing.py:2706-2727",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-04",
+          "category": "testing",
+          "evidence": "Afirma round-trip byte-a-byte de emit(); medido False (borra comentarios). La propiedad sustantiva si se cumple.",
+          "file": "docs/specs/012-discovered-inventory/evidence/P1-implementation.md",
+          "id": "F-11",
+          "line": 62,
+          "repair_attempts": 1,
+          "reproduction": "emit(load_config('models.toml'))==Path('models.toml').read_text() -> False",
+          "required_outcome": "Corregir la afirmacion de la evidencia.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "evidence/P1-implementation.md:59-66,81-82",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-07",
+          "category": "correctness",
+          "evidence": "CATALOG_INVALID generico, indistinguible de cualquier otro fallo de catalogo.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "F-12",
+          "line": 399,
+          "repair_attempts": 1,
+          "reproduction": "Curar dos filas con mismo model id y family distinta -> mensaje generico.",
+          "required_outcome": "Diferenciar el motivo sin romper el vocabulario de reason codes.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "catalog.py:382-400",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-12",
+          "category": "integration",
+          "evidence": "No nombra consume_fallback, el CHECK terminal ni la relacion con 011 que AC-12 pide.",
+          "file": "docs/adr/0016-discovered-inventory.md",
+          "id": "F-13",
+          "line": 128,
+          "repair_attempts": 1,
+          "reproduction": "Comparar AC-12 contra el ADR.",
+          "required_outcome": "Agregar las citas por simbolo que AC-12 enumera.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_scope": "docs/adr/0016-discovered-inventory.md:128-132",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "attack_path": "1) routes.v1.toml:57-59 curates the live routable row provider=anthropic model=opus family=opus. 2) This package's new models.toml:23 [catalog].opencode_zen allowlist declares claude-opus-4-8/claude-sonnet-5/claude-haiku-4-5/claude-fable-5. 3) catalog.py:56 PI_MODEL_MAP is in-repo proof that anthropic/opus IS claude-opus-4-8. 4) A curator opens AC-05's four gates for opencode-zen (the explicit next step) and curates an opencode-zen/claude-opus-4-8 row with family='claude-opus'. 5) _check_family_collisions keys `seen` on the RAW model string, so 'opus' != 'claude-opus-4-8' and build_snapshot accepts. 6) In service.py the zen candidate has different provider (155 does not fire) and different family (149 does not fire), wins selection, and 170 records independence_verified=True for a writer/reviewer that are the same model.",
+          "evidence": "Executed PoC output: build_snapshot ACCEPTED the alias catalog; WRITER anthropic/opus family=opus; REVIEWER opencode-zen/claude-opus-4-8 family=claude-opus; independence_verified=True; reason_codes=(). Live corroboration: opencode models opencode --pure -> rc=0, 60 ids, includes opencode/claude-opus-4-8, opencode/claude-sonnet-5, opencode/claude-haiku-4-5.",
+          "file": "ai/scripts/routing_core/catalog.py:400-403",
+          "id": "SEC-001",
+          "impact": "The harness's central separation-of-duties invariant is positively falsified in the durable record: independence_verified=True with zero reason_codes for a writer and reviewer that are the same model instance. Not live-exploitable today (AC-05's four gates remain closed, verified), but AC-07 exists to be correct before they open.",
+          "minimal_fix": "Normalize the model id through a curated canonical-alias map (seeded from PI_MODEL_MAP) at catalog.py:400 before keying `seen`, and add a REVIEW_MODEL_CONFLICT hard exclusion in service.py between lines 149 and 155.",
+          "not_covered_by_accepted_residual_risk": "ADR-0016 lines 116-126 accept the exact-id gap only for the free/paid tier split across the two OpenCode lanes (mimo-v2.5-free vs mimo-v2.5), neither routable today, justified because closing the general case needs model-identity knowledge no probe provides. This alias crosses into anthropic (already-enabled, live curated rows), needs no probe because identity already exists curated in PI_MODEL_MAP in the same file, and hits opus/sonnet/haiku -- the harness's actual reviewer/writer tiers. The ADR never names it.",
+          "related_files": [
+            "ai/scripts/routing_core/catalog.py:56",
+            "ai/scripts/routing_core/catalog.py:457",
+            "ai/scripts/routing_core/service.py:149",
+            "ai/scripts/routing_core/service.py:155",
+            "ai/scripts/routing_core/service.py:170",
+            "models.toml:23",
+            "ai/catalogs/routes.v1.toml:57-59",
+            "ai/scripts/models_config.py:227-233"
+          ],
+          "repair_attempts": 1,
+          "repro_script": "/var/tmp/claude/claude-1000/-home-federico/43dc2166-f747-499d-bb44-b977839e26f7/scratchpad/poc_e2e.py",
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "title": "Cross-provider model alias defeats AC-07's exact-id family-collision guard: the same Claude Opus model reviews itself with independence_verified=True",
+          "verification": "Unit test with the PoC fixture: writer=anthropic/opus, reviewer=opencode-zen/claude-opus-4-8, assert execution_enabled is False, reason_codes==(\"REVIEWER_INDEPENDENCE_UNAVAILABLE\",), independence_verified is False, and REVIEW_MODEL_CONFLICT in exclusion reasons; plus a build_snapshot test asserting CATALOG_INVALID. The existing test only exercises the exact-id minimax-m2.7 case and passes green with the bug present.",
+          "verified_at": "2026-07-31T00:52:01+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-07",
+          "category": "security",
+          "evidence": "CANONICAL_MODEL sembrado solo desde PI_MODEL_MAP['anthropic']={opus,sonnet,haiku}, sin 'fable'. PoC: build_snapshot ACEPTA el catalogo alias fable, service.py da independence_verified=True con solo REVIEW_FAMILY_CONFLICT -- mismo patron de falsa independencia que SEC-001, sin cubrir.",
+          "file": "ai/scripts/routing_core/catalog.py",
+          "id": "SEC-002",
+          "repair_attempts": 1,
+          "reproduction": "scratchpad/dr_fable.py contra el arbol post-SEC-001: LAYER 1 ACCEPTED, LAYER 2 independence_verified=True.",
+          "required_outcome": "Curar explicitamente (anthropic,fable)->claude-fable-5 en CANONICAL_MODEL; extender el test de coherencia a todo [catalog].claude.",
+          "severity": "medium",
+          "status": "closed",
+          "verified_at": "2026-07-31T00:52:42+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-12",
+          "category": "documentation",
+          "evidence": "Tras los fixes de F-04/SEC-001, el ADR quedo autocontradictorio: lineas 60 y 176 siguen diciendo 'three-site'; Accepted residual risk sigue describiendo 'exact model-id equality'.",
+          "file": "docs/adr/0016-discovered-inventory.md",
+          "id": "N-02",
+          "repair_attempts": 1,
+          "reproduction": "grep -n 'three-site' docs/adr/0016-discovered-inventory.md -> matches.",
+          "required_outcome": "Actualizar a five-site y reescribir Accepted residual risk.",
+          "severity": "low",
+          "status": "closed",
+          "verified_at": "2026-07-31T00:52:42+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-30T20:40:57+00:00",
+          "evidence": "docs/specs/012-discovered-inventory/evidence/P1-implementation.md#verify-sh",
+          "name": "verify.sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T20:40:57+00:00",
+          "evidence": "docs/specs/012-discovered-inventory/evidence/P1-implementation.md#unittest-suite",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T20:40:57+00:00",
+          "evidence": "docs/specs/012-discovered-inventory/evidence/P1-implementation.md#ownership-check",
+          "name": "ownership-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-30T20:40:57+00:00",
+          "evidence": "docs/specs/012-discovered-inventory/evidence/P1-implementation.md#git-diff-check",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Reemplazar el cat\u00e1logo de proveedores escrito a mano por un inventario sondeado del entorno real (OpenCode Zen/Go + los dos existentes), con captura fail-closed, mapa credencial/CLI-id separado, campo curado subscription/metered, y family normalizada entre providers para ids compartidos.",
+      "owned_paths": [
+        "ai/scripts/routing_core/catalog.py",
+        "ai/catalogs/models.toml",
+        "ai/scripts/models_config.py",
+        "docs/adr/0016-discovered-inventory.md",
+        "docs/adr/README.md",
+        "docs/specs/012-discovered-inventory/**",
+        "ai/state/features/012-discovered-inventory.json",
+        "ai/state/STATUS.md",
+        "ai/state/decisions-log.jsonl",
+        "ai/state/narrative-log.jsonl",
+        "docs/notas/**"
+      ],
+      "package_id": "P1-discovered-inventory",
+      "read_only_paths": [
+        "Global/**",
+        "docs/specs/008-dynamic-selection/spec.md",
+        "docs/specs/011-quota-failover/**"
+      ],
+      "repairs": [
+        {
+          "at": "2026-07-31T00:52:08+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/catalog.py",
+            "ai/scripts/routing_core/service.py",
+            "models.toml",
+            "ai/scripts/models_config.py",
+            "docs/adr/0016-discovered-inventory.md",
+            "docs/adr/README.md",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "SEC-001",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-11",
+            "F-12",
+            "F-13"
+          ],
+          "verification": [
+            "Suite completa 482->488 tests, VERIFY_PASS, git diff --check limpio, mutaciones MUT-A..MUT-H matan sus mutantes (F-10/MUT-I sobrevive, queda abierto)."
+          ]
+        },
+        {
+          "at": "2026-07-31T00:52:48+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/catalog.py",
+            "docs/adr/0016-discovered-inventory.md",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "SEC-002",
+            "F-10",
+            "N-02"
+          ],
+          "verification": [
+            "Suite completa 488->490 tests, VERIFY_PASS. dr_fable.py rechazado (CATALOG_FAMILY_COLLISION), grep three-site vacio. Mutaciones propias del delta-reviewer confirman ambos tests nuevos discriminan."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-30T22:39:25+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-30T20:53:50+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-30T22:18:31+00:00",
+              "evidence": "Revision independiente: 482 tests verificados, build.sh --check OK, sondeo en vivo confirmado, 3 experimentos de mutacion ejecutados (family-collision wiring, sitio 3 lockstep, argv vs id-CLI). 13 hallazgos: 2 high (F-01/F-02, tests no discriminantes en las 2 ACs mas delicadas), 4 medium, 7 low.",
+              "findings": [
+                "F-01",
+                "F-02",
+                "F-03",
+                "F-04",
+                "F-05",
+                "F-06",
+                "F-07",
+                "F-08",
+                "F-09",
+                "F-10",
+                "F-11",
+                "F-12",
+                "F-13"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-30T22:39:13+00:00",
+              "evidence": "PoC end-to-end ejecutado (build_snapshot + service.py review-selection real), corroboracion en vivo contra opencode CLI, 482 tests corridos, mapas de traduccion/fail-closed/injection/billing-kind auditados sin hallazgos adicionales.",
+              "findings": [
+                "SEC-001"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-30T22:39:25+00:00",
+          "evidence": "Panel RP-01: package-reviewer (repair_required, 13 hallazgos: 2 high F-01/F-02 sobre tests no discriminantes de AC-07/AC-10, 4 medium, 7 low) + security-auditor (repair_required, SEC-001 critical: alias cross-provider anthropic/opus == opencode-zen/claude-opus-4-8 derrota la colision de family por comparacion de string exacto, PoC ejecutado). Ambos independientes, contexto limpio.",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-10",
+            "F-11",
+            "F-12",
+            "F-13",
+            "SEC-001"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-31T00:53:04+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_routing.py"
+      ],
+      "spawns": [
+        {
+          "at": "2026-07-30T20:07:45+00:00",
+          "client": "Arranca la implementaci\u00f3n del cat\u00e1logo din\u00e1mico de modelos.",
+          "purpose": "Implementar el cat\u00e1logo din\u00e1mico sondeado (AC-01..AC-12) contra routing_core/catalog.py, models.toml y models_config.py",
+          "role": "implementer",
+          "spawn_id": "SPAWN-001",
+          "tech": "implementer sobre P1-discovered-inventory, contrato ya verificado en 3 rondas de spec-challenge, ready_for_user_approval."
+        },
+        {
+          "at": "2026-07-30T20:53:58+00:00",
+          "client": "Un revisor que nunca vio la implementaci\u00f3n audita si el cat\u00e1logo din\u00e1mico est\u00e1 bien construido.",
+          "purpose": "Revisi\u00f3n independiente del paquete P1-discovered-inventory completo",
+          "role": "package-reviewer",
+          "spawn_id": "SPAWN-002",
+          "tech": "package-reviewer, contexto limpio, panel RP-01."
+        },
+        {
+          "at": "2026-07-30T20:53:58+00:00",
+          "client": "Un segundo revisor, de seguridad, audita espec\u00edficamente si la l\u00f3gica que evita que un modelo se revise a s\u00ed mismo bajo dos nombres de proveedor es realmente s\u00f3lida.",
+          "purpose": "Auditor\u00eda de seguridad de la regla de colisi\u00f3n de family y el mapa de doble traducci\u00f3n",
+          "role": "security-auditor",
+          "spawn_id": "SPAWN-003",
+          "tech": "security-auditor, contexto limpio, panel RP-01, concurrente con package-reviewer."
+        },
+        {
+          "at": "2026-07-30T22:39:33+00:00",
+          "client": "El panel de revisi\u00f3n encontr\u00f3 un agujero real de seguridad (un modelo podr\u00eda revisarse a s\u00ed mismo bajo dos nombres de proveedor) y varios problemas menores. Se repara todo en una sola pasada.",
+          "purpose": "Reparaci\u00f3n consolidada de 14 hallazgos del panel RP-01 (1 critical, 2 high, 4 medium, 7 low)",
+          "role": "repair-agent",
+          "spawn_id": "SPAWN-004",
+          "tech": "repair-agent consolidado, orden por severidad: SEC-001 (critical) primero, F-01/F-02 (high, tests que no discriminan) segundo, resto despu\u00e9s."
+        },
+        {
+          "at": "2026-07-30T23:35:12+00:00",
+          "client": "Un tercer revisor, que no vio ni la implementaci\u00f3n original ni el panel, confirma que las reparaciones cierran los problemas sin abrir otros nuevos.",
+          "purpose": "Delta-review acotado a los archivos tocados en la reparaci\u00f3n de los 14 hallazgos de RP-01",
+          "role": "delta-reviewer",
+          "spawn_id": "SPAWN-005",
+          "tech": "delta-reviewer, contexto limpio, acotado al diff de la reparaci\u00f3n (catalog.py, service.py, models.toml, models_config.py, ADR-0016, README, test_routing.py)."
+        },
+        {
+          "at": "2026-07-30T23:59:05+00:00",
+          "client": "El mismo agujero de seguridad que se cerr\u00f3 para Opus/Sonnet/Haiku se filtr\u00f3 para Fable, el modelo m\u00e1s nuevo. Se cierra ahora, acotado.",
+          "purpose": "Reparaci\u00f3n ronda 2: SEC-002 (medium, mismo patr\u00f3n que SEC-001 pero con claude-fable-5), F-10 reabierto, N-02 (ADR autocontradictorio)",
+          "role": "repair-agent",
+          "spawn_id": "SPAWN-006",
+          "tech": "repair-agent, segunda ronda, alcance m\u00ednimo: 3 hallazgos."
+        },
+        {
+          "at": "2026-07-31T00:22:55+00:00",
+          "client": "\u00daltima verificaci\u00f3n antes de cerrar el paquete.",
+          "purpose": "Confirmaci\u00f3n final de la ronda 2 (SEC-002, F-10, N-02)",
+          "role": "delta-reviewer",
+          "spawn_id": "SPAWN-007",
+          "tech": "delta-reviewer, contexto limpio, acotado a los 3 fixes de la ronda 2."
+        }
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Extender _OPENCODE_PROVIDER_KEYS y agregar el mapa provider->id-CLI (AC-02/AC-03)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac01_new_pairs_are_registered_in_the_closed_pair_table_only",
+            "unittest tests.test_routing.RoutingTests.test_ac02_ac03_credential_and_cli_id_maps_are_independently_addressable"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Mover el allowlist de [catalog] a los 3 sitios de lockstep + agregar ROUTING_PROVIDERS (AC-04/AC-05)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac04_allowlist_ceiling_moved_in_lockstep_across_the_three_sites",
+            "unittest tests.test_routing.RoutingTests.test_ac05_new_providers_are_probeable_not_routable_today",
+            "models_config.load_config round-trip check (opencode_zen/opencode_go emit)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Regla de colisi\u00f3n de family entre providers para ids compartidos (AC-07)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac07_family_collision_rule_is_pure_and_wired_into_build_snapshot"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Mapa curado subscription/metered a nivel de provider (AC-08)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac08_subscription_metered_map_is_provider_keyed_not_a_row_field"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Property test de route_id estable con fixture sint\u00e9tico (AC-09)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac09_route_id_identity_is_provider_agnostic_for_a_synthetic_discovered_row"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Tests deterministas AC-01..AC-10 (exit codes, cache, gates fail-closed)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac10_probe_fails_closed_on_nonzero_exit_for_the_new_pairs",
+            "python3 -m unittest discover -s tests (482 tests, OK)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "P2 local live-parity gate credential-gated (AC-10 verificaci\u00f3n)",
+          "local_validations": [
+            "unittest tests.test_routing.RoutingTests.test_ac10_p2_local_live_parity_gate (ran LIVE, credentials present, ok)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "docs/adr/0016-discovered-inventory.md + fila en README",
+          "local_validations": [
+            "docs/adr/0016-discovered-inventory.md created; docs/adr/README.md row added; 0016 confirmed next free number"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-31T00:53:04+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "490/490 tests OK verificado independientemente 3 veces a lo largo del ciclo de reparacion. verify.sh -> VERIFY_PASS. git diff --check limpio en todos los archivos tocados.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-31T00:52:01+00:00",
+          "evidence": "Los 14 hallazgos del panel RP-01 fueron verificados independientemente por un delta-reviewer de contexto limpio via mutacion ejecutada y PoC corrido, no solo lectura: mutaciones MUT-A..MUT-I matan sus mutantes correspondientes en copia espejo, poc_e2e.py confirma SEC-001 cerrado y ningun falso positivo sobre un par legitimamente independiente. Los 14 se sostienen (upheld); la reparacion decide cuales cierran (13) y cual queda abierto para otra ronda (F-10).",
+          "refuted": [],
+          "upheld": [
+            "SEC-001",
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-10",
+            "F-11",
+            "F-12",
+            "F-13"
+          ]
+        },
+        {
+          "at": "2026-07-31T00:52:42+00:00",
+          "evidence": "SEC-002 verificado por PoC ejecutado (dr_fable.py) en delta-review ronda 1: build_snapshot acepta el catalogo alias fable, service.py da independence_verified=True. N-02 verificado por grep sobre el ADR (contradicciones 'three-site' remanentes). F-10 ya estaba upheld de la verificacion anterior, no se re-verifica.",
+          "refuted": [],
+          "upheld": [
+            "SEC-002",
+            "N-02"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 48,
+  "schema_version": 1,
+  "updated_at": "2026-07-31T00:53:17+00:00"
+}

@@ -3,35 +3,42 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_ACCEPTED` · modo: feature · revisión 71
+- fase: `DONE` · modo: feature · revisión 176
+- estado final: **DONE**
 - spec: `docs/specs/005-portable-harness/spec.md` (hash `e821373ff2e8`)
 
 ## Paquetes
 
 - [[features/005-portable-harness/P1-portable-core|P1-portable-core]] — accepted · Make the 004 adaptive router reachable and correctly scoped from any project on any machi…
+- [[features/005-portable-harness/P2-vault-mandatory|P2-vault-mandatory]] — accepted · Vault de Obsidian obligatorio: instalacion multiplataforma, registro de vault-link, notes…
+- [[features/005-portable-harness/P3-tui|P3-tui]] — accepted · Reemplazar los menús numerados por un selector de flechas stdlib-only, con core puro test…
 
 ## Approach y decisiones
 
-- [2026-07-27] debugger: debugging-loop: timeout 90 on the guest test is reproducible. Debugger owns only the affected implementation/test/docs paths and must prove root cause before editing; no test weak…
-- [2026-07-27] debugger: debugging-loop hard stop: direct AC-09 guest test reproduced timeout 124 twice; verify.sh likewise did not terminate in the nested guest test. No root cause was proven, so no code…
-- [2026-07-27] debugger: Expanded debugging scope after explicit user authorization. This is the 12th and final P1 instantiation budget: debugger may instrument subprocess execution with bounded diagnosti…
-- [2026-07-27] delta-reviewer: Reusing the prior independent gate instance without creating a new package spawn (the physical P1 spawn budget is exhausted). Read-only delta review: inspect only the guest verify…
-- [2026-07-27] debugger: Expanded diagnosis proved a nested full 181-test suite, not a deadlock. Minimal repair: verify.sh detects SET_AGENTS_GUEST_VERIFY and runs only the portable smoke assertions alrea…
-- [2026-07-27] delta-reviewer: Independent focused delta review PASS: direct guest AC-09 in 22.189s, explicit cwd lifecycle including failure close, absolute APP_CLI/read-only Pi guards, full verify behavior, a…
+- [2026-07-30] -: Abriendo P3-tui: AC-22..AC-30 ya aprobados en el contrato 1.1.0, sin bloqueantes. Narrando apertura antes de crear el paquete (sin --package-id, sin record-spawn contra P2-vault-m…
+- [2026-07-30] implementer: implementer, contra P3-tui, AC-22..AC-30, 8 tareas, adversarial-primero
+- [2026-07-30] package-reviewer: package-reviewer, contra P3-tui integrado, foco adversarial en AC-26/27 (handoff de terminal + señales)
+- [2026-07-30] repair-agent: repair-agent, consolidado, F-01..F-10, tests de regresión rojo-primero por hallazgo
+- [2026-07-30] repair-agent: repair-agent, consolidado, 1 llamada record-repair al final
+- [2026-07-30] delta-reviewer: delta-reviewer, foco en si D-02/D-03/F-08 (mecanismos nuevos: render a stderr, clamp de header, filtro de search) quedaron genuinamente cerrados
 - decisión: [[decisiones/2026-07-27 global-absolute-path-leak|Pre-existing absolute-path leak in tracked Global/ templates (out of P1 scope, tracked)]]
 - decisión: [[decisiones/2026-07-27 p1-pi-project-cwd-propagation|Pi lifecycle propagates project context by explicit cwd]]
+- decisión: [[decisiones/2026-07-29 record-spawn-misused-for-pre-package-narration-also-trips-budget|record-spawn contra el package_id viejo para narrar la apertura de un paquete nuevo repite el falso bloqueo]]
+- decisión: [[decisiones/2026-07-29 adr-0009-slot-taken-by-006-p2-vault-adr-is-0012|AC-10 de 005 nombra docs/adr/0009-mandatory-vault.md pero ese numero ya lo uso 006-P2]]
+- decisión: [[decisiones/2026-07-29 tools-toml-obsidian-apt-dnf-zypper-were-fabricated|AC-11's apt/dnf/zypper obsidian identifiers were fabricated, not source-verified]]
+- decisión: [[decisiones/2026-07-29 vault-doctor-basename-fallback-still-collides-when-both-sides-unregistered|vault-doctor's basename fallback for an unregistered project still lets two never-registered repos collide]]
 
 ## Qué falta
 
-- → `INTEGRATION` — all packages accepted
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
-- spawns: 12 (máx 12/paquete) · deep review máx 2 ciclos
+- spawns: 20 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/005-portable-harness/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/005-portable-harness/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/005-portable-harness/bitacora.md`
 
-_Actualizado: 2026-07-27T17:58:36+00:00_
+_Actualizado: 2026-07-30T16:16:18+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

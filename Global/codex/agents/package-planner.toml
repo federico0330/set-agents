@@ -29,8 +29,12 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
    - `medium`: several related tasks, multiple layers, or integration work.
    - `high`: architecture-critical, auth/authz, concurrency, destructive migration, public contract, secrets, money,
      or high-risk data changes.
-6. Decide `required_reviewers` explicitly, for the orchestrator to use as a ceiling on the review panel — it may
-   not invoke a reviewer you did not declare here:
+6. Decide `required_reviewers` explicitly, for the orchestrator to use as the review panel's opening
+   membership — `start-review-panel --role` is required and this is where the list comes from. It is a ceiling
+   the orchestrator may not quietly exceed, not a sealed one: a specialist the package turns out to need can
+   be added with `extend-review-panel --role <r> --reason "<why it became necessary mid-panel>"`, which stays
+   inside the same single review cycle and leaves the reason on the record. Declaring the reviewer here is
+   still strictly better — it is declared before anything is spawned rather than justified afterwards:
    - `small`/`medium` (default): `["package-reviewer"]` only — it already covers correctness, data-integrity, and
      scalability itself.
    - add `security-auditor` only when the package touches auth, authorization, payments, secrets, tenant

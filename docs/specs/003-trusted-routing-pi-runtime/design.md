@@ -452,8 +452,11 @@ PRIMARY KEY (
 explicit sentinel rather than raw/free text. Counters are non-negative. Every event insertion updates all
 applicable lifetime deltas exactly once in the same transaction: `lifetime_count`,
 `lifetime_latency_sum_ms`, the selected latency bucket, exclusion count, fallback offered/consumed count, and
-fallback success/failure count. One excluded candidate is one allowlisted exclusion event, so it has one
-unambiguous rollup key.
+fallback success/failure count. `exclusion_count` counts one increment per `rejected` lifecycle event, each of
+which carries one unambiguous rollup key. It does **not** count route-selection candidate exclusions: those are
+reported to the caller on `RouteDecision.exclusions` and emit no event at all, so a decision that excludes four
+candidates increments nothing here. Both mechanisms are named on purpose — the sentence this replaces asserted
+the opposite from the commit that repaired FD-008 onward, and naming only one of them is how it inverted.
 
 Compaction groups the exact deletion set by the complete rollup key and increments only `compacted_count` by the
 number of deleted rows. It never touches lifetime, latency-sum, histogram, exclusion, or fallback counters,

@@ -1,7 +1,7 @@
 ---
 description: "Security-Auditor \u2014 offensive + defensive read-only security review"
 mode: subagent
-model: openai/gpt-5.6-sol
+model: openai/gpt-5.5
 temperature: 0.0
 steps: 14
 permission:

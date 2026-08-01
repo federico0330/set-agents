@@ -1,0 +1,35 @@
+# SEC-010: the harness template shipped with no .gitignore at all, so a project scaffolded
+# or synced from here inherited none of the hygiene rules the harness repo itself relies on
+# -- e.g. ai/state/render-failures.log (written by feature-state.py's render_notes() failure
+# path) had nothing keeping it out of git. Mirrors the harness's own root .gitignore.
+*.tmp
+*.log
+# SEC-004: *.log above does not match the rotated `render-failures.log.1` sibling
+# _log_render_failure (ai/scripts/feature-state.py) writes past RENDER_FAILURE_LOG_CAP.
+render-failures.log*
+
+# Local credentials and environment overrides
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# Editor and operating-system noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Language caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+
+# Obsidian workspace and MCP session dumps
+.obsidian/
+.playwright-mcp/

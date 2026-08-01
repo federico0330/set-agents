@@ -1,0 +1,1010 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-28T13:49:52+00:00",
+    "hash": "d16765edd3998650e836bf46f98d2f886633490c99a00131457234831ef263f2",
+    "path": "docs/specs/008-dynamic-selection/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-uninterrupted-delegation",
+  "feature_id": "008-dynamic-selection",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "spec_path": "docs/specs/008-dynamic-selection/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-28T13:49:52+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Doctrina de continuidad del turno en orchestrator.md (AC-01, AC-02, AC-03)",
+          "Operacion degradada de un solo proveedor y su constancia en el paquete (AC-04..AC-08)",
+          "Propagar la doctrina a los tres globales de Global/_shared, incluida la seccion Human decision faltante en OpenCode (AC-08)",
+          "Regenerar Global/ y agregar el test de tres runtimes (AC-09)",
+          "ADR-0011 con el trade-off de independencia y el diferimiento del carril Pi (AC-10)"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T13:50:43+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Contrato reconciliado; empieza la implementacion de la doctrina"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T13:50:57+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Doctrina de continuidad del turno en orchestrator.md (AC-01, AC-02, AC-03)",
+        "validations": [
+          "test_turn_continuity_doctrine_reaches_all_three_harnesses falla sobre el arbol previo y pasa despues",
+          "test_orchestrator_narration_reaches_all_three_harnesses sigue verde: el bloque de cierre no se toco"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Operacion degradada de un solo proveedor y su constancia en el paquete (AC-04..AC-08)",
+        "validations": [
+          "assertIn de clean context, pi lane, update-package --exception y every provider is exhausted en los tres runtimes",
+          "test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy sigue verde: la denegacion dura del carril Pi no se contradice"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Propagar la doctrina a los tres globales de Global/_shared, incluida la seccion Human decision faltante en OpenCode (AC-08)",
+        "validations": [
+          "test_shared_doctrine_covers_turn_continuity pasa sobre los tres archivos",
+          "test_shared_doctrine_covers_narration y test_shared_doctrine_covers_living_docs siguen verdes"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Regenerar Global/ y agregar el test de tres runtimes (AC-09)",
+        "validations": [
+          "./build.sh regenerado; verify.sh:22-27 diff -ruN sin diferencias",
+          "GLOBAL_PORTABILITY_OK"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0011 con el trade-off de independencia y el diferimiento del carril Pi (AC-10)",
+        "validations": [
+          "docs/adr/0011-uninterrupted-delegation.md con D1..D6, umbral de reversion explicito y fila agregada en docs/adr/README.md",
+          "0010 no se usa: esta reservado por 007-P2"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Tareas completas, corren los gates"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify.sh",
+        "status": "pass"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:00:50+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Gates verdes, empieza la review profunda"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:01:16+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "architect"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:01:16+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Antes de dar por bueno el arreglo, alguien que no lo escribio lo revisa entero: que la regla nueva no contradiga otra vieja y que de verdad haga lo que promete.",
+        "purpose": "Deep review of the integrated package",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel concurrente RP-01 (006-P1). El paquete toca doctrina ya testeada: REVIEWER_INDEPENDENCE_UNAVAILABLE como HARD DENIAL (test_harness.py) y el bloque de cierre de turno. Contexto limpio y modelo distinto al del writer segun ADR-0011 D3."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:01:17+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Y en paralelo, alguien mira si la decision de fondo esta bien tomada y bien documentada, para que dentro de seis meses se entienda por que se hizo asi.",
+        "purpose": "Architectural review of ADR-0011 and the doctrine boundaries",
+        "role": "architect",
+        "spawns": 2,
+        "tech": "Segundo miembro del mismo panel RP-01, en el mismo batch. Verifica ADR-0011: alcance, alternativas rechazadas, umbral de reversion, y que el diferimiento del carril Pi sea coherente con service.py:148,154."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:01:17+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 6,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:21:57+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 5,
+        "role": "architect",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:22:19+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:22:19+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 6
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:29:19+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01",
+          "F-02",
+          "F-03",
+          "F-04",
+          "F-05",
+          "F-06",
+          "F-07",
+          "F-08",
+          "F-09",
+          "F-10",
+          "F-11"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:36:03+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:42:38+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de tocar nada por lo que dijeron los revisores, alguien mas trata de demostrar que se equivocaron, para no cambiar cosas por un reclamo falso.",
+        "purpose": "Adversarial refutation of the RP-01 findings",
+        "role": "finding-verifier",
+        "spawns": 3,
+        "tech": "ADR-0009: refutacion adversarial entre panel y reparacion. Tercer modelo (Fable 5), distinto del writer y de los dos reviewers. Los seis hallazgos por encima de low sobrevivieron."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:43:07+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Y despues del arreglo, otra persona revisa solo lo que cambio, no todo de nuevo.",
+        "purpose": "Focused review of the repair delta",
+        "role": "delta-reviewer",
+        "spawns": 4,
+        "tech": "Delta review acotada al delta reparado. Cerro los once y abrio dos nuevos de prosa, requires_full_review=false."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:43:07+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Lo mismo para el hallazgo nuevo: primero se intenta refutar, despues se corrige.",
+        "purpose": "Refute D-01 before repairing it",
+        "role": "finding-verifier",
+        "spawns": 5,
+        "tech": "El estado rechazo record-repair con 'finding was never verified: D-01'. La maquina aplica ADR-0009 sobre los hallazgos del delta igual que sobre los del panel."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:43:07+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 2
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:45:12+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": true,
+        "finding_ids": [
+          "D-01",
+          "D-02"
+        ]
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:45:12+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "./ai/scripts/verify.sh",
+          "./build.sh --check",
+          "python3 -m unittest discover -s tests",
+          "git diff --check",
+          "python3 ai/scripts/check-owned-paths.py --package-id P1-uninterrupted-delegation"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:48:21+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "reason": "Rodeo obligado: --skip-delta dejo delta_reviews[-1] en repair_required y no hay arista de vuelta a DELTA_REVIEW (ver decision skip-delta-deja-la-aceptacion-inalcanzable)"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:49:13+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "reason": "Registrar el delta review que efectivamente paso sobre la reparacion de D-01 y D-02"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:49:14+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:49:14+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "./ai/scripts/verify.sh",
+          "./build.sh --check",
+          "python3 -m unittest discover -s tests",
+          "git diff --check",
+          "python3 ai/scripts/check-owned-paths.py --package-id P1-uninterrupted-delegation"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:49:14+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-07-28T14:49:14+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 2,
+    "human_questions_after_approval": 0,
+    "package_reviews": 1,
+    "repair_batches": 2,
+    "task_deep_reviews": 0,
+    "verifications": 2
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 5,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-28T14:42:38+00:00",
+          "closed_findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-10",
+            "F-11"
+          ],
+          "new_or_reopened_findings": [
+            "D-01",
+            "D-02"
+          ],
+          "reason": "Los once hallazgos del panel cierran contra el arbol. Dos nuevos, ambos de prosa y ambos dentro del mismo paquete: no requiere review completa.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-28T14:49:14+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [],
+          "reason": "Delta de dos archivos de prosa (ADR-0011 Contexto punto 2 y la cita de spec.md). Inspeccionado por una instancia independiente de contexto limpio en un tercer modelo, que verifico D-01 leyendo _probe_pairs en catalog.py:282-297 -solo estado de login, la cadena quota no aparece en el archivo- y D-02 leyendo tests/test_harness.py:1333 y :1336, ambas assertions reales. Veredicto textual: defecto real entonces, ausente ahora. Sin hallazgos nuevos.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "f16887ad070caef944df8688e7fd28636f061845",
+      "findings": [
+        {
+          "category": "correctness",
+          "file": "docs/specs/008-dynamic-selection/spec.md:98-106",
+          "id": "F-01",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "AC-05/D4 afirman que fuera del carril Pi no corre ningun chequeo de independencia; es falso. set_agents_app.py:390 default selected_runtime=opencode y service.py:148,154 emiten REVIEWER_INDEPENDENCE_UNAVAILABLE igual para opencode/claude-code/codex. Tiered dispatch 3c sigue mandando HALT, y se lee antes que Turn continuity.",
+          "verified_at": "2026-07-28T14:29:19+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "Global/_shared/CLAUDE.md",
+          "id": "F-02",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "AC-08 incompleto: every provider is exhausted solo aparece en AGENTS.opencode.md. CLAUDE.md y AGENTS.codex.md no lo tienen ni en Turn continuity ni en su seccion Human decision, y el test solo asserta el encabezado.",
+          "verified_at": "2026-07-28T14:29:19+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "Global/_shared/CLAUDE.md",
+          "id": "F-03",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "AC-03 sin cobertura: el tope de una sola reinstanciacion por encargo falta en CLAUDE.md y AGENTS.codex.md, y ningun test lo asserta en ninguno de los tres archivos.",
+          "verified_at": "2026-07-28T14:29:19+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "docs/specs/008-dynamic-selection/spec.md:104",
+          "id": "F-04",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Cita equivocada: spec.md AC-05 cita tests/test_harness.py:1246; la assertion real de REVIEWER_INDEPENDENCE_UNAVAILABLE esta en :1323.",
+          "verified_at": "2026-07-28T14:29:19+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "documentation",
+          "file": "docs/specs/008-dynamic-selection/spec.md:57",
+          "id": "F-08",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "spec.md:57 promete un amendment log al final del archivo que no existe; las enmiendas estan inline en AC-05 y AC-10."
+        },
+        {
+          "category": "documentation",
+          "file": "docs/specs/008-dynamic-selection/spec.md:224-226",
+          "id": "F-09",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El parrafo final de Verificacion describe la prueba end-to-end del P1 viejo (corrida real contra un plan agotado, filas en la base de ruteo) bajo la etiqueta P1; ese trabajo hoy es P1b."
+        },
+        {
+          "category": "correctness",
+          "file": "docs/adr/0011-uninterrupted-delegation.md",
+          "id": "F-05",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "closed",
+          "summary": "D3 apoya la rendicion de cuentas en --evidence, que no tiene validacion de forma ni de no-vacio (feature-state.py:1575,1613,2499,2508). ADR-0009 ya encontro y endurecio esta misma clase de hueco; ADR-0011 debe declararlo como limite conocido o pedir el guarda.",
+          "verified_at": "2026-07-28T14:29:19+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "docs/adr/0011-uninterrupted-delegation.md",
+          "id": "F-06",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "closed",
+          "summary": "El umbral de reversion de D3 dice que las entradas de evidencia lo hacen medible en vez de opinable; el antecedente es chequeable pero el contrafactico -lo habria encontrado una review cross-provider- es juicio humano irreducible. La ADR sobreafirma lo que el mecanismo compra.",
+          "verified_at": "2026-07-28T14:29:19+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "docs/adr/0011-uninterrupted-delegation.md",
+          "id": "F-07",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "architect",
+          "status": "closed",
+          "summary": "Consecuencias subestima el radio de explosion: se apoya en el limite de paquete, que esta misma ADR elimina (terminar un paquete con el siguiente ya aprobado es reportar avance, que D1 prohibe como razon para cortar). El radio real de un turno pasa a ser el alcance del ultimo USER_APPROVAL."
+        },
+        {
+          "category": "documentation",
+          "file": "docs/adr/README.md",
+          "id": "F-10",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "architect",
+          "status": "closed",
+          "summary": "El indice de ADRs no explica el hueco en 0010; un lector que solo tiene el README no puede saber que esta reservado por 007-P2 sin abrir la ADR-0011."
+        },
+        {
+          "category": "documentation",
+          "file": "docs/adr/0011-uninterrupted-delegation.md",
+          "id": "F-11",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "architect",
+          "status": "closed",
+          "summary": "D3 es un cambio de postura de seguridad y ADR-0011 no lleva la seccion rotulada Scale/Data/Security que usa ADR-0008 como precedente; el contenido esta, la convencion de descubribilidad no."
+        },
+        {
+          "category": "documentation",
+          "file": "docs/adr/0011-uninterrupted-delegation.md:34-37",
+          "id": "D-01",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "ADR-0011 Contexto punto 2 quedo con el encuadre viejo (un proveedor agotado detiene toda review), que es exactamente la conflacion que D4, agregada en la misma reparacion, corrige cincuenta lineas mas abajo. spec.md si recibio la anotacion correctiva; la ADR no.",
+          "verified_at": "2026-07-28T14:45:12+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "documentation",
+          "file": "docs/specs/008-dynamic-selection/spec.md:116",
+          "id": "D-02",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "La cita reparada de F-04 cae en una linea de comentario dentro del test correcto; las assertions reales estan en :1333-1336.",
+          "verified_at": "2026-07-28T14:45:12+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-28T14:00:50+00:00",
+          "evidence": "VERIFY_PASS; Ran 211 tests OK (base 209); GLOBAL_PORTABILITY_OK; diff -ruN de Global/ sin diferencias",
+          "name": "verify.sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T14:00:50+00:00",
+          "evidence": "./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T14:00:50+00:00",
+          "evidence": "check-owned-paths.py --package-id P1-uninterrupted-delegation -> OWNERSHIP_PASS, out_of_scope vacio",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "objective": "Que una sesion larga se camine sola: el orquestador no termina un turno para reportar avance, relanza una vez a un subagente muerto por cuota sin preguntar, y sigue trabajando en modo degradado con un solo proveedor dejando constancia del costo",
+      "owned_paths": [
+        "Global/_canonical/agents/orchestrator.md",
+        "Global/_shared/AGENTS.opencode.md",
+        "Global/_shared/CLAUDE.md",
+        "Global/_shared/AGENTS.codex.md",
+        "Global/opencode/*",
+        "Global/claude-code/*",
+        "Global/codex/*",
+        "docs/adr/0011-uninterrupted-delegation.md",
+        "docs/adr/README.md",
+        "docs/specs/008-dynamic-selection/*",
+        "ai/state/features/008-dynamic-selection.json",
+        "ai/state/STATUS.md",
+        "ai/state/narrative-log.jsonl",
+        "ai/state/decisions-log.jsonl",
+        "docs/notas/*"
+      ],
+      "package_id": "P1-uninterrupted-delegation",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-28T14:36:03+00:00",
+          "changed_files": [
+            "Global/_canonical/agents/orchestrator.md",
+            "Global/_shared/AGENTS.opencode.md",
+            "Global/_shared/CLAUDE.md",
+            "Global/_shared/AGENTS.codex.md",
+            "tests/test_harness.py",
+            "docs/specs/008-dynamic-selection/spec.md",
+            "docs/adr/0011-uninterrupted-delegation.md",
+            "docs/adr/README.md"
+          ],
+          "finding_ids": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08",
+            "F-09",
+            "F-10",
+            "F-11"
+          ],
+          "verification": [
+            "./ai/scripts/verify.sh -> VERIFY_PASS; Ran 211 tests OK; GLOBAL_PORTABILITY_OK; SELF_SCAFFOLD_SYNC_OK files=2; git diff --check limpio",
+            "F-01: la frontera se redibujo por mecanismo. La doctrina ahora dice que un --route-decide con REVIEWER_INDEPENDENCE_UNAVAILABLE corta en TODOS los runtimes, y la relajacion cubre solo la delegacion sin decision de ruteo. Asserted por test_turn_continuity_doctrine_reaches_all_three_harnesses con la cadena literal 'HARD DENIAL that halts, in **every** runtime'",
+            "F-02 y F-03: 'every provider is exhausted' y 'second exhaustion' ahora estan en los tres archivos de _shared y en el orquestador, y test_shared_doctrine_covers_turn_continuity los assertea en los tres",
+            "F-04: la cita pasa de tests/test_harness.py:1246 (que es test_invalid_separation_graph_is_rejected) a :1323, verificado con sed -n '1246p;1323p'"
+          ]
+        },
+        {
+          "at": "2026-07-28T14:45:12+00:00",
+          "changed_files": [
+            "docs/adr/0011-uninterrupted-delegation.md",
+            "docs/specs/008-dynamic-selection/spec.md"
+          ],
+          "delta_waived": true,
+          "finding_ids": [
+            "D-01",
+            "D-02"
+          ],
+          "verification": [
+            "D-01: Contexto punto 2 pasa de 'One exhausted provider' a 'One unusable provider' y agrega el parrafo que separa ausente de agotado, citando catalog.py:305 y apuntando a D4",
+            "D-02: la cita pasa a tests/test_harness.py:1333-1336, verificado leyendo el archivo"
+          ],
+          "waiver_reason": "all findings <= medium and <= 3 changed files"
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-28T14:22:19+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "architect"
+          ],
+          "started_at": "2026-07-28T14:01:16+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-28T14:21:57+00:00",
+              "evidence": "Review sin independencia entre proveedores: en esta sesion solo hay proveedor Anthropic. Writer = Opus 5, reviewer = Sonnet 5 con contexto limpio (ADR-0011 D3). Costo aceptado: puntos ciegos correlacionados de la misma familia sobreviven. Corrio la suite completa: 211 tests OK.",
+              "findings": [
+                "F-01",
+                "F-02",
+                "F-03",
+                "F-04",
+                "F-08",
+                "F-09"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-28T14:22:19+00:00",
+              "evidence": "Review sin independencia entre proveedores (mismo motivo que el otro miembro del panel): unico proveedor Anthropic, writer Opus 5, reviewer Sonnet 5 con contexto limpio. Verifico como correctas set_agents_spawn.py:329,243; service.py:148,154; feature-state.py:1321-1326; la reserva de 0010 por 007-P2; y el formato de la fila del README. Convergio de forma independiente con package-reviewer en F-01.",
+              "findings": [
+                "F-05",
+                "F-06",
+                "F-07",
+                "F-10",
+                "F-11"
+              ],
+              "role": "architect",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-28T14:22:19+00:00",
+          "evidence": "Panel RP-01 concurrente, dos miembros, ambos con contexto limpio y modelo distinto al del writer. Sin independencia entre proveedores: unico proveedor disponible en la sesion (ADR-0011 D3, costo declarado: puntos ciegos correlacionados). Convergencia independiente en F-01, que es bloqueante. 11 hallazgos: 1 critico, 2 altos, 3 medios, 5 bajos.",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-08",
+            "F-09",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-10",
+            "F-11"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Toca doctrina ya testeada: REVIEWER_INDEPENDENCE_UNAVAILABLE como HARD DENIAL (test_harness.py:1246) y el bloque de cierre de turno (test_harness.py:1087).",
+        "build.sh --check NO detecta que Global/ quedo desactualizado tras editar _canonical/; solo verify.sh:22-27 lo agarra."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-28T14:48:21+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        },
+        {
+          "at": "2026-07-28T14:49:14+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Doctrina de continuidad del turno en orchestrator.md (AC-01, AC-02, AC-03)",
+          "local_validations": [
+            "test_turn_continuity_doctrine_reaches_all_three_harnesses falla sobre el arbol previo y pasa despues",
+            "test_orchestrator_narration_reaches_all_three_harnesses sigue verde: el bloque de cierre no se toco"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Operacion degradada de un solo proveedor y su constancia en el paquete (AC-04..AC-08)",
+          "local_validations": [
+            "assertIn de clean context, pi lane, update-package --exception y every provider is exhausted en los tres runtimes",
+            "test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy sigue verde: la denegacion dura del carril Pi no se contradice"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Propagar la doctrina a los tres globales de Global/_shared, incluida la seccion Human decision faltante en OpenCode (AC-08)",
+          "local_validations": [
+            "test_shared_doctrine_covers_turn_continuity pasa sobre los tres archivos",
+            "test_shared_doctrine_covers_narration y test_shared_doctrine_covers_living_docs siguen verdes"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Regenerar Global/ y agregar el test de tres runtimes (AC-09)",
+          "local_validations": [
+            "./build.sh regenerado; verify.sh:22-27 diff -ruN sin diferencias",
+            "GLOBAL_PORTABILITY_OK"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "ADR-0011 con el trade-off de independencia y el diferimiento del carril Pi (AC-10)",
+          "local_validations": [
+            "docs/adr/0011-uninterrupted-delegation.md con D1..D6, umbral de reversion explicito y fila agregada en docs/adr/README.md",
+            "0010 no se usa: esta reservado por 007-P2"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-28T14:48:21+00:00",
+          "commands": [
+            "./ai/scripts/verify.sh",
+            "./build.sh --check",
+            "python3 -m unittest discover -s tests",
+            "git diff --check",
+            "python3 ai/scripts/check-owned-paths.py --package-id P1-uninterrupted-delegation"
+          ],
+          "evidence": "VERIFY_PASS; Ran 211 tests OK (base 209, +2, ninguno skipeado); GLOBAL_PORTABILITY_OK; SELF_SCAFFOLD_SYNC_OK files=2; git diff --check limpio; OWNERSHIP_PASS. Prueba adversarial: las dos pruebas nuevas se corrieron primero contra el arbol previo y fallaron (FF), y cada assertion agregada durante la reparacion -second exhaustion, every provider is exhausted, HARD DENIAL that halts in every runtime, probed from credentials- se agrego a partir de un defecto real encontrado por el panel, no de un texto ya presente.",
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-28T14:49:14+00:00",
+          "commands": [
+            "./ai/scripts/verify.sh",
+            "./build.sh --check",
+            "python3 -m unittest discover -s tests",
+            "git diff --check",
+            "python3 ai/scripts/check-owned-paths.py --package-id P1-uninterrupted-delegation"
+          ],
+          "evidence": "VERIFY_PASS; Ran 211 tests OK; GLOBAL_PORTABILITY_OK; SELF_SCAFFOLD_SYNC_OK files=2; git diff --check limpio; OWNERSHIP_PASS",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-28T14:29:19+00:00",
+          "evidence": "finding-verifier con brief invertido, contexto limpio y tercer modelo (Fable 5, distinto del writer Opus 5 y de los dos reviewers Sonnet 5). Los seis hallazgos sobreviven al intento de refutacion. F-01: test_routing.py:554-571 corre selected_runtime=claude-code y assertEqual reason_codes == (REVIEWER_INDEPENDENCE_UNAVAILABLE,); set_agents_app.py:390 default opencode; domain.py:20 SELECTED_RUNTIMES incluye claude-code y codex; service.py:163 filtra por role_class, nunca por runtime. F-03 se estrecha: el tope de una reinstanciacion si esta y si esta testeado; lo que falta es la clausula de segundo agotamiento. F-06 se estrecha a sobreafirmacion de redaccion. Hallazgo adicional del verificador: catalog.py:305 probe_inventory observa credenciales, no cuota, asi que un proveedor agotado pero autenticado sigue ruteable y muere en el spawn en vez de negar en el decide.",
+          "refuted": [],
+          "upheld": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06"
+          ]
+        },
+        {
+          "at": "2026-07-28T14:45:12+00:00",
+          "evidence": "finding-verifier con brief invertido, contexto limpio, Fable 5 (distinto del delta-reviewer que los levanto). Veredicto textual: 'Defect real then, gone now' para los dos. D-01 se verifico de forma independiente leyendo _probe_pairs (catalog.py:282-297): solo parsea estado de login y listas de modelos, y la cadena quota no aparece en catalog.py, asi que un proveedor autenticado pero agotado sigue en el inventario. D-02: tests/test_harness.py:1333 es assertIn HARD DENIAL y :1336 es assertIn REVIEWER_INDEPENDENCE_UNAVAILABLE, ambas assertions reales. Se registran como upheld y no como refuted porque los hallazgos eran correctos cuando se levantaron; la correccion se aplico antes de esta pasada.",
+          "refuted": [],
+          "upheld": [
+            "D-01",
+            "D-02"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 33,
+  "schema_version": 1,
+  "updated_at": "2026-07-28T14:49:14+00:00"
+}

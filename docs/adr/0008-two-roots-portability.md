@@ -458,6 +458,16 @@ check (`store.py:150`) stays fail-closed and is NOT taught to auto-migrate. Inst
 - a new operator command performs the migration and prints
   `ROUTING_MIGRATE_OK from=4 to=5 rows=<n> backup=<path>`.
 
+007-P2 amendment (2026-07-29): `from=4 to=5` described the ONLY migration step that existed at the time D8
+was written. `SCHEMA` is now 6 and the chain is 4→5→6 under one transaction (`store.py:migrate`), so the
+banner reports the real observed `from`/`to` pair instead of this hardcoded one — once schema 6 exists,
+`from=4 to=5` is a false statement about a 5→6 migration, not a formatting choice this ADR gets to keep.
+`migration_required()` is likewise version-generic (`stored < SCHEMA`, never the literal `"4"`), so a database
+written by a newer harness answers `False` instead of being offered a downgrade. Partially superseded by
+`docs/adr/0010-spawn-accounting.md` D4, which records the generalization itself; this paragraph is left in
+place, corrected, rather than deleted, per this file's own precedent for amendments (`docs/adr/README.md:3-5`
+governs deletion of whole ADRs, not paragraph-level corrections inside a live one).
+
 Rationale: ADR-0005's doctrine is that state-changing recovery is operator-driven; an auto-migration would
 make every ordinary `--route-decide` a potential schema writer, and a crash mid-migration during a routine
 spawn is strictly worse than an explicit degrade with printed instructions.

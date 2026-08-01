@@ -54,6 +54,21 @@ Only the orchestrator asks, and only for real product decisions, major scope cha
 missing credentials/access, or blockers after retry budget. Routine failures are handled by the worker/retry
 budget, not by asking the user.
 
+## Turn continuity
+The coordinator must never end a turn to report progress. A turn ends only for a question the Question policy
+authorizes, for finished work, or to record a `HUMAN_DECISION_REQUIRED` blocker — if the pending-decision line
+would read "nada", the turn is not over and the next link runs in the same turn. Quota exhaustion is not a
+failed task and does not consume the retry budget: relaunch it once with a different model, without asking,
+and persist the cause. One relaunch per assignment — a second exhaustion of the same assignment is a real
+blocker and is reported as one. With one usable provider left, warn once with `log-decision` and keep working
+inside it — degraded is not stopped. When every provider is exhausted, stop: that is
+`HUMAN_DECISION_REQUIRED`, because there is nothing left to delegate to. Reviewer independence is primarily a **clean context**, so a same-provider
+reviewer is acceptable when it runs on a different model than the writer; record that degradation in the
+review evidence (`record-subreview --evidence` / `finalize-review-panel --evidence`) so it lands on the
+package record, because correlated blind spots survive it. This relaxation covers delegation that carries no
+routing decision; a `--route-decide` returning `REVIEWER_INDEPENDENCE_UNAVAILABLE` stays a hard denial that
+halts, in every runtime. See `docs/adr/0011-uninterrupted-delegation.md`.
+
 ## MCP discipline
 MCP servers start disabled. Ask before enabling, use for the task, then disable. The automatic exception is the
 runtime/E2E gate: the harness may enable `playwright` or `brave-cdp` through `ai/scripts/mcp.sh` or
@@ -63,4 +78,5 @@ the session.
 
 ## Human decision
 Stop with `HUMAN_DECISION_REQUIRED` when acceptance conflicts, a finding changes intended behavior, a migration
-risks money/identity/audit data, the same failure repeats after budget, or secrets/prod access are required.
+risks money/identity/audit data, the same failure repeats after budget, secrets/prod access are required, or
+every provider is exhausted.

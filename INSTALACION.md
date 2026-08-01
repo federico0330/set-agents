@@ -23,7 +23,7 @@ reutiliza esas credenciales.
 gh auth login        # una vez (instalá gh primero si no está: pacman/apt/brew install gh)
 gh repo clone federico0330/SET-AGENTS ~/SET-AGENTS
 cd ~/SET-AGENTS
-./set-agents         # abre la app de consola → opción [1] Instalar
+./set-agents         # abre la app de consola → elegí "Instalar / Reparar" con las flechas + Enter
 ```
 
 ## Windows 10/11 (PowerShell, sin necesidad de saber qué es WSL)
@@ -44,14 +44,19 @@ escribís `set-agents` en cualquier terminal de Windows y listo. Los CLIs
 (opencode/claude/codex) viven dentro de WSL. Qué vas a ver en pantalla: README.md.
 
 `./set-agents` es la puerta de entrada a todo (instala también el comando global
-`set-agents` para usarlo desde cualquier directorio):
+`set-agents` para usarlo desde cualquier directorio). Abre un selector de flechas (stdlib
+puro, sin librerías de terceros: ↑↓ mover, Enter elegir, `/` buscar/texto libre donde aplica,
+Esc/Ctrl-C volver) con estas opciones, en orden:
 
-```
-[1] Instalar / Reparar    [5] MCPs
-[2] Actualizar            [6] Plugins Claude Code
-[3] Modelos               [7] Estado
-[4] Herramientas (CLIs)   [8] Salir
-```
+- Instalar / Reparar
+- Actualizar
+- Modelos
+- Herramientas (CLIs)
+- MCPs
+- Plugins Claude Code
+- Estado
+- Vault Obsidian
+- Salir
 
 - **Auto-update**: al abrirla chequea el repo; si hay novedades las aplica sola mostrando qué
   cambió (backup + rollback de siempre). Se desactiva con `set-agents --auto-update off`.

@@ -1,0 +1,2856 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12",
+    "AC-13",
+    "AC-14",
+    "AC-15",
+    "AC-16",
+    "AC-17",
+    "AC-18",
+    "AC-19"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-07-29T00:39:09+00:00",
+    "hash": "31d6e65add49064130fffe003fec8bcf4a85aeaff0f0f31e1209d5512da18ca3",
+    "path": "docs/specs/007-quota-visibility/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P3-correct-record",
+  "feature_id": "007-quota-visibility",
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-07-29T17:10:39+00:00",
+      "evidence": "verify.sh -> VERIFY_PASS (284 tests); build.sh --check -> SELF_SCAFFOLD_SYNC_OK; integrator confirmed AC-by-AC in docs/specs/007-quota-visibility/evidence/integration.md",
+      "name": "integration verify",
+      "required": true,
+      "status": "pass"
+    }
+  ],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "user",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/007-quota-visibility/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-29T00:39:09+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Fixture congelado parametrizado (comentarios / CHECK N03 / version) reemplazando el literal inline, byte-identico con las perillas por default",
+          "_normalize_ddl() delimiter-aware sobre las cuatro formas de comillas, comentarios antes del colapso de espacios",
+          "Cablear los tres sitios de normalizacion y colapsar la query de sqlite_master triplicada (AC-01)",
+          "SchemaDivergence: str() sigue siendo ROUTING_UNAVAILABLE, el detalle viaja en atributos, nombres canonicos se imprimen y los del archivo se cuentan (AC-05)",
+          "Enmienda en ADR-0005 con el modelo de amenaza real (AC-07)"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:40:37+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "SCHEMA 5->6 con el vocabulario de cost-report FIELDS + cost_micros + usage_status, columnas justo despues de project_key y en el orden de los ALTER",
+          "migration_required generico y CLI de migracion con from/to reales; encadenado 4->5->6",
+          "close_run persiste usage; CLI rechaza duro un --usage invalido; close_run defensivo marca usage_status",
+          "--routing-report con tokens por ruta y el alcance declarado",
+          "colector pi en cost-report.py con atribucion solo bajo --project",
+          "ADR-0010"
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T00:41:10+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Reescribir la seccion de costo con lo verificado y registrarlo con log-decision"
+        ]
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T00:41:10+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Registro reconciliado; P1 arranca por el fixture parametrizado"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:42:05+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Fixture congelado parametrizado (comentarios / CHECK N03 / version) reemplazando el literal inline, byte-identico con las perillas por default"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:44:51+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Fixture congelado parametrizado (comentarios / CHECK N03 / version) reemplazando el literal inline, byte-identico con las perillas por default",
+        "validations": [
+          "frozen_dispatches_script() con las perillas por default es byte-identico (3913 chars) al literal borrado de tests/test_routing.py:1118-1141, comparado fuera de la suite antes de borrarlo",
+          "test_routing_migrate_uses_harness_identity_and_test_store pasa sin tocar ninguna de sus aserciones: es el portero del refactor",
+          "python3 -m unittest de los tres tests de schema (migrate, drift byte-identico, warning schema-4): OK en 0.240s"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:44:51+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "_normalize_ddl() delimiter-aware sobre las cuatro formas de comillas, comentarios antes del colapso de espacios"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:46:28+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "_normalize_ddl() delimiter-aware sobre las cuatro formas de comillas, comentarios antes del colapso de espacios",
+        "validations": [
+          "Los tres tests mostrados en rojo antes de escribir la funcion (AttributeError: module routing_core.store has no attribute _normalize_ddl), verdes despues",
+          "Mutacion 'bracket-opens-inside-quote' cazada por test_normalize_ddl_strips_the_canonical_comment_block; mutacion 'collapse-before-strip' cazada por los dos. Ningun guard queda solo demostrado en verde",
+          "La funcion todavia no esta cableada: la conducta del store es bit-identica en este paso"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:46:28+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Cablear los tres sitios de normalizacion y colapsar la query de sqlite_master triplicada (AC-01)"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:49:27+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Cablear los tres sitios de normalizacion y colapsar la query de sqlite_master triplicada (AC-01)",
+        "validations": [
+          "test_comment_only_divergence_migrates_and_opens y test_comment_free_schema_five_database_opens mostrados rojos antes (ROUTING_MIGRATE_FAILED rc 2), verdes despues",
+          "test_normalize_ddl_is_the_only_normalizer rojo antes (4 != 1), verde despues: la expresion inline y la query de sqlite_master quedan en 1 ocurrencia cada una",
+          "test_altered_check_is_still_rejected verde antes y despues: la reparacion no aflojo el control",
+          "python3 -m unittest tests.test_routing: Ran 82 tests, OK"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:49:27+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "SchemaDivergence: str() sigue siendo ROUTING_UNAVAILABLE, el detalle viaja en atributos, nombres canonicos se imprimen y los del archivo se cuentan (AC-05)"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:54:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "SchemaDivergence: str() sigue siendo ROUTING_UNAVAILABLE, el detalle viaja en atributos, nombres canonicos se imprimen y los del archivo se cuentan (AC-05)",
+        "validations": [
+          "Tres tests rojos antes (SchemaDivergence inexistente; 'altered=dispatches' ausente de stderr), verdes despues",
+          "Mutacion 'unexpected-name-echoed' cazada por test_diagnostic_never_echoes_a_file_supplied_name; mutacion 'narrow-isinstance-exit-removed' cazada por ese y por test_missing_check_names_the_diverged_object",
+          "test_schema_drift_fails_closed_byte_identically pasa sin tocar una sola de sus aserciones: assertRaisesRegex(RoutingError, ROUTING_UNAVAILABLE) sigue cierto sobre la subclase",
+          "Corregi una asercion propia que estaba mal (el alfabeto del diagnostico excluia mayusculas y SCHEMA_DIVERGED las tiene); se arreglo el test, no el codigo",
+          "python3 -m unittest tests.test_routing: Ran 86 tests, OK (base 75)"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:54:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Enmienda en ADR-0005 con el modelo de amenaza real (AC-07)"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:55:01+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Enmienda en ADR-0005 con el modelo de amenaza real (AC-07)",
+        "validations": [
+          "Enmienda inline en el bullet Security, con el mismo idioma que la enmienda R3 que ya vivia en el archivo (linea con fecha + decision referenciada)",
+          "Referencia routing-ddl-validation-blind-to-triggers y dice por que ese hueco NO se cierra: cerrarlo no cambia el alcance del adversario",
+          "La fila del indice de ADRs no cambia (el estado sigue Accepted), asi que el guard de 009-P3 sobre docs/adr/README.md sigue pasando"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:55:01+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T00:59:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Las cinco tareas completas"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:06+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "package verify",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "self-scaffold-sync",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "whitespace",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "adversarial-proof",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "live-diagnosis",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:00:07+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Seis gates en pass, paquete integrado"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:01:08+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:01:08+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Dos revisores independientes miran el cambio al mismo tiempo y ninguno de los dos puede tocar el codigo. Uno busca errores concretos en como se compara la estructura de la base; el otro se pregunta si al arreglar la comparacion no la aflojamos, y si el mensaje de error nuevo puede filtrar algo que venga del archivo.",
+        "purpose": "Revision profunda de correccion sobre el normalizador y los tres sitios cableados",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel concurrente RP-01 (regla de 006-P1: un solo lote, sin serializar). package-reviewer cubre la maquina de estados de _normalize_ddl (escapes, delimitador sin cerrar, orden comentarios-antes-de-espacios), la equivalencia de _ddl_divergence con la desigualdad de dicts que reemplaza, la salida isinstance angosta en el except de _validate_existing_readonly, y si alguno de los 11 tests promete mas de lo que verifica. security-auditor cubre si la reparacion aflojo el control (AC-04), si algun texto controlado por el archivo llega a schema_diagnostic o a stderr, y si la enmienda del modelo de amenaza en el ADR-0005 dice la verdad."
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:01:08+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "-",
+        "purpose": "Revision de seguridad: control no aflojado y diagnostico sin filtracion",
+        "role": "security-auditor",
+        "spawns": 2,
+        "tech": "Segundo miembro del mismo panel acotado RP-01."
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T01:01:08+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {},
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:19:45+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "role": "package-reviewer",
+        "verdict": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:19:55+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "role": "security-auditor",
+        "verdict": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:25:44+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "extend-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "added_roles": [
+          "architect"
+        ],
+        "panel_id": "RP-01"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:25:44+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Sumo un tercer par de ojos, especializado en decisiones de arquitectura, porque apareci\u00f3 algo que ninguno de los dos primeros ten\u00eda el encargo de juzgar: el documento de dise\u00f1o que escribimos puede estar diciendo que el sistema se protege menos de lo que realmente se protege.",
+        "purpose": "Dictaminar si la enmienda del ADR-0005 afirma el modelo de amenaza real",
+        "role": "architect",
+        "spawns": 3,
+        "tech": "Tercer miembro del panel RP-01 via extend-review-panel: NO abre un segundo ciclo de review profundo ni toca deep_review_cycles. Dictamina AC-07 con la reproduccion en mano."
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:25:44+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 1,
+        "role": "architect",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:29:19+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:29:19+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 1,
+        "upheld": 0
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:34:57+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "global": false,
+        "name": "package verify (post-panel)",
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:39:41+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "./ai/scripts/verify.sh",
+          "python3 -m unittest discover -s tests -v",
+          "./build.sh --check",
+          "python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/007-quota-visibility.json --package-id P1-schema-normalize --changed-file ..."
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:39:41+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-schema-normalize",
+      "timestamp": "2026-07-29T03:39:59+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1 aceptado; se abre P2 tras enmendar el contrato a 1.3.0"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-29T04:16:55+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T04:16:56+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Contrato 1.3.0, excepciones registradas, context pack escrito"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T04:17:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "SCHEMA 5->6 con el vocabulario de cost-report FIELDS + cost_micros + usage_status, columnas justo despues de project_key y en el orden de los ALTER"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T04:51:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "SCHEMA 5->6 con el vocabulario de cost-report FIELDS + cost_micros + usage_status, columnas justo despues de project_key y en el orden de los ALTER",
+        "validations": [
+          "Siete columnas anulables declaradas inmediatamente despues de PROJECT_KEY_COLUMN; dispatches pasa de 32 a 39 columnas y la cola es exactamente usage_input..usage_status. Los CHECK >= 0 son detectores de corrupcion, no validacion de entrada: _usage_row bindea solo NULL o enteros validados, y un CHECK violado adentro de close_run haria ROLLBACK del cierre, que es justo lo que AC-11 prohibe.",
+          "Una sola secuencia ordenada con dos consumidores (USAGE_COLUMNS): _create_schema la empalma y el paso 5->6 emite un ALTER por elemento. El acoplamiento de AC-09 pasa a ser aritmetica en vez de disciplina -- no hay segunda lista que mantener en sincronia.",
+          "El INSERT posicional de _authorize_issued pasa a lista explicita de columnas (_AUTHORIZED_COLUMNS, 32 nombres derivados de _IDENTITY). Verificado que el orden coincide con la tabla. Ninguna columna futura vuelve a tocar esa linea.",
+          "test_the_usage_columns_sit_exactly_where_alter_table_puts_them y test_the_usage_vocabulary_matches_cost_report mostrados rojos antes (AttributeError USAGE_COLUMNS_SQL), verdes despues. El primero incluye su complemento: las mismas columnas declaradas antes de state NO reproducen el texto migrado."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T04:51:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "migration_required generico y CLI de migracion con from/to reales; encadenado 4->5->6"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T04:51:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "migration_required generico y CLI de migracion con from/to reales; encadenado 4->5->6",
+        "validations": [
+          "migrate_from_v4 reemplazado por migrate(), cadena declarativa _MIGRATION_STEPS keyeada por la version de origen, toda adentro de un solo BEGIN EXCLUSIVE con una unica comparacion de DDL al final -- necesidad y no preferencia: la comparacion es contra el canonico ACTUAL, asi que un chequeo intermedio tras 4->5 compararia un schema-5 contra canonico-6 y fallaria siempre.",
+          "_stored_schema_version es el unico lector de meta.schema_version: los tres literales '4' y el '5' de vuelta desaparecieron. migration_required usa < SCHEMA y nunca != SCHEMA, para que una base escrita por un arnes MAS nuevo conteste False en vez de ofrecer un downgrade.",
+          "Banner con from/to observados. ADR-0008 D8 pineaba el literal; el formato no cambia, los valores pasan a ser observados, porque con schema 6 existiendo 'from=4 to=5' es una afirmacion falsa y no una eleccion de formato. El backup pasa a llamarse por la version de origen real.",
+          "test_the_migration_banner_reports_the_versions_it_observed corre DOS esquemas de origen por el mismo camino y exige que los from= DIFIERAN: un regex sobre un solo fixture pasa igual contra un from=4 hardcodeado. Mutacion 'migration_required con != en vez de <' cazada; mutacion 'orden de ALTER invertido' cazada por el test de migracion (y NO por el de colocacion, dicho en su docstring).",
+          "python3 -m unittest tests.test_routing: Ran 89 tests, OK"
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T04:51:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "close_run persiste usage; CLI rechaza duro un --usage invalido; close_run defensivo marca usage_status"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T12:09:59+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "close_run persiste usage; CLI rechaza duro un --usage invalido; close_run defensivo marca usage_status",
+        "validations": [
+          "parse_usage() en set_agents_app.py, idioma de cmd_route_decide: ValueError pelado, sin whitelist de claves. Rechaza solo lo no-JSON o JSON-no-objeto; acepta shapes no mapeadas (AC-12 lo exige). parse_float=decimal.Decimal preserva el texto exacto del proveedor.",
+          "_cost_micros() en store.py: scaleb(6) + ROUND_HALF_UP sobre el Decimal parseado desde texto. Medido: 0.0000005 via parse_usage redondea a 1; el mismo valor via decimal.Decimal(float) redondea a 0 -- la justificacion completa de parse_float=Decimal, no solo citada.",
+          "Limite [0,2^53) fijado sobre cost_micros, no sobre dolares: 9007199254.740991 dolares -> 2^53-1 micros (valido), 9007199254.740992 -> 2^53 micros (invalido). Leido al reves contradice AC-11, ya documentado en el spec (B-08).",
+          "_usage_row() en store.py: NULL nunca se coacciona a 0 (sample real de Pi sin cache/reasoning -> esas columnas NULL, status ok). {} y None son 'absent', nunca 'invalid'. Cualquier valor no confiable (tipo, negativo, mismatch de totalTokens contra la suma de los campos presentes) descarta TODA la fila -- usage_status='invalid' ES el registro del descarte, no una mezcla parcialmente confiada.",
+          "9 tests nuevos mostrados en rojo antes (AttributeError: parse_usage / _cost_micros / _usage_row no existian), verdes despues. python3 -m unittest tests.test_routing: Ran 100 tests, OK (base 91)."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T12:19:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "close_run persiste usage; CLI rechaza duro un --usage invalido; close_run defensivo marca usage_status",
+        "validations": [
+          "close_run() ahora recibe usage=None por default. Rama dispatched->terminal_<outcome>: el UPDATE incluye las siete columnas via _USAGE_SET_CLAUSE, bindeadas con _usage_row(usage). Rama authorized+failure->abandoned: fuerza _usage_row(None) SIN IMPORTAR lo que el llamador haya pasado -- un run que nunca se despacho no puede semanticamente tener consumido nada, y esa invariante vive aca, no en la disciplina del llamador.",
+          "cmd_route_terminal() en set_agents_app.py gana usage_text=None. Si viene, se parsea con parse_usage(); ValueError -> ROUTING_INPUT_INVALID exit 2 ANTES de tocar el store (el run no esta cerrado todavia, no hay nada que proteger). Lo parseable pero no confiable NO se rechaza aca -- es el borde del store.",
+          "--usage sumado a argparse, a _routing_args (para que no dispare other_mode) y a modifier_misuse (usage sin --route-terminal -> ROUTING_INPUT_INVALID), con un test cada uno: test_dispatch_cli_mode_and_modifier_exclusion cubre el segundo; test_route_terminal_usage_flows_from_the_cli_into_the_stored_row prueba que --usage + --route-terminal llega hasta la fila (si _routing_args no lo hubiera declarado, ese mismo test habria fallado por other_mode).",
+          "set_agents_spawn.py:371-374: --usage se agrega SOLO cuando outcome=='success' (detail.get('usage') del spawn exitoso). Los otros dos --route-terminal ... failure (:362 dispatch fallido antes de spawn, :382 excepcion) nunca lo llevan y jamas pasan por esta linea. model_mismatch/failure tampoco tienen clave 'usage' en su detail, asi que se omite naturalmente sin casos especiales.",
+          "8 tests nuevos mostrados en rojo antes (TypeError: close_run() unexpected keyword usage; argparse unrecognized --usage; conteo de lineas de stdout en 0 en vez de 1), verdes despues. python3 -m unittest discover -s tests: Ran 268 tests, OK (base 263)."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T12:35:51+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "--routing-report con tokens por ruta y el alcance declarado"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T12:35:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "--routing-report con tokens por ruta y el alcance declarado",
+        "validations": [
+          "report() en store.py gana la clave 'tokens', HERMANA de 'per_route' (nunca mezclada adentro): agrupa por COALESCE(actual_route_id,selected_route_id,'none') sobre dispatches, scopeado a self.project_key. SUM() sobre una columna totalmente NULL en el grupo da NULL, nunca 0 -- coercionarlo seria la misma fabricacion que AC-08 prohibe, generalizada al agregado.",
+          "tokens['scope'] declara la diferencia de alcance EN EL JSON, no solo en prosa: percentiles/per_route salen de events (global de maquina, sin project_key); tokens sale de dispatches (por proyecto). cmd_routing_report no se toco -- ya pasa el dict entero como data, y ninguna clave nueva se llama reason_codes (el comando lee esa clave especifica del reporte para decidir ok/exit code).",
+          "2 tests en test_routing.py: uno prueba SUM a traves de dos runs en la MISMA ruta (150+50 input, cache_read sigue NULL); otro prueba que un run cerrado SIN --latency-ms aporta tokens y ningun percentil -- la prueba de que los dos conjuntos de claves de ruta no son subconjunto uno del otro, no una afirmacion de prosa.",
+          "cost-report.py gana collect_pi() + _pi_project_key(): lee routing.db via --home (nunca via routing_core -- store.py deriva home de pwd.getpwuid a proposito, ADR-0005), filtra usage_status='ok' (absent/invalid no tienen nada usable), atribuye por project_key SOLO con --project (recomputando la clave), si no reporta el carril sin atribuir. --help/epilog y TIPS-USO.md declaran el limite de cobertura (solo spawns despachados por el arnes).",
+          "3 tests en test_harness.py: _pi_project_key coincide con set_agents_app.project_key_for en las dos ramas (hash-fallback y project.json persistido); atribucion solo con --project (otra proyecto nunca se filtra); filas absent/invalid no producen sesiones fantasma. Mutacion verificada: sacar la linea collect_pi(...) de main() tira rojo el test de atribucion, restaurada vuelve a verde.",
+          "python3 -m unittest discover -s tests: Ran 273 tests, OK (base 268)."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T12:51:31+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0010"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T12:51:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0010",
+        "validations": [
+          "docs/adr/0010-spawn-accounting.md escrito con el esqueleto moderno (0008/0009/0011): metadata (Estado, numeracion, amends, citas verificadas), Contexto, D1-D6, Scale/Data/Security, Consecuencias. D4 documenta la generalizacion de la cadena de migracion, superseding en parte a ADR-0008 D8.",
+          "ADR-0008 D8 enmendado inline (idioma R3/007-P1 ya establecido en el propio archivo): el banner from=4 to=5 pasa a ser historico del paso 4->5 especifico, apunta a ADR-0010 D4. Fila 0010 agregada a docs/adr/README.md, nota de reserva retirada.",
+          "El guard del hueco reservado (tests/test_harness.py) era un no-op real: assertNotIn('0010', linked) comparaba membresia exacta contra una lista de NOMBRES DE ARCHIVO completos, nunca podia fallar. Generalizado a parsear la nota de reserva (' is reserved by feature') y verificar que ese numero no tenga TAMBIEN una fila entregada -- mutacion verificada: agregar una nota de reserva falsa sobre un ADR ya entregado (0009) tira el test.",
+          "docs/architecture/overview.md (excepcion aprobada): --usage agregado a la fila de --route-terminal en la matriz de modificadores, y a la oracion del exit 2 ROUTING_INPUT_INVALID, citando ADR-0010 D3. Clausula agregada, matriz no reescrita.",
+          "Verificacion en vivo (un spawn real por el carril Pi, role=implementer): encontro un bug real -- Pi manda cacheRead/cacheWrite en camelCase, no cache_read/cache_write, y _usage_row nunca los habria capturado. Corregido con _USAGE_FIELD_ALIASES en store.py, pinned por test_usage_row_accepts_pis_actual_camelcase_cache_keys sobre el payload real, mutacion verificada. Registrado con log-decision (pi-usage-cache-keys-are-camelcase-not-snake-case).",
+          "--routing-report --json tras el spawn real muestra tokens.input=3321, tokens.output=5, tokens.cost_micros=3351 en la ruta real. cost-report.py --project . lista el carril pi (gpt-5.6-luna, implementer, sessions=1, input 3.3k) al lado de claude-code/opencode.",
+          "./ai/scripts/verify.sh -> VERIFY_PASS (274 tests, base 259 al empezar P2 +15 del paquete). ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2. git diff --check limpio. check-owned-paths.py -> OWNERSHIP_PASS, out_of_scope=[], las dos excepciones aprobadas (ADR-0008, overview.md) resueltas correctamente."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:26:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0010",
+        "validations": [
+          "Correccion de shell del validation anterior (los backticks se interpretaron como command substitution): el guard generalizado parsea la nota de reserva con el patron backtick-NNNN-backtick seguido de \"is reserved by feature\" en docs/adr/README.md, extrae el numero de 4 digitos, y falla si ese numero tambien aparece como una fila linkeada y entregada."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:26:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:09+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "package verify",
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:21+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "self-scaffold-sync",
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:22+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "whitespace",
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:22+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:22+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "adversarial-proof",
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:35+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "live-verification",
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:35+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:27:41+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:28:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "colector pi en cost-report.py con atribucion solo bajo --project"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:28:21+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "colector pi en cost-report.py con atribucion solo bajo --project",
+        "validations": [
+          "collect_pi() + _pi_project_key() en cost-report.py, leyendo routing.db via --home (nunca routing_core). Filtra usage_status='ok'. Atribuye solo con --project, recomputando la clave localmente; sin --project reporta el carril sin atribuir (project='?').",
+          "3 tests en tests/test_harness.py: test_pi_collector_project_key_matches_project_key_for (la derivacion duplicada coincide con project_key_for en las dos ramas), test_cost_report_pi_collector_attributes_only_with_project (otro proyecto nunca se filtra sin --project, se excluye con --project), test_cost_report_pi_collector_ignores_rows_with_no_usable_usage (absent/invalid no generan sesiones fantasma). Mutacion verificada.",
+          "Verificacion en vivo: cost-report.py --project . listo el carril pi real (gpt-5.6-luna, implementer, sessions=1, input=3.3k) al lado de claude-code y opencode, sobre el spawn real corrido para este paquete."
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:28:21+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:28:27+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:28:27+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:28:42+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Antes de aceptar el paquete que hace visible cuanto gasta cada delegacion, un revisor independiente mira todo el codigo para asegurarse de que funcione bien, no rompa nada de lo que ya andaba, y sea facil de mantener.",
+        "purpose": "Revision independiente y profunda del paquete completo antes de aceptarlo",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Separacion de responsabilidades: el implementador nunca aprueba su propio trabajo. Panel RP-01, package-reviewer + security-auditor declarados juntos en la apertura."
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:29:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "El mismo paquete agrega un lugar nuevo donde el arnes recibe datos de afuera (el costo y los tokens de cada delegacion) y una herramienta que lee la base de datos de ruteo. Un auditor de seguridad revisa especificamente esos dos puntos.",
+        "purpose": "Revision de seguridad sobre la superficie de entrada no confiable (parseo de --usage, lectura de routing.db por cost-report.py)",
+        "role": "security-auditor",
+        "spawns": 2,
+        "tech": "El parseo en el borde CLI (parse_usage) y el borde del store (_usage_row) son la superficie nueva de entrada no confiable de este paquete; cost-report.py agrega lectura de un sqlite ajeno via --home. Mismo panel RP-01."
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:29:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 4,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:41:40+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 6,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:42:56+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:43:12+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 1,
+        "upheld": 9
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T13:50:07+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-SEC-01",
+          "F-PR-01",
+          "F-SEC-02",
+          "F-PR-02",
+          "F-SEC-03",
+          "F-SEC-04",
+          "F-PR-05",
+          "F-PR-03",
+          "F-PR-04"
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T14:18:13+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Reviso solo lo que se toco al arreglar los 9 problemas encontrados antes, para confirmar que quedaron bien resueltos y que no se rompio nada mas.",
+        "purpose": "Revision acotada al diff de reparacion de los 9 hallazgos upheld del panel RP-01 (DELTA_REVIEW)",
+        "role": "delta-reviewer",
+        "spawns": 3,
+        "tech": "DELTA_REVIEW tras record-repair (F-SEC-01 critical descarta --skip-delta). Ambito: 7 archivos del repair batch, 9 finding-ids cerrados. Produce veredicto pass/repair_required/blocked para record-delta-review."
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T14:18:54+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T14:36:04+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T14:49:50+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "N-01",
+          "N-02",
+          "N-03"
+        ]
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T14:50:08+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "El primer chequeo encontro que uno de mis propios arreglos anteriores dejaba abierta una falla parecida a otra que ya habiamos cerrado. La corregi, y ahora mando a revisarla de nuevo, acotado solo a lo que toque esta vez.",
+        "purpose": "Segunda revision acotada al diff del segundo repair batch (N-01, N-02, y el bug de GROUP BY encontrado en el camino)",
+        "role": "delta-reviewer",
+        "spawns": 4,
+        "tech": "Segundo ciclo de DELTA_REVIEW (mismo panel logico, delta-reviewer). Ambito: 5 archivos del segundo repair batch, 3 finding-ids cerrados (N-01 verificado, N-02 y N-03 low sin verificacion obligatoria). Objetivo: confirmar que N-01/N-02/N-03 quedaron resueltos y que no se introdujo una tercera vuelta."
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T14:52:50+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T15:10:53+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh",
+          "python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/007-quota-visibility.json --package-id P2-spawn-accounting"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T15:15:19+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P2-spawn-accounting",
+      "timestamp": "2026-07-29T15:15:38+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P2 aceptado; se abre P3, ultimo paquete de la feature (AC-19, solo prosa)"
+      },
+      "package_id": null,
+      "timestamp": "2026-07-29T15:24:16+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Unica tarea: reescribir la seccion de costo de BUENOS-DIAS.md con lo verificado por P1/P2"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:24:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Reescribir la seccion de costo con lo verificado y registrarlo con log-decision"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:24:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Reescribir la seccion de costo con lo verificado y registrarlo con log-decision",
+        "validations": [
+          "docs/notas/BUENOS-DIAS.md seccion 3: el bloque 'Lo que falta, y es el bloqueante real' (routing.db schema-4 + rm) reemplazado por una nota de retractacion fechada, sin ofrecer remediacion porque no hay nada que remediar (routing.db no existe, 007-P1 cerro la clase de bug). La advertencia sobre sobrecargo de anthropic reemplazada con la medicion real (mismo bucket OAuth, costo real = piso de entrada por spawn, 3221/6 tokens).",
+          "El bloque 'Lo que si esta' (100-112) no se toco: AC-19 solo alcanza a las dos afirmaciones falsas, no al inventario que sigue siendo cierto.",
+          "log-decision buenos-dias-anthropic-surcharge-claim-was-wrong registrado, enlazado a routing-db-schema4-unmigratable, feature 007 / package P3-correct-record.",
+          "Cero cambios de codigo: grep confirma que solo docs/notas/BUENOS-DIAS.md cambio de contenido de producto; el resto son los archivos de estado que log-decision/complete-task escriben (owned_paths declarados)."
+        ]
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:25:48+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "Unica tarea completa"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:25:54+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:32:22+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:32:32+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "package verify",
+        "status": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:32:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "self-scaffold-sync",
+        "status": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:32:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "whitespace",
+        "status": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:32:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "ownership",
+        "status": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:32:58+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Cuatro gates en pass, paquete integrado"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:33:01+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer"
+        ]
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:33:12+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Antes de dar por cerrada esta funcionalidad, alguien que no escribio el texto corregido lo revisa: que lo que ahora dice coincida con lo que de verdad se probo, y que no haya quedado ninguna afirmacion vieja sin corregir en esa misma seccion.",
+        "purpose": "Revision independiente de la correccion de prosa en BUENOS-DIAS.md antes de aceptar el paquete",
+        "role": "package-reviewer",
+        "spawns": 1,
+        "tech": "Panel RP-01, un solo miembro (complexity: small, sin superficie de codigo ni de seguridad). package-reviewer, read-only, chequea las dos correcciones contra las citas de spec.md (Contexto, P1, P2) palabra por palabra, y que la excepcion de ownership sobre docs/specs/007-quota-visibility/** este bien justificada."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:33:23+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 8,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:42:34+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:42:46+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de dar por buena la segunda version del texto, un tercer par de ojos con la consigna invertida: su trabajo es tratar de tirar abajo cada uno de los ocho problemas que encontro el revisor anterior, no confirmarlos. Lo que sobrevive a eso es lo unico que queda registrado como corregido.",
+        "purpose": "Refutacion adversarial de los 8 hallazgos del panel RP-01 antes de dar la reparacion por cerrada",
+        "role": "finding-verifier",
+        "spawns": 2,
+        "tech": "Read-only, sin panel nuevo -- es el paso finding-verifier entre PACKAGE_REVIEW y PACKAGE_REPAIR que exige record-verification para severidad > low. Los 8 hallazgos ya fueron reparados en el arbol (orden invertido respecto del flujo canonico: yo verifique 3 de ellos directo contra la base sqlite antes de aplicar el fix); el verificador chequea independientemente que cada uno era real Y que el texto actual lo resuelve, no solo uno de los dos."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:42:58+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 6
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:51:54+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01",
+          "F-02",
+          "F-03",
+          "F-04",
+          "F-05",
+          "F-06",
+          "F-07",
+          "F-08"
+        ]
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:52:19+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Ultimo control: un revisor nuevo mira solo lo que se cambio para arreglar los ocho problemas que encontraron los dos anteriores, no el paquete entero. Confirma que quedaron bien resueltos y que arreglarlos no metio un problema nuevo.",
+        "purpose": "DELTA_REVIEW acotado al lote de reparacion de los 8 hallazgos de RP-01",
+        "role": "delta-reviewer",
+        "spawns": 3,
+        "tech": "Sonnet, contexto limpio, read-only, alcance acotado a docs/notas/BUENOS-DIAS.md y ai/state/decisions-log.jsonl (las dos entradas de decision). F-01/F-02 high descartan --skip-delta. Foco: si las correcciones de la segunda pasada (slug de decision, alcance del encabezado, matiz de fallback_provider) resuelven de verdad las observaciones del finding-verifier, y si algo mas quedo sin resolver."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T15:59:35+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:07:03+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un ultimo chequeo, muy chico: el revisor de delta encontro que el propio archivo de esta funcionalidad todavia repetia, en un lugar que no habiamos mirado, una de las frases que ya habiamos corregido. Antes de cerrar eso tambien, alguien independiente confirma que la correccion que le puse encima es la correcta.",
+        "purpose": "Verificacion de los 3 hallazgos nuevos del delta-reviewer (N-01/N-02/N-03) antes de cerrarlos",
+        "role": "finding-verifier",
+        "spawns": 4,
+        "tech": "finding-verifier, read-only. 3 hallazgos: N-01 medium (local_validations del task rendido en la nota del paquete), N-02/N-03 low (notas de decision sin marca de supersesion / con razon contradicha). Los tres ya tienen una correccion aplicada via la seccion Notas propias de los archivos afectados (canal fuera del bloque notas:auto). Verificar que la correccion es fiel."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:07:21+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 3
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:13:42+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "N-01",
+          "N-02",
+          "N-03"
+        ]
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:13:53+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un ultimo control mas, sobre lo minimo que quedaba: si las tres correcciones chiquitas que hice recien -- incluida una que el mismo verificador anterior me hizo corregir por una fecha mal puesta -- estan bien esta vez.",
+        "purpose": "Segundo DELTA_REVIEW, acotado al lote que cerro N-01/N-02/N-03",
+        "role": "delta-reviewer",
+        "spawns": 5,
+        "tech": "Sonnet, contexto limpio, read-only. Alcance: docs/notas/features/007-quota-visibility/P3-correct-record.md y las dos notas de decision, seccion Notas propias unicamente. No re-revisar BUENOS-DIAS.md ni el primer lote (ya con pass implicito del delta-review anterior salvo por estos 3)."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:14:23+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:19:29+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "./ai/scripts/verify.sh",
+          "python3 -m unittest discover -s tests -v",
+          "./build.sh --check",
+          "python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/007-quota-visibility.json --package-id P3-correct-record --changed-file ..."
+        ],
+        "status": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:22:02+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:22:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Mismo control para la parte que hace visible cuanto gasta cada delegacion.",
+        "purpose": "",
+        "role": "integrator",
+        "spawns": 6,
+        "tech": "Integracion de 007-quota-visibility: confirma que P1 (normalizacion de schema) + P2 (contabilidad de spawns) + P3 (correccion de la nota) juntos satisfacen el contrato 1.3.0, incluyendo la deuda de la clausula de AC-19 que quedo registrada para un futuro 1.4.0."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T16:55:25+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "Integrator confirmed all accepted packages together satisfy the approved spec; global gates (verify.sh, build.sh --check) pass."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T17:10:20+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "integration verify",
+        "status": "pass"
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T17:10:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Integration evidence consolidated at docs/specs/007-quota-visibility/evidence/integration.md; global gate recorded; no blocking cross-package findings."
+      },
+      "package_id": "P3-correct-record",
+      "timestamp": "2026-07-29T17:10:45+00:00",
+      "to": "DONE"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 4,
+    "human_questions_after_approval": 0,
+    "package_reviews": 3,
+    "repair_batches": 4,
+    "task_deep_reviews": 0,
+    "verifications": 5
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "docs/specs/*/bitacora.md",
+          "reason": "feature-state.py regenera la bitacora de TODAS las features en cada mutacion y en cada sync-notes, no solo la de la feature que se toca. Medido: el unico delta sobre las features ajenas es el header generado Actualizado:, verificado con diff ignorando esa linea. No se amplian owned_paths porque P1 no es duenio de la bitacora de otra feature; se registra el efecto de la herramienta.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/store.py",
+          "reason": "Independencia degradada en el panel RP-01, por AC-07 de 008-P1. Los dos revisores originales murieron por agotamiento de cuota del proveedor (session limit) sin devolver veredicto, y el relanzamiento prescrito por AC-02/AC-03 tuvo que bajar de tier a haiku en vez de cambiar de proveedor, porque el tope es de cuenta y no de tier. Costo asumido: no hay independencia entre proveedores y ademas el revisor es de menor capacidad que el escritor, asi que los puntos ciegos correlacionados sobreviven. Mitigacion aplicada: el orquestador verifico por construccion las afirmaciones portantes del veredicto en vez de tomarlas por validas, y encontro asi un fail-open preexistente que el panel no vio (decision la-normalizacion-de-ddl-baja-a-minusculas-los-literales-de-los-check).",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 0,
+        "spawns": 3,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "complexity": "medium",
+      "context_pack": "docs/specs/007-quota-visibility/context/P1-schema-normalize.md",
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6..worktree",
+      "findings": [
+        {
+          "ac": "AC-07",
+          "detail": "El parrafo 007-P1 amendment sostiene que quien puede escribir el archivo puede insertar las filas que quiera porque los CHECK restringen inserts futuros y no validan filas ya presentes, y que por eso la comparacion no compra nada contra ese adversario. Es falso hacia el lado permisivo: PRAGMA integrity_check devuelve ok en una conexion ro y CHECK constraint failed in dispatches en una rw sobre el MISMO archivo, y _validate_schema lo corre en las dos. Resultado observado: _validate_existing_readonly acepta una base canonica con filas que violan sus CHECK, pero la apertura completa por _connect la rechaza con ROUTING_UNAVAILABLE. Descartado que sea visibilidad de WAL: la conexion ro ve la fila, con y sin wal_checkpoint(TRUNCATE) mas journal_mode=DELETE.",
+          "id": "F-01",
+          "impact": "Un mantenedor futuro lee que la comparacion no compra nada contra ese adversario, concluye que el PRAGMA integrity_check del camino rw es cruft defensivo y lo borra para simplificar. A partir de ahi una base con filas que violan los CHECK abre sin ruido. Es la imagen espejo de la falla que la propia enmienda dice querer prevenir: sobredimensionar un control es como deja de mantenerse, y subdimensionarlo tambien.",
+          "severity": "medium",
+          "source_role": "architect",
+          "status": "refuted",
+          "title": "La enmienda del ADR-0005 que AC-07 exige afirma un modelo de amenaza mas permisivo que el real",
+          "verdict_evidence": "ai/scripts/routing_core/store.py:302-304 es la comparacion, que pasa; el rechazo viene de _validate_schema corrido sobre la conexion rw en _connect (ai/scripts/routing_core/store.py:342). Repro propia del orquestador con python3 sobre un archivo de estado descartable: fila forjada terminal_success con actual_* completo y fallback_window_open=0 -> PRAGMA integrity_check ok en modo ro Y en modo rw, report() ACEPTA, y la fila se sirve (run1_ffffffffffffffffffffffffffffffff, terminal_success, openai-codex). AC-07 pide el modelo de amenaza real y la frase lo describe con exactitud. La linea de refutacion 3 FALLO y queda como observacion aparte: ningun test de regresion fija el rechazo del integrity_check rw en tests/test_routing.py.",
+          "verdict_reason": "El sujeto de la frase disputada es la COMPARACION de DDL, y la propia reproduccion del hallazgo la prueba cierta: la base con filas violatorias pasa _ddl_divergence y cae recien en el PRAGMA integrity_check del camino rw, o sea la comparacion efectivamente no compra nada contra ese adversario. El verificador aporto ademas el experimento que el panel no hizo y que es el decisivo, reproducido de forma independiente por el orquestador: una fila FORJADA pero internamente consistente -- un terminal_success que satisface todos los CHECK -- pasa integrity_check en los dos modos, el store abre y la sirve. O sea el alcance del adversario que la frase describe es exacto: las unicas filas que el chequeo rw rechaza son las auto-inconsistentes, que ningun atacante necesita escribir. Lo que el chequeo caza es corrupcion, que es como el ADR lo enmarca. El hallazgo le atribuye a la frase una afirmacion que no hace (que el store va a ABRIR esa base): es una lectura, no un defecto.",
+          "verified_at": "2026-07-29T03:34:57+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-29T01:00:07+00:00",
+          "evidence": "./ai/scripts/verify.sh -> VERIFY_PASS. Ran 249 tests in 179.686s, OK, ninguno skipeado (base 238, +11). Incluye GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK y el diff -ruN de frescura de los tres arboles de Global/.",
+          "name": "package verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T01:00:07+00:00",
+          "evidence": "./build.sh --check -> CHECK_PASS profile go-zen + SELF_SCAFFOLD_SYNC_OK files=2. Nota: routing_core/ NO tiene gemelo en PROYECTO/ y build.sh --check compara una lista fija de dos archivos, asi que ningun gate de drift mira store.py; quien lo compila es verify.sh:19.",
+          "name": "self-scaffold-sync",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T01:00:07+00:00",
+          "evidence": "git diff --check limpio.",
+          "name": "whitespace",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T01:00:07+00:00",
+          "evidence": "OWNERSHIP_PASS sobre 24 archivos, out_of_scope=[] y read_only_violations=[]. El conjunto se armo por mtime porque check-owned-paths.py usa git diff --name-only y es ciego a los sin trackear. Se excluyo Global/{opencode,claude-code,codex} tras medir con diff -rq contra un build fresco que es byte-identico: build.sh lo reescribe en el lugar y le mueve el mtime sin cambiarle un byte, y _canonical/ no lo toco P1. Una excepcion aprobada nueva para docs/specs/*/bitacora.md: feature-state.py regenera la bitacora de todas las features en cada mutacion y el unico delta sobre las ajenas es el header Actualizado:, verificado con diff ignorando esa linea.",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T01:00:07+00:00",
+          "evidence": "Ningun guard queda solo demostrado en verde. Los 11 tests mostrados en rojo sobre el arbol de hoy antes de su arreglo (AttributeError _normalize_ddl / SchemaDivergence; ROUTING_MIGRATE_FAILED rc 2; conteo 4 != 1). Ademas cuatro mutaciones deliberadas del codigo, cada una cazada: 'bracket-opens-inside-quote' (el [ dentro de comilla simple invierte la paridad y el comentario -- N03 sobrevive) por test_normalize_ddl_strips_the_canonical_comment_block; 'collapse-before-strip' por dos tests; 'unexpected-name-echoed' por test_diagnostic_never_echoes_a_file_supplied_name; 'narrow-isinstance-exit-removed' por dos tests.",
+          "name": "adversarial-proof",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T01:00:07+00:00",
+          "evidence": "Los dos backups reales de schema-4 en ~/.local/state/set-agentes/routing-v2/backups/ abiertos en modo immutable: ambos devuelven 'SCHEMA_DIVERGED missing=none altered=dispatches,dispatches_review unexpected=0' con str(exc)='ROUTING_UNAVAILABLE'. sha256 identico antes y despues: no se toco ninguno. Es el artefacto que costo la sesion de diagnostico, nombrandose solo.",
+          "name": "live-diagnosis",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T03:39:41+00:00",
+          "evidence": "./ai/scripts/verify.sh -> VERIFY_PASS. Ran 250 tests, OK, ninguno skipeado (base 238, +12: los 11 del paquete mas el que salio de la refutacion). git diff --check limpio, build.sh --check SELF_SCAFFOLD_SYNC_OK files=2.",
+          "name": "package verify (post-panel)",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Que la comparacion de DDL compare estructura y no prosa, y que una base que genuinamente no se puede migrar lo diga nombrando el objeto que diverge en vez de fallar mudo",
+      "owned_paths": [
+        "ai/scripts/routing_core/store.py",
+        "docs/adr/0005-trusted-routing-sqlite-lifecycle.md",
+        "docs/specs/007-quota-visibility/**",
+        "ai/state/features/007-quota-visibility.json",
+        "ai/state/STATUS.md",
+        "ai/state/decisions-log.jsonl",
+        "ai/state/narrative-log.jsonl",
+        "docs/notas/**"
+      ],
+      "package_id": "P1-schema-normalize",
+      "read_only_paths": [],
+      "repairs": [],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-29T03:29:19+00:00",
+          "extensions": [
+            {
+              "at": "2026-07-29T03:25:44+00:00",
+              "reason": "El security-auditor probo, y el orquestador reprodujo, que PRAGMA integrity_check en modo rw rechaza filas preexistentes que violan un CHECK mientras que en modo ro las acepta. Eso hace que la enmienda del ADR-0005 que AC-07 exige afirme un modelo de amenaza mas permisivo que el real. Ninguno de los dos miembros del panel tiene el lente de ADR y modelo de amenaza, y el orquestador no puede a la vez encontrar el defecto en su propio texto y dictaminarlo. Se suma architect al mismo panel acotado, sin abrir un segundo ciclo.",
+              "roles": [
+                "architect"
+              ]
+            }
+          ],
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor",
+            "architect"
+          ],
+          "started_at": "2026-07-29T01:01:08+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-29T03:19:55+00:00",
+              "evidence": "Veredicto pass sin hallazgos, en haiku tras el agotamiento de cuota que mato al revisor original: independencia degradada, registrada como excepcion aprobada. Verifico los ocho puntos del brief y corrio la suite. El orquestador NO tomo el veredicto por valido: reverifico por construccion las dos afirmaciones portantes. La primera se confirma -- SQLite rechaza el doblado ]] adentro de corchetes con 'unrecognized token', asi que la regla de que [...] no tiene escape coincide con SQLite. La segunda es FALSA: el revisor sostuvo que ningun DDL divergente puede normalizar igual al canonico porque los largos diferirian, y una base cuyo CHECK del estado enumera los valores en mayuscula normaliza igual, con largo identico, y es aceptada. Ese hueco es preexistente y esta registrado como deuda, no como hallazgo de P1.",
+              "findings": [],
+              "role": "package-reviewer",
+              "verdict": "pass"
+            },
+            {
+              "at": "2026-07-29T03:25:44+00:00",
+              "evidence": "Veredicto pass sin hallazgos, tambien en haiku (misma degradacion ya registrada). Confirmo por construccion el rechazo del nombre hostil (unexpected=1, sin texto del archivo, alfabeto acotado), que la condicion nueva no ensancha lo aceptado sobre cuatro casos, y el orden comentarios-antes-de-espacios (2581 y no 2081). El orquestador reverifico la afirmacion portante de su Tarea A y RESULTA CIERTA pero deja al ADR mal parado: PRAGMA integrity_check devuelve ok en modo ro y 'CHECK constraint failed in dispatches' en modo rw sobre EL MISMO archivo, asi que _validate_existing_readonly acepta una base canonica con filas que violan sus propios CHECK, pero la apertura completa la rechaza. Descarte que fuera visibilidad de WAL: la conexion ro ve la fila, con y sin checkpoint. Consecuencia: la enmienda del ADR-0005 que este paquete escribio dice que quien puede escribir el archivo puede poner las filas que quiera, y eso esta sobredimensionado hacia el lado permisivo -- puede escribirlas, pero el store no abre la base. El auditor lo llamo 'dependencia implicita no documentada, no un hueco'; el orquestador discrepa y extiende el panel con architect para que lo dictamine alguien independiente.",
+              "findings": [],
+              "role": "security-auditor",
+              "verdict": "pass"
+            },
+            {
+              "at": "2026-07-29T03:29:19+00:00",
+              "evidence": "Tercer miembro del panel RP-01, sumado a mitad de camino con extend-review-panel para dictaminar AC-07, que ni el package-reviewer ni el security-auditor tenian encargo de juzgar. Reprodujo las cuatro observaciones de forma independiente antes de dictaminar. Fallo entre las dos lecturas en disputa: le da la razon al orquestador sobre el security-auditor -- el auditor llamo al asunto 'dependencia implicita no documentada, no un hueco' y paso el paquete; el architect dictamina que un ADR que subdimensiona un control invita a borrarlo, y que AC-07 pide el modelo de amenaza REAL, asi que queda cumplido solo a medias. Propuso texto de reemplazo, que NO se adopta verbatim: afirma como mecanismo que 'las conexiones ro de SQLite no aplican CHECK sobre filas existentes', y eso es una explicacion que nadie verifico -- solo se establecio la conducta observable.",
+              "findings": [
+                "F-01"
+              ],
+              "role": "architect",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-29T03:29:19+00:00",
+          "evidence": "Panel RP-01 cerrado con tres miembros: package-reviewer (pass), security-auditor (pass) y architect (repair_required), este ultimo sumado a mitad de panel via extend-review-panel sin abrir un segundo ciclo de review profundo. Un hallazgo medium, contra prosa que escribio el propio paquete.",
+          "findings": [
+            "F-01"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Redefine que significa 'correcto' para toda base en disco: _canonical_schema_sql define la referencia de los otros dos sitios y su resultado se memoiza en un atributo de clase que nunca se invalida. Un normalizador equivocado ahi no da una respuesta equivocada, deja de abrir todo, y el fallo es silencioso y fail-closed."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-29T03:39:41+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_routing.py",
+        "tests/test_harness.py",
+        "ai/scripts/set_agents_app.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Fixture congelado parametrizado (comentarios / CHECK N03 / version) reemplazando el literal inline, byte-identico con las perillas por default",
+          "local_validations": [
+            "frozen_dispatches_script() con las perillas por default es byte-identico (3913 chars) al literal borrado de tests/test_routing.py:1118-1141, comparado fuera de la suite antes de borrarlo",
+            "test_routing_migrate_uses_harness_identity_and_test_store pasa sin tocar ninguna de sus aserciones: es el portero del refactor",
+            "python3 -m unittest de los tres tests de schema (migrate, drift byte-identico, warning schema-4): OK en 0.240s"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "_normalize_ddl() delimiter-aware sobre las cuatro formas de comillas, comentarios antes del colapso de espacios",
+          "local_validations": [
+            "Los tres tests mostrados en rojo antes de escribir la funcion (AttributeError: module routing_core.store has no attribute _normalize_ddl), verdes despues",
+            "Mutacion 'bracket-opens-inside-quote' cazada por test_normalize_ddl_strips_the_canonical_comment_block; mutacion 'collapse-before-strip' cazada por los dos. Ningun guard queda solo demostrado en verde",
+            "La funcion todavia no esta cableada: la conducta del store es bit-identica en este paso"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Cablear los tres sitios de normalizacion y colapsar la query de sqlite_master triplicada (AC-01)",
+          "local_validations": [
+            "test_comment_only_divergence_migrates_and_opens y test_comment_free_schema_five_database_opens mostrados rojos antes (ROUTING_MIGRATE_FAILED rc 2), verdes despues",
+            "test_normalize_ddl_is_the_only_normalizer rojo antes (4 != 1), verde despues: la expresion inline y la query de sqlite_master quedan en 1 ocurrencia cada una",
+            "test_altered_check_is_still_rejected verde antes y despues: la reparacion no aflojo el control",
+            "python3 -m unittest tests.test_routing: Ran 82 tests, OK"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "SchemaDivergence: str() sigue siendo ROUTING_UNAVAILABLE, el detalle viaja en atributos, nombres canonicos se imprimen y los del archivo se cuentan (AC-05)",
+          "local_validations": [
+            "Tres tests rojos antes (SchemaDivergence inexistente; 'altered=dispatches' ausente de stderr), verdes despues",
+            "Mutacion 'unexpected-name-echoed' cazada por test_diagnostic_never_echoes_a_file_supplied_name; mutacion 'narrow-isinstance-exit-removed' cazada por ese y por test_missing_check_names_the_diverged_object",
+            "test_schema_drift_fails_closed_byte_identically pasa sin tocar una sola de sus aserciones: assertRaisesRegex(RoutingError, ROUTING_UNAVAILABLE) sigue cierto sobre la subclase",
+            "Corregi una asercion propia que estaba mal (el alfabeto del diagnostico excluia mayusculas y SCHEMA_DIVERGED las tiene); se arreglo el test, no el codigo",
+            "python3 -m unittest tests.test_routing: Ran 86 tests, OK (base 75)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Enmienda en ADR-0005 con el modelo de amenaza real (AC-07)",
+          "local_validations": [
+            "Enmienda inline en el bullet Security, con el mismo idioma que la enmienda R3 que ya vivia en el archivo (linea con fecha + decision referenciada)",
+            "Referencia routing-ddl-validation-blind-to-triggers y dice por que ese hueco NO se cierra: cerrarlo no cambia el alcance del adversario",
+            "La fila del indice de ADRs no cambia (el estado sigue Accepted), asi que el guard de 009-P3 sobre docs/adr/README.md sigue pasando"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-29T03:39:41+00:00",
+          "commands": [
+            "./ai/scripts/verify.sh",
+            "python3 -m unittest discover -s tests -v",
+            "./build.sh --check",
+            "python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/007-quota-visibility.json --package-id P1-schema-normalize --changed-file ..."
+          ],
+          "evidence": "250 tests, OK, ninguno skipeado; base 238. Once tests son del paquete y el numero 12 salio de la refutacion de F-01: test_the_ddl_comparison_sees_schema_and_the_integrity_check_sees_rows fija las dos mitades del reparto que la enmienda del ADR afirma -- que una fila que viola un CHECK la rechaza la apertura rw, y que una fila forjada pero internamente consistente pasa todo y se sirve, que es el limite documentado del control. Mutacion 'integrity_check borrado' cazada por ese test. Ese cambio NO pudo registrarse como lote de reparacion: al refutarse el unico hallazgo, record-verification ya habia movido la fase a PACKAGE_TESTING y record-repair quedo inalcanzable; queda registrado como decision un-hallazgo-refutado-puede-dejar-trabajo-y-el-ciclo-no-tiene-puerta-para-registrarlo.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-29T03:34:57+00:00",
+          "evidence": "",
+          "refuted": [
+            "F-01"
+          ],
+          "upheld": []
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15",
+        "AC-16",
+        "AC-17",
+        "AC-18"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "docs/architecture/overview.md",
+          "reason": "La matriz de exit codes vive ahi (:115-129) y nombra --latency-ms explicitamente en la oracion del exit 2. Un --usage malformado pertenece a esa misma oracion por AC-11, y el archivo no esta en owned_paths de P2. Se agrega una clausula, no se reescribe la matriz.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0008-two-roots-portability.md",
+          "reason": "El D8 pinea la salida ROUTING_MIGRATE_OK from=4 to=5 y AC-14 exige from/to reales. La enmienda tiene que ir en el ADR que hizo la promesa, no solo en el 0010, o el 0008 queda afirmando un contrato que ya no se cumple. Es una enmienda inline con el idioma que el propio 0005 ya usa, no una reescritura.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 4,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/007-quota-visibility/context/P2-spawn-accounting.md",
+      "delta_reviews": [
+        {
+          "at": "2026-07-29T14:36:04+00:00",
+          "closed_findings": [
+            "F-SEC-01",
+            "F-PR-01",
+            "F-SEC-02",
+            "F-PR-02",
+            "F-SEC-03",
+            "F-SEC-04",
+            "F-PR-05",
+            "F-PR-03",
+            "F-PR-04"
+          ],
+          "new_or_reopened_findings": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ],
+          "reason": "Delta review acotada al diff de reparacion (7 archivos). Los 9 hallazgos upheld del panel RP-01 estan correctamente cerrados. El propio repair batch introdujo una regresion (N-01, high) que reabre el invariante de F-SEC-02/AC-11 por un disparador distinto (tope de largo de --usage), mas dos hallazgos low (N-02 diagnostico enganoso, N-03 ADR desactualizado). Alcance acotado a las mismas funciones que ya toco el repair (route_and_spawn/parse_usage, collect_pi, el ADR); no requiere re-review completa.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-29T15:10:53+00:00",
+          "closed_findings": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Segunda ronda de DELTA_REVIEW, acotada al segundo repair batch (5 archivos). N-01 (subida de _MAX_USAGE_TEXT_LEN a 1MiB) verificado empiricamente: el except RecursionError pasa a ser load-bearing (json anidado de 120000 chars dispara RecursionError real bajo el nuevo tope), un usage valido de 70KB cierra el run, y el techo real de argv del kernel (~128KiB) no reintroduce el bug -- por encima de eso el spawner ya cerraba best-effort sin --usage, conducta identica antes y despues. N-02 (project_key!=? en collect_pi) y el bug de GROUP BY verificados con revert aislado de cada fix, solo el test correspondiente se pone en rojo. N-03 (ADR) contrastado contra el codigo real, no solo contra la prosa nueva. Dos observaciones no bloqueantes registradas aparte, no motivan repair_required: O-01 (comentario desactualizado en set_agents_app.py, corregido directamente por ser un cambio de una linea de prosa sin riesgo) y O-02 (bug real mas serio pero preexistente y fuera del diff: collect_pi no chequea version de schema y se cae con OperationalError contra una routing.db sin migrar a schema 6, tumbando los otros tres carriles del reporte -- registrado via log-decision como candidato de 007-P3, no de este paquete).",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [
+        "P1-schema-normalize"
+      ],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6..worktree",
+      "findings": [
+        {
+          "detail": "_cost_micros hace 'if value < 0' sobre un Decimal antes de chequear finitud. Decimal('NaN') < 0 lanza decimal.InvalidOperation, que ni close_run (except OverflowError,sqlite3.Error) ni _lifecycle_command (except OSError,TypeError,ValueError,OverflowError) atrapan -> traceback crudo, stdout vacio, exit 1, y el run queda dispatched para siempre sin ni siquiera un evento rejected. Infinity produce OverflowError builtin en int(Decimal('Infinity')), que tampoco cazan los except de decimal.Overflow -> se degrada a ROUTING_UNAVAILABLE (no crashea, pero el run tampoco cierra). El docstring 'Never raises' es falso en los dos casos. Repro: json.loads acepta NaN/Infinity como constantes (via parse_constant, NO via parse_float=Decimal), asi que 'total' llega como float('nan')/float('inf'), no Decimal.",
+          "id": "F-SEC-01",
+          "impact": "Un provider hostil o roto que reporte cost.total=NaN deja un run dispatched sin cerrar y sin ningun evento de auditoria, violando AC-11 ('la run cierra pase lo que pase con el usage') y AC-17 (retencion) de forma silenciosa -- ademas de romper el contrato de una-linea-JSON de la CLI con un traceback de 22 lineas.",
+          "repair_attempts": 1,
+          "severity": "critical",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "title": "cost.total no finito (NaN/Infinity) rompe el cierre del run y filtra un traceback",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Reproducido por el auditor: --usage '{\"cost\":{\"total\":NaN}}' -> rc=1, stdout vacio, traceback terminando en decimal.InvalidOperation.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "spawn() hace 'usage or {}' pero nunca valida que last_assistant.get('usage') sea un dict antes de eso -- si pi devuelve usage como lista/string/numero, route_and_spawn lo json.dumps y lo pasa como --usage. parse_usage lo rechaza correctamente (ROUTING_INPUT_INVALID, exit 2) pero --usage y el cierre del run son LA MISMA llamada CLI, asi que rechazar el usage rechaza TODO el --route-terminal, dejando el run dispatched para siempre. La premisa de AC-11 ('el run no esta cerrado todavia, no hay nada que proteger') asume que el rechazo de --usage es independiente del cierre, y en el cableado real de produccion no lo es.",
+          "id": "F-SEC-02",
+          "impact": "Un run que en teoria ya termino (dispatch + spawn exitoso o fallido) queda abierto indefinidamente si pi devuelve una forma de usage rara, acumulando en open_runs sin que nada lo repare.",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "title": "Un usage no-dict devuelto por el hijo Pi deja el run abierto sin error visible",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Reproducido: --usage '[1, 2, 3]' o '\"3227 tokens\"' o '42' -> rc=2 ROUTING_INPUT_INVALID, el run sigue en estado dispatched.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "El except de parse_usage es (json.JSONDecodeError, ValueError, TypeError) -- no incluye RecursionError. Un --usage con anidacion profunda ('[[[...]]]') dispara RecursionError en el decoder recursivo de json, con traceback crudo (rutas absolutas incluidas) en vez de ROUTING_INPUT_INVALID. No alcanzable desde el spawn real de Pi (el propio proceso ya trunca antes), pero si desde cualquier invocacion directa de la CLI.",
+          "id": "F-SEC-03",
+          "impact": "Rompe el contrato de una-linea-JSON documentado exactamente para el caso que el propio docstring de parse_usage dice haber evitado copiando el idioma de cmd_route_decide en vez de parse_json_object.",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "title": "parse_usage no atrapa RecursionError sobre JSON profundamente anidado",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Medido: ~52146 niveles de anidacion (~104KB, por debajo de MAX_ARG_STRLEN) dispara RecursionError: Stack overflow.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Con ai/state/project.json presente pero invalido, project_key_for lanza ProjectIdentityError (fail-closed documentado: 'falling back would silently split history'). _pi_project_key cae en silencio al hash de path en ese mismo caso -- el reporte muestra 0 tokens del carril pi en vez de fallar visiblemente. Ademas usa identity.read_text() en vez del patron _safe_read (O_NOFOLLOW/O_NONBLOCK/limite de tamano) que el original usa deliberadamente contra FIFOs -- un --project cuyo ai/state/project.json es un FIFO cuelga cost-report.py indefinidamente.",
+          "id": "F-SEC-04",
+          "impact": "El test que 'fija que las dos derivaciones coinciden' solo cubre los caminos felices (ausente, presente y valido); el caso presente-e-invalido -- el que el original trata como refusal deliberada -- no esta cubierto y diverge en silencio. Ademas hay una superficie de DoS local trivial (crear un FIFO en esa ruta) contra una herramienta de reporte que un usuario podria correr sobre un directorio no confiable.",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "title": "_pi_project_key diverge de project_key_for exactamente en el caso que el original rechaza a proposito, y puede colgarse con un FIFO",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Confirmado por lectura: project_key_for usa _safe_read con O_NOFOLLOW/O_NONBLOCK y limite de bytes; _pi_project_key usa .read_text() plano sin ninguna de esas guardas.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Coincide independientemente con F-SEC-01 del security-auditor. value < 0 sobre Decimal('NaN') lanza decimal.InvalidOperation (traceback crudo, stdout vacio); int(Decimal('Infinity')) lanza OverflowError builtin que SI cae en el except de close_run mas amplio pero deja el run sin cerrar igual (ROUTING_UNAVAILABLE). json.loads acepta NaN/Infinity via parse_constant, no via parse_float=Decimal, asi que 'total' llega como float('nan')/float('inf').",
+          "id": "F-PR-01",
+          "impact": "Viola el invariante central de AC-11 (el run cierra pase lo que pase con el usage) y para NaN rompe ademas el contrato de una linea JSON.",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "_cost_micros lanza sobre NaN/Infinity, el run nunca cierra",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Reproducido por el package-reviewer end-to-end via CLI real: NaN -> exit 1 stdout vacio traceback decimal.InvalidOperation; Infinity -> ROUTING_UNAVAILABLE con un evento rejected espurio, run sigue dispatched.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "spawn() en las ramas model_mismatch (dos sitios) y PI_TURN_ERROR retorna DESPUES de agent_settled=true, exit 0, con last_assistant ya disponible como variable local -- pero ninguno de los tres return incluye 'usage' en el detail. route_and_spawn arma usage=detail.get('usage') if outcome=='success' else None, asi que estas dos ramas (que SI corrieron y gastaron tokens) cierran sin --usage, y close_run las graba usage_status='absent'.",
+          "id": "F-PR-02",
+          "impact": "AC-11 define absent como 'usage que nunca existio: los dos cierres de fallo que nunca despacharon'. Estos spawns corrieron completos y consumieron cuota real. Grabarlos absent los vuelve indistinguibles de un run que nunca se disparo -- exactamente la ceguera que el paquete existe para terminar, en una ruta que SEC-A04 ya documenta como observada en produccion (el marcador de fallback de modelo).",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "Un spawn que gasto tokens y termino en model_mismatch o PI_TURN_ERROR se graba absent, no invalid ni ok",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Confirmado por lectura de codigo: los tres return de spawn() para model_mismatch/PI_TURN_ERROR ocurren despues de que last_assistant.get('usage') ya fue leido para otros propositos, y ninguno lo propaga al detail.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Si Pi empezara a reportar totalTokens excluyendo cache (la unica muestra en vivo tiene cache=0 asi que no distingue las dos convenciones), todo row con cache no-cero pasaria a invalid con las siete columnas NULL. --routing-report mostraria tokens.input=null y cost-report.py 'No sessions matched.' -- identico byte a byte a que nunca hubo spawns de pi.",
+          "id": "F-PR-03",
+          "impact": "AC-11 dice explicitamente que un colector que no puede distinguir 'no consumio nada' de 'venimos descartando cada lectura' reintroduce la ceguera. El store distingue (usage_status='invalid'); los dos lectores (report(), cost-report.py) la borran.",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "usage_status='invalid' se guarda pero ningun reporte lo agrega o lo muestra",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Confirmado por lectura: report()['tokens'] no agrupa por usage_status, collect_pi filtra WHERE usage_status='ok' sin contar ni avisar cuantas filas quedaron afuera.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Los otros tres colectores usan in_project() (Path.relative_to, --project como PREFIJO de directorio). collect_pi recomputa la clave de EXACTAMENTE el directorio pasado en --project y filtra project_key=? -- si --project es un ancestro o un descendiente del directorio real del proyecto, la clave no coincide con ninguna fila y el carril pi desaparece sin aviso.",
+          "id": "F-PR-04",
+          "impact": "--project significa dos cosas distintas en un mismo comando; la divergencia se ve como 'pi no cuesta nada', exactamente la conclusion que la feature existe para prevenir, en el escenario multi-proyecto que el propio Contexto del spec describe.",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "cost-report.py --project trata al carril pi distinto de los otros tres: prefijo vs coincidencia exacta de clave",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Confirmado por lectura comparando in_project() (relative_to) contra _pi_project_key(Path(project).resolve()) + filtro project_key=? exacto.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Ademas del caso presente-e-invalido que reporto security-auditor, el package-reviewer identifico que project_key_for tambien rechaza (via _safe_read con O_NOFOLLOW) un ai/state/project.json que sea un SYMLINK, mientras _pi_project_key usa Path.read_text() y lo sigue en silencio -- podria atribuir tokens a la identidad de un proyecto distinto al que el symlink apunta.",
+          "id": "F-PR-05",
+          "impact": "El test de equivalencia (ADR-0010 D6) solo cubre los caminos felices; la garantia de que 'las dos derivaciones coinciden' es verde exactamente en los inputs donde coinciden por construccion.",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "_pi_project_key diverge de project_key_for en cada camino de identidad inutilizable (coincide y extiende F-SEC-04)",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Confirmado por lectura: project_key_for usa _safe_read (O_NOFOLLOW + limite de bytes + chequeo de tipo de archivo dos veces, antes y despues de abrir); _pi_project_key no.",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "dispatches no tiene indice que cubra las siete columnas de usage; AC-17 acepta crecimiento de almacenamiento sin limite pero no analiza el costo de LECTURA, y este paquete es lo que hace que la tabla se lea en un camino de operador caliente (--routing-report).",
+          "id": "F-PR-06",
+          "impact": "A 10x-1000x las filas de hoy, --routing-report adquiere un piso de latencia que hoy no tiene. Es un limite a documentar o mitigar, no una urgencia de este paquete.",
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "refuted",
+          "title": "report() y collect_pi agregan con full-table-scan sobre dispatches, que no tiene retencion",
+          "verdict_evidence": "EXPLAIN QUERY PLAN SELECT SUM(usage_input),... FROM dispatches WHERE project_key=? -> 'SEARCH dispatches USING INDEX dispatches_review (project_key=?)', medido contra routing_core/store.py:1 report(). La variante GROUP BY 1 agrega 'USE TEMP B-TREE FOR GROUP BY' pero mantiene el mismo SEARCH.",
+          "verdict_reason": "La afirmacion central ('full-table-scan', 'sin indice') es falsa, medida con EXPLAIN QUERY PLAN contra un store schema-6 real: las dos queries nuevas de report() y collect_pi con --project son SEARCH dispatches USING INDEX dispatches_review (project_key=?), no SCAN. dispatches_review lidera con project_key exactamente como ADR-0008 D8 lo dise\u00f1o (AC-17 acepta crecimiento sin retencion, no lectura sin indice), asi que las tres podan a un solo proyecto. El unico SCAN real es cost-report.py SIN --project, un reporte deliberadamente global.",
+          "verified_at": "2026-07-29T13:50:07+00:00",
+          "verified_by": "finding-verifier",
+          "verified_evidence": "Confirmado por lectura del schema: dispatches_review(project_key,role,state,terminal_at) no cubre usage_input..cost_micros.",
+          "verified_verdict": "refuted"
+        },
+        {
+          "detail": "route_and_spawn adjunta --usage siempre que detail['usage'] sea un dict (fix de F-SEC-02/F-PR-02). parse_usage (set_agents_app.py) rechaza CUALQUIER texto de mas de _MAX_USAGE_TEXT_LEN=65536 caracteres con ValueError, y cmd_route_terminal levanta ROUTING_INPUT_INVALID (exit 2) ANTES de llamar a close_run -- el run nunca cierra. Reproducido: un usage dict valido con un campo de relleno de 70KB (heredado de un provider real o de una respuesta con texto largo) hace que decide/dispatch corran bien pero terminal salga rc=2 con el run quedando en estado dispatched para siempre. Es la misma clase de bug que F-SEC-02/F-PR-02 (invariante 'el run cierra pase lo que pase con el usage', AC-11), reabierta por un disparador distinto: el limite de longitud que F-SEC-03 agrego para prevenir RecursionError. Ademas, con el limite actual (65536 chars), un ataque por anidamiento profundo ya es rechazado por el chequeo de largo antes siquiera de llegar a json.loads (medido: se necesitan ~104000 caracteres de anidamiento para disparar RecursionError, por encima del tope actual), asi que el 'except RecursionError' agregado en el mismo repair es codigo muerto: ningun test lo ejercita de verdad.",
+          "id": "N-01",
+          "impact": "Un run legitimo puede quedar 'dispatched' para siempre (nunca cierra, nunca se contabiliza su costo, AC-17 lo deja sin retencion posible) si el usage reportado por un provider supera 65536 caracteres serializados -- exactamente el modo de falla que AC-11 y F-SEC-02 existen para impedir.",
+          "repair_attempts": 1,
+          "severity": "high",
+          "status": "closed",
+          "title": "El tope de largo de --usage agregado por F-SEC-03 reabre el invariante de F-SEC-02: un usage valido pero grande deja el run dispatched para siempre",
+          "verified_at": "2026-07-29T14:49:50+00:00",
+          "verified_by": "delta-reviewer",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "collect_pi cuenta 'matched' DESPUES de aplicar el filtro since_ms (linea ~309), pero el 'total' que se usa para el aviso 'existen N fila(s) ok para otros proyectos' se calcula SIN filtrar por project_key ni por since_ms. Si el proyecto pedido con --project tiene filas 'ok' pero todas caen fuera de la ventana de --since, matched=0 y el aviso puede decir textualmente que existen filas de 'otros proyectos' cuando en realidad son filas del MISMO proyecto, simplemente viejas -- un diagnostico equivocado que manda al operador a revisar --project cuando el problema real es --since.",
+          "id": "N-02",
+          "impact": "Mensaje de diagnostico enganoso en un caso de uso legitimo (revisar costos de una ventana de tiempo acotada), sin afectar los datos persistidos ni el conteo que se le muestra al usuario en el reporte -- solo el texto del aviso por stderr.",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "title": "El aviso de F-PR-04 en collect_pi puede culpar a 'otros proyectos' cuando en realidad son filas del mismo proyecto fuera de la ventana de --since"
+        },
+        {
+          "detail": "D3 dice que el borde CLI rechaza solo lo no-parseable ('not JSON, or JSON that is not an object') y que 'there is nothing to protect' porque el run no cerro todavia -- desde F-SEC-03 el CLI tambien rechaza por longitud, y N-01 muestra que la premisa 'nothing to protect' es exactamente la que ya fallo una vez (F-SEC-02) para el cableado de produccion real. D5 no menciona tokens['status_counts'] (agregado por F-PR-03/F-PR-04). D6 describe el test de equivalencia de identidad como cubriendo 'the persisted-identity path and the hash-fallback path' cuando ahora cubre todos los caminos de identidad inutilizable (schema invalido, corrupto, symlink, oversized).",
+          "id": "N-03",
+          "impact": "El ADR deja de ser una fuente de verdad fiel al codigo que documenta -- riesgo puramente documental, sin efecto en runtime.",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "title": "ADR-0010 (D3, D5, D6) quedo desactualizado por el propio repair batch"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-29T13:27:21+00:00",
+          "evidence": "./ai/scripts/verify.sh -> VERIFY_PASS. Ran 274 tests, OK, ninguno skipeado (base 259 al abrir P2, +15: 9 de parse_usage/_cost_micros/_usage_row, 5 de close_run+CLI+spawner, 2 de report tokens (base+11 de pi collector serian test_harness.py, contados aparte), 1 del alias camelCase encontrado en la verificacion en vivo). Incluye GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK.",
+          "name": "package verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T13:27:22+00:00",
+          "evidence": "./build.sh --check -> CHECK_PASS profile go-zen + SELF_SCAFFOLD_SYNC_OK files=2. routing_core/, cost-report.py y set_agents_app.py/set_agents_spawn.py no tienen gemelo en PROYECTO/ (build.sh --check compara una lista fija de dos archivos); ningun gate de drift los mira.",
+          "name": "self-scaffold-sync",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T13:27:22+00:00",
+          "evidence": "git diff --check limpio.",
+          "name": "whitespace",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T13:27:22+00:00",
+          "evidence": "OWNERSHIP_PASS sobre 17 archivos armados por conocimiento directo de los cambios (no por mtime: el arbol tiene trabajo sin commitear de 008/009 con mtimes recientes que no son de este paquete). out_of_scope=[], read_only_violations=[]. Las dos excepciones aprobadas (docs/adr/0008-two-roots-portability.md, docs/architecture/overview.md) resueltas correctamente por el chequeo.",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T13:27:35+00:00",
+          "evidence": "Ningun guard queda solo demostrado en verde. Rojo-primero mostrado para los 14 tests nuevos de comportamiento (AttributeError para parse_usage/_cost_micros/_usage_row antes de existir; TypeError close_run() unexpected keyword usage; argparse unrecognized --usage; KeyError tokens en report()). Cuatro mutaciones deliberadas cazadas: 'sacar _USAGE_FIELD_ALIASES' por test_usage_row_accepts_pis_actual_camelcase_cache_keys (encontrado por el spawn real, no por lectura de codigo); 'sacar la linea collect_pi(...) de main()' por test_cost_report_pi_collector_attributes_only_with_project; 'reservation note falsa sobre ADR ya entregado' por el guard generalizado de docs/adr/README.md; ademas se documento que el guard anterior (assertNotIn('0010', linked)) era un no-op real, nunca podia fallar.",
+          "name": "adversarial-proof",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T13:27:35+00:00",
+          "evidence": "Un spawn real por el carril Pi (role=implementer, task_class=mechanical, run_id=run1_3cfe6411e0493d85cc7f337af95d7470): usage real {input:3321,output:5,reasoning:0,totalTokens:3326,cacheRead:0,cacheWrite:0,cost.total:0.003351}. --routing-report --json muestra tokens.input=3321, tokens.output=5, tokens.cost_micros=3351 en la ruta real. cost-report.py --project . lista pi/gpt-5.6-luna/implementer/sessions=1/input=3.3k al lado de claude-code y opencode. La verificacion en vivo encontro un bug real (cacheRead/cacheWrite en camelCase) que ningun test con datos sinteticos habria encontrado, corregido y registrado con log-decision.",
+          "name": "live-verification",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Persistir en el expediente el usage que el spawn ya recibe y hacer visible el gasto por carril incluido Pi, para que el costo de la delegacion deje de ser el unico eje sin traza",
+      "owned_paths": [
+        "ai/scripts/routing_core/store.py",
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/set_agents_spawn.py",
+        "ai/scripts/cost-report.py",
+        "TIPS-USO.md",
+        "docs/adr/0010-spawn-accounting.md",
+        "docs/adr/README.md",
+        "docs/specs/007-quota-visibility/**",
+        "ai/state/features/007-quota-visibility.json",
+        "ai/state/STATUS.md",
+        "ai/state/decisions-log.jsonl",
+        "ai/state/narrative-log.jsonl",
+        "docs/notas/**"
+      ],
+      "package_id": "P2-spawn-accounting",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-29T14:18:13+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/store.py",
+            "ai/scripts/set_agents_app.py",
+            "ai/scripts/set_agents_spawn.py",
+            "ai/scripts/cost-report.py",
+            "tests/test_routing.py",
+            "tests/test_harness.py",
+            "docs/adr/0010-spawn-accounting.md"
+          ],
+          "finding_ids": [
+            "F-SEC-01",
+            "F-PR-01",
+            "F-SEC-02",
+            "F-PR-02",
+            "F-SEC-03",
+            "F-SEC-04",
+            "F-PR-05",
+            "F-PR-03",
+            "F-PR-04"
+          ],
+          "verification": [
+            "record-verification 2026-07-29T13:50:07Z (finding-verifier, adversarial, reproduccion propia). Fixes: _cost_micros rechaza Decimal no finito antes de comparar (F-SEC-01/F-PR-01, misma causa raiz); parse_usage cachea RecursionError y limita el largo del texto (F-SEC-03); _usage_field_key acepta cacheRead/cacheWrite ademas de cache_read/cache_write (hallazgo de la verificacion en vivo); route_and_spawn solo adjunta --usage si es dict (F-SEC-02/F-PR-02, con el loop de last_assistant adelantado para cubrir tambien PI_MODEL_FALLBACK); _pi_project_key endurecido con O_NOFOLLOW/O_NONBLOCK y tope de tamano, igual que project_key_for (F-SEC-04/F-PR-05, misma causa raiz); report() agrega tokens[status_counts] para que las filas descartadas no sean invisibles (F-PR-03/F-PR-04). Suite completa: 281 tests OK. verify.sh: VERIFY_PASS. check-owned-paths.py: OWNERSHIP_PASS. Mutation-tested cada arreglo por separado (rojo confirmado, restaurado, verde)."
+          ]
+        },
+        {
+          "at": "2026-07-29T14:50:08+00:00",
+          "changed_files": [
+            "ai/scripts/set_agents_app.py",
+            "ai/scripts/cost-report.py",
+            "tests/test_routing.py",
+            "tests/test_harness.py",
+            "docs/adr/0010-spawn-accounting.md"
+          ],
+          "finding_ids": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ],
+          "verification": [
+            "record-delta-review + record-verification 2026-07-29 (delta-reviewer, revision acotada al diff del primer repair). N-01 (high, verificado por record-verification): _MAX_USAGE_TEXT_LEN subio de 65536 a 1MiB (set_agents_app.py) para que un usage valido pero grande no deje el run dispatched para siempre -- el mismo invariante de F-SEC-02/AC-11 reabierto por el propio tope de largo que F-SEC-03 agrego. N-02 (low): collect_pi ya no acusa a 'otros proyectos' cuando las filas que faltan son del mismo proyecto fuera de --since (project_key!=? en la query de conteo); ademas se encontro y arreglo un bug independiente durante el testing de N-02 (GROUP BY usage_status faltante en la query de descartes, que hacia imprimir un aviso falso 'excluded 0 None row(s)' en CUALQUIER corrida sin descartes reales -- registrado en la verificacion aunque no tiene finding-id propio, por ser hallado y reparado en el mismo diff). N-03 (low, solo ADR): D3/D5/D6 de docs/adr/0010-spawn-accounting.md actualizados para reflejar los dos batches de reparacion. Debt residual registrada via log-decision: pi-lane-since-window-blind-to-discard-and-total (--since no filtra los totales de diagnostico, solo las filas contadas). Suite completa: 284 tests OK (subio de 281). Cada arreglo mutation-testeado por separado: N-01 con un test que reproduce el caso real (usage valido de 70KB) mostrado en rojo antes del fix; N-02 y el bug de GROUP BY con mutaciones aisladas (revertir cada fix por separado, confirmar que solo su test correspondiente falla)."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-29T13:43:12+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-07-29T13:28:42+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-29T13:41:40+00:00",
+              "evidence": "Cuatro hallazgos verificados experimentalmente contra la CLI real (SET_AGENTS_ROUTING_TEST_ROOT hermetico), no solo por lectura de codigo. Confirmado limpio: sin inyeccion SQL (todo el texto SQL de usage sale de constantes de modulo, ninguna clave/valor del dict usage toca un string SQL), sin shell=True/os.system, usage_status='invalid' no persiste nada crudo, SchemaDivergence cuenta en vez de imprimir nombres no confiables, _rejection_event usa conexion propia fuera de la transaccion abortada.",
+              "findings": [
+                "F-SEC-01",
+                "F-SEC-02",
+                "F-SEC-03",
+                "F-SEC-04"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-07-29T13:42:56+00:00",
+              "evidence": "Revision profunda con 274 tests corridos (OK, 347s). Confirmado correcto: la cadena de migracion 4->5->6 (probado contra fixtures reales v4 y v5, no solo aserciones), _AUTHORIZED_COLUMNS verificado mecanicamente contra un dispatches en vivo (32 nombres, orden identico a la tupla de valores), las dos ramas de close_run (bind correcto de _USAGE_SET_CLAUSE, abandoned fuerza _usage_row(None) literal), report() tokens (SUM sobre todo-NULL da NULL, scope correcto, tokens es clave hermana). Seis hallazgos en la superficie nueva, ninguno en la migracion/schema/close_run que ya estaban duros.",
+              "findings": [
+                "F-PR-01",
+                "F-PR-02",
+                "F-PR-03",
+                "F-PR-04",
+                "F-PR-05",
+                "F-PR-06"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-29T13:43:12+00:00",
+          "evidence": "Panel RP-01: package-reviewer y security-auditor, los dos repair_required. Diez hallazgos entre ambos, con solapamiento real (F-PR-01/F-SEC-01 sobre NaN/Infinity en cost.total; F-PR-05/F-SEC-04 sobre la divergencia de _pi_project_key) que sube la confianza en esos dos en vez de restarla -- dos lentes independientes llegaron al mismo defecto por caminos distintos. Ningun hallazgo es de estilo; los diez tienen reproduccion o cita de codigo concreta.",
+          "findings": [
+            "F-SEC-01",
+            "F-SEC-02",
+            "F-SEC-03",
+            "F-SEC-04",
+            "F-PR-01",
+            "F-PR-02",
+            "F-PR-03",
+            "F-PR-04",
+            "F-PR-05",
+            "F-PR-06"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Sube SCHEMA a 6: toda base schema-5 existente deja de abrir si migration_required no se generaliza. La posicion de las columnas nuevas en el DDL canonico es load-bearing y falla recien en vivo."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-29T15:15:19+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [
+        "tests/test_routing.py",
+        "tests/test_harness.py"
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "SCHEMA 5->6 con el vocabulario de cost-report FIELDS + cost_micros + usage_status, columnas justo despues de project_key y en el orden de los ALTER",
+          "local_validations": [
+            "Siete columnas anulables declaradas inmediatamente despues de PROJECT_KEY_COLUMN; dispatches pasa de 32 a 39 columnas y la cola es exactamente usage_input..usage_status. Los CHECK >= 0 son detectores de corrupcion, no validacion de entrada: _usage_row bindea solo NULL o enteros validados, y un CHECK violado adentro de close_run haria ROLLBACK del cierre, que es justo lo que AC-11 prohibe.",
+            "Una sola secuencia ordenada con dos consumidores (USAGE_COLUMNS): _create_schema la empalma y el paso 5->6 emite un ALTER por elemento. El acoplamiento de AC-09 pasa a ser aritmetica en vez de disciplina -- no hay segunda lista que mantener en sincronia.",
+            "El INSERT posicional de _authorize_issued pasa a lista explicita de columnas (_AUTHORIZED_COLUMNS, 32 nombres derivados de _IDENTITY). Verificado que el orden coincide con la tabla. Ninguna columna futura vuelve a tocar esa linea.",
+            "test_the_usage_columns_sit_exactly_where_alter_table_puts_them y test_the_usage_vocabulary_matches_cost_report mostrados rojos antes (AttributeError USAGE_COLUMNS_SQL), verdes despues. El primero incluye su complemento: las mismas columnas declaradas antes de state NO reproducen el texto migrado."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "migration_required generico y CLI de migracion con from/to reales; encadenado 4->5->6",
+          "local_validations": [
+            "migrate_from_v4 reemplazado por migrate(), cadena declarativa _MIGRATION_STEPS keyeada por la version de origen, toda adentro de un solo BEGIN EXCLUSIVE con una unica comparacion de DDL al final -- necesidad y no preferencia: la comparacion es contra el canonico ACTUAL, asi que un chequeo intermedio tras 4->5 compararia un schema-5 contra canonico-6 y fallaria siempre.",
+            "_stored_schema_version es el unico lector de meta.schema_version: los tres literales '4' y el '5' de vuelta desaparecieron. migration_required usa < SCHEMA y nunca != SCHEMA, para que una base escrita por un arnes MAS nuevo conteste False en vez de ofrecer un downgrade.",
+            "Banner con from/to observados. ADR-0008 D8 pineaba el literal; el formato no cambia, los valores pasan a ser observados, porque con schema 6 existiendo 'from=4 to=5' es una afirmacion falsa y no una eleccion de formato. El backup pasa a llamarse por la version de origen real.",
+            "test_the_migration_banner_reports_the_versions_it_observed corre DOS esquemas de origen por el mismo camino y exige que los from= DIFIERAN: un regex sobre un solo fixture pasa igual contra un from=4 hardcodeado. Mutacion 'migration_required con != en vez de <' cazada; mutacion 'orden de ALTER invertido' cazada por el test de migracion (y NO por el de colocacion, dicho en su docstring).",
+            "python3 -m unittest tests.test_routing: Ran 89 tests, OK"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "close_run persiste usage; CLI rechaza duro un --usage invalido; close_run defensivo marca usage_status",
+          "local_validations": [
+            "parse_usage() en set_agents_app.py, idioma de cmd_route_decide: ValueError pelado, sin whitelist de claves. Rechaza solo lo no-JSON o JSON-no-objeto; acepta shapes no mapeadas (AC-12 lo exige). parse_float=decimal.Decimal preserva el texto exacto del proveedor.",
+            "_cost_micros() en store.py: scaleb(6) + ROUND_HALF_UP sobre el Decimal parseado desde texto. Medido: 0.0000005 via parse_usage redondea a 1; el mismo valor via decimal.Decimal(float) redondea a 0 -- la justificacion completa de parse_float=Decimal, no solo citada.",
+            "Limite [0,2^53) fijado sobre cost_micros, no sobre dolares: 9007199254.740991 dolares -> 2^53-1 micros (valido), 9007199254.740992 -> 2^53 micros (invalido). Leido al reves contradice AC-11, ya documentado en el spec (B-08).",
+            "_usage_row() en store.py: NULL nunca se coacciona a 0 (sample real de Pi sin cache/reasoning -> esas columnas NULL, status ok). {} y None son 'absent', nunca 'invalid'. Cualquier valor no confiable (tipo, negativo, mismatch de totalTokens contra la suma de los campos presentes) descarta TODA la fila -- usage_status='invalid' ES el registro del descarte, no una mezcla parcialmente confiada.",
+            "9 tests nuevos mostrados en rojo antes (AttributeError: parse_usage / _cost_micros / _usage_row no existian), verdes despues. python3 -m unittest tests.test_routing: Ran 100 tests, OK (base 91).",
+            "close_run() ahora recibe usage=None por default. Rama dispatched->terminal_<outcome>: el UPDATE incluye las siete columnas via _USAGE_SET_CLAUSE, bindeadas con _usage_row(usage). Rama authorized+failure->abandoned: fuerza _usage_row(None) SIN IMPORTAR lo que el llamador haya pasado -- un run que nunca se despacho no puede semanticamente tener consumido nada, y esa invariante vive aca, no en la disciplina del llamador.",
+            "cmd_route_terminal() en set_agents_app.py gana usage_text=None. Si viene, se parsea con parse_usage(); ValueError -> ROUTING_INPUT_INVALID exit 2 ANTES de tocar el store (el run no esta cerrado todavia, no hay nada que proteger). Lo parseable pero no confiable NO se rechaza aca -- es el borde del store.",
+            "--usage sumado a argparse, a _routing_args (para que no dispare other_mode) y a modifier_misuse (usage sin --route-terminal -> ROUTING_INPUT_INVALID), con un test cada uno: test_dispatch_cli_mode_and_modifier_exclusion cubre el segundo; test_route_terminal_usage_flows_from_the_cli_into_the_stored_row prueba que --usage + --route-terminal llega hasta la fila (si _routing_args no lo hubiera declarado, ese mismo test habria fallado por other_mode).",
+            "set_agents_spawn.py:371-374: --usage se agrega SOLO cuando outcome=='success' (detail.get('usage') del spawn exitoso). Los otros dos --route-terminal ... failure (:362 dispatch fallido antes de spawn, :382 excepcion) nunca lo llevan y jamas pasan por esta linea. model_mismatch/failure tampoco tienen clave 'usage' en su detail, asi que se omite naturalmente sin casos especiales.",
+            "8 tests nuevos mostrados en rojo antes (TypeError: close_run() unexpected keyword usage; argparse unrecognized --usage; conteo de lineas de stdout en 0 en vez de 1), verdes despues. python3 -m unittest discover -s tests: Ran 268 tests, OK (base 263)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "--routing-report con tokens por ruta y el alcance declarado",
+          "local_validations": [
+            "report() en store.py gana la clave 'tokens', HERMANA de 'per_route' (nunca mezclada adentro): agrupa por COALESCE(actual_route_id,selected_route_id,'none') sobre dispatches, scopeado a self.project_key. SUM() sobre una columna totalmente NULL en el grupo da NULL, nunca 0 -- coercionarlo seria la misma fabricacion que AC-08 prohibe, generalizada al agregado.",
+            "tokens['scope'] declara la diferencia de alcance EN EL JSON, no solo en prosa: percentiles/per_route salen de events (global de maquina, sin project_key); tokens sale de dispatches (por proyecto). cmd_routing_report no se toco -- ya pasa el dict entero como data, y ninguna clave nueva se llama reason_codes (el comando lee esa clave especifica del reporte para decidir ok/exit code).",
+            "2 tests en test_routing.py: uno prueba SUM a traves de dos runs en la MISMA ruta (150+50 input, cache_read sigue NULL); otro prueba que un run cerrado SIN --latency-ms aporta tokens y ningun percentil -- la prueba de que los dos conjuntos de claves de ruta no son subconjunto uno del otro, no una afirmacion de prosa.",
+            "cost-report.py gana collect_pi() + _pi_project_key(): lee routing.db via --home (nunca via routing_core -- store.py deriva home de pwd.getpwuid a proposito, ADR-0005), filtra usage_status='ok' (absent/invalid no tienen nada usable), atribuye por project_key SOLO con --project (recomputando la clave), si no reporta el carril sin atribuir. --help/epilog y TIPS-USO.md declaran el limite de cobertura (solo spawns despachados por el arnes).",
+            "3 tests en test_harness.py: _pi_project_key coincide con set_agents_app.project_key_for en las dos ramas (hash-fallback y project.json persistido); atribucion solo con --project (otra proyecto nunca se filtra); filas absent/invalid no producen sesiones fantasma. Mutacion verificada: sacar la linea collect_pi(...) de main() tira rojo el test de atribucion, restaurada vuelve a verde.",
+            "python3 -m unittest discover -s tests: Ran 273 tests, OK (base 268)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "colector pi en cost-report.py con atribucion solo bajo --project",
+          "local_validations": [
+            "collect_pi() + _pi_project_key() en cost-report.py, leyendo routing.db via --home (nunca routing_core). Filtra usage_status='ok'. Atribuye solo con --project, recomputando la clave localmente; sin --project reporta el carril sin atribuir (project='?').",
+            "3 tests en tests/test_harness.py: test_pi_collector_project_key_matches_project_key_for (la derivacion duplicada coincide con project_key_for en las dos ramas), test_cost_report_pi_collector_attributes_only_with_project (otro proyecto nunca se filtra sin --project, se excluye con --project), test_cost_report_pi_collector_ignores_rows_with_no_usable_usage (absent/invalid no generan sesiones fantasma). Mutacion verificada.",
+            "Verificacion en vivo: cost-report.py --project . listo el carril pi real (gpt-5.6-luna, implementer, sessions=1, input=3.3k) al lado de claude-code y opencode, sobre el spawn real corrido para este paquete."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "ADR-0010",
+          "local_validations": [
+            "docs/adr/0010-spawn-accounting.md escrito con el esqueleto moderno (0008/0009/0011): metadata (Estado, numeracion, amends, citas verificadas), Contexto, D1-D6, Scale/Data/Security, Consecuencias. D4 documenta la generalizacion de la cadena de migracion, superseding en parte a ADR-0008 D8.",
+            "ADR-0008 D8 enmendado inline (idioma R3/007-P1 ya establecido en el propio archivo): el banner from=4 to=5 pasa a ser historico del paso 4->5 especifico, apunta a ADR-0010 D4. Fila 0010 agregada a docs/adr/README.md, nota de reserva retirada.",
+            "El guard del hueco reservado (tests/test_harness.py) era un no-op real: assertNotIn('0010', linked) comparaba membresia exacta contra una lista de NOMBRES DE ARCHIVO completos, nunca podia fallar. Generalizado a parsear la nota de reserva (' is reserved by feature') y verificar que ese numero no tenga TAMBIEN una fila entregada -- mutacion verificada: agregar una nota de reserva falsa sobre un ADR ya entregado (0009) tira el test.",
+            "docs/architecture/overview.md (excepcion aprobada): --usage agregado a la fila de --route-terminal en la matriz de modificadores, y a la oracion del exit 2 ROUTING_INPUT_INVALID, citando ADR-0010 D3. Clausula agregada, matriz no reescrita.",
+            "Verificacion en vivo (un spawn real por el carril Pi, role=implementer): encontro un bug real -- Pi manda cacheRead/cacheWrite en camelCase, no cache_read/cache_write, y _usage_row nunca los habria capturado. Corregido con _USAGE_FIELD_ALIASES en store.py, pinned por test_usage_row_accepts_pis_actual_camelcase_cache_keys sobre el payload real, mutacion verificada. Registrado con log-decision (pi-usage-cache-keys-are-camelcase-not-snake-case).",
+            "--routing-report --json tras el spawn real muestra tokens.input=3321, tokens.output=5, tokens.cost_micros=3351 en la ruta real. cost-report.py --project . lista el carril pi (gpt-5.6-luna, implementer, sessions=1, input 3.3k) al lado de claude-code/opencode.",
+            "./ai/scripts/verify.sh -> VERIFY_PASS (274 tests, base 259 al empezar P2 +15 del paquete). ./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2. git diff --check limpio. check-owned-paths.py -> OWNERSHIP_PASS, out_of_scope=[], las dos excepciones aprobadas (ADR-0008, overview.md) resueltas correctamente.",
+            "Correccion de shell del validation anterior (los backticks se interpretaron como command substitution): el guard generalizado parsea la nota de reserva con el patron backtick-NNNN-backtick seguido de \"is reserved by feature\" en docs/adr/README.md, extrae el numero de 4 digitos, y falla si ese numero tambien aparece como una fila linkeada y entregada."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-29T15:15:19+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh",
+            "python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/007-quota-visibility.json --package-id P2-spawn-accounting"
+          ],
+          "evidence": "284 tests OK (base 250 al aceptar P1, +34 de este paquete). verify.sh: VERIFY_PASS (GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK). check-owned-paths.py: OWNERSHIP_PASS en las dos rondas de reparacion. Dos ciclos de DELTA_REVIEW: el primero repair_required (N-01 high, N-02/N-03 low), el segundo pass sin hallazgos nuevos que reabran el ciclo. Panel original RP-01: 10 hallazgos, 9 upheld + 1 refutado (F-PR-06, via EXPLAIN QUERY PLAN). Verificacion en vivo con un spawn real por el carril Pi, que encontro el defecto de las claves de cache en camelCase (pi-usage-cache-keys-are-camelcase-not-snake-case). runtime_surface=false: sin superficie de navegador, CLI/store puros.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-29T13:50:07+00:00",
+          "evidence": "Verificacion adversarial independiente de los 10 hallazgos del panel RP-01, con reproduccion propia (CLI real contra un routing root hermetico, EXPLAIN QUERY PLAN, fixtures de symlink/FIFO/JSON profundamente anidado). Nueve sobreviven; F-PR-06 se refuta por medicion directa. F-SEC-01/F-PR-01 son la misma causa raiz (store.py:_cost_micros, NaN/Infinity); F-SEC-04/F-PR-05 tambien (cost-report.py:_pi_project_key, identidad inutilizable) -- un solo arreglo cierra cada par. Correccion a F-PR-02: uno de los tres sitios de spawn() (PI_MODEL_FALLBACK, linea 268) retorna ANTES de que last_assistant exista, asi que ese sitio necesita levantar el loop de parseo de eventos, no solo agregar 'usage' al detail.",
+          "refuted": [
+            "F-PR-06"
+          ],
+          "upheld": [
+            "F-SEC-01",
+            "F-PR-01",
+            "F-PR-02",
+            "F-SEC-02",
+            "F-SEC-03",
+            "F-SEC-04",
+            "F-PR-05",
+            "F-PR-03",
+            "F-PR-04"
+          ]
+        },
+        {
+          "at": "2026-07-29T14:49:50+00:00",
+          "evidence": "Reproducido por el propio delta-reviewer con el CLI real (routing root hermetico): usage dict valido con un campo de 70KB de relleno -> decide/dispatch rc=0, terminal rc=2 (ROUTING_INPUT_INVALID), run queda en estado 'dispatched' sin cerrar nunca. Confirmado de forma independiente por el orquestador leyendo set_agents_app.py:497-530 (cmd_route_terminal levanta ROUTING_INPUT_INVALID y retorna ANTES de llamar a close_run cuando parse_usage falla por largo) y escribiendo un test que reproduce el mismo escenario end-to-end (test_route_terminal_large_but_valid_usage_still_closes_the_run), mostrado en rojo contra el arbol sin arreglar antes de aplicar el fix.",
+          "refuted": [],
+          "upheld": [
+            "N-01"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-19"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "docs/specs/007-quota-visibility/**",
+          "reason": "owned_paths de P3 quedo incompleto en la reconciliacion con acta (a diferencia de P1/P2, no declaro este directorio); feature-state.py regenera docs/specs/007-quota-visibility/bitacora.md en cada mutacion de este mismo paquete, asi que cae fuera de scope sin esta excepcion. Mismo patron ya visto en P1/P0 de la 009.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 6,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [
+        {
+          "at": "2026-07-29T16:07:03+00:00",
+          "closed_findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08"
+          ],
+          "new_or_reopened_findings": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ],
+          "reason": "delta-reviewer confirmo los 8 hallazgos y los 3 residuos del finding-verifier resueltos; encontro 3 nuevos (N-01 medium, N-02/N-03 low) sobre el propio expediente del paquete, no sobre BUENOS-DIAS.md.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-07-29T16:19:29+00:00",
+          "closed_findings": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Segundo delta-reviewer: pass. Cronologia de N-01 verificada de forma independiente contra history y sqlite (complete-task 15:25:48Z vs dispatch real 13:10:29Z, 2h15m antes). N-02/N-03 fieles sin cambios. Dos observaciones no bloqueantes registradas como deuda (O-1 atribucion menor, O-2 record-delta-review no estampa source_role -- log-decision record-delta-review-new-finding-missing-source-role). O-3 (AC-19 vencida) ya registrada, diferida a INTEGRATION.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [
+        "P2-spawn-accounting"
+      ],
+      "diff_ref": "898c539669b840e5b5d78a97f484b9abef0df9a6",
+      "findings": [
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-01",
+          "line": 121,
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El texto corregido afirmaba 'esa base ya no existe en la maquina', pero routing.db existe en schema 6 con un dispatch real creado por la QA en vivo de 007-P2 (2026-07-29 10:10).",
+          "verified_at": "2026-07-29T15:51:54+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-02",
+          "line": 124,
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El texto afirmaba que 'una base vieja migra en vez de quedar atascada', contradiciendo el alcance explicito de 007-P1 (no recovery of that database) y la decision del 2026-07-28 de descartar los backups schema-4 reales, que siguen rechazados a proposito por AC-04/AC-05.",
+          "verified_at": "2026-07-29T15:51:54+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-03",
+          "line": 143,
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "'la unica muestra en vivo' era falso: hay una segunda muestra real (3321 input / 5 output) del dispatch de verificacion de 007-P2, ademas de la de la feature 004 (3221/6).",
+          "verified_at": "2026-07-29T15:51:54+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "integration",
+          "file": "ai/state/decisions-log.jsonl",
+          "id": "F-04",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "La entrada de log-decision que registro la primera correccion (buenos-dias-anthropic-surcharge-claim-was-wrong) repite las mismas dos afirmaciones sin verificar de F-01/F-02, dejando el expediente consistente consigo mismo pero falso contra el disco.",
+          "verified_at": "2026-07-29T15:51:54+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-05",
+          "line": 206,
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "La cola de trabajo seguia listando 'Reparacion de migrate_from_v4 en la 005' como pendiente, cuando 007-P1 ya la entrego (_normalize_ddl, AC-01).",
+          "verified_at": "2026-07-29T15:51:54+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-06",
+          "line": 144,
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "'Para features largas eso pesa mas que el proveedor que elijas dentro del carril' reintroduce una comparacion anthropic-vs-openai-codex no medida que el contrato 007 excluye explicitamente por nombre.",
+          "verified_at": "2026-07-29T15:51:54+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-07",
+          "line": 138,
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "Las referencias a 'log-decision' (lineas 99 y 138) nombran el verbo del CLI, no un registro localizable; el resto del documento ya cita el slug."
+        },
+        {
+          "acceptance_criterion": "AC-19",
+          "category": "correctness",
+          "file": "docs/notas/BUENOS-DIAS.md",
+          "id": "F-08",
+          "line": 3,
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "summary": "El encabezado afirma que todo el documento esta commiteado y pusheado, pero la seccion 3 tiene una enmienda del 2026-07-29 sin commitear al momento de escribirla."
+        },
+        {
+          "category": "integration",
+          "file": "ai/state/features/007-quota-visibility.json",
+          "id": "N-01",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "status": "closed",
+          "summary": "local_validations del task de P3 (escritas antes de la reparacion) siguen afirmando 'routing.db no existe' y 'unica muestra 3221/6', renderizado textual en docs/notas/features/007-quota-visibility/P3-correct-record.md -- la falsedad que el paquete existe para corregir sobrevive en el propio expediente del paquete.",
+          "verified_at": "2026-07-29T16:13:42+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "docs/notas/decisiones/2026-07-29 buenos-dias-anthropic-surcharge-claim-was-wrong.md",
+          "id": "N-02",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "La nota de la primera decision no tiene marca de supersesion y su 'Consecuencias' dice que BUENOS-DIAS.md la cita a ella, cuando ahora cita a la superadora.",
+          "verified_at": "2026-07-29T16:13:42+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "category": "correctness",
+          "file": "docs/notas/decisiones/2026-07-29 ac-19-rationale-drifted-mid-package-routing-db-recreated.md",
+          "id": "N-03",
+          "repair_attempts": 1,
+          "severity": "low",
+          "status": "closed",
+          "summary": "La razon registrada para no editar spec.md ('owned_paths de este paquete es solo AC-19') esta contradicha por la excepcion de ownership aprobada sobre docs/specs/007-quota-visibility/**.",
+          "verified_at": "2026-07-29T16:13:42+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-07-29T15:32:57+00:00",
+          "evidence": "284 tests OK, VERIFY_PASS",
+          "name": "package verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T15:32:57+00:00",
+          "evidence": "SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "self-scaffold-sync",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T15:32:57+00:00",
+          "evidence": "git diff --check limpio",
+          "name": "whitespace",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-07-29T15:32:58+00:00",
+          "evidence": "OWNERSHIP_PASS, out_of_scope=[]",
+          "name": "ownership",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Retractar la afirmacion registrada de que el carril anthropic de Pi cobra por token como extra-usage, y retirar la remediacion rm que ya no aplica",
+      "owned_paths": [
+        "docs/notas/BUENOS-DIAS.md",
+        "ai/state/features/007-quota-visibility.json",
+        "ai/state/STATUS.md",
+        "ai/state/decisions-log.jsonl",
+        "ai/state/narrative-log.jsonl",
+        "docs/notas/**"
+      ],
+      "package_id": "P3-correct-record",
+      "read_only_paths": [],
+      "repairs": [
+        {
+          "at": "2026-07-29T15:52:19+00:00",
+          "changed_files": [
+            "docs/notas/BUENOS-DIAS.md",
+            "ai/state/decisions-log.jsonl",
+            "ai/state/features/007-quota-visibility.json",
+            "ai/state/STATUS.md",
+            "docs/notas/decisiones/2026-07-29 ac-19-rationale-drifted-mid-package-routing-db-recreated.md",
+            "docs/notas/features/007-quota-visibility.md",
+            "docs/notas/features/007-quota-visibility/P3-correct-record.md",
+            "docs/specs/007-quota-visibility/bitacora.md"
+          ],
+          "finding_ids": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08"
+          ],
+          "verification": [
+            "F-01: routing.db reescrito a 'existe en schema 6, dispatch real de la QA de P2' (BUENOS-DIAS.md:120-126), confirmado por finding-verifier contra el sqlite en vivo.",
+            "F-02: acotado a AC-03 (divergencia solo-comentarios), nombrando que los backups reales siguen rechazados por AC-04/AC-05 y descartados por decision previa (BUENOS-DIAS.md:128-134), confirmado por finding-verifier contra spec.md y los backups en disco.",
+            "F-03: citadas las dos muestras reales, 3221/6 y 3321/5 (BUENOS-DIAS.md:152-153).",
+            "F-04: decisions-log.jsonl gano una entrada superadora (buenos-dias-anthropic-surcharge-claim-was-wrong-supersedes-first-pass) que corrige los mismos dos puntos sin editar la original (append-only); las dos citas de slug en BUENOS-DIAS.md se re-apuntaron a la entrada superadora tras la observacion del finding-verifier.",
+            "F-05: fila 4 de la cola de trabajo marcada como entregada por 007-P1 (BUENOS-DIAS.md:219).",
+            "F-06: la comparacion anthropic-vs-openai-codex se nombra como fuera de alcance con su razon (routes.v1.toml, enabled_providers todo-o-nada); ademas suavizada tras observacion del finding-verifier sobre fallback_provider.",
+            "F-07: las dos referencias sueltas a 'log-decision' pasan a citar el slug real.",
+            "F-08: encabezado enmendado citando la fecha y el alcance exacto de lo no commiteado (seccion 3 + fila 4 de seccion 5).",
+            "Adicional (no finding del panel, encontrado por el propio finding-verifier): AC-19 del contrato aprobado quedo con una clausula ('the database it names no longer exists') que la QA en vivo de 007-P2 volvio falsa horas despues de aprobarse. Registrado como decision ac-19-rationale-drifted-mid-package-routing-db-recreated en vez de editar spec.md fuera del owned_paths de P3."
+          ]
+        },
+        {
+          "at": "2026-07-29T16:13:53+00:00",
+          "changed_files": [
+            "docs/notas/features/007-quota-visibility/P3-correct-record.md",
+            "docs/notas/decisiones/2026-07-29 buenos-dias-anthropic-surcharge-claim-was-wrong.md",
+            "docs/notas/decisiones/2026-07-29 ac-19-rationale-drifted-mid-package-routing-db-recreated.md",
+            "ai/state/features/007-quota-visibility.json",
+            "ai/state/STATUS.md",
+            "docs/notas/features/007-quota-visibility.md",
+            "docs/specs/007-quota-visibility/bitacora.md"
+          ],
+          "finding_ids": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ],
+          "verification": [
+            "N-01: corregida la nota en 'Notas propias' de P3-correct-record.md -- la primera version tenia un error cronologico (afirmaba que las frases originales eran ciertas al momento de escribirse); un segundo finding-verifier lo refuto y se corrigio a 'ya eran falsas cuando se escribieron', con los timestamps exactos (complete-task 15:25:48Z vs dispatch real 13:10:29Z).",
+            "N-02: nota de supersesion agregada en 'Notas propias' de la decision original, confirmada por finding-verifier.",
+            "N-03: razon corregida en 'Notas propias' de la decision de AC-19, nombrando la excepcion de ownership aprobada y la razon real (hash del contrato, no reabrir spec.md desde la reparacion)."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-07-29T15:42:46+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer"
+          ],
+          "started_at": "2026-07-29T15:33:12+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-07-29T15:42:34+00:00",
+              "evidence": "Revision independiente contra spec.md, decisions-log.jsonl y consulta directa a routing.db (meta.schema_version, filas de dispatches). 8 hallazgos, 2 high, 4 medium, 2 low. El primer intento de correccion de BUENOS-DIAS.md copiaba el Contexto del spec (fechado 2026-07-28) como estado presente en vez de verificar contra la maquina real.",
+              "findings": [
+                "F-01",
+                "F-02",
+                "F-03",
+                "F-04",
+                "F-05",
+                "F-06",
+                "F-07",
+                "F-08"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-07-29T15:42:46+00:00",
+          "evidence": "package-reviewer: 8 hallazgos (2 high, 4 medium, 2 low), todos sobre docs/notas/BUENOS-DIAS.md y ai/state/decisions-log.jsonl",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06",
+            "F-07",
+            "F-08"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Ninguno tecnico. El riesgo es dejar una afirmacion equivocada en un documento que el usuario lee como autoritativo."
+      ],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-07-29T16:22:02+00:00",
+          "reason": "package declared runtime_surface=false at planning",
+          "status": "pass",
+          "waived": true
+        }
+      ],
+      "runtime_surface": false,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Reescribir la seccion de costo con lo verificado y registrarlo con log-decision",
+          "local_validations": [
+            "docs/notas/BUENOS-DIAS.md seccion 3: el bloque 'Lo que falta, y es el bloqueante real' (routing.db schema-4 + rm) reemplazado por una nota de retractacion fechada, sin ofrecer remediacion porque no hay nada que remediar (routing.db no existe, 007-P1 cerro la clase de bug). La advertencia sobre sobrecargo de anthropic reemplazada con la medicion real (mismo bucket OAuth, costo real = piso de entrada por spawn, 3221/6 tokens).",
+            "El bloque 'Lo que si esta' (100-112) no se toco: AC-19 solo alcanza a las dos afirmaciones falsas, no al inventario que sigue siendo cierto.",
+            "log-decision buenos-dias-anthropic-surcharge-claim-was-wrong registrado, enlazado a routing-db-schema4-unmigratable, feature 007 / package P3-correct-record.",
+            "Cero cambios de codigo: grep confirma que solo docs/notas/BUENOS-DIAS.md cambio de contenido de producto; el resto son los archivos de estado que log-decision/complete-task escriben (owned_paths declarados)."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-07-29T16:22:02+00:00",
+          "commands": [
+            "./ai/scripts/verify.sh",
+            "python3 -m unittest discover -s tests -v",
+            "./build.sh --check",
+            "python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/007-quota-visibility.json --package-id P3-correct-record --changed-file ..."
+          ],
+          "evidence": "284 tests OK (sin regresion, paquete docs-only), VERIFY_PASS, SELF_SCAFFOLD_SYNC_OK files=2, OWNERSHIP_PASS out_of_scope=[]. Dos rondas de repair+delta-review: primera cerro 8 hallazgos del panel RP-01, segunda cerro 3 hallazgos que el propio delta-review encontro sobre el expediente del paquete. Segunda delta-review: pass.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-07-29T15:51:54+00:00",
+          "evidence": "Refutacion adversarial de los 8 hallazgos de RP-01: los 8 sobrevivieron (ninguno refutado). F-01/F-02 verificados directo contra routing.db y los backups schema-4 en disco; F-05 contra el estado 007-P1 accepted; F-06 contra routes.v1.toml. F-07/F-08 (low) no requieren este paso, se cierran via record-repair.",
+          "refuted": [],
+          "upheld": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04",
+            "F-05",
+            "F-06"
+          ]
+        },
+        {
+          "at": "2026-07-29T16:13:42+00:00",
+          "evidence": "Segunda ronda de verificacion (finding-verifier) sobre los 3 hallazgos del delta-review: los 3 upheld como hallazgos reales. La correccion de N-01 tuvo un error cronologico en su primer intento (afirmaba que las frases originales eran ciertas al momento de escribirse); el propio verificador lo detecto y se corrigio la nota antes de este record-verification.",
+          "refuted": [],
+          "upheld": [
+            "N-01",
+            "N-02",
+            "N-03"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "DONE",
+  "revision": 114,
+  "schema_version": 1,
+  "updated_at": "2026-07-29T17:10:45+00:00"
+}

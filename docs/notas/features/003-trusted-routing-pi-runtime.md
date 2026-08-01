@@ -3,7 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_ACCEPTED` · modo: feature · revisión 77
+- fase: `DONE` · modo: feature · revisión 80
+- estado final: **DONE**
 - spec: `docs/specs/003-trusted-routing-pi-runtime/spec.md` (hash `433771847056`)
 
 ## Criterios de aceptación
@@ -42,18 +43,20 @@
 - decisión: [[decisiones/2026-07-24 p1r-r2-authorized|Second repair cycle authorized by user]]
 - decisión: [[decisiones/2026-07-24 p1r-final-delta-block|P1R remains blocked after fresh independent delta review]]
 - decisión: [[decisiones/2026-07-25 r3-threat-model-amendment|R3: enmienda del threat model de routing-v2]]
+- decisión: [[decisiones/2026-07-29 record-spawn-budget-does-not-exempt-integration-bookkeeping|record-spawn cuenta la narracion de INTEGRATION contra el presupuesto de implementacion de un paquete ya aceptado]]
+- decisión: [[decisiones/2026-07-29 done-ready-does-not-filter-resolved-blockers|done_ready trata cualquier blocker historico como abierto para siempre, incluso ya resuelto]]
 
 ## Qué falta
 
-- → `INTEGRATION` — all packages accepted
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
 - spawns: 16 (máx 16/paquete) · deep review máx 3 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/003-trusted-routing-pi-runtime/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/003-trusted-routing-pi-runtime/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/003-trusted-routing-pi-runtime/bitacora.md`
 
-_Actualizado: 2026-07-25T03:01:53+00:00_
+_Actualizado: 2026-07-29T17:13:45+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

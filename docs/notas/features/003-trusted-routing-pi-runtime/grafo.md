@@ -1,0 +1,138 @@
+# 003-trusted-routing-pi-runtime · grafo
+
+<!-- notas:auto -->
+```mermaid
+flowchart TD
+subgraph sg_003_trusted_routing_pi_runtime["003-trusted-routing-pi-runtime"]
+  feature_003_trusted_routing_pi_runtime_1["feature: 003-trusted-routing-pi-runtime"]
+  subgraph sg_003_trusted_routing_pi_runtime_p1r_trusted_routing["P1R-trusted-routing"]
+    package_003_trusted_routing_pi_runtime_p1r_trusted_routing_1["package: P1R-trusted-routing"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_1["PKG-001 #40;critical#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_2["PKG-002 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_3["PKG-003 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_4["PKG-004 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_5["PKG-005 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_6["PKG-006 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_7["PKG-007 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_8["PKG-008 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_9["PKG-009 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_10["PKG-010 #40;medium#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_11["SEC-001 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_12["SEC-002 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_13["SEC-003 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_14["SEC-004 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_15["SEC-005 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_16["SEC-006 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_17["SEC-007 #40;medium#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_18["SEC-008 #40;medium#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_19["DR-001 #40;critical#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_20["DR-002 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_21["DR-003 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_22["DR-004 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_23["DR-005 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_24["DR-006 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_25["DR-007 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_26["DR-008 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_27["DR-009 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_28["DR-010 #40;medium#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_29["FD-001 #40;critical#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_30["FD-002 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_31["FD-003 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_32["FD-004 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_33["FD-005 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_34["FD-006 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_35["FD-007 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_36["FD-008 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_37["FD-009 #40;high#41;"]
+    finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_38["FD-010 #40;medium#41;"]
+    review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1["package-reviewer: repair_required"]
+    review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2["security-auditor: repair_required"]
+    review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3["delta: blocked"]
+    review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4["delta: blocked"]
+    repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1["9 changed files"]
+    repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2["8 changed files"]
+    repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3["9 changed files"]
+  end
+end
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_1
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_2
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_3
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_4
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_5
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_6
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_7
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_8
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_9
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_10
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_11
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_12
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_13
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_14
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_15
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_16
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_17
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_18
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_19
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_20
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_21
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_22
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_23
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_24
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_25
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_26
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_27
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_28
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_29
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_30
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_31
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_32
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_33
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_34
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_35
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_36
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_37
+review_003_trusted_routing_pi_runtime_p1r_trusted_routing_4 -->|produjo| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_38
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_1
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_2
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_3
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_4
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_5
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_6
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_7
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_8
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_9
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_10
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_11
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_12
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_13
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_14
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_15
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_16
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_17
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_1 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_18
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_19
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_20
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_21
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_22
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_23
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_24
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_25
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_26
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_27
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_2 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_28
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_29
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_30
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_31
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_32
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_33
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_34
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_35
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_36
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_37
+repair_003_trusted_routing_pi_runtime_p1r_trusted_routing_3 -->|reparó| finding_003_trusted_routing_pi_runtime_p1r_trusted_routing_38
+```
+<!-- /notas:auto -->
+
+## Notas propias
+
+_Lo que escribas fuera del bloque auto se preserva en cada regeneración._
