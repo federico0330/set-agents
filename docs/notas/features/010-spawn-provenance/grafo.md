@@ -20,6 +20,7 @@ subgraph sg_010_spawn_provenance["010-spawn-provenance"]
     spawn_010_spawn_provenance_p1_spawn_provenance_7["SPAWN-008 gate-runner Independent full-suite verification of P1-REV-001 repair"]
     spawn_010_spawn_provenance_p1_spawn_provenance_8["SPAWN-009 debugger Diagnose full-suite hang after P1-REV-001 test repair"]
     spawn_010_spawn_provenance_p1_spawn_provenance_9["SPAWN-010 delta-reviewer Focused independent delta review of P1-REV-001 repair"]
+    spawn_010_spawn_provenance_p1_spawn_provenance_10["SPAWN-011 integrator Integration validation of accepted P1-spawn-provenance before global gate"]
   end
 end
 review_010_spawn_provenance_p1_spawn_provenance_1 -->|produjo| finding_010_spawn_provenance_p1_spawn_provenance_1

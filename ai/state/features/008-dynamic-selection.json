@@ -27,8 +27,16 @@
   },
   "current_package_id": "P1-uninterrupted-delegation",
   "feature_id": "008-dynamic-selection",
-  "final_state": null,
-  "global_gates": [],
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-02T14:53:39+00:00",
+      "evidence": "verify.sh VERIFY_PASS (558 tests OK skipped=1); unittest 558 OK; build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2; baseline fa43fce",
+      "name": "feature-008-integration",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -495,6 +503,57 @@
       "package_id": "P1-uninterrupted-delegation",
       "timestamp": "2026-07-28T14:49:14+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Un integrador confirma que la seleccion dinamica de modelos convive bien con el resto del sistema antes de darla por terminada.",
+        "purpose": "Integration validation of accepted P1-uninterrupted-delegation before global gate",
+        "role": "integrator",
+        "spawn_id": "SPAWN-006",
+        "spawns": 6,
+        "tech": "INTEGRATION entry: read-only validation of P1-uninterrupted-delegation against approved spec 008; P3 budget-aware-selection stays blocked on 011 and is out of scope."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-08-02T14:44:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1-uninterrupted-delegation accepted and integration-validated (AC-01..AC-10 in tree, no conflicts with 015). P3 budget-aware-selection stays blocked on 011 by design, out of feature scope for DONE per user decision 2026-08-02."
+      },
+      "package_id": "P1-uninterrupted-delegation",
+      "timestamp": "2026-08-02T14:53:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "feature-008-integration",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T14:53:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Feature 008 dynamic-selection COMPLETE: uninterrupted delegation doctrine live in all three runtimes (relaunch-once, degraded-not-stopped, HARD DENIAL preserved), global gate green. Budget-aware-selection deferred behind 011."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T14:53:39+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
@@ -524,7 +583,7 @@
       "attempts": {
         "deep_review_cycles": 1,
         "repair_batches": 2,
-        "spawns": 5,
+        "spawns": 6,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 2
@@ -903,6 +962,16 @@
       "shared_paths": [
         "tests/test_harness.py"
       ],
+      "spawns": [
+        {
+          "at": "2026-08-02T14:44:35+00:00",
+          "client": "Un integrador confirma que la seleccion dinamica de modelos convive bien con el resto del sistema antes de darla por terminada.",
+          "purpose": "Integration validation of accepted P1-uninterrupted-delegation before global gate",
+          "role": "integrator",
+          "spawn_id": "SPAWN-006",
+          "tech": "INTEGRATION entry: read-only validation of P1-uninterrupted-delegation against approved spec 008; P3 budget-aware-selection stays blocked on 011 and is out of scope."
+        }
+      ],
       "status": "accepted",
       "tasks": [
         {
@@ -1003,8 +1072,8 @@
       ]
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 33,
+  "phase": "DONE",
+  "revision": 37,
   "schema_version": 1,
-  "updated_at": "2026-07-28T14:49:14+00:00"
+  "updated_at": "2026-08-02T14:53:39+00:00"
 }

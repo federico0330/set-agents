@@ -217,11 +217,15 @@ diffeable y offline. Ningún arnés SaaS lo tiene, porque su estado es el transc
 
 | # | Qué | Estado |
 |---|---|---|
-| 1 | **005-P2 `vault-mandatory`** | pendiente, y ahora es el que desbloquea todo. Ojo: migra notas reales de 4 proyectos, 29 archivos que son única copia. Dry-run + backup + confirmación tuya antes de tocar `~/iey` |
-| 2 | **005-P3 `tui`** | pendiente, va último del 005 |
-| 3 | **006-P3 `graph-view`** | bloqueado por (1) |
+| 1 | ~~**005-P2 `vault-mandatory`**~~ | **entregada** — 005 completa (`DONE` 2026-07-30) |
+| 2 | ~~**005-P3 `tui`**~~ | **entregada** — 005 completa |
+| 3 | ~~**006-P3 `graph-view`**~~ | **entregada** e integrada (validación 2026-08-02, AC-20..29 pass). 006 queda en `PACKAGE_ACCEPTED` **para siempre** por su propia spec (P1/P2 fueron por waiver); el "próximo paso: INTEGRATION" del tablero es fraseo automático, no trabajo pendiente |
 | 4 | ~~Reparación de `migrate_from_v4` en la 005~~ | **entregada** por 007-P1 `schema-normalize` (2026-07-29): `_normalize_ddl()` ignora comentarios y es delimiter-aware en los tres sitios de comparación |
-| 5 | Deuda de la auditoría (`audit-debt-006-p2`) | 6 ítems registrados; los más valiosos son `repair_entry` como campo autoritativo y el compare-and-swap en `mutate` |
+| 5 | Deuda de la auditoría (`audit-debt-006-p2`) | 6 ítems registrados; PR-07/PR-08/PR-09 + limpieza van en la feature 016 (Pasada D del 2026-08-02); PR-06/PR-10/PR-11 diferidos — PR-11 (compare-and-swap en `mutate`) es la próxima candidata a paquete propio |
+
+**Pasada de integración 2026-08-02:** 008 y 012 transicionadas a `DONE` con gate global verde
+(verify.sh 558 tests OK, build check sin drift). 006 y 010 validadas con `pass` pero quedan en
+`PACKAGE_ACCEPTED` por diseño registrado (spec 006 §proceso; HANDOFF-PASO9 §5.5) — no son pendientes.
 
 **Deuda registrada, sin paquete:** `Global/_canonical/opencode-agents/package-gate-runner.md` sigue con paths
 absolutos y nombres de módulos de negocio de un proyecto cliente. Repo privado, pero se copia a cada máquina

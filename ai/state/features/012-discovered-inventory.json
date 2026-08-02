@@ -29,8 +29,16 @@
   },
   "current_package_id": "P1-discovered-inventory",
   "feature_id": "012-discovered-inventory",
-  "final_state": null,
-  "global_gates": [],
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-02T15:00:53+00:00",
+      "evidence": "verify.sh VERIFY_PASS (558 tests OK skipped=1, GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK); build.sh --check CHECK_PASS; baseline fa43fce",
+      "name": "feature-012-integration",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -681,6 +689,57 @@
       "package_id": "P1-discovered-inventory",
       "timestamp": "2026-07-31T00:53:17+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Un integrador comprueba que el inventario descubierto se integra sin romper nada de lo existente.",
+        "purpose": "Integration validation of accepted P1-discovered-inventory before global gate",
+        "role": "integrator",
+        "spawn_id": "SPAWN-008",
+        "spawns": 8,
+        "tech": "INTEGRATION entry: read-only validation of P1-discovered-inventory against approved spec 012."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-08-02T14:44:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1-discovered-inventory accepted and integration-validated (AC-01..AC-12 in tree, 16/16 findings closed, non-goals honored: probeable not routable)."
+      },
+      "package_id": "P1-discovered-inventory",
+      "timestamp": "2026-08-02T15:00:53+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "feature-012-integration",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T15:00:53+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Feature 012 discovered-inventory COMPLETE: opencode-zen/opencode-go discovered model inventory probeable via catalog with canonical aliasing and billing kinds; routing gates intentionally closed. Global gate green."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T15:00:53+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
@@ -723,7 +782,7 @@
       "attempts": {
         "deep_review_cycles": 1,
         "repair_batches": 2,
-        "spawns": 7,
+        "spawns": 8,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 2
@@ -1307,6 +1366,14 @@
           "role": "delta-reviewer",
           "spawn_id": "SPAWN-007",
           "tech": "delta-reviewer, contexto limpio, acotado a los 3 fixes de la ronda 2."
+        },
+        {
+          "at": "2026-08-02T14:44:35+00:00",
+          "client": "Un integrador comprueba que el inventario descubierto se integra sin romper nada de lo existente.",
+          "purpose": "Integration validation of accepted P1-discovered-inventory before global gate",
+          "role": "integrator",
+          "spawn_id": "SPAWN-008",
+          "tech": "INTEGRATION entry: read-only validation of P1-discovered-inventory against approved spec 012."
         }
       ],
       "status": "accepted",
@@ -1425,8 +1492,8 @@
       ]
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 48,
+  "phase": "DONE",
+  "revision": 52,
   "schema_version": 1,
-  "updated_at": "2026-07-31T00:53:17+00:00"
+  "updated_at": "2026-08-02T15:00:53+00:00"
 }

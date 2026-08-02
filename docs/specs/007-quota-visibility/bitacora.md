@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-07-30T16:39:42+00:00
+Actualizado: 2026-08-02T15:03:09+00:00
 
 [2026-07-28T10:43:12+00:00] P1-schema-normalize · spec-challenger · done
 Cliente: El desafio del contrato encontro cuatro problemas serios, y dos tumban premisas centrales. El mas importante: medir el gasto de Pi como lo planteamos NO puede responder tu pregunta original, porque el ruteo en produccion siempre elige el carril de OpenAI y nunca el de Anthropic, asi que nunca habria con que comparar. Ademas la base de datos de ruteo ya no esta donde estaba: su historia sobrevive …

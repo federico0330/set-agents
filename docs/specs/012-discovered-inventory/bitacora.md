@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-07-31T00:53:17+00:00
+Actualizado: 2026-08-02T15:03:09+00:00
 
 [2026-07-30T20:07:45+00:00] P1-discovered-inventory · implementer · started
 Cliente: Arranca la implementación del catálogo dinámico de modelos.
@@ -31,3 +31,11 @@ Ingeniería: repair-agent, segunda ronda, alcance mínimo: 3 hallazgos.
 [2026-07-31T00:22:55+00:00] P1-discovered-inventory · delta-reviewer · started
 Cliente: Última verificación antes de cerrar el paquete.
 Ingeniería: delta-reviewer, contexto limpio, acotado a los 3 fixes de la ronda 2.
+
+[2026-08-02T14:44:35+00:00] P1-discovered-inventory · integrator · started
+Cliente: Un integrador comprueba que el inventario descubierto se integra sin romper nada de lo existente.
+Ingeniería: INTEGRATION entry: read-only validation of P1-discovered-inventory against approved spec 012.
+
+[2026-08-02T15:00:53+00:00] P1-discovered-inventory · integrator · done
+Cliente: El integrador confirmo que el inventario de modelos descubiertos quedo bien integrado: los 16 hallazgos de revision estan cerrados y verificados, y las compuertas de seguridad siguen cerradas como se acordo (se puede sondear, no rutear).
+Ingeniería: Integration validation PASS: AC-01..AC-12 verified in tree (pair commands, dual maps, lockstep allowlists, CANONICAL_MODEL aliasing closing SEC-001/002, billing kinds, ADR-0016 Accepted). Live gates: unittest 558 OK, verify.sh VERIFY_PASS. Non-goals honored: enabled_providers/ROUTING_PROVIDERS stay closed.

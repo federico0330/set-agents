@@ -36,7 +36,7 @@
 
 - spawns: 20 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/005-portable-harness/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/005-portable-harness/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/005-portable-harness/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/005-portable-harness/bitacora.md`
 
 _Actualizado: 2026-07-30T16:16:18+00:00_
 <!-- /notas:auto -->

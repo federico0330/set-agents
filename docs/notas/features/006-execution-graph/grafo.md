@@ -33,6 +33,7 @@ subgraph sg_006_execution_graph["006-execution-graph"]
     repair_006_execution_graph_p3_graph_view_1["5 changed files"]
     repair_006_execution_graph_p3_graph_view_2["3 changed files"]
     repair_006_execution_graph_p3_graph_view_3["10 changed files"]
+    spawn_006_execution_graph_p3_graph_view_1["SPAWN-009 integrator Integration validation of accepted P3-graph-view against approved contract before global gate"]
   end
 end
 review_006_execution_graph_p3_graph_view_1 -->|produjo| finding_006_execution_graph_p3_graph_view_1

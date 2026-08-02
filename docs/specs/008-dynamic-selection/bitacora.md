@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-07-30T19:46:48+00:00
+Actualizado: 2026-08-02T15:03:09+00:00
 
 [2026-07-28T13:04:40+00:00] P1-quota-failover · spec-challenger · done
 Cliente: El desafio encontro que el failover automatico que planee no puede alcanzar tu caso. El arnes solo controla como subproceso el carril Pi; cuando se queda sin tokens un subagente de Claude Code -- que es exactamente lo que te pasa -- no hay ningun proceso que el arnes pueda clasificar ni volver a lanzar. Ademas encontro que uno de mis argumentos era falso: cite una restriccion de la base de datos …
@@ -51,3 +51,15 @@ Ingeniería: product-analyst entregó contract 1.2.0 resolviendo los 3 bloqueant
 [2026-07-30T19:46:48+00:00] started
 Cliente: Última vuelta del contrato de P2: el único punto flojo que quedaba era cómo evitar que el mismo modelo, ofrecido bajo dos proveedores con nombres distintos, se revisara a sí mismo creyendo que era independiente.
 Ingeniería: product-analyst reescribió AC-17/AC-18 quirúrgicamente (contract 1.3.0): family pasa a ser curada con regla de colisión para ids compartidos entre providers, subscription/metered pasa a mapa curado por provider en vez de columna de fila (evita el esquema cerrado de catalog.py). Tercera pasada del mismo spec-challenger, acotada.
+
+[2026-08-02T14:44:35+00:00] P1-uninterrupted-delegation · integrator · started
+Cliente: Un integrador confirma que la seleccion dinamica de modelos convive bien con el resto del sistema antes de darla por terminada.
+Ingeniería: INTEGRATION entry: read-only validation of P1-uninterrupted-delegation against approved spec 008; P3 budget-aware-selection stays blocked on 011 and is out of scope.
+
+[2026-08-02T14:53:27+00:00] P1-uninterrupted-delegation · integrator · done
+Cliente: El integrador reviso la pieza que evita pausas innecesarias al delegar trabajo: las diez condiciones acordadas estan cumplidas y conviven bien con lo entregado despues. Solo falta la corrida final de pruebas globales antes del sello de terminado.
+Ingeniería: Integration validation PASS: AC-01..AC-10 verified in current tree (doctrine in 3 shared runtimes, build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK, ADR-0011 linked, no conflict with 015 lane logic). P3 budget-aware-selection out of scope (blocked on 011). Pending: feature-level global gate (full verify.sh + unittest) before transition DONE.
+
+[2026-08-02T14:53:45+00:00] orchestrator · done
+Cliente: La seleccion dinamica de modelos quedo oficialmente terminada: todas las pruebas del proyecto pasaron y la pieza convive bien con el resto. La parte que depende de medir cuotas reales queda en pausa hasta que eso sea posible.
+Ingeniería: 008 DONE: transition PACKAGE_ACCEPTED->INTEGRATION->DONE with global gate feature-008-integration pass (verify.sh 558 OK, build check). P3 budget-aware-selection remains deferred behind 011 (BLOCKED by design).

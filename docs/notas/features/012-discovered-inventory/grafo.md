@@ -37,6 +37,7 @@ subgraph sg_012_discovered_inventory["012-discovered-inventory"]
     spawn_012_discovered_inventory_p1_discovered_inventory_5["SPAWN-005 delta-reviewer Delta-review acotado a los archivos tocados en la reparación de los 14 hallazgos de RP-01"]
     spawn_012_discovered_inventory_p1_discovered_inventory_6["SPAWN-006 repair-agent Reparación ronda 2: SEC-002 #40;medium, mismo patrón que SEC-001 pero con claude-fable-5#41;, F-10 rea…"]
     spawn_012_discovered_inventory_p1_discovered_inventory_7["SPAWN-007 delta-reviewer Confirmación final de la ronda 2 #40;SEC-002, F-10, N-02#41;"]
+    spawn_012_discovered_inventory_p1_discovered_inventory_8["SPAWN-008 integrator Integration validation of accepted P1-discovered-inventory before global gate"]
   end
 end
 review_012_discovered_inventory_p1_discovered_inventory_1 -->|produjo| finding_012_discovered_inventory_p1_discovered_inventory_1

@@ -58,7 +58,7 @@
 
 - spawns: 20 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/004-adaptive-dispatch/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/004-adaptive-dispatch/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/004-adaptive-dispatch/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/004-adaptive-dispatch/bitacora.md`
 
 _Actualizado: 2026-07-27T14:04:38+00:00_
 <!-- /notas:auto -->

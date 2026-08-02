@@ -704,6 +704,22 @@
       "package_id": "P3-graph-view",
       "timestamp": "2026-07-30T07:38:47+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Un integrador revisa que la vista de grafo terminada encaje con todo lo ya entregado antes de declararla lista: nada se marca como completo sin esa mirada de conjunto.",
+        "purpose": "Integration validation of accepted P3-graph-view against approved contract before global gate",
+        "role": "integrator",
+        "spawn_id": "SPAWN-009",
+        "spawns": 9,
+        "tech": "INTEGRATION entry: read-only validation of P3-graph-view (ACs 20-29) against approved spec 006, cross-package deps and vault artifacts; produces integration verdict for global gate."
+      },
+      "package_id": "P3-graph-view",
+      "timestamp": "2026-08-02T14:44:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
@@ -739,7 +755,7 @@
       "attempts": {
         "deep_review_cycles": 1,
         "repair_batches": 3,
-        "spawns": 8,
+        "spawns": 9,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 2
@@ -1198,6 +1214,16 @@
         "ai/scripts/set_agents_app.py",
         "tests/test_harness.py"
       ],
+      "spawns": [
+        {
+          "at": "2026-08-02T14:44:35+00:00",
+          "client": "Un integrador revisa que la vista de grafo terminada encaje con todo lo ya entregado antes de declararla lista: nada se marca como completo sin esa mirada de conjunto.",
+          "purpose": "Integration validation of accepted P3-graph-view against approved contract before global gate",
+          "role": "integrator",
+          "spawn_id": "SPAWN-009",
+          "tech": "INTEGRATION entry: read-only validation of P3-graph-view (ACs 20-29) against approved spec 006, cross-package deps and vault artifacts; produces integration verdict for global gate."
+        }
+      ],
       "status": "accepted",
       "tasks": [
         {
@@ -1313,7 +1339,7 @@
     }
   ],
   "phase": "PACKAGE_ACCEPTED",
-  "revision": 50,
+  "revision": 51,
   "schema_version": 1,
-  "updated_at": "2026-07-30T07:38:47+00:00"
+  "updated_at": "2026-08-02T14:44:35+00:00"
 }

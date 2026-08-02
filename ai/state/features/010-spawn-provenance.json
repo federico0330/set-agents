@@ -596,6 +596,22 @@
       "package_id": "P1-spawn-provenance",
       "timestamp": "2026-07-30T16:15:59+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Un integrador verifica que el registro de procedencia de cada delegacion quedo bien conectado con el tablero y las notas.",
+        "purpose": "Integration validation of accepted P1-spawn-provenance before global gate",
+        "role": "integrator",
+        "spawn_id": "SPAWN-011",
+        "spawns": 11,
+        "tech": "INTEGRATION entry: read-only validation of P1-spawn-provenance against approved spec 010, including the ownership exception granted in HANDOFF-PASO9."
+      },
+      "package_id": "P1-spawn-provenance",
+      "timestamp": "2026-08-02T14:44:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
@@ -626,7 +642,7 @@
       "attempts": {
         "deep_review_cycles": 1,
         "repair_batches": 1,
-        "spawns": 10,
+        "spawns": 11,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 1
@@ -849,6 +865,14 @@
           "role": "delta-reviewer",
           "spawn_id": "SPAWN-010",
           "tech": "delta-reviewer revisa exclusivamente el delta en tests/test_harness.py: replay antes de phase/budget y no-op byte-estable; read-only."
+        },
+        {
+          "at": "2026-08-02T14:44:35+00:00",
+          "client": "Un integrador verifica que el registro de procedencia de cada delegacion quedo bien conectado con el tablero y las notas.",
+          "purpose": "Integration validation of accepted P1-spawn-provenance before global gate",
+          "role": "integrator",
+          "spawn_id": "SPAWN-011",
+          "tech": "INTEGRATION entry: read-only validation of P1-spawn-provenance against approved spec 010, including the ownership exception granted in HANDOFF-PASO9."
         }
       ],
       "status": "accepted",
@@ -936,7 +960,7 @@
     }
   ],
   "phase": "PACKAGE_ACCEPTED",
-  "revision": 42,
+  "revision": 43,
   "schema_version": 1,
-  "updated_at": "2026-07-30T16:15:59+00:00"
+  "updated_at": "2026-08-02T14:44:35+00:00"
 }

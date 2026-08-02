@@ -50,7 +50,7 @@
 
 - spawns: 12 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/002-adaptive-pi-orchestration/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/002-adaptive-pi-orchestration/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/002-adaptive-pi-orchestration/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/002-adaptive-pi-orchestration/bitacora.md`
 
 _Actualizado: 2026-07-24T16:16:04+00:00_
 <!-- /notas:auto -->

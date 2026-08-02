@@ -68,7 +68,7 @@
 
 - spawns: 13 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/007-quota-visibility/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/007-quota-visibility/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/007-quota-visibility/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/007-quota-visibility/bitacora.md`
 
 _Actualizado: 2026-07-29T17:10:45+00:00_
 <!-- /notas:auto -->

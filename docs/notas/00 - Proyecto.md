@@ -9,11 +9,11 @@
 - [[features/005-portable-harness|005-portable-harness]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/006-execution-graph|006-execution-graph]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
 - [[features/007-quota-visibility|007-quota-visibility]] — fase `DONE` · paquetes 3/3 · **DONE**
-- [[features/008-dynamic-selection|008-dynamic-selection]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
+- [[features/008-dynamic-selection|008-dynamic-selection]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/009-self-application|009-self-application]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/010-spawn-provenance|010-spawn-provenance]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
 - [[features/011-quota-failover|011-quota-failover]] — fase `BLOCKED` · paquetes 0/1 · **BLOCKED**
-- [[features/012-discovered-inventory|012-discovered-inventory]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
+- [[features/012-discovered-inventory|012-discovered-inventory]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/013-pi-interactive-target|013-pi-interactive-target]] — fase `PACKAGE_PLANNING` · paquetes 0/0
 - [[features/015-anthropic-dispatch-parity|015-anthropic-dispatch-parity]] — fase `DONE` · paquetes 1/1 · **DONE**
 
@@ -22,11 +22,9 @@
 - **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **006-execution-graph** → `INTEGRATION` — all packages accepted
-- **008-dynamic-selection** → `INTEGRATION` — all packages accepted
 - **010-spawn-provenance** → `INTEGRATION` — all packages accepted
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
-- **012-discovered-inventory** → `INTEGRATION` — all packages accepted
 - **013-pi-interactive-target** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
 
 ## Quick-fixes recientes
@@ -36,6 +34,7 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-02 pasada-integracion-2026-08-02|Pasada de integración 2026-08-02: 008 y 012 a DONE; 006 y 010 quedan PACKAGE_ACCEPTED por diseño]]
 - [[decisiones/2026-08-01 areas-ops-opencode-go-zen-colision-cerrada-f-03-ac-06a-queda-genericamente-cerrado|areas.ops.opencode.go-zen colision CERRADA (F-03); AC-06(a) queda genericamente cerrado, sin residuo]]
 - [[decisiones/2026-08-01 areas-judge-opencode-go-zen-colisión-cerrada-f-02-amplía-ac-06a-nuevo-residuo-areas-ops|areas.judge.opencode.go-zen colisión CERRADA (F-02, amplía AC-06a); nuevo residuo areas.ops]]
 - [[decisiones/2026-08-01 areas-judge-go-zen-colisiona-residuo-fuera-de-alcance|areas.judge.opencode.go-zen colisiona con la misma escalera implementer, fuera de alcance]]
@@ -43,21 +42,25 @@
 - [[decisiones/2026-08-01 redirect-de-effective-runtime-es-silencioso-sin-reason-code|Redirect de _effective_runtime es silencioso, sin reason_code]]
 - [[decisiones/2026-07-31 013-pi-interactive-target-must-sequence-its-own-orchestrator-md-work-after-015-lands|013-pi-interactive-target must sequence its own orchestrator.md work after 015 lands]]
 - [[decisiones/2026-07-30 p2-discovered-inventory-pasa-a-ser-su-propia-feature-012|P2-discovered-inventory se separa de 008 y pasa a ser la feature 012, mismo patrón que 010/006]]
-- [[decisiones/2026-07-30 family-se-normaliza-no-se-captura-del-vendor-para-ids-compartidos|Para modelos compartidos entre lanes de OpenCode, family se normaliza (colisiona), no se copia del vendor]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-01T22:46:55+00:00_
+_Actualizado: 2026-08-02T15:00:53+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias
 
 _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
 
-### Lo que queda (2026-08-01, sin formalizar en specs)
+### Lo que queda (actualizado 2026-08-02)
+
+**Pasada de integración 2026-08-02 (Pasada A):** 008 y 012 llegaron a `DONE` con gate global verde.
+006 y 010 fueron validadas en integración con `pass` pero quedan en `PACKAGE_ACCEPTED` **por diseño
+registrado** (spec 006 §proceso: P1/P2 salieron por waiver; HANDOFF-PASO9 §5.5 para 010) — su
+"próximo paso: INTEGRATION" en el tablero es fraseo automático, no pendiente real.
 
 - **013-pi-interactive-target** — contrato aprobado, todavía sin paquete. Falta `package-planner` +
   implementación. Importante: su propio trabajo sobre `Global/_canonical/agents/orchestrator.md` debe

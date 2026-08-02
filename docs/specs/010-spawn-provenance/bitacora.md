@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-07-30T16:39:42+00:00
+Actualizado: 2026-08-02T15:03:09+00:00
 
 [2026-07-30T13:46:49+00:00] P1-spawn-provenance · implementer · started
 Cliente: Instanciamos al implementador que conecta los spawns al grafo de ejecución (010-spawn-provenance).
@@ -83,3 +83,11 @@ Ingeniería: El paquete está en DELTA_REVIEW; un revisor distinto verificará s
 [2026-07-30T16:15:18+00:00] P1-spawn-provenance · delta-reviewer · done
 Cliente: La última revisión confirmó que la nueva prueba cubre exactamente el borde faltante y no introdujo efectos secundarios.
 Ingeniería: Delta review pasó sin hallazgos nuevos. Se cerrará P1-REV-001, se registrará testing y se aceptará 010; recién entonces se marcará 005 como DONE.
+
+[2026-08-02T14:44:35+00:00] P1-spawn-provenance · integrator · started
+Cliente: Un integrador verifica que el registro de procedencia de cada delegacion quedo bien conectado con el tablero y las notas.
+Ingeniería: INTEGRATION entry: read-only validation of P1-spawn-provenance against approved spec 010, including the ownership exception granted in HANDOFF-PASO9.
+
+[2026-08-02T14:54:59+00:00] P1-spawn-provenance · integrator · done
+Cliente: El integrador confirmo que el registro de procedencia de cada delegacion funciona y quedo bien conectado: las cinco condiciones acordadas se cumplen y los pendientes del traspaso anterior ya estaban ejecutados. Igual que con la vista de grafo, esta ficha queda cerrada sin sello final, tal como se decidio en su momento.
+Ingeniería: Integration validation PASS: AC-01..AC-05 verified in tree (replay guard first, spawn nodes edge-free, ownership clean, done_ready resolved_at filter, 5/5 regression tests green). HANDOFF-PASO9 5.2/5.3 executed (ADR-0013 superseded note + log-decision ac-04). Per HANDOFF 5.5 + spec Origen, 010 stays PACKAGE_ACCEPTED; INTEGRATION/DONE never invoked. Non-blocking observation: exceptions field absen…

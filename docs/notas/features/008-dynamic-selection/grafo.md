@@ -27,6 +27,7 @@ subgraph sg_008_dynamic_selection["008-dynamic-selection"]
     verification_008_dynamic_selection_p1_uninterrupted_delegation_2["verified_by=finding-verifier"]
     repair_008_dynamic_selection_p1_uninterrupted_delegation_1["8 changed files"]
     repair_008_dynamic_selection_p1_uninterrupted_delegation_2["2 changed files"]
+    spawn_008_dynamic_selection_p1_uninterrupted_delegation_1["SPAWN-006 integrator Integration validation of accepted P1-uninterrupted-delegation before global gate"]
   end
 end
 review_008_dynamic_selection_p1_uninterrupted_delegation_1 -->|produjo| finding_008_dynamic_selection_p1_uninterrupted_delegation_1

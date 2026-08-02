@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-07-30T16:39:42+00:00
+Actualizado: 2026-08-02T15:03:09+00:00
 
 [2026-07-30T16:16:54+00:00] product-analyst · started
 Cliente: Arrancamos el contrato del cambio seguro de proveedor cuando una suscripción se agota.

@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-01T22:46:55+00:00
+Actualizado: 2026-08-02T15:03:09+00:00
 
 ## Features
 
@@ -12,13 +12,13 @@ Actualizado: 2026-08-01T22:46:55+00:00
 | 003-trusted-routing-pi-runtime | feature | DONE | P1R-trusted-routing (accepted) | 1/1 | 16/16 | 3/3 | 0 | - | - | 2026-07-29T17:13:45+00:00 transition |
 | 004-adaptive-dispatch | feature | DONE | P3-pi-lane (accepted) | 3/3 | 20/12 | 1/2 | 0 | - | - | 2026-07-27T14:04:38+00:00 transition |
 | 005-portable-harness | feature | DONE | P3-tui (accepted) | 3/3 | 20/12 | 1/2 | 0 | - | - | 2026-07-30T16:16:18+00:00 transition |
-| 006-execution-graph | feature | PACKAGE_ACCEPTED | P3-graph-view (accepted) | 1/1 | 8/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-30T07:38:47+00:00 accept-package |
+| 006-execution-graph | feature | PACKAGE_ACCEPTED | P3-graph-view (accepted) | 1/1 | 9/12 | 1/2 | 0 | - | INTEGRATION | 2026-08-02T14:44:35+00:00 record-spawn |
 | 007-quota-visibility | feature | DONE | P3-correct-record (accepted) | 3/3 | 13/12 | 1/2 | 0 | - | - | 2026-07-29T17:10:45+00:00 transition |
-| 008-dynamic-selection | feature | PACKAGE_ACCEPTED | P1-uninterrupted-delegation (accepted) | 1/1 | 5/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-28T14:49:14+00:00 accept-package |
+| 008-dynamic-selection | feature | DONE | P1-uninterrupted-delegation (accepted) | 1/1 | 6/12 | 1/2 | 0 | - | - | 2026-08-02T14:53:39+00:00 transition |
 | 009-self-application | feature | DONE | P3-panel-integrity (accepted) | 3/3 | 13/12 | 1/2 | 0 | - | - | 2026-07-29T17:10:45+00:00 transition |
-| 010-spawn-provenance | feature | PACKAGE_ACCEPTED | P1-spawn-provenance (accepted) | 1/1 | 10/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-30T16:15:59+00:00 accept-package |
+| 010-spawn-provenance | feature | PACKAGE_ACCEPTED | P1-spawn-provenance (accepted) | 1/1 | 11/12 | 1/2 | 0 | - | INTEGRATION | 2026-08-02T14:44:35+00:00 record-spawn |
 | 011-quota-failover | feature | BLOCKED | P1-quota-failover (package_gates) | 0/1 | 3/12 | 0/2 | 0 | HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está v… | - | 2026-07-30T17:04:39+00:00 block |
-| 012-discovered-inventory | feature | PACKAGE_ACCEPTED | P1-discovered-inventory (accepted) | 1/1 | 7/12 | 1/2 | 0 | - | INTEGRATION | 2026-07-31T00:53:17+00:00 accept-package |
+| 012-discovered-inventory | feature | DONE | P1-discovered-inventory (accepted) | 1/1 | 8/12 | 1/2 | 0 | - | - | 2026-08-02T15:00:53+00:00 transition |
 | 013-pi-interactive-target | feature | PACKAGE_PLANNING | - | 0/0 | 0/12 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-07-31T14:26:21+00:00 init |
 | 015-anthropic-dispatch-parity | feature | DONE | P1-anthropic-dispatch-parity (accepted) | 1/1 | 0/12 | 1/2 | 0 | - | - | 2026-08-01T22:46:55+00:00 transition |
 
@@ -28,6 +28,42 @@ Actualizado: 2026-08-01T22:46:55+00:00
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-02T15:00:53+00:00] P1-discovered-inventory · integrator · done
+Cliente: El integrador confirmo que el inventario de modelos descubiertos quedo bien integrado: los 16 hallazgos de revision estan cerrados y verificados, y las compuertas de seguridad siguen cerradas como se acordo (se puede sondear, no rutear).
+Ingeniería: Integration validation PASS: AC-01..AC-12 verified in tree (pair commands, dual maps, lockstep allowlists, CANONICAL_MODEL aliasing closing SEC-001/002, billing kinds, ADR-0016 Accepted). Live gates: unittest 558 OK, verify.sh VERIFY_PASS. Non-goals honored: enabled_providers/ROUTING_PROVIDERS stay closed.
+
+[2026-08-02T14:54:59+00:00] P1-spawn-provenance · integrator · done
+Cliente: El integrador confirmo que el registro de procedencia de cada delegacion funciona y quedo bien conectado: las cinco condiciones acordadas se cumplen y los pendientes del traspaso anterior ya estaban ejecutados. Igual que con la vista de grafo, esta ficha queda cerrada sin sello final, tal como se decidio en su momento.
+Ingeniería: Integration validation PASS: AC-01..AC-05 verified in tree (replay guard first, spawn nodes edge-free, ownership clean, done_ready resolved_at filter, 5/5 regression tests green). HANDOFF-PASO9 5.2/5.3 executed (ADR-0013 superseded note + log-decision ac-04). Per HANDOFF 5.5 + spec Origen, 010 stays PACKAGE_ACCEPTED; INTEGRATION/DONE never invoked. Non-blocking observation: exceptions field absen…
+
+[2026-08-02T14:53:45+00:00] orchestrator · done
+Cliente: La seleccion dinamica de modelos quedo oficialmente terminada: todas las pruebas del proyecto pasaron y la pieza convive bien con el resto. La parte que depende de medir cuotas reales queda en pausa hasta que eso sea posible.
+Ingeniería: 008 DONE: transition PACKAGE_ACCEPTED->INTEGRATION->DONE with global gate feature-008-integration pass (verify.sh 558 OK, build check). P3 budget-aware-selection remains deferred behind 011 (BLOCKED by design).
+
+[2026-08-02T14:53:27+00:00] P1-uninterrupted-delegation · integrator · done
+Cliente: El integrador reviso la pieza que evita pausas innecesarias al delegar trabajo: las diez condiciones acordadas estan cumplidas y conviven bien con lo entregado despues. Solo falta la corrida final de pruebas globales antes del sello de terminado.
+Ingeniería: Integration validation PASS: AC-01..AC-10 verified in current tree (doctrine in 3 shared runtimes, build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK, ADR-0011 linked, no conflict with 015 lane logic). P3 budget-aware-selection out of scope (blocked on 011). Pending: feature-level global gate (full verify.sh + unittest) before transition DONE.
+
+[2026-08-02T14:47:21+00:00] P3-graph-view · integrator · done
+Cliente: El integrador confirmo que la vista de grafo funciona y encaja con todo lo entregado: las diez condiciones acordadas se cumplen y no aparecio ningun problema nuevo. La ficha de esta pieza queda cerrada tal como se acordo: completa, sin marcarla con un sello final que prometeria mas de lo que se rastreo.
+Ingeniería: Integration validation PASS: AC-20..AC-29 verified in tree (graph subcommand, mermaid oracle 0 violations, skeleton exit 0, grafo.md 8/8 clean, WAIVED retired, twin byte-identical). Per spec.md:198-204 006 stays PACKAGE_ACCEPTED; transition DONE is never invoked (P1/P2 delivered under waiver, only P3's 9 ACs tracked). Integration evidence recorded; no findings.
+
+[2026-08-02T14:44:35+00:00] P1-discovered-inventory · integrator · started
+Cliente: Un integrador comprueba que el inventario descubierto se integra sin romper nada de lo existente.
+Ingeniería: INTEGRATION entry: read-only validation of P1-discovered-inventory against approved spec 012.
+
+[2026-08-02T14:44:35+00:00] P1-spawn-provenance · integrator · started
+Cliente: Un integrador verifica que el registro de procedencia de cada delegacion quedo bien conectado con el tablero y las notas.
+Ingeniería: INTEGRATION entry: read-only validation of P1-spawn-provenance against approved spec 010, including the ownership exception granted in HANDOFF-PASO9.
+
+[2026-08-02T14:44:35+00:00] P1-uninterrupted-delegation · integrator · started
+Cliente: Un integrador confirma que la seleccion dinamica de modelos convive bien con el resto del sistema antes de darla por terminada.
+Ingeniería: INTEGRATION entry: read-only validation of P1-uninterrupted-delegation against approved spec 008; P3 budget-aware-selection stays blocked on 011 and is out of scope.
+
+[2026-08-02T14:44:35+00:00] P3-graph-view · integrator · started
+Cliente: Un integrador revisa que la vista de grafo terminada encaje con todo lo ya entregado antes de declararla lista: nada se marca como completo sin esa mirada de conjunto.
+Ingeniería: INTEGRATION entry: read-only validation of P3-graph-view (ACs 20-29) against approved spec 006, cross-package deps and vault artifacts; produces integration verdict for global gate.
 
 [2026-07-31T00:22:55+00:00] P1-discovered-inventory · delta-reviewer · started
 Cliente: Última verificación antes de cerrar el paquete.
@@ -52,40 +88,4 @@ Ingeniería: security-auditor, contexto limpio, panel RP-01, concurrente con pac
 [2026-07-30T20:53:58+00:00] P1-discovered-inventory · package-reviewer · started
 Cliente: Un revisor que nunca vio la implementación audita si el catálogo dinámico está bien construido.
 Ingeniería: package-reviewer, contexto limpio, panel RP-01.
-
-[2026-07-30T20:07:45+00:00] P1-discovered-inventory · implementer · started
-Cliente: Arranca la implementación del catálogo dinámico de modelos.
-Ingeniería: implementer sobre P1-discovered-inventory, contrato ya verificado en 3 rondas de spec-challenge, ready_for_user_approval.
-
-[2026-07-30T19:46:48+00:00] started
-Cliente: Última vuelta del contrato de P2: el único punto flojo que quedaba era cómo evitar que el mismo modelo, ofrecido bajo dos proveedores con nombres distintos, se revisara a sí mismo creyendo que era independiente.
-Ingeniería: product-analyst reescribió AC-17/AC-18 quirúrgicamente (contract 1.3.0): family pasa a ser curada con regla de colisión para ids compartidos entre providers, subscription/metered pasa a mapa curado por provider en vez de columna de fila (evita el esquema cerrado de catalog.py). Tercera pasada del mismo spec-challenger, acotada.
-
-[2026-07-30T19:29:30+00:00] started
-Cliente: El contrato de P2 volvió corregido: el mapa de nombres estaba al revés (el par nuevo hubiera quedado invisible en toda máquina), dos afirmaciones 'verificadas en vivo' resultaron mal medidas, y se agregó el campo que distingue suscripción de pago-por-uso que me confirmaste vos.
-Ingeniería: product-analyst entregó contract 1.2.0 resolviendo los 3 bloqueantes + 4 highs + 6 mediums + 6 lows del primer challenge. Mando al mismo spec-challenger (contexto ya cargado) a una segunda pasada, acotada a verificar que las correcciones sean reales y no haya nada nuevo.
-
-[2026-07-30T17:58:01+00:00] done
-Cliente: El contrato de P2 (catálogo dinámico) ya está escrito con reglas concretas — incluida una fricción real que encontró al probar en vivo: el nombre de la credencial de OpenCode no coincide con el id que pide su propio comando para listar modelos.
-Ingeniería: product-analyst entregó AC-11..AC-20 en docs/specs/008-dynamic-selection/spec.md (1.0.0->1.1.0), verificado contra catalog.py/domain.py/service.py y una corrida real de 'opencode auth list'/'opencode models'. No tocó P1/P1b/P3. Mando un spec-challenger de contexto limpio antes de iniciar el paquete.
-
-[2026-07-30T17:57:23+00:00] P1-quota-failover · started
-Cliente: Antes de seguir, encontré que la suite completa tiene 2 pruebas rojas que la verificación acotada de la sesión anterior no corrió.
-Ingeniería: verify.sh (suite completa, 473 tests) -> FAILED (failures=2): test_routing_migrate_uses_harness_identity_and_test_store espera 'to=6' y el schema real ya es 7; test_the_usage_columns_sit_exactly_where_alter_table_puts_them compara contra un DDL canónico que no incluye replacement_of_run_id. Ambos son literales desactualizados por el propio paquete P1-quota-failover (SCHEMA=7, columna agregada cor…
-
-[2026-07-30T17:44:00+00:00] started
-Cliente: Arrancamos el catálogo dinámico de modelos: hoy el orquestador solo conoce dos proveedores escritos a mano, y no ve los modelos propios de OpenCode ni los que agregues en el futuro.
-Ingeniería: product-analyst redacta P2-discovered-inventory como enmienda real de 008 (hoy es un párrafo sin ACs). No depende de 007-P2 ni de 011/P1b — solo de sondear el entorno. Ownership acotado a docs/specs/008-dynamic-selection/spec.md; sin tocar código todavía.
-
-[2026-07-30T17:04:50+00:00] P1-quota-failover · runtime-verifier · blocked
-Cliente: La prueba real no puede hacerse de forma segura sin una suscripción agotada controlada; el sistema quedó detenido sin gastar ni modificar nada.
-Ingeniería: AC-06 requiere precondición externa verificable. Runner validado devuelve BLOCKED/HUMAN_DECISION_REQUIRED antes de abrir DB o invocar Pi; feature state quedó BLOCKED.
-
-[2026-07-30T17:02:28+00:00] P1-quota-failover · implementer · done
-Cliente: El reemplazo seguro y su comprobación real quedaron implementados; sin precondición controlada, el sistema informa un bloqueo seguro.
-Ingeniería: Core schema-7, transición atómica, adaptador Pi, pruebas AC-01..05 y runner AC-06 documentados; cinco pruebas focalizadas PASS.
-
-[2026-07-30T16:58:41+00:00] P1-quota-failover · implementer · started
-Cliente: Se completa la comprobación real que debe bloquearse honestamente si falta la precondición controlada.
-Ingeniería: Instancia focalizada para runner credencial-gated AC-06 y evidencia, sin expandir el núcleo de routing.
 
