@@ -16,7 +16,8 @@ if [[ "${SET_AGENTS_GUEST_VERIFY:-}" == "1" ]]; then
 else
   python3 -m unittest discover -s tests -v
 fi
-python3 -m py_compile ai/scripts/*.py ai/scripts/routing_core/*.py tests/*.py
+python3 -m py_compile ai/scripts/*.py ai/scripts/routing_core/*.py ai/scripts/feature_state_lib/*.py \
+  PROYECTO/ai/scripts/feature_state_lib/*.py tests/*.py
 git diff --check
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"
