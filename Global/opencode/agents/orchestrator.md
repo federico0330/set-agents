@@ -461,15 +461,28 @@ it:
    grammar, never a free-form passthrough. Every use is narrated like any other spawn action, never silent.
 7. `gate-runner` runs deterministic package gates after the package is integrated enough to review.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
+   Also run `python3 ai/scripts/feature-state.py freeze-candidate <PKG> --state-file ai/state/features/<feature_id>.json
+   --baseline <baseline> --actor gate-runner` (docs/adr/0020-*.md) right before the panel — it mints/bumps the
+   package's `candidate_identity` (a git tree-hash pair, re-derivable and tamper-evident), which the
+   integration receipt will later reference. Then run `python3 ai/scripts/classify-risk.py --state-file
+   ai/state/features/<feature_id>.json --package-id <PKG>` and record its result with `record-gate --name
+   risk-classification --status pass --evidence '<its JSON output>'` — it classifies risk from EVIDENCE in the
+   frozen candidate (path tokens, executable-mode changes, subprocess-spawn content), never from diff size
+   (docs/adr/0021-*.md).
 8. `package-reviewer` leads the bounded package review panel — it covers correctness, architecture, test gaps,
    data-integrity, and scalability itself in one pass (no separate DB/performance/legacy-audit agent to
-   delegate those to). Add only the reviewers `package-planner` declared in `required_reviewers`: typically
+   delegate those to). Add the reviewers `package-planner` declared in `required_reviewers`: typically
    `security-auditor` (offensive+defensive, one pass) when auth/payments/PII/tenant-isolation is in scope, or
-   `ux-ui-designer` for UI/UX risk. Their outputs are subreviews inside one panel and must be consolidated
-   before repair. **Spawn the panel members concurrently, in a single batch.** They all read the same
-   integrated diff and none of them consumes another's output, so there is no dependency to serialize on —
-   sequencing them buys nothing and costs their combined wall-clock. Concurrency does not change the count:
-   the panel is still ONE review cycle against the two-cycle budget.
+   `ux-ui-designer` for UI/UX risk. **Also read the `risk-classification` gate you just recorded**: if its
+   `level` is `high` and `security-auditor` is not already in `required_reviewers`, add it with
+   `extend-review-panel --role security-auditor --reason "risk-classification: <its top reason>"` before
+   spawning the panel — this is evidence discovered post-implementation extending the SAME lever
+   `package-planner` already declared statically, never a second, competing mechanism. A `medium`/`low` level
+   changes nothing; the static declaration from planning stands as-is. Their outputs are subreviews inside one
+   panel and must be consolidated before repair. **Spawn the panel members concurrently, in a single batch.**
+   They all read the same integrated diff and none of them consumes another's output, so there is no
+   dependency to serialize on — sequencing them buys nothing and costs their combined wall-clock. Concurrency
+   does not change the count: the panel is still ONE review cycle against the two-cycle budget.
    Trigger early focused checkpoints only for auth, authorization, tenant isolation, payments,
    secrets, crypto, destructive migrations/deletes, incompatible public contracts, system permissions, or
    untrusted code execution.

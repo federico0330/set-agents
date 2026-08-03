@@ -53,3 +53,39 @@ es la que se conserva.
 - `readability`/`resilience` quedan disponibles como categorías de finding en todo el pipeline (delta-review,
   refutación adversarial, repair) sin cambio de código, porque `structured-findings` es la fuente única que
   todos esos roles ya leen.
+
+## Amendment (2026-08-03, PKG-05) — escalación de panel por riesgo evidenciado, ahora completa
+
+La decisión 4 quedó explícitamente diferida hasta que existiera el script de clasificación. Ya existe
+(`ai/scripts/classify-risk.py`, hermano estructural de `check-owned-paths.py`, twin en `PROYECTO/`) y su
+wiring en doctrina, cerrando esta ADR por completo:
+
+5. `classify-risk.py --state-file <path> --package-id <PKG>` lee el `candidate_identity` ya congelado del
+   paquete (ADR-0020 — depende de `freeze-candidate`, nunca del worktree vivo) y clasifica `low|medium|high`
+   por EVIDENCIA únicamente, nunca por tamaño de diff: señales de path de alto riesgo (`auth`, `payments`,
+   `pii`, `secrets`, `tenant`, `migrations`) escalan a `high`; un archivo de workflow/shell (`.github/
+   workflows/*`, `*.sh`) sin otra señal escala a `medium`; el bit ejecutable agregado o contenido con
+   `subprocess`/`os.system`/`child_process`/`Process.Start` en los primeros 8KB escalan a `high`. Un rename
+   mecánico de 200 líneas sin ninguna señal nombrada se clasifica `low` — el mismo principio que gentle-ai
+   documenta ("el tamaño nunca selecciona el tier").
+6. `gate-runner` corre `freeze-candidate` y luego `classify-risk.py` en `PACKAGE_GATES`, justo antes del panel
+   (`orchestrator.md` paso 7), y registra el resultado con `record-gate --name risk-classification --status
+   pass --evidence '<JSON>'` — la clasificación en sí nunca falla el gate (es informativa), solo el gate de
+   ownership puede fallar ahí.
+7. El orquestador (`orchestrator.md` paso 8) lee ese gate antes de spawnear el panel: si `level == "high"` y
+   `security-auditor` no está ya en `required_reviewers`, lo agrega con `extend-review-panel --role
+   security-auditor --reason "risk-classification: <razón principal>"` — reusando el lever YA existente de
+   `package-planner` (decisión 1 original de este ADR más arriba), nunca un mecanismo paralelo. `medium`/`low`
+   no cambian nada; la declaración estática de planning queda como está.
+8. `package-planner.md` documenta que su declaración estática de `required_reviewers` no es el único lever:
+   la clasificación evidenciada es una cobertura ADITIVA para lo que el planning no podía ver todavía (el
+   código no existía aún cuando se planificó el paquete) — nunca un reemplazo del juicio del planner.
+
+### Rejected alternatives (amendment)
+
+- **Correr `classify-risk.py` en `PACKAGE_PLANNING`.** Imposible por construcción: la clasificación lee el
+  `candidate_identity` congelado, que no existe hasta que hay código implementado y congelado en
+  `PACKAGE_GATES`. Confirma por qué la decisión 4 original tuvo que diferirse hasta este momento.
+- **Hacer que `classify-risk.py` pueda fallar el gate.** Rechazado: es una clasificación, no una validación
+  binaria — gentle-ai mismo la trata como informativa para decidir cuántos lentes activar, nunca como un
+  pass/fail. `check-owned-paths.py` sigue siendo el único gate de `PACKAGE_GATES` que falla de verdad.

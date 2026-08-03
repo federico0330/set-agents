@@ -42,7 +42,12 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
      isolation, or PII.
    - add `ux-ui-designer` only when the package introduces or changes user-facing UI.
    This is the single biggest lever on review wall-clock: do not over-declare reviewers a package's surface does
-   not need, and do not under-declare on a real risk surface either.
+   not need, and do not under-declare on a real risk surface either. This static, planning-time declaration is
+   not the only lever: the orchestrator ALSO reads the `risk-classification` gate (computed from evidence in
+   the frozen candidate, at `PACKAGE_GATES`, after your plan but before the panel — docs/adr/0021-*.md) and
+   extends the panel post-implementation if it surfaces a `high` signal your plan didn't anticipate. That is
+   additive coverage for what planning-time analysis could not yet see (the code didn't exist yet); it never
+   replaces your own judgment here.
 7. Write one **context pack** per package at `docs/specs/<feature_id>/context/<PACKAGE_ID>.md`, max ~120
    lines. It is the ONLY context a spawned worker gets besides its task, so it must be self-contained:
    - objective of the package in 2-3 lines and the acceptance criteria it covers,
