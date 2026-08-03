@@ -1,6 +1,9 @@
 # ADR-0015 — Quota failover is a new linked dispatch, not fallback-window reuse
 
-- Estado: Proposed (2026-07-30). Feature `011-quota-failover`, contract 1.1.0.
+- Estado: Accepted (2026-08-03, corregido de Proposed — el diseño de las 7 decisiones ya está implementado y
+  aceptado en código: tabla `provider_exhaustions`, `close_exhausted_and_authorize_replacement()` con
+  `BEGIN IMMEDIATE`, tests AC-01..05 verdes. Solo queda pendiente AC-06, credential-gated, bloqueado por
+  `HUMAN_DECISION_REQUIRED` — ver feature `011-quota-failover`). Feature `011-quota-failover`, contract 1.1.0.
 
 ## Contexto
 
