@@ -2525,7 +2525,12 @@ def cmd_scaffold(target: str | None) -> int:
     else:
         skips.append("ai/state/features")
     template_dir = ROOT / "PROYECTO/ai/scripts"
-    for name in ("feature-state.py", "check-owned-paths.py"):
+    feature_state_lib_dir = template_dir / "feature_state_lib"
+    feature_state_lib_names = tuple(
+        f"feature_state_lib/{path.name}"
+        for path in sorted(feature_state_lib_dir.glob("*.py"))
+    ) if feature_state_lib_dir.is_dir() else ()
+    for name in ("feature-state.py", *feature_state_lib_names, "check-owned-paths.py"):
         source, destination = template_dir / name, root / "ai/scripts" / name
         if not source.is_file():
             conflicts.append(f"ai/scripts/{name}")
