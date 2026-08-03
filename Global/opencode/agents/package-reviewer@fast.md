@@ -129,11 +129,33 @@ Two modes, same agent and same checklist depth:
    8. Frontend render cost (when UI is touched — load `web-frontend-fundamentals`): no re-render storm, no
       long synchronous work blocking the event loop, no rendering-strategy choice that needlessly inflates
       Time-to-Interactive.
-5. When specialist subreviewers are present (e.g. `security-auditor`), read their evidence and consolidate
+5. **Legibilidad checklist** — walk this explicitly on every review, it applies to any diff regardless of
+   surface:
+   1. Names say what the thing is/does; no `data2`/`tmp`/`handleStuff`-shaped names, no misleading name left
+      over from a refactor.
+   2. Functions/modules are not doing several unrelated things at once — split by responsibility, not by
+      length alone.
+   3. No dead code: unreachable branches, unused parameters/imports, commented-out blocks left "just in case".
+   4. No duplicated logic that should be one extracted function/constant — three copies of the same
+      conditional is a finding, not a style nit.
+   5. Comments explain WHY when it is non-obvious (a constraint, a workaround, a subtle invariant); a comment
+      that only restates what the code already says is itself a finding.
+6. **Resiliencia checklist** — walk this explicitly whenever the diff touches an external call (network, disk,
+   subprocess, third-party API, queue) or a failure path:
+   1. Timeouts exist on every external call; nothing can hang forever waiting on a dependency.
+   2. Failure is handled explicitly — no bare `except:`/`catch {}` that swallows an error silently; a caught
+      failure is logged or surfaced with enough context to diagnose it later.
+   3. Retryable failures (transient network, lock contention) either retry with a bound (count or timeout) or
+      explicitly document why a single attempt is correct here.
+   4. Degradation is graceful where the spec allows it: a non-critical dependency failing does not take down
+      the whole request/flow when a documented fallback exists.
+   5. Observability on the failure path: a failure that reaches a human is legible (what failed, with what
+      input, at what point) — not just a stack trace with no context.
+7. When specialist subreviewers are present (e.g. `security-auditor`), read their evidence and consolidate
    without duplicating findings.
-6. Review correctness, integration, architecture, edge cases, regression risk, and test gaps for the package,
+8. Review correctness, integration, architecture, edge cases, regression risk, and test gaps for the package,
    estimating data-path cost at 10×–1000× current rows where relevant.
-7. Return one consolidated report. Findings must be concrete and repairable.
+9. Return one consolidated report. Findings must be concrete and repairable.
 
 ## Must NOT
 - Edit files.
@@ -154,8 +176,8 @@ Return:
   "findings": []
 }
 ```
-Each finding includes `id`, `severity`, `category` (`correctness|security|data-integrity|scalability|testing|
-integration`), `acceptance_criterion`, `file`, `line`, `evidence`, `reproduction` (or the concrete interleaving
+Each finding includes `id`, `severity`, `category` (`correctness|security|data-integrity|scalability|
+readability|resilience|testing|integration`), `acceptance_criterion`, `file`, `line`, `evidence`, `reproduction` (or the concrete interleaving
 that breaks, for concurrency findings; the query-plan risk, for scalability findings), `required_outcome`, and
 `suggested_scope`. In quick/focused mode without a package, end with a final line exactly `AUDIT_PASS` or, if
 findings exist, list them and end with exactly `AUDIT_FAIL`.

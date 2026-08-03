@@ -13,7 +13,10 @@ metadata:
 Required fields:
 - `id`
 - `severity`: `critical|high|medium|low`
-- `category`: `correctness|security|stability|scalability|testing|integration`
+- `category`: `correctness|security|data-integrity|scalability|readability|resilience|testing|integration`
+  (`data-integrity` reconciles a pre-existing naming drift with this same field's `stability` spelling —
+  `package-reviewer.md`'s own data-integrity checklist was always the enforced one; `readability`/`resilience`
+  are new, added alongside the checklists of the same name — ADR-0021)
 - `acceptance_criterion`
 - `file`, `line`
 - `evidence`
