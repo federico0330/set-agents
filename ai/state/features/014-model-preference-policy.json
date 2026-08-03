@@ -1,0 +1,1020 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-02T22:07:39+00:00",
+    "hash": "a75c53dbed98b7afa418ff65a7b693b8da3a96ac41aca6ea0a1d21fa91e38c84",
+    "path": "docs/specs/014-model-preference-policy/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-model-preference-policy",
+  "feature_id": "014-model-preference-policy",
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-03T00:38:12+00:00",
+      "evidence": "Serialized final gates on integrated tree: 613 tests OK skipped=3, VERIFY_PASS, CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2, --diff clean. AC-06 negatives verified (read-only files untouched).",
+      "name": "feature-014-integration",
+      "required": true,
+      "status": "pass"
+    }
+  ],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "user",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/014-model-preference-policy/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T22:07:39+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Role-class taxonomy + single resolver (AC-01, AC-05): partition test over 28 roles, tiers cross-check, 4-file doctrine-consistency test",
+          "Sibling config file: schema, atomic TOML writer/loader, shared validators, fail-closed die(), round-trip isolation test (AC-02, AC-03)",
+          "CLI --model-preference-set/-role-override/-show wired to shared validators, MODEL_PREFERENCE_NOTE scoped to genuinely-inert classes, argparse rejections (AC-02)",
+          "RoutingService.route() sort-key insertion at position 3, exclusion loop and _effective_runtime untouched; point-5 tripwire test pinning 5-tuple (AC-04)",
+          "RouteDecision.bias_class/preference_configured + to_dict + cmd_route_decide envelope, non-collision test, 5-refusal-site population test (AC-08)",
+          "Regression suite: mechanism-correctness synthetic inventory + live-effect proofs for grunt 4 + build 2 tiered roles against real (claude-code,anthropic) inventory + AC-06 negatives",
+          "ADR (re-check next free number live, expect 0018) + README row (AC-09)"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T22:11:51+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Package created from approved contract 3.2.0; implementer spawn deliberately held until 016-P2-hygiene (shared service.py/test_routing.py) completes implementation."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T22:11:52+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un implementador construye la politica de preferencia de modelos: el sistema aprende que clase de rol es cada agente (decision, construccion, revision) y sesga que proveedor prefiere cada clase, con efecto real inmediato para seis roles.",
+        "purpose": "Implement P1-model-preference-policy: taxonomy, config+CLI, sort-key, observability, ADR",
+        "role": "implementer",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "PACKAGE_IMPLEMENTATION 014-P1 (AC-01..09): role-class resolver, sibling config atomic writer + CLI, sort-key position 3, RouteDecision.bias_class observability, ADR-0018. Runs AFTER 016-P2 accepted (shared service.py/test_routing/set_agents_app now clear). No build.sh/verify.sh during development (staging race rule)."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:19:16+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Role-class taxonomy + single resolver (AC-01, AC-05): partition test over 28 roles, tiers cross-check, 4-file doctrine-consistency test"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:29:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Sibling config file: schema, atomic TOML writer/loader, shared validators, fail-closed die(), round-trip isolation test (AC-02, AC-03)"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Role-class taxonomy + single resolver (AC-01, AC-05): partition test over 28 roles, tiers cross-check, 4-file doctrine-consistency test",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK)"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:30+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Sibling config file: schema, atomic TOML writer/loader, shared validators, fail-closed die(), round-trip isolation test (AC-02, AC-03)",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "CLI --model-preference-set/-role-override/-show wired to shared validators, MODEL_PREFERENCE_NOTE scoped to genuinely-inert classes, argparse rejections (AC-02)"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "CLI --model-preference-set/-role-override/-show wired to shared validators, MODEL_PREFERENCE_NOTE scoped to genuinely-inert classes, argparse rejections (AC-02)",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "RoutingService.route() sort-key insertion at position 3, exclusion loop and _effective_runtime untouched; point-5 tripwire test pinning 5-tuple (AC-04)"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "RoutingService.route() sort-key insertion at position 3, exclusion loop and _effective_runtime untouched; point-5 tripwire test pinning 5-tuple (AC-04)",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "RouteDecision.bias_class/preference_configured + to_dict + cmd_route_decide envelope, non-collision test, 5-refusal-site population test (AC-08)"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "RouteDecision.bias_class/preference_configured + to_dict + cmd_route_decide envelope, non-collision test, 5-refusal-site population test (AC-08)",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Regression suite: mechanism-correctness synthetic inventory + live-effect proofs for grunt 4 + build 2 tiered roles against real (claude-code,anthropic) inventory + AC-06 negatives"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Regression suite: mechanism-correctness synthetic inventory + live-effect proofs for grunt 4 + build 2 tiered roles against real (claude-code,anthropic) inventory + AC-06 negatives",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR (re-check next free number live, expect 0018) + README row (AC-09)"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR (re-check next free number live, expect 0018) + README row (AC-09)",
+        "validations": [
+          "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:47:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Con los dos implementadores terminados, un unico verificador corre todas las pruebas del proyecto en orden, sin carreras.",
+        "purpose": "Serialized heavy gates for 014-P1 (also evidence for 016-P1 testing)",
+        "role": "gate-runner",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "PACKAGE_GATES 014 + PACKAGE_TESTING 016-P1: full discover, verify.sh, build.sh --check/--diff, git diff --check, serialized single-runner per build-staging race decision."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:49:29+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "feature-014-gates",
+        "status": "pass"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:52+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:52+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "All 7 tasks complete; serialized gates green."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:52+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "Gates recorded green; opening panel RP-014-01 (package-reviewer + security-auditor)."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:53+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-014-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:53+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente lee toda la politica de preferencia de modelos de punta a punta contra el contrato aprobado.",
+        "purpose": "RP-014-01 deep review of P1 vs AC-01..AC-09",
+        "role": "package-reviewer",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "PACKAGE_REVIEW 014: read-only vs contract 3.2.0; sort-key position, resolver partition, config surface, observability, ADR-0018; targeted tests only."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:53+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un auditor revisa que el sesgo de preferencia no pueda debilitar la independencia de los revisores ni abrir una via de inyeccion por el archivo de configuracion.",
+        "purpose": "RP-014-01 security audit: sort-key vs independence ordering, config injection, CLI validation",
+        "role": "security-auditor",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "PACKAGE_REVIEW 014: security-auditor read-only on sort-key placement vs REVIEWER_INDEPENDENCE, _model_preference internal-marker injection, TOML parsing fail-closed, atomic writes."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-02T23:59:53+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 1,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:04:10+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Antes de reparar, un verificador intenta refutar los ocho hallazgos del panel de la politica de modelos.",
+        "purpose": "Adversarial verification of RP-014-01 findings before repair",
+        "role": "finding-verifier",
+        "spawn_id": "SPAWN-005",
+        "spawns": 5,
+        "tech": "FINDING_VERIFICATION 014: refute/uphold SEC14-01, RF14-01..07 with live reproduction where claimed."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:08:38+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un reparador cierra en una pasada los ocho detalles confirmados de la politica de modelos: errores que escapaban sin mensaje claro, un archivo editado a mano que se corrompia, la cobertura del camino real de produccion y dos textos de documentacion imprecisos.",
+        "purpose": "Consolidated repair R1 of SEC14-01 + RF14-01..07",
+        "role": "repair-agent",
+        "spawn_id": "SPAWN-006",
+        "spawns": 6,
+        "tech": "PACKAGE_REPAIR 014 R1: except clauses (show/route-explain), dedicated MODEL_PREFERENCE_INVALID handling in route-decide, production-plumbing test with populated STATE_DIR, service-level role_override + AC-04e tests, full-doc validation before serialize (set AND role-override paths), pop marker in __init__, log-decision for AC-01i deviation. One record-repair call."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:13:23+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 7,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:14:06+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-014-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:14:06+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 8
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:14:06+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC14-01",
+          "RF14-01",
+          "RF14-02",
+          "RF14-03",
+          "RF14-04",
+          "RF14-05",
+          "RF14-06",
+          "RF14-07"
+        ]
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:34:54+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor distinto verifica que los ocho arreglos sean reales y esten bien acotados, sin reabrir la revision general.",
+        "purpose": "Focused delta review of R1 repair (8 findings)",
+        "role": "delta-reviewer",
+        "spawn_id": "SPAWN-007",
+        "spawns": 7,
+        "tech": "DELTA_REVIEW 014 R1: verify except-clause mappings, production-plumbing test bites, full-doc validation both write paths, marker pop, deviation durably recorded."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:35:25+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [],
+        "status": "pass"
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1 accepted after panel (2 reviewers, 8 findings verified 8/8 upheld, consolidated repair, delta pass). Cross-feature consistency with 015 redirect and 016-P2 RUNTIME_REDIRECTED explicitly reviewed in panel."
+      },
+      "package_id": "P1-model-preference-policy",
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "feature-014-integration",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Feature 014 model-preference-policy COMPLETE: role-class taxonomy (decision/grunt/build/unscoped) with single resolver, opt-in atomic config + CLI, sort-key bias at position 3 (independence and tier inviolable), RouteDecision observability, ADR-0018. Real live effect on 6 tiered roles via 015 redirect, proven end-to-end."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-03T00:38:12+00:00",
+      "to": "DONE"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 1,
+    "human_questions_after_approval": 0,
+    "package_reviews": 1,
+    "repair_batches": 1,
+    "task_deep_reviews": 0,
+    "verifications": 1
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 7,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/014-model-preference-policy/context/P1-model-preference-policy.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-03T00:38:12+00:00",
+          "closed_findings": [
+            "SEC14-01",
+            "RF14-01",
+            "RF14-02",
+            "RF14-03",
+            "RF14-04",
+            "RF14-05",
+            "RF14-06",
+            "RF14-07"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "R1 delta pass: 8/8 resolved, all biting on revert (exception ordering correct \u2014 ModelPreferenceError before ValueError; production plumbing asserts real provider flip; no-corruption test byte-identical file; pop before both consumers). One doc-only nit DR14-01 (slug typo providers/proveedores in ADR-0018:177) fixed by orchestrator in-line.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "HEAD",
+      "findings": [
+        {
+          "file": "ai/scripts/set_agents_app.py:2901-2902 y :398-418",
+          "id": "SEC14-01",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "suggested_fix": "Dos except clauses: show en main() con el mismo bloque stderr+exit 2 de set/override; ModelPreferenceError en el except-tuple de cmd_route_explain mapeando a ROUTING_INPUT_INVALID; test hermetico con STATE_DIR temporal",
+          "title": "ModelPreferenceError escapa sin atrapar en --model-preference-show y route-explain",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "Un model-preference.toml malformado produce traceback crudo (exit 1) en show en vez de la disciplina model-preference:+exit 2, y en route-explain rompe el contrato de envelope JSON de una linea (SEC-A02) filtrando paths absolutos con username. route-decide no afectado (ValueError lo atrapa). PoC reproducido"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py:415-418",
+          "id": "RF14-01",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "model-preference.toml malformado crashea route-explain con traceback sin envelope",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py:667",
+          "id": "RF14-02",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "route-decide degrada archivo malformado a ROUTING_UNAVAILABLE generico",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py:280-289",
+          "id": "RF14-03",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "Plumbing de produccion del marker sin cobertura de test",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/routing_core/service.py:222",
+          "id": "RF14-04",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "role_override no ejercitado a nivel service; falta test AC-04e",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "tests/test_routing.py:3629-3644",
+          "id": "RF14-05",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "Desviacion AC-01i sin registro durable",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/set_agents_app.py:292-303",
+          "id": "RF14-06",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "Write valida solo la entrada escrita: string ajeno se corrompe a lista de chars",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        },
+        {
+          "file": "ai/scripts/routing_core/service.py:123",
+          "id": "RF14-07",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "title": "ADR-0018/docstring dicen reads and strips; el codigo solo lee (documental)",
+          "verified_at": "2026-08-03T00:14:06+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-02T23:59:52+00:00",
+          "evidence": "Serialized gates: full 606 OK skipped=3; test_routing 229 OK skipped=1 (~30 new); verify.sh VERIFY_PASS; build.sh --check CHECK_PASS SYNC_OK; --diff clean; model-preference.toml opt-in confirmed (no strays in repo or ~/.local/state).",
+          "name": "feature-014-gates",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Role-class-scoped model/provider preference: taxonomy+resolver, sibling config+CLI, one sort-key integration point in RoutingService.route(), RouteDecision observability, and the design ADR",
+      "owned_paths": [
+        "ai/scripts/routing_core/service.py",
+        "ai/scripts/routing_core/domain.py",
+        "ai/scripts/set_agents_app.py",
+        "tests/test_routing.py",
+        "docs/adr/README.md",
+        "docs/adr/0018-model-preference-policy.md"
+      ],
+      "package_id": "P1-model-preference-policy",
+      "read_only_paths": [
+        "models.toml",
+        "roles.tsv",
+        "ai/catalogs/routes.v1.toml",
+        "ai/scripts/models_config.py",
+        "ai/scripts/routing_core/catalog.py",
+        "ai/scripts/routing.py",
+        "Global/_canonical/agents/orchestrator.md",
+        "docs/specs/008-dynamic-selection/spec.md",
+        "docs/specs/015-anthropic-dispatch-parity/spec.md"
+      ],
+      "repair_entry": "review",
+      "repairs": [
+        {
+          "at": "2026-08-03T00:34:54+00:00",
+          "changed_files": [
+            "ai/scripts/set_agents_app.py",
+            "ai/scripts/routing_core/service.py",
+            "tests/test_routing.py",
+            "docs/adr/0018-model-preference-policy.md",
+            "ai/state/decisions-log.jsonl"
+          ],
+          "finding_ids": [
+            "SEC14-01",
+            "RF14-01",
+            "RF14-02",
+            "RF14-03",
+            "RF14-04",
+            "RF14-05",
+            "RF14-06",
+            "RF14-07"
+          ],
+          "verification": [
+            "python3 -m unittest tests.test_routing -v: Ran 236 tests OK (skipped=1); python3 -m unittest discover -s tests: Ran 613 tests OK (skipped=3); ./ai/scripts/verify.sh: VERIFY_PASS; ./build.sh --check: CHECK_PASS + SELF_SCAFFOLD_SYNC_OK; git diff --check: clean. SEC14-01: --model-preference-show wrapped in try/except ModelPreferenceError (set_agents_app.py:2901-2906), test_model_preference_show_dispatch_fails_closed_on_a_malformed_file. RF14-01: cmd_route_explain except ModelPreferenceError -> ROUTING_INPUT_INVALID with message (set_agents_app.py ~427), test_cmd_route_explain_fails_closed_on_a_malformed_model_preference_file. RF14-02: cmd_route_decide except ModelPreferenceError before broad ValueError catch -> ROUTING_INPUT_INVALID (set_agents_app.py ~665), test_cmd_route_decide_fails_closed_on_a_malformed_model_preference_file. RF14-03: test_model_preference_production_plumbing_end_to_end_via_real_cli proves real CLI write->load->_config_with_model_preference->RoutingService.__init__ flips live-probed provider. RF14-04: test_service_level_role_override_wiring_reorders_via_for_tests + test_role_class_pre_sort_consultation_exactly_as_scoped (AC-04(e)). RF14-05: decision logged via log-decision slug ac-01i-grunt-no-flip-en-verified-review-2-proveedores, ADR-0018 Accepted-residual-risk sentence added. RF14-06: cmd_model_preference_set/cmd_model_preference_role_override call load_model_preference() to validate the whole doc before merge/write (set_agents_app.py), test_model_preference_write_rejects_a_pre_existing_invalid_entry_without_corrupting_the_file. RF14-07: RoutingService.__init__ config.pop('_model_preference', None) instead of .get (service.py:123)."
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-08-03T00:14:06+00:00",
+          "panel_id": "RP-014-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-08-02T23:59:53+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-08-03T00:04:10+00:00",
+              "evidence": "Cleared: exclusion loop zero hunks (bias cannot resurrect excluded candidates nor suppress REVIEWER_INDEPENDENCE_UNAVAILABLE); tuple ordering structural; _config_with_model_preference overwrites marker unconditionally (models.toml injection closed); atomic mkstemp+os.replace 0600; envelope leaks nothing; doctrine intact; no test weakened.",
+              "findings": [
+                "SEC14-01"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-08-03T00:14:06+00:00",
+              "evidence": "Clean: partition 7/6/7/8, sort position 3 con exclusiones intactas, AC-06 negatives vacios, marker injection cerrada, atomicidad probada, NOTE matrix exacta, live-effect con inventario real, interaccion 016-P2 ok, ADR-0018, 229 tests OK.",
+              "findings": [
+                "RF14-01",
+                "RF14-02",
+                "RF14-03",
+                "RF14-04",
+                "RF14-05",
+                "RF14-06",
+                "RF14-07"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-08-03T00:14:06+00:00",
+          "evidence": "RP-014-01: 8 findings (RF14-01/03 medium; SEC14-01, RF14-02/04/05/06/07 low). Mechanism correct as shipped; repairs small. To verification.",
+          "findings": [
+            "SEC14-01",
+            "RF14-01",
+            "RF14-02",
+            "RF14-03",
+            "RF14-04",
+            "RF14-05",
+            "RF14-06",
+            "RF14-07"
+          ],
+          "panel_id": "RP-014-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "Sort-key element misplaced vs tier/independence boundary silently degrades reviewer-independence ordering: mitigated by AC-04 point-5 tripwire and never touching the exclusion loop",
+        "Sibling-file writer reusing flat serializer or silent-parse-swallow corrupts config: mitigated by dedicated atomic writer + fail-closed loader + round-trip test",
+        "Live-effect tests against synthetic missing-pair fixture would prove a post-015 falsehood: mitigated by fixture-that-would-fool-it rule",
+        "SHARED FILES with 016-P2-hygiene (service.py, test_routing.py): implementation strictly sequenced after P2 lands"
+      ],
+      "routing_reason": "Edits the live primary-dispatch sort key + new atomic config surface + CLI with fail-closed validation; architecture-critical cross-layer",
+      "runtime_qa": [
+        {
+          "at": "2026-08-03T00:38:12+00:00",
+          "browser": "",
+          "checks": [],
+          "evidence": "runtime_surface: live CLI proven end-to-end \u2014 real model-preference.toml under temp STATE_DIR through --route-decide subprocess flips provider (production plumbing test, 10.4s); manual smoke: build preference flips implementer openai-codex -> anthropic/claude-code via 015 redirect.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": "implementer",
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-02T23:19:16+00:00",
+          "client": "Un implementador construye la politica de preferencia de modelos: el sistema aprende que clase de rol es cada agente (decision, construccion, revision) y sesga que proveedor prefiere cada clase, con efecto real inmediato para seis roles.",
+          "purpose": "Implement P1-model-preference-policy: taxonomy, config+CLI, sort-key, observability, ADR",
+          "role": "implementer",
+          "spawn_id": "SPAWN-001",
+          "tech": "PACKAGE_IMPLEMENTATION 014-P1 (AC-01..09): role-class resolver, sibling config atomic writer + CLI, sort-key position 3, RouteDecision.bias_class observability, ADR-0018. Runs AFTER 016-P2 accepted (shared service.py/test_routing/set_agents_app now clear). No build.sh/verify.sh during development (staging race rule)."
+        },
+        {
+          "at": "2026-08-02T23:49:29+00:00",
+          "client": "Con los dos implementadores terminados, un unico verificador corre todas las pruebas del proyecto en orden, sin carreras.",
+          "purpose": "Serialized heavy gates for 014-P1 (also evidence for 016-P1 testing)",
+          "role": "gate-runner",
+          "spawn_id": "SPAWN-002",
+          "tech": "PACKAGE_GATES 014 + PACKAGE_TESTING 016-P1: full discover, verify.sh, build.sh --check/--diff, git diff --check, serialized single-runner per build-staging race decision."
+        },
+        {
+          "at": "2026-08-02T23:59:53+00:00",
+          "client": "Un revisor independiente lee toda la politica de preferencia de modelos de punta a punta contra el contrato aprobado.",
+          "purpose": "RP-014-01 deep review of P1 vs AC-01..AC-09",
+          "role": "package-reviewer",
+          "spawn_id": "SPAWN-003",
+          "tech": "PACKAGE_REVIEW 014: read-only vs contract 3.2.0; sort-key position, resolver partition, config surface, observability, ADR-0018; targeted tests only."
+        },
+        {
+          "at": "2026-08-02T23:59:53+00:00",
+          "client": "Un auditor revisa que el sesgo de preferencia no pueda debilitar la independencia de los revisores ni abrir una via de inyeccion por el archivo de configuracion.",
+          "purpose": "RP-014-01 security audit: sort-key vs independence ordering, config injection, CLI validation",
+          "role": "security-auditor",
+          "spawn_id": "SPAWN-004",
+          "tech": "PACKAGE_REVIEW 014: security-auditor read-only on sort-key placement vs REVIEWER_INDEPENDENCE, _model_preference internal-marker injection, TOML parsing fail-closed, atomic writes."
+        },
+        {
+          "at": "2026-08-03T00:08:38+00:00",
+          "client": "Antes de reparar, un verificador intenta refutar los ocho hallazgos del panel de la politica de modelos.",
+          "purpose": "Adversarial verification of RP-014-01 findings before repair",
+          "role": "finding-verifier",
+          "spawn_id": "SPAWN-005",
+          "tech": "FINDING_VERIFICATION 014: refute/uphold SEC14-01, RF14-01..07 with live reproduction where claimed."
+        },
+        {
+          "at": "2026-08-03T00:13:23+00:00",
+          "client": "Un reparador cierra en una pasada los ocho detalles confirmados de la politica de modelos: errores que escapaban sin mensaje claro, un archivo editado a mano que se corrompia, la cobertura del camino real de produccion y dos textos de documentacion imprecisos.",
+          "purpose": "Consolidated repair R1 of SEC14-01 + RF14-01..07",
+          "role": "repair-agent",
+          "spawn_id": "SPAWN-006",
+          "tech": "PACKAGE_REPAIR 014 R1: except clauses (show/route-explain), dedicated MODEL_PREFERENCE_INVALID handling in route-decide, production-plumbing test with populated STATE_DIR, service-level role_override + AC-04e tests, full-doc validation before serialize (set AND role-override paths), pop marker in __init__, log-decision for AC-01i deviation. One record-repair call."
+        },
+        {
+          "at": "2026-08-03T00:35:25+00:00",
+          "client": "Un revisor distinto verifica que los ocho arreglos sean reales y esten bien acotados, sin reabrir la revision general.",
+          "purpose": "Focused delta review of R1 repair (8 findings)",
+          "role": "delta-reviewer",
+          "spawn_id": "SPAWN-007",
+          "tech": "DELTA_REVIEW 014 R1: verify except-clause mappings, production-plumbing test bites, full-doc validation both write paths, marker pop, deviation durably recorded."
+        }
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Role-class taxonomy + single resolver (AC-01, AC-05): partition test over 28 roles, tiers cross-check, 4-file doctrine-consistency test",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Sibling config file: schema, atomic TOML writer/loader, shared validators, fail-closed die(), round-trip isolation test (AC-02, AC-03)",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "CLI --model-preference-set/-role-override/-show wired to shared validators, MODEL_PREFERENCE_NOTE scoped to genuinely-inert classes, argparse rejections (AC-02)",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "RoutingService.route() sort-key insertion at position 3, exclusion loop and _effective_runtime untouched; point-5 tripwire test pinning 5-tuple (AC-04)",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "RouteDecision.bias_class/preference_configured + to_dict + cmd_route_decide envelope, non-collision test, 5-refusal-site population test (AC-08)",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Regression suite: mechanism-correctness synthetic inventory + live-effect proofs for grunt 4 + build 2 tiered roles against real (claude-code,anthropic) inventory + AC-06 negatives",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "ADR (re-check next free number live, expect 0018) + README row (AC-09)",
+          "local_validations": [
+            "python3 -m unittest tests.test_routing (229 tests, OK); py_compile clean; manual CLI smoke"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-03T00:38:12+00:00",
+          "commands": [],
+          "evidence": "Post-repair sequential gates: test_routing 236 OK skipped=1; full suite 613 OK skipped=3; verify.sh VERIFY_PASS; build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2; git diff --check clean.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-03T00:14:06+00:00",
+          "evidence": "8/8 upheld with live scratch reproductions and greps. Compounding note: role-override write path has identical corruption shape (:351-355), same root cause, cover in same repair.",
+          "refuted": [],
+          "upheld": [
+            "SEC14-01",
+            "RF14-01",
+            "RF14-02",
+            "RF14-03",
+            "RF14-04",
+            "RF14-05",
+            "RF14-06",
+            "RF14-07"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "DONE",
+  "revision": 40,
+  "schema_version": 1,
+  "updated_at": "2026-08-03T00:38:12+00:00"
+}

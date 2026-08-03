@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from .catalog import build_snapshot, canonical_model, probe_inventory
 from .domain import (RISK_ORDER, TIER_ORDER, RoutingError, StaticRoute, TaskRequest, _ObservedTaskFacts,
-                     combined_risk, required_tier, RouteDecision)
+                     combined_risk, required_tier, RouteDecision, resolve_bias_class)
 
 # ADR-0007 (P3-pi-lane, T-305): flipped False only once the pi doctor is green (pinned
 # version resolves, both audited pairs authenticate, `pi --list-models` parses — see
@@ -47,6 +47,22 @@ _PROVIDER_RUNTIME_REDIRECTS = {"anthropic": "claude-code"}
 # (`claude-code`/`anthropic`) is separately, fully authenticated. This is stricter than,
 # and supersedes, the pair-presence check alone for this one lane.
 _NEVER_REDIRECT_FROM_RUNTIMES = frozenset({"pi"})
+
+
+def _bias_rank(provider: str, preference: tuple) -> int:
+    """AC-04: rank a candidate's provider by AC-02's ordered, class-scoped preference
+    list -- sort-tuple position 3, strictly between tier (position 2) and
+    `curated_priority` (today's position 3, shifting to 4). A provider named in the list
+    ranks by its list position; a provider absent from a non-empty list, and every
+    provider alike when the list is empty (no preference configured for this decision's
+    resolved class, or the role is `unscoped`), ranks at one fixed, tied, constant value
+    equal to the list's length -- never excluded, never a separate code branch for the
+    absent-configuration case (AC-04 point 4: an empty list makes every candidate compare
+    equal at this position, so ordering falls through unchanged to `curated_priority`)."""
+    try:
+        return preference.index(provider)
+    except ValueError:
+        return len(preference)
 
 
 class _FactsIssuer:
@@ -96,22 +112,43 @@ class RoutingService:
             cache_root = (store if store is not None else RoutingStore()).ensure_cache_root()
         except RoutingError:
             cache_root = None
+        # AC-04/AC-02 (014-model-preference-policy): `config` is the one channel already
+        # available here without touching `routing.py`'s read-only `compose()` signature
+        # -- the app-layer CLI (set_agents_app.py) injects the sibling file's already-
+        # loaded, already-validated `{"preference": {...}, "role_override": {...}}` under
+        # this internal-marker key (the same `_source_schema`-style convention
+        # models_config.py already uses for a value that is never itself serialized back
+        # to models.toml). Absent entirely (every other production/test caller) is the
+        # unbiased default, never a crash.
+        model_preference = config.pop("_model_preference", None) if isinstance(config, dict) else None
+        preference = dict((model_preference or {}).get("preference") or {})
+        role_override = dict((model_preference or {}).get("role_override") or {})
         self._seal(build_snapshot(catalog_path, roster, config), roster,
                    probe_inventory(config, cache_root=cache_root, fresh=fresh_probes, cache_write=not simulate),
                    store, simulate, clock,
                    recheck=lambda: build_snapshot(catalog_path, roster, config),
-                   reprobe=None if simulate else (lambda pairs: probe_inventory(config, pairs=pairs)))
+                   reprobe=None if simulate else (lambda pairs: probe_inventory(config, pairs=pairs)),
+                   preference=preference, role_override=role_override)
 
     @classmethod
-    def _for_tests(cls, snapshot, roster, inventory, store=None, simulate=False, clock=time.time, reprobe=None):
-        """Private hermetic seam; production callers never reach it."""
+    def _for_tests(cls, snapshot, roster, inventory, store=None, simulate=False, clock=time.time, reprobe=None,
+                    preference=None, role_override=None):
+        """Private hermetic seam; production callers never reach it.
+
+        `preference`/`role_override` (AC-04): the resolved sibling-config tables a
+        production caller would otherwise inject via `config["_model_preference"]`
+        (`__init__` above) -- both default to empty, the unbiased default, so every
+        existing call site of this seam stays byte-identical (AC-04c) without updating
+        its call.
+        """
         service = cls.__new__(cls)
         if reprobe is None:
             reprobe = lambda pairs: {pair: set(inventory.get(pair, set())) for pair in pairs}
-        service._seal(snapshot, roster, inventory, store, simulate, clock, recheck=lambda: snapshot, reprobe=reprobe)
+        service._seal(snapshot, roster, inventory, store, simulate, clock, recheck=lambda: snapshot, reprobe=reprobe,
+                       preference=preference, role_override=role_override)
         return service
 
-    def _seal(self, snapshot, roster, inventory, store, simulate, clock, recheck, reprobe):
+    def _seal(self, snapshot, roster, inventory, store, simulate, clock, recheck, reprobe, preference=None, role_override=None):
         self.snapshot = snapshot
         self.roster = {item["role"]: item for item in roster}
         self.inventory = {key: frozenset(values) for key, values in inventory.items()}
@@ -120,6 +157,11 @@ class RoutingService:
         self._recheck = recheck
         self._reprobe = reprobe
         self._issuer = _AuthorizationIssuer()
+        # AC-02/AC-04: preference values are stored as tuples (an ordered rank, `_bias_rank`
+        # indexes into it) -- never mutated after construction, matching the sealed-composition
+        # discipline every other collection on this instance already follows.
+        self._bias_preference = {key: tuple(value) for key, value in (preference or {}).items()}
+        self._bias_role_override = dict(role_override or {})
         if store is not None: store._bind_issuer(self._issuer)
 
     # Explicitly private composition seam. Production callers receive facts from harness composition.
@@ -168,18 +210,29 @@ class RoutingService:
                 or not all(isinstance(tool, str) for tool in request.required_tools)):
             return RouteDecision(None,None,None,None,None,None,False,("FACTS_INCOMPLETE",))
         role_class = self._role_class(facts.role)
+        # AC-01/AC-05/AC-08 (014-model-preference-policy): resolved exactly once, right
+        # after `role_class` (the pre-existing 3-value classification this contract's own
+        # resolver piggybacks the same `facts.role`/roster lookup on) is known -- `None`
+        # only for the two refusals strictly before this point (`:206`/`:211` above,
+        # unreachable from here). `bias_preference` is the resolved class's ordered
+        # provider list from AC-02's config, or `()` (the unbiased default) when the
+        # class has no configured entry -- `preference_configured` is true only when that
+        # list is genuinely non-empty (AC-08).
+        bias_class = resolve_bias_class(facts.role, self.roster[facts.role], self._bias_role_override)
+        bias_preference = self._bias_preference.get(bias_class, ())
+        preference_configured = bool(bias_preference)
         unverified = False
         if role_class == "review":
             # P1R persists only writers; a review decision is selected but never becomes a writer authorization.
             if not review_of_run_id or self.store is None:
                 if not unverified_review:
-                    return RouteDecision(None,None,None,None,None,None,False,("REVIEW_IDENTITY_INVALID",))
+                    return RouteDecision(None,None,None,None,None,None,False,("REVIEW_IDENTITY_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
                 # Contract 004 AC-03: tier/model still reported, execution stays disabled, and the
                 # doctrine forbids a routed spawn on an unverified reviewer decision.
                 writer, unverified = None, True
             else:
                 try: writer = self.store.implementation_identity(review_of_run_id)
-                except RoutingError: return RouteDecision(None,None,None,None,None,None,False,("REVIEW_IDENTITY_INVALID",))
+                except RoutingError: return RouteDecision(None,None,None,None,None,None,False,("REVIEW_IDENTITY_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
         else: writer = None
         # AC-01 non-goal: this conflict check governs a disjoint concern (whether the
         # CALLER's own requested lane conflicts with the resolved one) and is
@@ -188,7 +241,7 @@ class RoutingService:
         conflicts = (request.role != facts.role or request.operation != facts.operation or request.task_class != facts.task_class
                      or request.selected_runtime not in (None, facts.selected_runtime))
         if conflicts:
-            return RouteDecision(None,None,None,None,None,None,False,("FACTS_INCOMPLETE",))
+            return RouteDecision(None,None,None,None,None,None,False,("FACTS_INCOMPLETE",),bias_class=bias_class,preference_configured=preference_configured)
         # Conservative combination: a request can raise the observed risk, never lower it.
         risk = combined_risk(facts.risk, request.risk)
         need = required_tier(facts.task_class, risk)
@@ -242,19 +295,37 @@ class RoutingService:
             elif TIER_ORDER[route.tier] < TIER_ORDER[need]: reason="TIER_INSUFFICIENT"
             if reason: exclusions.append({"route_id": route.route_id, "reason": reason})
             else: candidates.append((route, identity))
-        # Lowest eligible tier >= required wins; 003's reviewer different-provider preference stays first.
-        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, TIER_ORDER[x[0].tier], x[0].curated_priority, x[0].route_id))
+        # Lowest eligible tier >= required wins; 003's reviewer different-provider preference
+        # stays first. AC-04 (014-model-preference-policy): `_bias_rank` is inserted at
+        # position 3, strictly between tier (position 2) and `curated_priority` (today's
+        # position 3, shifted to 4) -- never before the independence/tier boundary, never a
+        # change to which candidates reach this sort (the exclusion loop above, untouched).
+        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, TIER_ORDER[x[0].tier], _bias_rank(x[0].provider, bias_preference), x[0].curated_priority, x[0].route_id))
         if not candidates:
-            return RouteDecision(None,None,None,None,None,None,False,("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",),tuple(exclusions))
+            return RouteDecision(None,None,None,None,None,None,False,("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",),tuple(exclusions),bias_class=bias_class,preference_configured=preference_configured)
         selected, identity = candidates[0]; fallback = candidates[1][1] if len(candidates) > 1 else None
+        # AC-09 (016-audit-debt-repayment): purely additive audit-trail element. When the
+        # SELECTED candidate's effective runtime (identity[1], already computed by
+        # `_effective_runtime` in the exclusion loop above) differs from the caller's
+        # literal requested `facts.selected_runtime`, a redirect happened for this
+        # decision. Recorded as an extra `reason_codes` entry alongside whatever codes a
+        # branch already emits — never replaces or reorders an existing code, never
+        # changes `success`/`runtime`/`identity`/`fallback`. Distinguishable from every
+        # existing code (none of them share this prefix).
+        redirect_reason = (
+            (f"RUNTIME_REDIRECTED requested={facts.selected_runtime} effective={identity[1]}",)
+            if identity[1] != facts.selected_runtime else ()
+        )
         if self.simulate or role_class != "writer":
             # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
             # reason code — true only for a review decision that matched a real terminal writer and
             # survived the family+model+provider hard exclusions above (REVIEW_MODEL_CONFLICT added
             # 012 repair SEC-001); an unverified reviewer never sets it.
             verified = role_class == "review" and writer is not None and not unverified
-            return RouteDecision(*identity, False, ("REVIEW_IDENTITY_UNVERIFIED",) if unverified else (), tuple(exclusions),
-                                 fallback, independence_verified=verified)
+            return RouteDecision(*identity, False,
+                                 (("REVIEW_IDENTITY_UNVERIFIED",) if unverified else ()) + redirect_reason,
+                                 tuple(exclusions), fallback, independence_verified=verified,
+                                 bias_class=bias_class, preference_configured=preference_configured)
         # The static binding is recomputed from the route's canonical fields and the
         # identity is revalidated against a fresh on-disk snapshot before the durable,
         # one-use authorization. Inventory was probed fresh for this invocation;
@@ -264,9 +335,9 @@ class RoutingService:
         try:
             fresh = self._recheck()
         except RoutingError:
-            return RouteDecision(None,None,None,None,None,None,False,("CATALOG_INVALID",))
+            return RouteDecision(None,None,None,None,None,None,False,("CATALOG_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
         if recomputed != selected.route_id or not fresh.identity_allowed(identity) or (fallback and not fresh.identity_allowed(fallback)):
-            return RouteDecision(None,None,None,None,None,None,False,("AUTHORIZATION_INVALID",))
+            return RouteDecision(None,None,None,None,None,None,False,("AUTHORIZATION_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
         # AC-01: `identity[1]`/`fallback[1]` ARE the effective runtimes already computed
         # per-candidate in the exclusion loop above (identity index 1 in the
         # `(route_id, runtime, provider, model, family, effort)` tuple) — reused here
@@ -274,7 +345,7 @@ class RoutingService:
         # what the candidate was actually authorized under, including for a fallback on
         # a DIFFERENT provider than `selected` (each carries its own effective runtime).
         if selected.model not in self.inventory.get((identity[1], selected.provider), frozenset()):
-            return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",))
+            return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
         # AM-2 fresh-selected: the cache only filtered candidates; the pair that is about to be
         # durably authorized (and the fallback's, if different) is re-probed fresh right now.
         if self._reprobe is not None:
@@ -283,9 +354,9 @@ class RoutingService:
             try:
                 verified = self._reprobe(sorted(pairs))
             except Exception:
-                return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",))
+                return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
             if selected.model not in verified.get((identity[1], selected.provider), set()):
-                return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",))
+                return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
             if fallback and fallback[3] not in verified.get((fallback[1], fallback[2]), set()):
                 fallback = None  # an unverified fallback is dropped, never durably offered
         run_id = self.store.new_run_id()
@@ -293,8 +364,9 @@ class RoutingService:
         try:
             self.store._authorize_issued(run_id, nonce, identity, fallback, facts.role, role_class, self.snapshot)
         except RoutingError as exc:
-            return RouteDecision(None,None,None,None,None,None,False,(str(exc),))
-        return RouteDecision(*identity, True, (), tuple(exclusions), fallback, run_id)
+            return RouteDecision(None,None,None,None,None,None,False,(str(exc),),bias_class=bias_class,preference_configured=preference_configured)
+        return RouteDecision(*identity, True, redirect_reason, tuple(exclusions), fallback, run_id,
+                             bias_class=bias_class, preference_configured=preference_configured)
 
     def _role_class(self, role):
         item = self.roster.get(role)

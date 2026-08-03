@@ -139,6 +139,9 @@ every other loop. Now a finding carrying `verified_verdict == "upheld"` cannot b
 `max_verifications_per_package` (2 for feature/scoped, 1 for quick-fix/incident) blocks the package when
 exhausted. The budget is validated with a default, so state files written before it stay valid.
 
+This sizing was corrected twice below: see "D7 corrected again" for the value actually in force
+(`DEFAULT_MAX_VERIFICATIONS = 6`).
+
 ### D8 (new) — the auto-transition is gated on why the package is in repair (PV-04)
 
 `PACKAGE_REPAIR` has four entry points: review, delta review, a failed testing run and a failed runtime QA.

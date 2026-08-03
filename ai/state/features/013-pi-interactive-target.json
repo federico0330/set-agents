@@ -29,10 +29,18 @@
     "max_spawns_per_package": 12,
     "max_verifications_per_package": 6
   },
-  "current_package_id": null,
+  "current_package_id": "P1-pi-interactive-target",
   "feature_id": "013-pi-interactive-target",
-  "final_state": null,
-  "global_gates": [],
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-02T22:40:39+00:00",
+      "evidence": "verify.sh VERIFY_PASS live during integration validation (573 tests OK skipped=3, GLOBAL_PORTABILITY_OK, CANONICAL_PATHS_OK, FEATURE_STATE_OK); build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2",
+      "name": "feature-013-integration",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -46,20 +54,1119 @@
       "package_id": null,
       "timestamp": "2026-07-31T14:26:21+00:00",
       "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Agents converter + role file (AC-02/03/04)",
+          "Doctrine file Global/_shared/AGENTS.pi.md (AC-07)",
+          "Skills + prompts converters (AC-05/06)",
+          "Install target + collision guard (AC-08/09)",
+          "Freshness/build wiring (AC-11)",
+          "End-to-end pi --verbose load check (AC-13)",
+          "Dispatch-lane closure + ADR-0017 skeleton + ADR-0007 amendment (AC-12/14)"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:08:51+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:08:58+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": "Package P1-pi-interactive-target created from approved contract; ownership exception on set_agents_spawn.py approved with 005-P1 precedent; contract line-citation drift documented in context pack."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:08:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Un implementador esta construyendo el cuarto destino del arnes: que el agente Pi interactivo tenga sus propios agentes, habilidades e instrucciones instalados en su carpeta, con un guardia que impide pisar archivos ajenos y una prueba real de arranque.",
+        "purpose": "Implement P1-pi-interactive-target: 7 tasks covering AC-01..AC-14 with local validation per task",
+        "role": "implementer",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "PACKAGE_IMPLEMENTATION spawn: implementer on P1 (complexity high, runtime_surface true). Context pack carries current line numbers (spec citations stale post-004/015). Ownership exception on set_agents_spawn.py approved. Local gates per task: unittest, verify.sh, build.sh --check/--diff, install.py --preview scratch."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:09:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Agents converter + role file (AC-02/03/04)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:11:34+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Agents converter + role file (AC-02/03/04)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_pi_agents_generated_with_required_frontmatter_fields tests.test_harness.HarnessTests.test_pi_validate_fails_closed_on_hand_edited_agent_file tests.test_harness.HarnessTests.test_pi_target_validate_requires_canonical_prompt_per_role -v -> OK (3 tests)"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Doctrine file Global/_shared/AGENTS.pi.md (AC-07)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Doctrine file Global/_shared/AGENTS.pi.md (AC-07)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_pi_doctrine_file_has_twelve_sections_and_orchestrator_operating_content -v -> OK"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Skills + prompts converters (AC-05/06)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Skills + prompts converters (AC-05/06)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_pi_skills_copy_byte_identical_to_canonical tests.test_harness.HarnessTests.test_pi_prompts_strip_agent_field_and_inject_subagent_instruction -v -> OK"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Install target + collision guard (AC-08/09)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Install target + collision guard (AC-08/09)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_pi_install_target_and_managed_write_set_is_bounded tests.test_harness.HarnessTests.test_pi_install_collision_guard_fails_closed_in_preview_and_write_mode -v -> OK; scratch install.py --preview against scratch $HOME confirmed AC-08/AC-09 manually"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Freshness/build wiring (AC-11)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Freshness/build wiring (AC-11)",
+        "validations": [
+          "./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2; ./build.sh --diff clean 4th pi diff after ./build.sh regenerated tracked Global/pi; verify.sh freshness loop extended with diff -ruN Global/pi"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Dispatch-lane closure + ADR-0017 skeleton + ADR-0007 amendment (AC-12/14)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Dispatch-lane closure + ADR-0017 skeleton + ADR-0007 amendment (AC-12/14)",
+        "validations": [
+          "python3 -m unittest tests.test_harness.HarnessTests.test_dispatch_lane_argv_closes_skills_and_prompt_templates tests.test_harness.HarnessTests.test_adr_0017_and_0007_amendment_and_superseding_decision_recorded -v -> OK; feature-state.py log-decision recorded ac09-ac10-pi-minimal-target-superseded-by-013"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "End-to-end pi --verbose load check (AC-13)"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:26:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "implementer",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "End-to-end pi --verbose load check (AC-13)",
+        "validations": [
+          "SET_AGENTS_PI_E2E=1 python3 -m unittest tests.test_harness.HarnessTests.test_pi_verbose_startup_actually_loads_the_generated_tree_e2e -v -> OK, real pi 0.83.0 verified live against scratch HOME: [Context]/~/.pi/agent/AGENTS.md, [Skills]/user/*, [Prompts]/user/* all present, no [Agents] section (correct, pi core has none). Default (no env var) -> skipped, not silently passed. BLOCKED-by-environment: pi-subagents extension not installed in this sandbox (no ~/.pi/agent/npm/node_modules), so the subagent({action:list})/subagents-doctor half of AC-13 (proving Global/pi/agents/** discoverability) could not be exercised live here -- recorded as a known gap for a future environment with pi-subagents active, not faked."
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:29:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": "All 7 tasks completed with local validation; moving to independent deterministic gates."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:51:55+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Un verificador independiente repite todas las pruebas automaticas del paquete de Pi, sin confiar en las corridas del implementador.",
+        "purpose": "Independent deterministic gates on P1 before review panel",
+        "role": "gate-runner",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "PACKAGE_GATES: gate-runner re-runs unittest full, verify.sh, build.sh --check/--diff, scratch install --target pi preview+collision guard. Read-only, never repairs."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:51:55+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-full",
+        "status": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check-diff",
+        "status": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "install-collision-guard",
+        "status": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "pi-e2e",
+        "status": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Un revisor independiente esta leyendo todo el trabajo del paquete de Pi de punta a punta: correctitud, datos y rendimiento, sin poder tocar codigo.",
+        "purpose": "RP-01 deep review of complete P1 diff against spec and package criteria",
+        "role": "package-reviewer",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "PACKAGE_REVIEW RP-01: package-reviewer read-only over full P1 diff vs approved spec 013 (AC-01..14), structured findings schema."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Un auditor de seguridad revisa especificamente lo delicado: que instalar en la carpeta de Pi no pueda pisar archivos ajenos y que el cambio en el despachador no abra ninguna puerta.",
+        "purpose": "RP-01 security audit: new HOME write surface + collision guard + set_agents_spawn.py exception",
+        "role": "security-auditor",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "PACKAGE_REVIEW RP-01: security-auditor read-only on install.py collision guard (AC-08/09), new ~/.pi/agent write surface, set_agents_spawn.py two-flag closure under exception, prompts converter injection surface."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T15:58:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:03:46+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": "All deterministic gates green on independent rerun; diff_ref HEAD (working tree), integrated locally. Opening deep review panel RP-01."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:03:46+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "roles": [
+          "package-reviewer",
+          "security-auditor"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:03:57+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "security-auditor",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "role": "security-auditor",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:03:57+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-subreview",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 5,
+        "role": "package-reviewer",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:06:42+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "finalize-review-panel",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "panel_id": "RP-01",
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:06:51+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Antes de reparar nada, un verificador intenta refutar cada uno de los siete hallazgos del panel: solo se repara lo que sobrevive la contraprueba.",
+        "purpose": "Adversarial verification of RP-01 findings SEC-01/SEC-02/RF-01..RF-05 before repair",
+        "role": "finding-verifier",
+        "spawn_id": "SPAWN-005",
+        "spawns": 5,
+        "tech": "FINDING_VERIFICATION: finding-verifier adversarially refutes/upholds 7 panel findings with evidence (file:line, commands run). Refuted requires reason+evidence; default upheld on doubt (ADR-0009)."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:06:51+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "finding-verifier",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 1,
+        "upheld": 6
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:10:18+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Un reparador cierra en una sola pasada los seis hallazgos confirmados: la valla de seguridad que faltaba en la doctrina de Pi, el chequeo vivo del roster que quedo sin implementar, dos tests exigidos por el contrato, el arreglo del symlink colgante y el texto invertido en las instrucciones generadas.",
+        "purpose": "Consolidated repair R1 of upheld findings SEC-01, RF-01..RF-05",
+        "role": "repair-agent",
+        "spawn_id": "SPAWN-006",
+        "spawns": 6,
+        "tech": "PACKAGE_REPAIR R1: single consolidated repair (SEC-01 fence+parity test, RF-01 roster check or explicit BLOCKED, RF-02 docstring assertion, RF-03 class-subset test, RF-04 lexists predicate+test, RF-05 wording+regen). SEC-02 refuted, no change. One record-repair call with all finding ids."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:10:29+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "SEC-01",
+          "RF-01",
+          "RF-02",
+          "RF-03",
+          "RF-04",
+          "RF-05"
+        ]
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T16:24:04+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Una validacion independiente repite todas las pruebas del tramo reparado antes del revisor final.",
+        "purpose": "Independent gates for consolidated repair R1 before delta review",
+        "role": "gate-runner",
+        "spawn_id": "SPAWN-007",
+        "spawns": 7,
+        "tech": "DELTA_REVIEW R1: gate-runner re-runs unittest full, verify.sh, build.sh --check/--diff, dangling-symlink guard test."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:07:53+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un revisor distinto reproduce cada arreglo y comprueba que sea real y que no haya roto nada alrededor, sin reabrir la revision general.",
+        "purpose": "Focused delta review of consolidated repair R1 against SEC-01, RF-01..RF-05",
+        "role": "delta-reviewer",
+        "spawn_id": "SPAWN-008",
+        "spawns": 8,
+        "tech": "DELTA_REVIEW R1: delta-reviewer read-only, resolved|open per finding, requires_full_review only if repair leaked scope."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:07:53+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:13:25+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [],
+        "status": "pass"
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:33:22+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:33:30+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:33:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "client": "Un integrador revisa que el paquete de Pi aceptado encaje con todo el sistema antes del cierre final de la feature.",
+        "purpose": "Integration validation of accepted P1 against contract before global gate and DONE",
+        "role": "integrator",
+        "spawn_id": "SPAWN-009",
+        "spawns": 9,
+        "tech": "INTEGRATION 013: read-only validation vs approved spec (14 ACs), cross-feature consistency (015 lanes, 008 doctrine, four-target parity), then global gate + transition DONE."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:33:56+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": "P1 accepted and integration-validated; four-target parity confirmed; cross-feature consistency with 008/015/016-P2 verified."
+      },
+      "package_id": "P1-pi-interactive-target",
+      "timestamp": "2026-08-02T22:40:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "gate-runner",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "feature-013-integration",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T22:40:39+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": "Feature 013 pi-interactive-target COMPLETE: pi interactive gains its own generated fourth harness target (agents/skills/prompts/doctrine) with fail-closed collision guard, live E2E proof against pi 0.83.0, dispatch-lane closure and ADR-0007 amendment + ADR-0017. Roster-discoverability half environment-gated per persisted decision."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-02T22:40:39+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
-    "delta_reviews": 0,
+    "delta_reviews": 1,
     "human_questions_after_approval": 0,
-    "package_reviews": 0,
-    "repair_batches": 0,
+    "package_reviews": 1,
+    "repair_batches": 1,
     "task_deep_reviews": 0,
-    "verifications": 0
+    "verifications": 1
   },
   "mode": "feature",
-  "packages": [],
-  "phase": "PACKAGE_PLANNING",
-  "revision": 0,
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/set_agents_spawn.py",
+          "reason": "AC-12: dispatch-lane closure directly caused by this package's own AC-05/AC-06 shipping Global/pi/skills|prompts under ~/.pi/agent/ \u2014 adds --no-skills/--no-prompt-templates to the fixed argv at set_agents_spawn.py:244-248 and updates the stale T-304 comment above it; scope limited to those two flags plus that one comment; precedent: 005 P1-portable-core approved_exceptions on this same file",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 9,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "complexity": "high",
+      "context_pack": "docs/specs/013-pi-interactive-target/context/P1-pi-interactive-target.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-02T22:13:25+00:00",
+          "closed_findings": [
+            "SEC-01",
+            "RF-01",
+            "RF-02",
+            "RF-03",
+            "RF-04",
+            "RF-05"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "R1 delta pass: all 6 upheld findings resolved with biting assertions (fence in 4 doctrine files, roster E2E with named gate skips, docstring pinned, class-subset roster test, dangling-symlink guard fixed+regressed, wording below+regen clean vs fresh build). SEC-02 untouched (refuted). No new findings; 2 informational notes (comment overclaim in parity test; roster assertion could match echoed names on first real run).",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "HEAD",
+      "findings": [
+        {
+          "file": "Global/_shared/AGENTS.pi.md:73-76",
+          "id": "SEC-01",
+          "repair_attempts": 1,
+          "severity": "high",
+          "source_role": "security-auditor",
+          "status": "closed",
+          "suggested_fix": "Agregar la frase byte-equivalente de los archivos hermanos al final del parrafo de Turn continuity + test de paridad de doctrina sobre el string REVIEWER_INDEPENDENCE_UNAVAILABLE en los 4 archivos",
+          "title": "AGENTS.pi.md omite la valla dura REVIEWER_INDEPENDENCE_UNAVAILABLE que llevan los otros tres archivos de doctrina",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "Reproduce la relajacion de reviewer-independence sin la frase que la acota: un orquestador pi-lane puede racionalizar un revisor same-provider incluso en el caso de decision de ruteo que los otros runtimes tratan como halt no-bypasseable"
+        },
+        {
+          "file": "ai/scripts/install.py:294-311",
+          "id": "SEC-02",
+          "severity": "low",
+          "source_role": "security-auditor",
+          "status": "refuted",
+          "suggested_fix": "Extender el scope de la guardia al set completo de escritura pi o documentar como deliberado el scope agents/-only con la justificacion backup-covered",
+          "title": "Guardia anti-colision cubre solo agents/, no prompts/skills/AGENTS.md",
+          "verdict_evidence": "docs/specs/013-pi-interactive-target/spec.md:696-706 vs ai/scripts/install.py:294-311",
+          "verdict_reason": "El scope agents/-only es exactamente lo que el contrato aprobado manda: AC-09 razona que skills/ y prompts/ estaban vacios/inexistentes al escribir el spec y agents/ es el unico con contenido de terceros real",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "refuted",
+          "what": "Un prompt-template de usuario preexistente y no registrado en ~/.pi/agent/prompts/ se sobreescribe sin disparar la guardia (recuperable via backup+MANIFEST, no perdida silenciosa)"
+        },
+        {
+          "file": "tests/test_harness.py:3358",
+          "id": "RF-01",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_fix": "Agregar el chequeo environment-gated con skip nombrado, o registrar BLOCKED explicito en el estado del paquete",
+          "title": "Mitad de AC-13 (discoverability viva del roster via pi-subagents) ausente y no degradada a BLOCKED",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "No existe el chequeo subagent({action:list})//subagents-doctor que AC-13 exige; el gate pi-e2e cubre solo el header --verbose; el gap no se registro como BLOCKED"
+        },
+        {
+          "file": "tests/test_harness.py:3153-3162",
+          "id": "RF-02",
+          "repair_attempts": 1,
+          "severity": "medium",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_fix": "assertNotIn sobre la frase retractada + assertIn de la nueva",
+          "title": "Falta la asercion de regresion sobre el docstring de validate_pi_target()",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "Verificacion AC-02 exige asertar que el docstring ya no contiene la premisa retractada pi gets NO generated agent tree; no existe"
+        },
+        {
+          "file": "tests/test_harness.py:3165",
+          "id": "RF-03",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_fix": "Test que itere el roster y aserte class-subset contra claude_tools()",
+          "title": "Invariante de techo de tools solo asertada indirectamente",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "Nada compara pi_tools() vs claude_tools() por clase de capacidad; agregar edit a la rama read-only pasaria todos los tests"
+        },
+        {
+          "file": "ai/scripts/install.py:300",
+          "id": "RF-04",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_fix": "Usar lexists / is_symlink() or exists() en el predicado",
+          "title": "La guardia de colision no ve un symlink colgante",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "Path.exists() sigue symlinks: un symlink colgante de terceros en agents/ bypasea la guardia y os.replace lo pisa silenciosamente"
+        },
+        {
+          "file": "ai/scripts/generate.py:339-344",
+          "id": "RF-05",
+          "repair_attempts": 1,
+          "severity": "low",
+          "source_role": "package-reviewer",
+          "status": "closed",
+          "suggested_fix": "Reword a below o emitir la instruccion despues del body; regenerar Global/pi/prompts",
+          "title": "La instruccion subagent(...) inyectada dice arriba pero se emite arriba del body",
+          "verified_at": "2026-08-02T16:10:18+00:00",
+          "verified_by": "finding-verifier",
+          "verified_verdict": "upheld",
+          "what": "El placeholder task: the request/arguments above apunta al lado equivocado; $ARGUMENTS queda debajo"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-02T15:58:33+00:00",
+          "evidence": "568 tests OK skipped=2 (baseline 558)",
+          "name": "unittest-full",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-02T15:58:33+00:00",
+          "evidence": "VERIFY_PASS",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-02T15:58:33+00:00",
+          "evidence": "CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2; --diff clean; git diff --check clean",
+          "name": "build-check-diff",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-02T15:58:33+00:00",
+          "evidence": "scratch install --target pi: clean preview exit 0 MANAGED_DIFF_FILES=93; collision guard exit 2 INSTALL_ABORTED_UNSAFE_COLLISION preview+write, file untouched",
+          "name": "install-collision-guard",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-02T15:58:33+00:00",
+          "evidence": "SET_AGENTS_PI_E2E=1: 1 test OK in 20.5s, no credentials required",
+          "name": "pi-e2e",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "objective": "Fourth generated harness target for pi interactive (agents/skills/prompts/doctrine) plus install/verify/build wiring, collision guard, E2E load check, dispatch-lane closure, and ADR-0007 amendment + ADR-0017 skeleton",
+      "owned_paths": [
+        "ai/scripts/generate.py",
+        "ai/scripts/install.py",
+        "ai/scripts/verify.sh",
+        "build.sh",
+        "Global/pi/**",
+        "Global/_shared/AGENTS.pi.md",
+        "docs/adr/0017-pi-interactive-target.md",
+        "docs/adr/0007-pi-lane.md",
+        "docs/adr/README.md",
+        "tests/test_harness.py",
+        "ai/state/decisions-log.jsonl"
+      ],
+      "package_id": "P1-pi-interactive-target",
+      "read_only_paths": [
+        "Global/_canonical/agents/**",
+        "Global/_canonical/skills/**",
+        "Global/_canonical/commands/**",
+        "Global/_shared/AGENTS.codex.md",
+        "Global/_shared/CLAUDE.md",
+        "Global/_shared/AGENTS.opencode.md",
+        "ai/scripts/models_config.py"
+      ],
+      "repairs": [
+        {
+          "at": "2026-08-02T16:24:04+00:00",
+          "changed_files": [
+            "Global/_shared/AGENTS.pi.md",
+            "ai/scripts/generate.py",
+            "ai/scripts/install.py",
+            "tests/test_harness.py",
+            "Global/pi/prompts"
+          ],
+          "finding_ids": [
+            "SEC-01",
+            "RF-01",
+            "RF-02",
+            "RF-03",
+            "RF-04",
+            "RF-05"
+          ],
+          "verification": [
+            "unittest discover -s tests -> 572 tests OK skipped=3",
+            "./ai/scripts/verify.sh -> VERIFY_PASS",
+            "./build.sh --check -> CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2",
+            "./build.sh --diff -> clean",
+            "git diff --check -> clean"
+          ]
+        }
+      ],
+      "review_panels": [
+        {
+          "completed_at": "2026-08-02T16:06:51+00:00",
+          "panel_id": "RP-01",
+          "roles": [
+            "package-reviewer",
+            "security-auditor"
+          ],
+          "started_at": "2026-08-02T16:03:57+00:00",
+          "status": "completed",
+          "subreviews": [
+            {
+              "at": "2026-08-02T16:03:57+00:00",
+              "evidence": "Cleared: two-flag closure exactly within exception scope; prompts converter trusted-authoring boundary; symlink/traversal parity with audited targets; manifest bypass requires same-user access; no secrets/PII in Global/pi or ADRs.",
+              "findings": [
+                "SEC-01",
+                "SEC-02"
+              ],
+              "role": "security-auditor",
+              "verdict": "repair_required"
+            },
+            {
+              "at": "2026-08-02T16:06:42+00:00",
+              "evidence": "AC-01..AC-12,AC-14 satisfied with citations; ownership clean; tests not weakened; three existing targets byte-unchanged; verify.sh re-run VERIFY_PASS independently.",
+              "findings": [
+                "RF-01",
+                "RF-02",
+                "RF-03",
+                "RF-04",
+                "RF-05"
+              ],
+              "role": "package-reviewer",
+              "verdict": "repair_required"
+            }
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "reviews": [
+        {
+          "at": "2026-08-02T16:06:51+00:00",
+          "evidence": "RP-01 consolidated: security-auditor repair_required (SEC-01 high doctrine fence, SEC-02 low guard scope) + package-reviewer repair_required (RF-01/02 medium test gaps vs spec, RF-03/04/05 low incl. dangling-symlink guard bypass). 7 findings to verification.",
+          "findings": [
+            "SEC-01",
+            "SEC-02",
+            "RF-01",
+            "RF-02",
+            "RF-03",
+            "RF-04",
+            "RF-05"
+          ],
+          "panel_id": "RP-01",
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [
+        "New HOME write target outside the three previously-audited harness roots (AC-08)",
+        "Fail-closed collision guard is the only protection against clobbering third-party content in ~/.pi/agent/agents/ (AC-09)",
+        "AC-12 requires an ownership exception on a file this package does not own by default",
+        "Every generate.py/orchestrator.md line citation in the approved spec is stale post-004/015"
+      ],
+      "routing_reason": "Architecture-critical fourth harness target, new HOME write surface, fail-closed security guard, cross-package ownership exception, ADR amendment \u2014 squarely high complexity",
+      "runtime_qa": [
+        {
+          "at": "2026-08-02T22:33:30+00:00",
+          "browser": "",
+          "checks": [],
+          "evidence": "Real pi 0.83.0 --verbose startup under pty/scratch HOME: [Context]/[Skills]/[Prompts] present, no [Agents] section (expected); opt-in E2E test green in 20.5s without credentials; roster-discoverability half environment-gated with named skip gate=AC-13-pi-subagents-roster per persisted decision ac-13-roster-half-environment-gated.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": "implementer",
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-02T15:09:12+00:00",
+          "client": "Un implementador esta construyendo el cuarto destino del arnes: que el agente Pi interactivo tenga sus propios agentes, habilidades e instrucciones instalados en su carpeta, con un guardia que impide pisar archivos ajenos y una prueba real de arranque.",
+          "purpose": "Implement P1-pi-interactive-target: 7 tasks covering AC-01..AC-14 with local validation per task",
+          "role": "implementer",
+          "spawn_id": "SPAWN-001",
+          "tech": "PACKAGE_IMPLEMENTATION spawn: implementer on P1 (complexity high, runtime_surface true). Context pack carries current line numbers (spec citations stale post-004/015). Ownership exception on set_agents_spawn.py approved. Local gates per task: unittest, verify.sh, build.sh --check/--diff, install.py --preview scratch."
+        },
+        {
+          "at": "2026-08-02T15:51:55+00:00",
+          "client": "Un verificador independiente repite todas las pruebas automaticas del paquete de Pi, sin confiar en las corridas del implementador.",
+          "purpose": "Independent deterministic gates on P1 before review panel",
+          "role": "gate-runner",
+          "spawn_id": "SPAWN-002",
+          "tech": "PACKAGE_GATES: gate-runner re-runs unittest full, verify.sh, build.sh --check/--diff, scratch install --target pi preview+collision guard. Read-only, never repairs."
+        },
+        {
+          "at": "2026-08-02T15:58:45+00:00",
+          "client": "Un revisor independiente esta leyendo todo el trabajo del paquete de Pi de punta a punta: correctitud, datos y rendimiento, sin poder tocar codigo.",
+          "purpose": "RP-01 deep review of complete P1 diff against spec and package criteria",
+          "role": "package-reviewer",
+          "spawn_id": "SPAWN-003",
+          "tech": "PACKAGE_REVIEW RP-01: package-reviewer read-only over full P1 diff vs approved spec 013 (AC-01..14), structured findings schema."
+        },
+        {
+          "at": "2026-08-02T15:58:45+00:00",
+          "client": "Un auditor de seguridad revisa especificamente lo delicado: que instalar en la carpeta de Pi no pueda pisar archivos ajenos y que el cambio en el despachador no abra ninguna puerta.",
+          "purpose": "RP-01 security audit: new HOME write surface + collision guard + set_agents_spawn.py exception",
+          "role": "security-auditor",
+          "spawn_id": "SPAWN-004",
+          "tech": "PACKAGE_REVIEW RP-01: security-auditor read-only on install.py collision guard (AC-08/09), new ~/.pi/agent write surface, set_agents_spawn.py two-flag closure under exception, prompts converter injection surface."
+        },
+        {
+          "at": "2026-08-02T16:06:51+00:00",
+          "client": "Antes de reparar nada, un verificador intenta refutar cada uno de los siete hallazgos del panel: solo se repara lo que sobrevive la contraprueba.",
+          "purpose": "Adversarial verification of RP-01 findings SEC-01/SEC-02/RF-01..RF-05 before repair",
+          "role": "finding-verifier",
+          "spawn_id": "SPAWN-005",
+          "tech": "FINDING_VERIFICATION: finding-verifier adversarially refutes/upholds 7 panel findings with evidence (file:line, commands run). Refuted requires reason+evidence; default upheld on doubt (ADR-0009)."
+        },
+        {
+          "at": "2026-08-02T16:10:29+00:00",
+          "client": "Un reparador cierra en una sola pasada los seis hallazgos confirmados: la valla de seguridad que faltaba en la doctrina de Pi, el chequeo vivo del roster que quedo sin implementar, dos tests exigidos por el contrato, el arreglo del symlink colgante y el texto invertido en las instrucciones generadas.",
+          "purpose": "Consolidated repair R1 of upheld findings SEC-01, RF-01..RF-05",
+          "role": "repair-agent",
+          "spawn_id": "SPAWN-006",
+          "tech": "PACKAGE_REPAIR R1: single consolidated repair (SEC-01 fence+parity test, RF-01 roster check or explicit BLOCKED, RF-02 docstring assertion, RF-03 class-subset test, RF-04 lexists predicate+test, RF-05 wording+regen). SEC-02 refuted, no change. One record-repair call with all finding ids."
+        },
+        {
+          "at": "2026-08-02T22:07:53+00:00",
+          "client": "Una validacion independiente repite todas las pruebas del tramo reparado antes del revisor final.",
+          "purpose": "Independent gates for consolidated repair R1 before delta review",
+          "role": "gate-runner",
+          "spawn_id": "SPAWN-007",
+          "tech": "DELTA_REVIEW R1: gate-runner re-runs unittest full, verify.sh, build.sh --check/--diff, dangling-symlink guard test."
+        },
+        {
+          "at": "2026-08-02T22:07:53+00:00",
+          "client": "Un revisor distinto reproduce cada arreglo y comprueba que sea real y que no haya roto nada alrededor, sin reabrir la revision general.",
+          "purpose": "Focused delta review of consolidated repair R1 against SEC-01, RF-01..RF-05",
+          "role": "delta-reviewer",
+          "spawn_id": "SPAWN-008",
+          "tech": "DELTA_REVIEW R1: delta-reviewer read-only, resolved|open per finding, requires_full_review only if repair leaked scope."
+        },
+        {
+          "at": "2026-08-02T22:33:56+00:00",
+          "client": "Un integrador revisa que el paquete de Pi aceptado encaje con todo el sistema antes del cierre final de la feature.",
+          "purpose": "Integration validation of accepted P1 against contract before global gate and DONE",
+          "role": "integrator",
+          "spawn_id": "SPAWN-009",
+          "tech": "INTEGRATION 013: read-only validation vs approved spec (14 ACs), cross-feature consistency (015 lanes, 008 doctrine, four-target parity), then global gate + transition DONE."
+        }
+      ],
+      "status": "accepted",
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Agents converter + role file (AC-02/03/04)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_pi_agents_generated_with_required_frontmatter_fields tests.test_harness.HarnessTests.test_pi_validate_fails_closed_on_hand_edited_agent_file tests.test_harness.HarnessTests.test_pi_target_validate_requires_canonical_prompt_per_role -v -> OK (3 tests)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Doctrine file Global/_shared/AGENTS.pi.md (AC-07)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_pi_doctrine_file_has_twelve_sections_and_orchestrator_operating_content -v -> OK"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Skills + prompts converters (AC-05/06)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_pi_skills_copy_byte_identical_to_canonical tests.test_harness.HarnessTests.test_pi_prompts_strip_agent_field_and_inject_subagent_instruction -v -> OK"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Install target + collision guard (AC-08/09)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_pi_install_target_and_managed_write_set_is_bounded tests.test_harness.HarnessTests.test_pi_install_collision_guard_fails_closed_in_preview_and_write_mode -v -> OK; scratch install.py --preview against scratch $HOME confirmed AC-08/AC-09 manually"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Freshness/build wiring (AC-11)",
+          "local_validations": [
+            "./build.sh --check -> SELF_SCAFFOLD_SYNC_OK files=2; ./build.sh --diff clean 4th pi diff after ./build.sh regenerated tracked Global/pi; verify.sh freshness loop extended with diff -ruN Global/pi"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "End-to-end pi --verbose load check (AC-13)",
+          "local_validations": [
+            "SET_AGENTS_PI_E2E=1 python3 -m unittest tests.test_harness.HarnessTests.test_pi_verbose_startup_actually_loads_the_generated_tree_e2e -v -> OK, real pi 0.83.0 verified live against scratch HOME: [Context]/~/.pi/agent/AGENTS.md, [Skills]/user/*, [Prompts]/user/* all present, no [Agents] section (correct, pi core has none). Default (no env var) -> skipped, not silently passed. BLOCKED-by-environment: pi-subagents extension not installed in this sandbox (no ~/.pi/agent/npm/node_modules), so the subagent({action:list})/subagents-doctor half of AC-13 (proving Global/pi/agents/** discoverability) could not be exercised live here -- recorded as a known gap for a future environment with pi-subagents active, not faked."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Dispatch-lane closure + ADR-0017 skeleton + ADR-0007 amendment (AC-12/14)",
+          "local_validations": [
+            "python3 -m unittest tests.test_harness.HarnessTests.test_dispatch_lane_argv_closes_skills_and_prompt_templates tests.test_harness.HarnessTests.test_adr_0017_and_0007_amendment_and_superseding_decision_recorded -v -> OK; feature-state.py log-decision recorded ac09-ac10-pi-minimal-target-superseded-by-013"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-02T22:33:22+00:00",
+          "commands": [],
+          "evidence": "Post-repair full suite: 572/573 tests OK skipped=3 (Gate 1 delta run + final verify.sh VERIFY_PASS after cross-package rpl-p0a test consistency restored by 016-P2 exception); build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK files=2; git diff --check clean; 4 repair tests pass (1 env-gated named skip).",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-02T16:10:18+00:00",
+          "evidence": "RF-04 reproduced live in scratch fv-013 (dangling symlink replaced, INSTALL_PASS, guard silent). SEC-01 confirmed by grep across 4 doctrine files. RF-01/02/03 confirmed absent vs spec Verificacion. RF-05 confirmed in generated audit.md (instruction line 5, ARGUMENTS line 7).",
+          "refuted": [
+            "SEC-02"
+          ],
+          "upheld": [
+            "SEC-01",
+            "RF-01",
+            "RF-02",
+            "RF-03",
+            "RF-04",
+            "RF-05"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "DONE",
+  "revision": 47,
   "schema_version": 1,
-  "updated_at": "2026-07-31T14:26:21+00:00"
+  "updated_at": "2026-08-02T22:40:39+00:00"
 }

@@ -25,7 +25,8 @@ import set_agents_app
 import set_agents_spawn
 from routing_core import catalog as routing_catalog
 from routing_core import store as routing_store
-from routing_core.domain import classify_pi_terminal_error
+from routing_core.domain import classify_pi_terminal_error, resolve_bias_class, BIAS_CLASSES
+from routing_core.service import resolve_bias_class as service_resolve_bias_class
 
 
 # ---- Frozen schema-4 fixture (007-P1)
@@ -808,11 +809,44 @@ class RoutingTests(unittest.TestCase):
             review = svc.route(routing.TaskRequest("package-reviewer", "change", "documentation", selected_runtime="opencode"),
                                self.observed(svc, "package-reviewer", "opencode"), writer.run_id)
             self.assertFalse(review.execution_enabled)  # review decisions never enable execution (P1R)
-            self.assertEqual(review.reason_codes, ())
+            # AC-09/AC-10 (016-audit-debt-repayment): the redirect is now additively observable
+            # in `reason_codes` -- `success`/`runtime`/`identity`/`fallback` stay byte-identical
+            # to before this contract (asserted below, unchanged), only this new element is added.
+            self.assertEqual(len(review.reason_codes), 1)
+            self.assertTrue(review.reason_codes[0].startswith("RUNTIME_REDIRECTED"))
+            self.assertIn("opencode", review.reason_codes[0])  # requested runtime
+            self.assertIn("claude-code", review.reason_codes[0])  # effective runtime
             self.assertEqual(review.provider, "anthropic")
             self.assertEqual(review.model, "opus")
             self.assertEqual(review.runtime, "claude-code")  # the EFFECTIVE, not requested, runtime
             self.assertTrue(review.independence_verified)
+
+    def test_ac10_shape_b_redirect_observability_before_after_success_runtime_identity_fallback_unchanged(self):
+        # AC-09/AC-10: dedicated redirect-observability test, isolated from shape (b)'s own
+        # narrative -- proves that adding the new `reason_codes` element is the ONLY
+        # observable change on a forced redirect. `success`/`runtime`/`identity`/`fallback`
+        # captured here are exactly the values asserted, unmodified, by shape (b) above (the
+        # "before" state); the new reason_codes element is the "after" delta.
+        with tempfile.TemporaryDirectory() as td:
+            inventory = {("opencode", "openai-codex"): {"gpt-5.6-sol"}, ("codex", "openai-codex"): {"gpt-5.6-sol"},
+                        ("claude-code", "anthropic"): {"opus"}}
+            svc = self.service(Path(td) / "state", inventory=inventory)
+            writer = svc.route(routing.TaskRequest("implementer", "change", "documentation", selected_runtime="opencode"),
+                               self.observed(svc, "implementer", "opencode"))
+            svc.store.mark_dispatched(writer.run_id); svc.store.terminal(writer.run_id, "success")
+            review = svc.route(routing.TaskRequest("package-reviewer", "change", "documentation", selected_runtime="opencode"),
+                               self.observed(svc, "package-reviewer", "opencode"), writer.run_id)
+            # "before" (pre-AC-09 behavior, unchanged):
+            self.assertFalse(review.execution_enabled)
+            self.assertEqual(review.runtime, "claude-code")
+            self.assertEqual((review.provider, review.model), ("anthropic", "opus"))
+            self.assertIsNone(review.fallback_identity)
+            self.assertTrue(review.independence_verified)
+            # "after" (new, additive):
+            self.assertEqual(len(review.reason_codes), 1)
+            self.assertTrue(review.reason_codes[0].startswith("RUNTIME_REDIRECTED"))
+            self.assertIn("requested=opencode", review.reason_codes[0])
+            self.assertIn("effective=claude-code", review.reason_codes[0])
 
     def test_ac01_shape_c_pi_already_authenticated_pair_is_never_redirected(self):
         # Shape (c), R2-05's own Non-goal-guarantee fixture: `("pi","anthropic")` IS fully
@@ -830,6 +864,11 @@ class RoutingTests(unittest.TestCase):
                                  self.observed(svc, "implementer", "pi"))
             self.assertTrue(decision.execution_enabled, decision.reason_codes)
             self.assertEqual((decision.runtime, decision.provider), ("pi", "anthropic"))
+            # AC-10 (016-audit-debt-repayment): shape (c) is one of the two `pi`-involved
+            # no-redirect cases -- here because the REQUESTED pair is present (no redirect
+            # trigger at all, not because `pi` is exempt; contrast with shape (e) below).
+            # No new RUNTIME_REDIRECTED code is ever emitted.
+            self.assertFalse(any(code.startswith("RUNTIME_REDIRECTED") for code in decision.reason_codes))
 
     def test_ac01_shape_d_pi_present_but_model_incomplete_pair_stays_excluded_not_redirected(self):
         # Shape (d), R3-05's granularity guarantee: `("pi","anthropic")` IS present (not
@@ -883,6 +922,12 @@ class RoutingTests(unittest.TestCase):
             reasons = {item["reason"] for item in decision.exclusions}
             self.assertIn("PROVIDER_UNAUTHENTICATED", reasons)
             self.assertNotIn("RUNTIME_UNAVAILABLE", reasons)
+            # AC-10 (016-audit-debt-repayment): shape (e) is the OTHER `pi`-involved
+            # no-redirect case -- here because `pi` is categorically lane-exempt
+            # (`_NEVER_REDIRECT_FROM_RUNTIMES`) even though the requested pair is
+            # genuinely absent (the opposite reason from shape (c) above). No new
+            # RUNTIME_REDIRECTED code is ever emitted for this shape either.
+            self.assertFalse(any(code.startswith("RUNTIME_REDIRECTED") for code in decision.reason_codes))
 
     # ---- AC-04 (015-anthropic-dispatch-parity): review-independence gap closed for the
     # ~12-day two-provider window, with the ADR-0011 D4 halt guarantee preserved.
@@ -950,7 +995,11 @@ class RoutingTests(unittest.TestCase):
             review = svc.route(routing.TaskRequest("package-reviewer", "change", "documentation", selected_runtime="opencode"),
                                self.observed(svc, "package-reviewer", "opencode"), writer.run_id)
             # The "verified" doctrine shape (step 3b's first sub-case) -- never benign, never a hard denial.
-            self.assertEqual(review.reason_codes, ())
+            # AC-09/AC-10 (016-audit-debt-repayment): this shape is itself a redirect (opencode ->
+            # claude-code), so `reason_codes` now additively carries the new observability code --
+            # `independence_verified`/`execution_enabled`/`runtime`/`provider`/`model` stay unchanged.
+            self.assertEqual(len(review.reason_codes), 1)
+            self.assertTrue(review.reason_codes[0].startswith("RUNTIME_REDIRECTED"))
             self.assertTrue(review.independence_verified)
             self.assertFalse(review.execution_enabled)
             self.assertEqual((review.runtime, review.provider, review.model), ("claude-code", "anthropic", "opus"))
@@ -2773,6 +2822,15 @@ class RoutingTests(unittest.TestCase):
                       "AUTHORIZATION_INVALID","AUTHORIZATION_REPLAY","CATALOG_INVALID","STATE_CONFLICT",
                       "ROUTING_UNAVAILABLE","REVIEWER_INDEPENDENCE_UNAVAILABLE"):
             self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,(reason,))),(False,1),reason)
+        # P2F-02: RUNTIME_REDIRECTED (AC-09) is informational and never affects ok/exit,
+        # alone or alongside the REVIEW_IDENTITY_UNVERIFIED non-executable-ok shape.
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("RUNTIME_REDIRECTED requested=opencode effective=claude-code",))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("REVIEW_IDENTITY_UNVERIFIED","RUNTIME_REDIRECTED requested=opencode effective=claude-code"))),(True,0))
+        # A hard-failure code co-occurring with a redirect notice is still a real failure.
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("FACTS_INCOMPLETE","RUNTIME_REDIRECTED requested=opencode effective=claude-code"))),(False,1))
 
     def test_validate_context_pack_path_rejects_unsafe_values(self):
         # SEC-A02: non-str, absolute, and traversal-outside-ROOT all degrade to "no pack" —
@@ -3479,6 +3537,647 @@ class RoutingTests(unittest.TestCase):
             cache_doc = json.loads((cache_root / "probe-cache.json").read_text())
             self.assertNotIn("opencode|opencode-zen", cache_doc["pairs"])
             self.assertNotIn("opencode|opencode-go", cache_doc["pairs"])
+
+    # --------------------------------------------- 014-model-preference-policy (AC-01..09)
+
+    _MP_TIERED_ROLES = frozenset({"debugger", "delta-reviewer", "finding-verifier",
+                                   "implementer", "package-reviewer", "security-auditor"})
+    _MP_LIVE_ROLES = _MP_TIERED_ROLES  # every tiered role is doctrine-invoked (AC-01 honest scope)
+    _MP_DOCTRINE_FILES = (
+        ROOT / "Global/_canonical/agents/orchestrator.md",
+        ROOT / "Global/claude-code/agents/orchestrator.md",
+        ROOT / "Global/opencode/agents/orchestrator.md",
+        ROOT / "Global/codex/agents/orchestrator.toml",
+    )
+    _MP_TIERED_SENTENCE_RE = re.compile(
+        r"`implementer`,\s*`debugger`,\s*`package-reviewer`,\s*`delta-reviewer`,\s*`security-auditor`,\s*and\s*"
+        r"`finding-verifier`\s*are\s*\*\*tiered roles\*\*"
+    )
+
+    def test_bias_class_partition_covers_all_28_roles_disjointly(self):
+        # AC-01/AC-05, directly mitigating 007-P0 finding 2 (decisions-log.jsonl:22, F-07):
+        # the full 28-role roster maps to exactly one of the four closed classes.
+        names = {row["role"] for row in self.roster}
+        self.assertEqual(len(names), 28)
+        by_row = {row["role"]: row for row in self.roster}
+        resolved = {role: resolve_bias_class(role, by_row[role]) for role in names}
+        decision = {r for r, c in resolved.items() if c == "decision"}
+        grunt = {r for r, c in resolved.items() if c == "grunt"}
+        build = {r for r, c in resolved.items() if c == "build"}
+        unscoped = {r for r, c in resolved.items() if c == "unscoped"}
+        self.assertEqual(decision, {"orchestrator", "product-analyst", "project-bootstrapper",
+                                     "architect", "agent-factory", "ux-ui-designer", "package-planner"})
+        self.assertEqual(grunt, {"spec-challenger", "package-reviewer", "delta-reviewer",
+                                  "security-auditor", "finding-verifier", "adversarial-judge"})
+        self.assertEqual(build, {"test-writer", "implementer", "frontend-engineer",
+                                  "refactor-specialist", "debugger", "repair-agent", "integrator"})
+        self.assertEqual(unscoped, {"brainstormer", "gate-runner", "local-gate-runner",
+                                     "github-release-manager", "memory-scribe", "image-describer",
+                                     "app-runner", "runtime-verifier"})
+        buckets = (decision, grunt, build, unscoped)
+        self.assertEqual(sum(len(b) for b in buckets), 28)
+        self.assertEqual(set().union(*buckets), names)
+        for role in names:
+            self.assertIn(resolved[role], BIAS_CLASSES)
+
+    def test_bias_class_matches_models_toml_tiered_roster(self):
+        # AC-01 (round 3): a code-level cross-check against models.toml's own `.tiers.*`
+        # universe -- 7 decision = 0 tiered; 6 grunt = 4 tiered + 2 not; 7 build = 2 tiered
+        # + 5 not -- so a future change to the tiered roster fails this loudly.
+        text = (ROOT / "models.toml").read_text()
+        tiered = set(re.findall(r"^\[roles\.([a-z0-9-]+)\.tiers\.", text, re.MULTILINE))
+        self.assertEqual(tiered, self._MP_TIERED_ROLES)
+        by_row = {row["role"]: row for row in self.roster}
+        cls = {role: resolve_bias_class(role, by_row[role]) for role in by_row}
+        self.assertEqual({r for r, c in cls.items() if c == "grunt" and r in tiered},
+                          {"package-reviewer", "delta-reviewer", "security-auditor", "finding-verifier"})
+        self.assertEqual({r for r, c in cls.items() if c == "build" and r in tiered}, {"implementer", "debugger"})
+        self.assertEqual({r for r, c in cls.items() if c == "decision" and r in tiered}, set())
+
+    def test_bias_class_doctrine_consistency_across_all_four_orchestrator_files(self):
+        # AC-01 (round 3, R3-F-06): ALL FOUR orchestrator-doctrine copies -- canonical
+        # plus its three generated copies -- name the identical six roles as "tiered
+        # roles", matching models.toml's own `.tiers.*` roster byte-for-byte.
+        files = self._MP_DOCTRINE_FILES
+        self.assertEqual(len(files), 4)
+        for path in files:
+            text = path.read_text(encoding="utf-8")
+            self.assertRegex(text, self._MP_TIERED_SENTENCE_RE, str(path))
+
+    def test_bias_sort_key_mechanism_correctness_all_four_classes(self):
+        # AC-01(ii)/AC-04: a synthetic multi-provider-authenticated inventory proves the
+        # sort key genuinely reorders RouteDecision.provider uniformly across all four
+        # classes -- expected, correct, uniform behavior (AC-04), not a defect to hide.
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+                     ("claude-code", "anthropic"): {"haiku", "sonnet", "opus"}}
+        snapshot = self.service(simulate=True, inventory=inventory).snapshot
+        cases = (("orchestrator", "decision", {}), ("spec-challenger", "grunt", {"unverified_review": True}),
+                  ("test-writer", "build", {}))
+        for role, cls, kwargs in cases:
+            default = routing.RoutingService._for_tests(snapshot, self.roster, inventory, simulate=True)
+            request = routing.TaskRequest(role, "change", "documentation", selected_runtime="codex")
+            base = default.route(request, self.observed(default, role, "codex"), **kwargs)
+            self.assertEqual(base.provider, "openai-codex", role)  # today's default tie-break
+            self.assertFalse(base.preference_configured, role)
+            anthropic_first = routing.RoutingService._for_tests(
+                snapshot, self.roster, inventory, simulate=True, preference={cls: ("anthropic", "openai-codex")})
+            biased = anthropic_first.route(request, self.observed(anthropic_first, role, "codex"), **kwargs)
+            self.assertEqual(biased.provider, "anthropic", role)
+            self.assertEqual(biased.bias_class, cls)
+            self.assertTrue(biased.preference_configured, role)
+
+    def test_grunt_class_live_effect_against_real_effective_runtime_inventory(self):
+        # AC-01(i)/Verificación fixture-that-would-fool-it rule: the live effective-
+        # runtime inventory (('claude-code','anthropic') authenticated, ('opencode',
+        # 'anthropic') absent) -- never an injected missing-pair fixture pretending the
+        # 015 redirect is absent.
+        # Note on what is, and is not, provable with only two real providers: independence
+        # (REVIEW_PROVIDER_CONFLICT) already forces the reviewer onto the ONE provider that
+        # differs from the writer's, so a configured preference cannot additionally choose
+        # a DIFFERENT provider here -- there is only one independence-eligible provider on
+        # this catalog, full stop. What this test proves instead, precisely and honestly,
+        # is AC-01(i)'s actual claim: the `anthropic` reviewer candidate now SURVIVES both
+        # `PROVIDER_UNAUTHENTICATED` and `REVIEW_PROVIDER_CONFLICT` and the decision
+        # succeeds (`independence_verified=True`) -- the exact reversal of the pre-015
+        # `REVIEWER_INDEPENDENCE_UNAVAILABLE`/zero-candidates state. Genuine cross-provider
+        # reordering by this contract's bias is proven separately, uniformly across all
+        # four classes including `grunt`, by the mechanism-correctness test above (an
+        # `unverified_review` decision has no writer identity to force independence against).
+        inventory = {("opencode", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+                     ("claude-code", "anthropic"): {"haiku", "sonnet", "opus"}}
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "state"
+            svc = self.service(root, inventory=inventory)
+            writer_request = routing.TaskRequest("implementer", "change", "documentation", selected_runtime="opencode")
+            writer = svc.route(writer_request, self.observed(svc, "implementer", "opencode"))
+            self.assertTrue(writer.execution_enabled, writer.reason_codes)
+            self.assertEqual(writer.provider, "openai-codex")
+            svc.store.mark_dispatched(writer.run_id)
+            svc.store.close_run(writer.run_id, "success")
+            for role in ("delta-reviewer", "finding-verifier", "package-reviewer", "security-auditor"):
+                review_request = routing.TaskRequest(role, "inspection", "documentation", selected_runtime="opencode")
+                unbiased_svc = self.service(root, inventory=inventory)
+                unbiased = unbiased_svc.route(
+                    review_request, self.observed(unbiased_svc, role, "opencode", operation="inspection", read_write="read"),
+                    review_of_run_id=writer.run_id)
+                self.assertTrue(unbiased.independence_verified, (role, unbiased.reason_codes))
+                self.assertEqual(unbiased.provider, "anthropic", role)  # forced by independence, not by the tie-break
+                self.assertEqual(unbiased.runtime, "claude-code", role)  # the redirect, proven
+                self.assertEqual(unbiased.bias_class, "grunt", role)
+                self.assertFalse(unbiased.preference_configured, role)
+                self.assertIn("RUNTIME_REDIRECTED requested=opencode effective=claude-code", unbiased.reason_codes)
+                biased_svc = routing.RoutingService._for_tests(
+                    unbiased_svc.snapshot, self.roster, inventory, routing.RoutingStore._for_tests(root),
+                    preference={"grunt": ("anthropic", "openai-codex")})
+                biased = biased_svc.route(
+                    review_request, self.observed(biased_svc, role, "opencode", operation="inspection", read_write="read"),
+                    review_of_run_id=writer.run_id)
+                self.assertTrue(biased.independence_verified, (role, biased.reason_codes))
+                self.assertEqual(biased.provider, "anthropic", role)
+                self.assertEqual(biased.runtime, "claude-code", role)  # the redirect, proven
+                self.assertTrue(biased.preference_configured, role)
+                self.assertIn("RUNTIME_REDIRECTED requested=opencode effective=claude-code", biased.reason_codes)
+
+    def test_build_class_live_effect_against_real_effective_runtime_inventory(self):
+        # AC-01(iv): build's two tiered, doctrine-invoked roles get their own real-world
+        # effect proof, same live effective-runtime inventory as the grunt test above.
+        inventory = {("opencode", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+                     ("claude-code", "anthropic"): {"haiku", "sonnet", "opus"}}
+        snapshot = self.service(simulate=True, inventory=inventory).snapshot
+        for role in ("implementer", "debugger"):
+            default = routing.RoutingService._for_tests(snapshot, self.roster, inventory, simulate=True)
+            request = routing.TaskRequest(role, "change", "documentation", selected_runtime="opencode")
+            unbiased = default.route(request, self.observed(default, role, "opencode"))
+            self.assertEqual(unbiased.provider, "openai-codex", role)
+            biased_svc = routing.RoutingService._for_tests(
+                snapshot, self.roster, inventory, simulate=True, preference={"build": ("anthropic", "openai-codex")})
+            biased = biased_svc.route(request, self.observed(biased_svc, role, "opencode"))
+            self.assertEqual(biased.provider, "anthropic", role)
+            self.assertEqual(biased.runtime, "claude-code", role)
+            self.assertIn("RUNTIME_REDIRECTED requested=opencode effective=claude-code", biased.reason_codes)
+
+    def test_model_preference_unauthenticated_provider_is_automatically_inert(self):
+        # AC-03: a preference naming a currently-unauthenticated provider produces the
+        # same candidate set as no preference at all -- no crash, no special-cased branch
+        # -- exercised for decision, grunt, and build alike.
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol"}}  # anthropic nowhere authenticated
+        snapshot = self.service(simulate=True, inventory=inventory).snapshot
+        cases = (("orchestrator", "decision", {}), ("delta-reviewer", "grunt", {"unverified_review": True}),
+                  ("implementer", "build", {}))
+        for role, cls, kwargs in cases:
+            base = routing.RoutingService._for_tests(snapshot, self.roster, inventory, simulate=True)
+            biased = routing.RoutingService._for_tests(
+                snapshot, self.roster, inventory, simulate=True, preference={cls: ("anthropic", "openai-codex")})
+            request = routing.TaskRequest(role, "change", "documentation", selected_runtime="codex")
+            d1 = base.route(request, self.observed(base, role, "codex"), **kwargs)
+            d2 = biased.route(request, self.observed(biased, role, "codex"), **kwargs)
+            self.assertEqual(d1.route_id, d2.route_id, role)
+            self.assertEqual(d1.provider, d2.provider, role)
+            self.assertEqual(d1.exclusions, d2.exclusions, role)
+            self.assertFalse(d1.preference_configured, role)
+            self.assertTrue(d2.preference_configured, role)  # configured, even though inert here
+
+    def test_sort_key_tripwire_pins_five_element_tuple_shape(self):
+        # AC-04 point 5: pins the sort tuple's exact element count/order -- independence,
+        # tier, role-class-preference-rank, curated_priority, route_id -- so ANY future
+        # shape change (this contract's or another's) fails loudly, not silently.
+        source = (ROOT / "ai/scripts/routing_core/service.py").read_text()
+        match = re.search(r"candidates\.sort\(key=lambda x: \((.*?)\)\)", source)
+        self.assertIsNotNone(match, "candidates.sort(...) call not found")
+        elements = match.group(1)
+        for token in ("writer.provider", "TIER_ORDER[x[0].tier]", "_bias_rank(x[0].provider, bias_preference)",
+                      "x[0].curated_priority", "x[0].route_id"):
+            self.assertIn(token, elements)
+        independence_pos = elements.index("writer.provider")
+        tier_pos = elements.index("TIER_ORDER[x[0].tier]")
+        bias_pos = elements.index("_bias_rank(")
+        priority_pos = elements.index("x[0].curated_priority")
+        route_id_pos = elements.index("x[0].route_id")
+        self.assertLess(independence_pos, tier_pos)
+        self.assertLess(tier_pos, bias_pos)
+        self.assertLess(bias_pos, priority_pos)
+        self.assertLess(priority_pos, route_id_pos)
+
+    def test_bias_never_reorders_across_independence_boundary(self):
+        # AC-04(a)/point 1: a same-provider-as-writer reviewer candidate is hard-excluded
+        # by REVIEW_PROVIDER_CONFLICT before the sort ever runs -- no configured
+        # preference, however ranked, can ever surface it.
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+                     ("claude-code", "anthropic"): {"haiku", "sonnet", "opus"}}
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "state"
+            svc = self.service(root, inventory=inventory)
+            writer_request = routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex")
+            writer = svc.route(writer_request, self.observed(svc, "implementer", "codex"))
+            self.assertTrue(writer.execution_enabled, writer.reason_codes)
+            self.assertEqual(writer.provider, "openai-codex")
+            svc.store.mark_dispatched(writer.run_id); svc.store.close_run(writer.run_id, "success")
+            biased = routing.RoutingService._for_tests(
+                svc.snapshot, self.roster, inventory, routing.RoutingStore._for_tests(root),
+                preference={"grunt": ("openai-codex", "anthropic")})  # same-provider-as-writer ranked FIRST
+            review_request = routing.TaskRequest("delta-reviewer", "inspection", "documentation", selected_runtime="codex")
+            review = biased.route(review_request,
+                                   self.observed(biased, "delta-reviewer", "codex", operation="inspection", read_write="read"),
+                                   review_of_run_id=writer.run_id)
+            # Reviews never set execution_enabled (only writer decisions do); independence
+            # is the correct positive signal here.
+            self.assertTrue(review.independence_verified, review.reason_codes)
+            self.assertEqual(review.provider, "anthropic")  # never openai-codex, despite ranking it first
+
+    def test_bias_never_promotes_a_tier_insufficient_candidate(self):
+        # AC-04(b): tier sufficiency (position 2) is evaluated before this contract's
+        # preference (position 3) -- a "premium" preference can never promote a candidate
+        # whose tier is too low for the task.
+        from routing_core.domain import CatalogSnapshot, StaticRoute
+        full_roles = tuple(row["role"] for row in self.roster)
+        tools = ("read",)
+        fast_anthropic = StaticRoute(2, "anthropic", "opus", "opus", "medium", "fast", full_roles, tools, 20,
+                                     StaticRoute.identifier(2, "anthropic", "opus", "opus", "medium", ("fast",), full_roles, tools, 20))
+        frontier_openai = StaticRoute(2, "openai-codex", "gpt-5.6-sol", "gpt-5.6", "medium", "frontier", full_roles, tools, 10,
+                                      StaticRoute.identifier(2, "openai-codex", "gpt-5.6-sol", "gpt-5.6", "medium", ("frontier",), full_roles, tools, 10))
+        identities = frozenset({
+            (fast_anthropic.route_id, "claude-code", fast_anthropic.provider, fast_anthropic.model, fast_anthropic.family, fast_anthropic.effort),
+            (frontier_openai.route_id, "codex", frontier_openai.provider, frontier_openai.model, frontier_openai.family, frontier_openai.effort),
+        })
+        snapshot = CatalogSnapshot((fast_anthropic, frontier_openai), identities)
+        inventory = {("claude-code", "anthropic"): {"opus"}, ("codex", "openai-codex"): {"gpt-5.6-sol"}}
+        svc = routing.RoutingService._for_tests(snapshot, self.roster, inventory, simulate=True,
+                                                preference={"decision": ("anthropic", "openai-codex")})
+        request = routing.TaskRequest("orchestrator", "change", "security", risk="high", selected_runtime="codex")
+        facts = self.observed(svc, "orchestrator", "codex", task_class="security", risk="high", criticality="security")
+        decision = svc.route(request, facts)
+        self.assertEqual(decision.provider, "openai-codex")  # the only frontier-tier candidate
+
+    def test_absent_model_preference_config_is_byte_identical_to_no_bias(self):
+        # AC-04(c): absent configuration (no preference/role_override at all) produces
+        # byte-identical RouteDecision output to an explicitly-empty configuration.
+        inventory = self.inventory
+        snapshot = self.service(simulate=True, inventory=inventory).snapshot
+        svc_none = routing.RoutingService._for_tests(snapshot, self.roster, inventory, simulate=True)
+        svc_explicit_empty = routing.RoutingService._for_tests(snapshot, self.roster, inventory, simulate=True,
+                                                                preference={}, role_override={})
+        request = routing.TaskRequest("product-analyst", "change", "documentation", selected_runtime="claude-code")
+        d1 = svc_none.route(request, self.observed(svc_none))
+        d2 = svc_explicit_empty.route(request, self.observed(svc_explicit_empty))
+        self.assertEqual(d1, d2)
+
+    def test_role_class_pre_sort_consultation_exactly_as_scoped(self):
+        # AC-04(e)/spec R2-F-08(a): `role_class`'s pre-sort consultation
+        # (`self.store.implementation_identity`, which feeds both `REVIEW_PROVIDER_CONFLICT`
+        # and sort position 1) fires ONLY for `role_class == "review"` -- never for
+        # `"writer"` or `"other"` -- proven by spying on the store, not inferred from
+        # reason codes alone.
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+                     ("claude-code", "anthropic"): {"haiku", "sonnet", "opus"}}
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "state"
+            svc = self.service(root, inventory=inventory)
+            writer_request = routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex")
+            writer = svc.route(writer_request, self.observed(svc, "implementer", "codex"))
+            self.assertTrue(writer.execution_enabled, writer.reason_codes)
+            svc.store.mark_dispatched(writer.run_id); svc.store.close_run(writer.run_id, "success")
+
+            spy_store = mock.Mock(wraps=routing.RoutingStore._for_tests(root))
+            spied = routing.RoutingService._for_tests(svc.snapshot, self.roster, inventory, spy_store)
+
+            # role_class == "writer" ("build" bias class): no pre-sort consultation.
+            spied.route(routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex"),
+                        self.observed(spied, "implementer", "codex"))
+            spy_store.implementation_identity.assert_not_called()
+
+            # role_class == "other" ("decision" bias class): no pre-sort consultation.
+            spied.route(routing.TaskRequest("orchestrator", "change", "documentation", selected_runtime="codex"),
+                        self.observed(spied, "orchestrator", "codex"))
+            spy_store.implementation_identity.assert_not_called()
+
+            # role_class == "review" ("grunt" bias class): pre-sort consultation DOES fire,
+            # and is fed exactly the requested run_id.
+            spied.route(routing.TaskRequest("delta-reviewer", "inspection", "documentation", selected_runtime="codex"),
+                        self.observed(spied, "delta-reviewer", "codex", operation="inspection", read_write="read"),
+                        review_of_run_id=writer.run_id)
+            spy_store.implementation_identity.assert_called_once_with(writer.run_id)
+
+    def test_service_level_role_override_wiring_reorders_via_for_tests(self):
+        # RF14-04: `role_override` (not just `preference`) wired end-to-end through
+        # `RoutingService._for_tests`'s own seam -- AC-05's test above already covers the
+        # domain-level resolver in isolation; this proves the service actually consults it.
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"},
+                     ("claude-code", "anthropic"): {"haiku", "sonnet", "opus"}}
+        snapshot = self.service(simulate=True, inventory=inventory).snapshot
+        svc = routing.RoutingService._for_tests(
+            snapshot, self.roster, inventory, simulate=True,
+            role_override={"implementer": "grunt"}, preference={"grunt": ("anthropic", "openai-codex")})
+        request = routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex")
+        decision = svc.route(request, self.observed(svc, "implementer", "codex"))
+        self.assertEqual(decision.bias_class, "grunt")  # overridden away from its default "build"
+        self.assertEqual(decision.provider, "anthropic")  # ranked first for the overridden class
+        self.assertTrue(decision.preference_configured)
+
+    def test_model_preference_production_plumbing_end_to_end_via_real_cli(self):
+        # RF14-03: proves the REAL production wiring -- `cmd_model_preference_set`'s write,
+        # `load_model_preference`, `_config_with_model_preference`,
+        # `config["_model_preference"]`, `RoutingService.__init__` -- actually flips the
+        # live-probed provider selection end to end, never the hermetic `_for_tests` seam
+        # alone (already covered above). Self-adapting to whichever two providers this
+        # machine actually has authenticated, per AC-01(i)'s own "exactly one
+        # independence-eligible provider on a two-provider catalog" precedent.
+        with tempfile.TemporaryDirectory() as td:
+            env = dict(os.environ)
+            env["SET_AGENTS_ROUTING_TEST_ROOT"] = str(Path(td) / "routing")
+            env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+            descriptor = json.dumps({"role": "product-analyst", "task_class": "documentation", "selected_runtime": "codex"})
+
+            def decide():
+                result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", "--route-decide", "-", "--json"],
+                                        cwd=ROOT, text=True, capture_output=True, env=env, input=descriptor)
+                return json.loads(result.stdout)
+
+            baseline = decide()
+            baseline_provider = baseline["data"]["provider"]
+            self.assertFalse(baseline["data"]["preference_configured"])
+            self.assertIsNotNone(baseline_provider, baseline)
+            other = "anthropic" if baseline_provider != "anthropic" else "openai-codex"
+
+            setter = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py",
+                                     "--model-preference-set", "decision", "--provider", other, "--provider", baseline_provider],
+                                    cwd=ROOT, text=True, capture_output=True, env=env)
+            self.assertEqual(setter.returncode, 0, setter.stderr)
+
+            biased = decide()
+            self.assertTrue(biased["data"]["preference_configured"], biased)
+            self.assertEqual(biased["data"]["provider"], other, biased)
+            self.assertNotEqual(biased["data"]["provider"], baseline_provider)
+
+    def test_resolve_bias_class_is_a_single_shared_function_not_duplicated(self):
+        # AC-05: service.py imports the SAME function object domain.py defines -- never
+        # a second, independently-maintained copy (unlike the pre-existing, accepted
+        # `_role_class`/`_role_class_of` duplication this contract deliberately does not
+        # repeat -- see Non-goals).
+        self.assertIs(service_resolve_bias_class, resolve_bias_class)
+        self.assertEqual(resolve_bias_class("implementer", {"capability": "code-rw", "duty": "implement"}), "build")
+        self.assertEqual(resolve_bias_class("adversarial-judge", {"capability": "review-ro", "duty": "judge"}), "grunt")
+        self.assertEqual(resolve_bias_class("orchestrator", {"capability": "coord-ro", "duty": "coord"}), "decision")
+        self.assertEqual(resolve_bias_class("architect", {"capability": "docs-rw", "duty": "docs"}), "decision")
+        self.assertEqual(resolve_bias_class("app-runner", {"capability": "run-ro", "duty": "ops"}), "unscoped")
+        # Override precedence: role_override wins over the default predicate.
+        row = {"capability": "code-rw", "duty": "implement"}
+        self.assertEqual(resolve_bias_class("implementer", row, {"implementer": "decision"}), "decision")
+        self.assertEqual(resolve_bias_class("implementer", row, {"other-role": "decision"}), "build")
+
+    def test_bias_class_population_across_the_five_refusal_sites(self):
+        # AC-08 (R3-F-05): `bias_class` is None only for the two refusals strictly before
+        # `service.py:170`; populated for the other three, including a `FACTS_INCOMPLETE`-
+        # coded pair that differs in `bias_class` despite sharing the identical reason code.
+        svc = self.service(simulate=True)
+        foreign = self.service(simulate=True)
+        foreign_facts = self.observed(foreign)
+        early_issuer = svc.route(routing.TaskRequest("product-analyst", "change", "documentation", selected_runtime="claude-code"),
+                                 foreign_facts)
+        self.assertIsNone(early_issuer.bias_class)
+        self.assertEqual(early_issuer.reason_codes, ("FACTS_INCOMPLETE",))
+        early_shape = svc.route(routing.TaskRequest("product-analyst", "change", "documentation", risk="extreme",
+                                                     selected_runtime="claude-code"), self.observed(svc))
+        self.assertIsNone(early_shape.bias_class)
+        self.assertEqual(early_shape.reason_codes, ("FACTS_INCOMPLETE",))
+        unverified = svc.route(routing.TaskRequest("delta-reviewer", "inspection", "documentation", selected_runtime="claude-code"),
+                               self.observed(svc, "delta-reviewer", "claude-code", operation="inspection", read_write="read"))
+        self.assertEqual(unverified.reason_codes, ("REVIEW_IDENTITY_INVALID",))
+        self.assertEqual(unverified.bias_class, "grunt")
+        with tempfile.TemporaryDirectory() as td:
+            real = self.service(Path(td) / "state")
+            rejected = real.route(routing.TaskRequest("delta-reviewer", "inspection", "documentation", selected_runtime="claude-code"),
+                                  self.observed(real, "delta-reviewer", "claude-code", operation="inspection", read_write="read"),
+                                  review_of_run_id="run1_" + "0" * 32)
+            self.assertEqual(rejected.reason_codes, ("REVIEW_IDENTITY_INVALID",))
+            self.assertEqual(rejected.bias_class, "grunt")
+        conflicts = svc.route(routing.TaskRequest("architect", "change", "documentation", selected_runtime="claude-code"),
+                              self.observed(svc, "product-analyst", "claude-code"))
+        self.assertEqual(conflicts.reason_codes, ("FACTS_INCOMPLETE",))
+        self.assertEqual(conflicts.bias_class, "decision")
+        # Same reason code as `early_shape`, yet `bias_class` differs -- proving `reason_codes`
+        # alone cannot predict population.
+        self.assertNotEqual(early_shape.bias_class, conflicts.bias_class)
+
+    def test_cmd_route_decide_bias_class_and_role_class_coexist_non_colliding(self):
+        # AC-08 (R2-F-09): both fields present, simultaneously, in the same envelope, with
+        # their independently correct, disjoint-vocabulary values.
+        with tempfile.TemporaryDirectory() as td:
+            env = dict(os.environ)
+            env["SET_AGENTS_ROUTING_TEST_ROOT"] = str(Path(td) / "routing")
+            env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+            descriptor = json.dumps({"role": "product-analyst", "task_class": "documentation", "selected_runtime": "opencode"})
+            result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", "--route-decide", "-", "--json"],
+                                    cwd=ROOT, text=True, capture_output=True, env=env, input=descriptor)
+            envelope = json.loads(result.stdout)
+            data = envelope["data"]
+            self.assertIn("bias_class", data); self.assertIn("role_class", data); self.assertIn("preference_configured", data)
+            self.assertEqual(data["bias_class"], "decision")
+            self.assertEqual(data["role_class"], "other")
+            self.assertIn(data["bias_class"], ("decision", "grunt", "build", "unscoped"))
+            self.assertIn(data["role_class"], ("writer", "review", "other"))
+
+    # ---------------------------------------------------------- AC-02 sibling config file
+
+    def test_model_preference_round_trip_isolates_unrelated_keys_and_app_config(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td)
+            with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", state / "model-preference.toml"), \
+                 mock.patch.object(set_agents_app, "STATE_DIR", state), \
+                 mock.patch.object(set_agents_app, "APP_CONFIG", state / "config.toml"):
+                set_agents_app.write_app_config(vault="/somewhere")
+                set_agents_app.cmd_model_preference_set("grunt", ["anthropic", "openai-codex"])
+                set_agents_app.cmd_model_preference_role_override("test-writer", "decision")
+                self.assertEqual(set_agents_app.app_config(), {"vault": "/somewhere"})  # untouched
+                set_agents_app.cmd_model_preference_set("build", ["openai-codex"])
+                data = set_agents_app.load_model_preference()
+                self.assertEqual(data["preference"], {"grunt": ("anthropic", "openai-codex"), "build": ("openai-codex",)})
+                self.assertEqual(data["role_override"], {"test-writer": "decision"})
+                set_agents_app.cmd_model_preference_role_override("implementer", "build")
+                data = set_agents_app.load_model_preference()
+                self.assertEqual(data["role_override"], {"test-writer": "decision", "implementer": "build"})
+                self.assertEqual(set_agents_app.app_config(), {"vault": "/somewhere"})  # still untouched
+
+    def test_model_preference_fail_closed_load_states(self):
+        with tempfile.TemporaryDirectory() as td:
+            mp_path = Path(td) / "model-preference.toml"
+            with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", mp_path):
+                mp_path.write_text('[preference]\ngrunt = ["not-a-real-provider"]\n')
+                with self.assertRaises(set_agents_app.ModelPreferenceError) as ctx:
+                    set_agents_app.load_model_preference()
+                self.assertIn("unknown provider", str(ctx.exception))
+                mp_path.write_text('[role_override]\nnope-role = "grunt"\n')
+                with self.assertRaises(set_agents_app.ModelPreferenceError) as ctx:
+                    set_agents_app.load_model_preference()
+                self.assertIn("does not match any role", str(ctx.exception))
+                mp_path.write_text('[role_override]\ntest-writer = "unscoped"\n')
+                with self.assertRaises(set_agents_app.ModelPreferenceError) as ctx:
+                    set_agents_app.load_model_preference()
+                self.assertIn("unknown class", str(ctx.exception))
+                mp_path.write_text("not valid toml [[[")
+                with self.assertRaises(set_agents_app.ModelPreferenceError):
+                    set_agents_app.load_model_preference()
+                mp_path.write_text('[preference]\ngrunt = ["anthropic", "anthropic"]\n')
+                with self.assertRaises(set_agents_app.ModelPreferenceError) as ctx:
+                    set_agents_app.load_model_preference()
+                self.assertIn("duplicate", str(ctx.exception))
+                mp_path.unlink()  # never app_config()'s own silent-swallow-as-{} degrade
+                self.assertEqual(set_agents_app.load_model_preference(), {"preference": {}, "role_override": {}})
+
+    def test_model_preference_cli_write_path_rejects_before_writing_the_file(self):
+        # AC-02: validation is shared between the CLI write path and the config-load
+        # path -- a malformed value can never even be WRITTEN to begin with.
+        with tempfile.TemporaryDirectory() as td:
+            mp_path = Path(td) / "model-preference.toml"
+            with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", mp_path):
+                with self.assertRaises(set_agents_app.ModelPreferenceError):
+                    set_agents_app.cmd_model_preference_set("grunt", ["not-a-real-provider"])
+                self.assertFalse(mp_path.exists())
+                with self.assertRaises(set_agents_app.ModelPreferenceError):
+                    set_agents_app.cmd_model_preference_role_override("nope-role", "grunt")
+                self.assertFalse(mp_path.exists())
+
+    def test_model_preference_write_rejects_a_pre_existing_invalid_entry_without_corrupting_the_file(self):
+        # RF14-06: an unrelated, otherwise-valid write must still validate the ENTIRE
+        # existing document first -- a hand-edited invalid entry elsewhere in the file
+        # (here, a bare string instead of a list) must `die()` before any merge/
+        # re-serialize is attempted, never silently iterate the string character-by-
+        # character into a corrupted `[preference]` list (the bug this closes).
+        with tempfile.TemporaryDirectory() as td:
+            mp_path = Path(td) / "model-preference.toml"
+            original = '[preference]\ngrunt = "anthropic"\n'
+            mp_path.write_text(original)
+            with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", mp_path):
+                with self.assertRaises(set_agents_app.ModelPreferenceError):
+                    set_agents_app.cmd_model_preference_set("build", ["openai-codex"])
+                self.assertEqual(mp_path.read_text(), original)
+                with self.assertRaises(set_agents_app.ModelPreferenceError):
+                    set_agents_app.cmd_model_preference_role_override("implementer", "build")
+                self.assertEqual(mp_path.read_text(), original)
+
+    def test_model_preference_write_is_atomic_an_interrupted_write_leaves_the_prior_file_intact(self):
+        with tempfile.TemporaryDirectory() as td:
+            mp_path = Path(td) / "model-preference.toml"
+            with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", mp_path):
+                set_agents_app.cmd_model_preference_set("grunt", ["anthropic"])
+                original = mp_path.read_text()
+                with mock.patch.object(set_agents_app.os, "replace", side_effect=OSError("boom")):
+                    with self.assertRaises(OSError):
+                        set_agents_app.cmd_model_preference_set("build", ["openai-codex"])
+                self.assertEqual(mp_path.read_text(), original)
+
+    def test_model_preference_cli_argparse_rejections_note_matrix_and_show(self):
+        with tempfile.TemporaryDirectory() as td:
+            env = dict(os.environ); env["SET_AGENTS_STATE"] = str(Path(td) / "state")
+            def run(*args):
+                return subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", *args],
+                                      cwd=ROOT, text=True, capture_output=True, env=env)
+            r = run("--model-preference-set", "grunt")
+            self.assertEqual(r.returncode, 2, r.stderr)
+            r = run("--provider", "anthropic")
+            self.assertEqual(r.returncode, 2, r.stderr)
+            r = run("--model-preference-set", "grunt", "--provider", "anthropic", "--provider", "anthropic")
+            self.assertEqual(r.returncode, 2, r.stderr)
+            r = run("--model-preference-set", "unscoped", "--provider", "anthropic")
+            self.assertEqual(r.returncode, 2, r.stderr)  # argparse choices reject the outcome-only value
+            r = run("--model-preference-show")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("MODEL_PREFERENCE_NONE", r.stdout)
+            r = run("--model-preference-set", "decision", "--provider", "openai-codex")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("MODEL_PREFERENCE_NOTE class=decision", r.stderr)
+            r = run("--model-preference-set", "grunt", "--provider", "anthropic")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertNotIn("MODEL_PREFERENCE_NOTE", r.stderr)  # grunt has a live tiered subset
+            r = run("--model-preference-role-override", "test-writer", "decision")
+            self.assertIn("MODEL_PREFERENCE_NOTE role=test-writer", r.stderr)
+            r = run("--model-preference-role-override", "implementer", "build")
+            self.assertNotIn("MODEL_PREFERENCE_NOTE", r.stderr)  # implementer is live-tiered
+            r = run("--model-preference-show")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("MODEL_PREFERENCE preference.decision=openai-codex", r.stdout)
+            self.assertIn("MODEL_PREFERENCE preference.grunt=anthropic", r.stdout)
+            self.assertIn("MODEL_PREFERENCE role_override.test-writer=decision", r.stdout)
+            self.assertIn("MODEL_PREFERENCE role_override.implementer=build", r.stdout)
+
+    def test_model_preference_note_fires_for_every_genuinely_inert_role_and_never_for_live_ones(self):
+        live = {"delta-reviewer", "finding-verifier", "package-reviewer", "security-auditor", "implementer", "debugger"}
+        names = {row["role"] for row in self.roster}
+        for role in names:
+            self.assertEqual(set_agents_app._model_preference_role_inert(role), role not in live, role)
+        self.assertTrue(set_agents_app._model_preference_class_inert("decision"))
+        self.assertFalse(set_agents_app._model_preference_class_inert("grunt"))
+        self.assertFalse(set_agents_app._model_preference_class_inert("build"))
+
+    def test_model_preference_show_dispatch_fails_closed_on_a_malformed_file(self):
+        # SEC14-01: `--model-preference-show` must fail closed exactly like its
+        # `--model-preference-set`/`--model-preference-role-override` siblings -- exit 2,
+        # a `model-preference: <msg>` stderr line, never an uncaught traceback -- on a
+        # malformed file.
+        with tempfile.TemporaryDirectory() as td:
+            mp_path = Path(td) / "state" / "model-preference.toml"
+            mp_path.parent.mkdir(parents=True)
+            mp_path.write_text('[preference]\ngrunt = ["not-a-real-provider"]\n')
+            env = dict(os.environ); env["SET_AGENTS_STATE"] = str(mp_path.parent)
+            result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", "--model-preference-show"],
+                                    cwd=ROOT, text=True, capture_output=True, env=env)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("model-preference:", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_cmd_route_explain_fails_closed_on_a_malformed_model_preference_file(self):
+        # RF14-01: `route-explain` must map a malformed `model-preference.toml` to a
+        # single valid JSON `ROUTING_INPUT_INVALID` envelope (exit 2) -- never crash, and
+        # never silently ignore the sibling file's own fail-closed contract.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "state"; state.mkdir()
+            (state / "model-preference.toml").write_text('[preference]\ngrunt = ["not-a-real-provider"]\n')
+            env = dict(os.environ); env["SET_AGENTS_STATE"] = str(state)
+            result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py",
+                                     "--route-explain", "documentation", "--json"],
+                                    cwd=ROOT, text=True, capture_output=True, env=env)
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            envelope = json.loads(result.stdout)  # single valid JSON envelope, not a traceback
+            self.assertFalse(envelope["ok"])
+            self.assertIn("ROUTING_INPUT_INVALID", envelope["reason_codes"])
+            self.assertIn("model-preference.toml", envelope["data"].get("message", ""))
+
+    def test_cmd_route_decide_fails_closed_on_a_malformed_model_preference_file(self):
+        # RF14-02: `route-decide` must catch `ModelPreferenceError` BEFORE the broad
+        # `ValueError` catch (which would otherwise degrade it to `ROUTING_UNAVAILABLE`,
+        # exit 1) and map it to `ROUTING_INPUT_INVALID` (exit 2), matching how a malformed
+        # `models.toml` already behaves via `ModelsError`.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "state"; state.mkdir()
+            (state / "model-preference.toml").write_text('[preference]\ngrunt = ["not-a-real-provider"]\n')
+            env = dict(os.environ)
+            env["SET_AGENTS_STATE"] = str(state)
+            env["SET_AGENTS_ROUTING_TEST_ROOT"] = str(Path(td) / "routing")
+            descriptor = json.dumps({"role": "product-analyst", "task_class": "documentation", "selected_runtime": "codex"})
+            result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", "--route-decide", "-", "--json"],
+                                    cwd=ROOT, text=True, capture_output=True, env=env, input=descriptor)
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            envelope = json.loads(result.stdout)
+            self.assertFalse(envelope["ok"])
+            self.assertIn("ROUTING_INPUT_INVALID", envelope["reason_codes"])
+            self.assertIn("model-preference.toml", envelope["data"].get("message", ""))
+
+    # -------------------------------------------------------------------------- AC-06
+
+    def test_ac06_no_change_to_generated_orchestrator_doctrine_text(self):
+        for path in self._MP_DOCTRINE_FILES:
+            content = path.read_text(encoding="utf-8")
+            self.assertNotIn("model-preference.toml", content)
+            self.assertNotIn("MODEL_PREFERENCE", content)
+
+    def test_ac06_no_change_to_areas_duty_static_resolution_or_codex_orchestrator(self):
+        # The mirror image of AC-04(c)'s proof: presence of a model-preference.toml file
+        # has literally zero effect on the OLD, static [areas.<duty>] mechanism.
+        row = next(r for r in self.roster if r["role"] == "implementer")
+        before = models_config.resolve_role(row, self.config, "go-zen")
+        before_orch = models_config.codex_orchestrator(ROOT / "roles.tsv", ROOT / "models.toml")
+        with tempfile.TemporaryDirectory() as td:
+            mp_path = Path(td) / "model-preference.toml"
+            mp_path.write_text('[preference]\nbuild = ["anthropic", "openai-codex"]\n')
+            with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", mp_path):
+                after = models_config.resolve_role(row, self.config, "go-zen")
+                after_orch = models_config.codex_orchestrator(ROOT / "roles.tsv", ROOT / "models.toml")
+        self.assertEqual(before, after)
+        self.assertEqual(before_orch, after_orch)
+
+    def test_ac06_no_unconditional_provider_exhausted_read_in_new_code(self):
+        source = (ROOT / "ai/scripts/routing_core/service.py").read_text()
+        self.assertEqual(len(re.findall(r"provider_exhausted", source)), 1)  # the single pre-existing conditional call
+
+    def test_ac06_no_provider_billing_kind_reference_in_new_code(self):
+        for path in (ROOT / "ai/scripts/routing_core/service.py", ROOT / "ai/scripts/routing_core/domain.py",
+                     ROOT / "ai/scripts/set_agents_app.py"):
+            self.assertNotIn("PROVIDER_BILLING_KIND", path.read_text())
+
+    def test_ac06_no_new_routes_v1_toml_rows(self):
+        text = (ROOT / "ai/catalogs/routes.v1.toml").read_text()
+        self.assertEqual(text.count("[[routes]]"), 6)
+        providers = set(re.findall(r'^provider = "([a-z0-9-]+)"', text, re.MULTILINE))
+        self.assertEqual(providers, {"openai-codex", "anthropic"})
 
 
 class ClaudeCodeSpawnTests(unittest.TestCase):

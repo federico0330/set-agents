@@ -2764,6 +2764,15 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("## Human decision", text, name)
             self.assertIn("every provider is exhausted", text, name)
 
+    def test_shared_doctrine_parity_route_decide_fence_covers_pi(self):
+        # SEC-01 (013-pi-interactive-target repair). AGENTS.pi.md's turn-continuity
+        # paragraph dropped the route-decide fence sentence the other three doctrine
+        # files carry, silently narrowing the hard-denial guarantee to non-pi
+        # runtimes. All four copies must state it, byte-equivalently.
+        for name in ("CLAUDE.md", "AGENTS.opencode.md", "AGENTS.codex.md", "AGENTS.pi.md"):
+            text = (ROOT / "Global/_shared" / name).read_text(encoding="utf-8")
+            self.assertIn("REVIEWER_INDEPENDENCE_UNAVAILABLE", text, name)
+
     def test_profile_switch_does_not_rewrite_roster(self):
         before = (ROOT / "roles.tsv").read_bytes()
         models_before = (ROOT / "models.toml").read_bytes()
@@ -3151,14 +3160,422 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("implementer@balanced", result.stderr)
 
     def test_pi_target_validate_requires_canonical_prompt_per_role(self):
-        # AC-10/ADR-0007: pi gets no generated tree — its "role artifact" IS the
-        # canonical prompt every other harness already derives from, so the pi-target
-        # verify surface (generate.validate_pi_target, wired into generate.validate())
-        # reduces to: every addressable role has that file on disk.
+        # 013-pi-interactive-target AC-02 (round 3, R3-01): pi now DOES get a generated
+        # agent tree (Global/pi/agents/<role>.md), but this function's own check is
+        # unchanged and still source-side — it re-asserts every addressable role's
+        # canonical prompt exists on disk, the invariant every generated pi agent file
+        # transitively depends on (see generate.validate_pi_target's own docstring).
         generate = self._import("generate")
         generate.validate_pi_target([{"role": "implementer"}])  # real role: does not raise
         with self.assertRaisesRegex(ValueError, "pi target"):
             generate.validate_pi_target([{"role": "definitely-not-a-real-role-xyz"}])
+        # RF-02 (repair): the docstring must not still claim the stale premise
+        # that pi gets no generated agent tree — it does, now.
+        self.assertNotIn("NO generated agent tree", generate.validate_pi_target.__doc__)
+        self.assertIn("pi DOES get", generate.validate_pi_target.__doc__)
+
+    def test_pi_agents_generated_with_required_frontmatter_fields(self):
+        # AC-02/AC-03/AC-04: every active-roster role gets a Global/pi/agents/<role>.md
+        # whose body byte-equals the canonical source, and whose frontmatter always
+        # carries name/description/tools/systemPromptMode: replace (round 2, C-04) —
+        # never omitted, since an omitted `tools` silently grants pi's full builtin set
+        # (README.md:472), blowing the never-wider-than-Claude-Code ceiling. Only the
+        # coord-ro-class role (orchestrator) carries maxSubagentDepth: 2 (round 2, N-05);
+        # no field here is keyed off the role being `orchestrator` BY NAME, only off its
+        # capability class — the same class-keyed differentiation claude_tools() uses.
+        gen = self._import("generate")
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            for role_file in sorted((out / "pi/agents").glob("*.md")):
+                text = role_file.read_text()
+                self.assertTrue(text.startswith("---\n"), role_file)
+                end = text.index("\n---\n", 4)
+                header = text[4:end]
+                self.assertIn("name: ", header)
+                self.assertIn("description: ", header)
+                self.assertIn("tools: ", header)
+                self.assertIn("systemPromptMode: replace", header)
+                canonical = (gen.CANON / "agents" / role_file.name).read_text()
+                self.assertTrue(text.endswith(canonical), role_file)
+            orchestrator_header = (out / "pi/agents/orchestrator.md").read_text()
+            self.assertIn("maxSubagentDepth: 2", orchestrator_header)
+            self.assertIn("subagent", orchestrator_header.split("---")[1])
+            implementer_header = (out / "pi/agents/implementer.md").read_text().split("---")[1]
+            self.assertNotIn("maxSubagentDepth", implementer_header)
+            self.assertNotIn("subagent", implementer_header.split("tools:")[1].splitlines()[0])
+            # AC-04: interactive-default behavior is served by Global/pi/AGENTS.md, not
+            # this per-role file — the doctrine file, not the agent file, is what pi's
+            # own context-file discovery path loads automatically.
+            self.assertTrue((out / "pi/AGENTS.md").exists())
+
+    def test_pi_tools_never_grants_a_capability_class_claude_tools_lacks(self):
+        # RF-03 (repair, 013-pi-interactive-target): AC-03's ceiling invariant
+        # (pi_tools()'s own docstring) asserted directly per roster role, not just for
+        # the two roles test_pi_agents_generated_with_required_frontmatter_fields
+        # happens to spot-check. Maps each vocabulary's tokens to a capability CLASS
+        # (write/read/bash/coord) and asserts pi's class set is never a superset of
+        # Claude Code's for the same role — `subagent` is the one documented exception,
+        # allowed only for the coord-ro capability.
+        gen = self._import("generate")
+        roles = gen.load_roles(gen.models_config.active_profile())
+
+        def pi_classes(tools):
+            tokens = {t.strip() for t in tools.split(",")}
+            classes = set()
+            for token in tokens:
+                if token in ("edit", "write"):
+                    classes.add("write")
+                elif token in ("read", "grep", "find", "ls"):
+                    classes.add("read")
+                elif token == "bash":
+                    classes.add("bash")
+                elif token == "subagent":
+                    classes.add("coord")
+                else:
+                    self.fail(f"unmapped pi tool token: {token!r}")
+            return classes
+
+        def claude_classes(tools):
+            classes = set()
+            if "Edit" in tools or "Write" in tools:
+                classes.add("write")
+            if "Read" in tools or "Grep" in tools or "Glob" in tools:
+                classes.add("read")
+            if "Bash" in tools:
+                classes.add("bash")
+            if "Agent(" in tools:
+                classes.add("coord")
+            return classes
+
+        for row in roles:
+            role, capability = row["role"], row["capability"]
+            pi = pi_classes(gen.pi_tools(capability, role))
+            claude = claude_classes(gen.claude_tools(capability, roles, role))
+            if capability != "coord-ro":
+                self.assertNotIn("coord", pi, role)
+            self.assertTrue(pi <= claude, f"{role}: pi classes {pi} not a subset of claude classes {claude}")
+
+    def test_pi_validate_fails_closed_on_hand_edited_agent_file(self):
+        # AC-02/AC-11 negative case: validate()'s extended frontmatter/role-set loops
+        # must fail if Global/pi/agents/**  is hand-edited out of sync with a fresh
+        # regeneration — a positive-only test would miss a silently-accepted drift.
+        gen = self._import("generate")
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            (out / "pi/agents/implementer.md").write_text("not frontmatter at all")
+            with self.assertRaises(ValueError):
+                gen.validate(out)
+            (out / "pi/agents/implementer.md").unlink()
+            with self.assertRaises(ValueError):
+                gen.validate(out)
+
+    def test_pi_skills_copy_byte_identical_to_canonical(self):
+        # AC-05: the fourth `copy_tree(CANON / "skills", ...)` member lands byte-
+        # identical to Global/_canonical/skills, unconditionally, no compatibility gate.
+        gen = self._import("generate")
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            canonical_skills = sorted(p.relative_to(gen.CANON / "skills") for p in (gen.CANON / "skills").rglob("*") if p.is_file())
+            pi_skills = sorted(p.relative_to(out / "pi/skills") for p in (out / "pi/skills").rglob("*") if p.is_file())
+            self.assertEqual(canonical_skills, pi_skills)
+            for relative in canonical_skills:
+                self.assertEqual(
+                    (gen.CANON / "skills" / relative).read_bytes(),
+                    (out / "pi/skills" / relative).read_bytes(),
+                )
+
+    def test_pi_prompts_strip_agent_field_and_inject_subagent_instruction(self):
+        # AC-06: `$ARGUMENTS` passes through verbatim (no translation), `agent:` is
+        # stripped from the emitted frontmatter (round 2, N-03) and instead becomes an
+        # explicit `subagent({ agent: "<role>", ... })` instruction in the body — never
+        # silently dropped (user decision 2).
+        gen = self._import("generate")
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            canonical_commands = sorted((gen.CANON / "commands").glob("*.md"))
+            self.assertTrue(canonical_commands)
+            for command in canonical_commands:
+                source = command.read_text()
+                converted = (out / "pi/prompts" / command.name).read_text()
+                header = converted[4:converted.index("\n---\n", 4)]
+                self.assertNotIn("agent:", header)
+                if "$ARGUMENTS" in source:
+                    self.assertIn("$ARGUMENTS", converted)
+                if "\nagent:" in ("\n" + source[4:source.index("\n---\n", 4)]):
+                    agent = next(
+                        line.split(":", 1)[1].strip()
+                        for line in source[4:source.index("\n---\n", 4)].splitlines()
+                        if line.startswith("agent:")
+                    )
+                    self.assertIn(f'subagent({{ agent: "{agent}"', converted)
+
+    def test_pi_doctrine_file_has_twelve_sections_and_orchestrator_operating_content(self):
+        # AC-07: twelve generic doctrine sections (same substance as the other three
+        # harness files) PLUS the orchestrator's own operating content — question
+        # policy, spawn economy, narration registers — folded in per user decision 1,
+        # so opening `pi` interactively behaves as orchestrator with no extra step.
+        gen = self._import("generate")
+        text = (gen.SHARED / "AGENTS.pi.md").read_text()
+        for heading in (
+            "## Reply language", "## Core invariant", "## Narration",
+            "## Living documentation", "## Separation of duties", "## Required workflow",
+            "## Quality rules", "## Execution discipline", "## Question policy",
+            "## Turn continuity", "## MCP discipline", "## Human decision",
+        ):
+            self.assertIn(heading, text, heading)
+        self.assertIn("Cliente:", text)
+        self.assertIn("Ingeniería:", text)
+        self.assertIn("Spawn economy", text)
+        self.assertIn("spawns per package", text)
+
+    def test_pi_install_target_and_managed_write_set_is_bounded(self):
+        # AC-08/AC-10: install.py's fourth target writes only under agents/|skills/
+        # |prompts/ or the literal AGENTS.md, relative to ~/.pi/agent/ — nothing else,
+        # specifically never settings.json/auth.json/trust.json/npm/. A --preview dry
+        # run against a scratch $HOME produces a non-zero MANAGED_DIFF_FILES count and
+        # no SPECIAL merge entry for AGENTS.md.
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            home = Path(home_td)
+            preview = run("python3", "ai/scripts/install.py", "--staging", str(out),
+                          "--home", str(home), "--target", "pi", "--preview")
+            self.assertRegex(preview.stdout, r"MANAGED_DIFF_FILES=\d+")
+            self.assertGreater(int(re.search(r"MANAGED_DIFF_FILES=(\d+)", preview.stdout).group(1)), 0)
+            written = run("python3", "ai/scripts/install.py", "--staging", str(out), "--home", str(home), "--target", "pi")
+            self.assertIn("INSTALL_PASS", written.stdout)
+            allowed_prefixes = ("agents/", "skills/", "prompts/")
+            for path in (home / ".pi/agent").rglob("*"):
+                if not path.is_file():
+                    continue
+                relative = str(path.relative_to(home / ".pi/agent"))
+                self.assertTrue(
+                    relative == "AGENTS.md" or relative.startswith(allowed_prefixes),
+                    f"unexpected managed pi write outside the bounded set: {relative}",
+                )
+                self.assertNotIn("settings.json", relative)
+                self.assertNotIn("auth.json", relative)
+                self.assertNotIn("trust.json", relative)
+                self.assertFalse(relative.startswith("npm/"))
+
+    def test_pi_install_collision_guard_fails_closed_in_preview_and_write_mode(self):
+        # AC-09 (round 2, N-01): an unrecorded pre-existing file at
+        # ~/.pi/agent/agents/<name>.md must abort the install (exit 2) in BOTH
+        # --preview and write mode, naming the colliding relative path, and must never
+        # be silently overwritten. A file already recorded in MANIFEST from a prior run
+        # keeps updating normally (the guard is scoped to unrecorded content only).
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            home = Path(home_td)
+            agents_dir = home / ".pi/agent/agents"
+            agents_dir.mkdir(parents=True)
+            (agents_dir / "orchestrator.md").write_text("third-party content this installer never wrote")
+
+            preview = run("python3", "ai/scripts/install.py", "--staging", str(out),
+                          "--home", str(home), "--target", "pi", "--preview", check=False)
+            self.assertEqual(preview.returncode, 2)
+            self.assertIn("orchestrator.md", preview.stderr)
+            self.assertNotEqual(preview.returncode, 1)
+
+            written = run("python3", "ai/scripts/install.py", "--staging", str(out),
+                          "--home", str(home), "--target", "pi", check=False)
+            self.assertEqual(written.returncode, 2)
+            self.assertIn("orchestrator.md", written.stderr)
+            self.assertEqual((agents_dir / "orchestrator.md").read_text(), "third-party content this installer never wrote")
+
+            (agents_dir / "orchestrator.md").unlink()
+            first_install = run("python3", "ai/scripts/install.py", "--staging", str(out), "--home", str(home), "--target", "pi")
+            self.assertIn("INSTALL_PASS", first_install.stdout)
+            second_install = run("python3", "ai/scripts/install.py", "--staging", str(out), "--home", str(home), "--target", "pi")
+            self.assertIn("INSTALL_PASS", second_install.stdout)
+
+    def test_pi_collision_guard_catches_dangling_symlink(self):
+        # RF-04 (repair, 013-pi-interactive-target): the collision guard used
+        # `target.exists()`, which follows symlinks and returns False for a dangling
+        # one — a third-party dangling symlink under ~/.pi/agent/agents/ would then be
+        # silently clobbered instead of aborting. `is_symlink()` catches it regardless
+        # of where (or whether) it points.
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            home = Path(home_td)
+            agents_dir = home / ".pi/agent/agents"
+            agents_dir.mkdir(parents=True)
+            dangling = agents_dir / "orchestrator.md"
+            dangling.symlink_to(home / "nowhere-does-this-exist.md")
+            self.assertTrue(dangling.is_symlink())
+            self.assertFalse(dangling.exists())  # confirms it is genuinely dangling
+
+            result = run("python3", "ai/scripts/install.py", "--staging", str(out),
+                         "--home", str(home), "--target", "pi", check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("orchestrator.md", result.stderr)
+            self.assertTrue(dangling.is_symlink())  # untouched, not overwritten
+
+    def test_dispatch_lane_argv_closes_skills_and_prompt_templates(self):
+        # AC-01/AC-12: the dispatch lane's fixed argv gains --no-skills and
+        # --no-prompt-templates, unconditional like the three pre-existing guard
+        # flags — never gated by guard_tools or tier — closing the residual risk that
+        # a dispatch-lane pi child would otherwise auto-discover this harness's own
+        # Global/pi/skills/**/Global/pi/prompts/** once AC-05/AC-06 install them.
+        set_agents_spawn = self._import("set_agents_spawn")
+        with tempfile.TemporaryDirectory() as td:
+            prompt = Path(td) / "role.md"
+            prompt.write_text("You are a test role.")
+            captured = {}
+
+            def fake_argv(*a):
+                captured["args"] = a
+                return (sys.executable, "-c", "import sys; print('{}')")
+
+            with mock.patch.object(set_agents_spawn.catalog, "pi_pinned_argv", side_effect=fake_argv):
+                set_agents_spawn.spawn("implementer", "hello", "openai-codex", "gpt-5.6-luna", prompt, cwd=td)
+            self.assertIn("--no-skills", captured["args"])
+            self.assertIn("--no-prompt-templates", captured["args"])
+            self.assertIn("--no-session", captured["args"])
+            self.assertIn("--no-extensions", captured["args"])
+            self.assertIn("--no-context-files", captured["args"])
+            captured.clear()
+            with mock.patch.object(set_agents_spawn.catalog, "pi_pinned_argv", side_effect=fake_argv):
+                set_agents_spawn.spawn("implementer", "hello", "openai-codex", "gpt-5.6-luna", prompt,
+                                       guard_tools=set_agents_spawn.GUARD_TOOLS_CODE_RW, cwd=td)
+            self.assertIn("--no-skills", captured["args"])
+            self.assertIn("--no-prompt-templates", captured["args"])
+
+    def test_pi_verbose_startup_actually_loads_the_generated_tree_e2e(self):
+        # AC-13 (F-01): a hermetic stub-loader test would go green even if the real pi
+        # binary silently ignored one of AC-05/AC-06/AC-07's generated trees — this is
+        # the check that survives that exact fixture. Credential/environment-gated
+        # (real, locally-installed pi binary + `script`, opt-in via
+        # SET_AGENTS_PI_E2E=1 since it shells out to pnpm dlx and a pty): a missing
+        # prerequisite degrades to an explicit skip naming the gate, never a silent
+        # pass on the static-check layer (AC-02/AC-05) alone.
+        if os.environ.get("SET_AGENTS_PI_E2E") != "1":
+            self.skipTest("SET_AGENTS_PI_E2E=1 not set: real pi --verbose E2E check "
+                          "BLOCKED-by-environment, gate=AC-13-pi-verbose-e2e")
+        if shutil.which("script") is None:
+            self.skipTest("`script` (bsdutils/util-linux) not found: AC-13 pty recipe unavailable, "
+                          "gate=AC-13-pi-verbose-e2e")
+        resolve = subprocess.run(
+            ["pnpm", "dlx", "--package", "@earendil-works/pi-coding-agent", "which", "pi"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+        if resolve.returncode != 0 or not resolve.stdout.strip():
+            self.skipTest("could not resolve a real pi binary via pnpm dlx: AC-13 E2E "
+                          "BLOCKED-by-environment, gate=AC-13-pi-verbose-e2e")
+        pi_bin = resolve.stdout.strip().splitlines()[-1].strip()
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td, tempfile.TemporaryDirectory() as cwd_td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            home = Path(home_td)
+            install_result = run("python3", "ai/scripts/install.py", "--staging", str(out), "--home", str(home), "--target", "pi")
+            self.assertIn("INSTALL_PASS", install_result.stdout)
+            logfile = Path(td) / "pi.log"
+            proc = subprocess.Popen(
+                ["script", "-qc", f"{pi_bin} --verbose --offline --no-session --no-approve", str(logfile)],
+                cwd=cwd_td, env={**os.environ, "HOME": str(home)},
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            try:
+                proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                # pi --verbose is an interactive TUI that never exits on its own even
+                # after rendering the header — a timeout kill is the expected, documented
+                # success path (AC-13), not a failure signal; content is asserted below.
+                proc.kill()
+                proc.wait(timeout=5)
+            raw = logfile.read_bytes().decode("utf-8", errors="replace")
+            clean = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[()][A-Za-z0-9]", "", raw)
+            clean = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", clean)
+            self.assertIn("[Context]", clean)
+            self.assertIn("~/.pi/agent/AGENTS.md", clean)
+            self.assertIn("[Skills]", clean)
+            self.assertIn("~/.pi/agent/skills/", clean)
+            self.assertIn("[Prompts]", clean)
+            self.assertIn("/status", clean)
+            self.assertNotIn("[Agents]", clean)
+
+    def test_pi_subagents_roster_discoverable_via_scripted_session_e2e(self):
+        # AC-13 (roster-discoverability half, RF-01 repair): the previous E2E
+        # (test_pi_verbose_startup_actually_loads_the_generated_tree_e2e) proves
+        # core `--verbose` startup loads Global/pi/agents/**'s siblings (AGENTS.md/
+        # skills/prompts) but deliberately asserts NO `[Agents]` section — pi core
+        # has none, per docs/adr/0017-pi-interactive-target.md. Enumerating the
+        # converted roster (`Global/pi/agents/<role>.md`) is instead
+        # `pi-subagents`' own job, via `subagent({ action: "list" })` or
+        # `/subagents-doctor` — a separately-installed npm extension this harness
+        # does not vendor. Same environment-gating pattern as the sibling E2E
+        # (SET_AGENTS_PI_E2E=1, real `pi` binary + `script`), plus one more
+        # prerequisite this half needs and the sibling does not: `pi-subagents`
+        # itself must actually be installed/enabled in the resolved pi's home. A
+        # missing prerequisite degrades to an explicit, named skip — never a
+        # silent pass — exactly as recorded in
+        # docs/notas/features/013-pi-interactive-target/P1-pi-interactive-target.md's
+        # known-gap note for this same check.
+        if os.environ.get("SET_AGENTS_PI_E2E") != "1":
+            self.skipTest("SET_AGENTS_PI_E2E=1 not set: real pi-subagents roster E2E "
+                          "BLOCKED-by-environment, gate=AC-13-pi-subagents-roster")
+        if shutil.which("script") is None:
+            self.skipTest("`script` (bsdutils/util-linux) not found: AC-13 pty recipe unavailable, "
+                          "gate=AC-13-pi-subagents-roster")
+        resolve = subprocess.run(
+            ["pnpm", "dlx", "--package", "@earendil-works/pi-coding-agent", "which", "pi"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+        if resolve.returncode != 0 or not resolve.stdout.strip():
+            self.skipTest("could not resolve a real pi binary via pnpm dlx: AC-13 E2E "
+                          "BLOCKED-by-environment, gate=AC-13-pi-subagents-roster")
+        pi_bin = resolve.stdout.strip().splitlines()[-1].strip()
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as home_td, tempfile.TemporaryDirectory() as cwd_td:
+            out = Path(td) / "out"
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
+            home = Path(home_td)
+            install_result = run("python3", "ai/scripts/install.py", "--staging", str(out), "--home", str(home), "--target", "pi")
+            self.assertIn("INSTALL_PASS", install_result.stdout)
+            pi_subagents_dir = home / ".pi/agent/npm/node_modules/pi-subagents"
+            if not pi_subagents_dir.is_dir():
+                self.skipTest("pi-subagents extension not installed in this environment's pi "
+                              "home (no ~/.pi/agent/npm/node_modules/pi-subagents): AC-13 roster "
+                              "check BLOCKED-by-environment, gate=AC-13-pi-subagents-roster")
+            logfile = Path(td) / "pi-roster.log"
+            proc = subprocess.Popen(
+                ["script", "-qc", f"{pi_bin} --offline --no-session --no-approve", str(logfile)],
+                cwd=cwd_td, env={**os.environ, "HOME": str(home)},
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            try:
+                proc.stdin.write(b"/subagents-doctor\n")
+                proc.stdin.flush()
+                proc.wait(timeout=20)
+            except (subprocess.TimeoutExpired, BrokenPipeError):
+                proc.kill()
+                proc.wait(timeout=5)
+            raw = logfile.read_bytes().decode("utf-8", errors="replace")
+            clean = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[()][A-Za-z0-9]", "", raw)
+            clean = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", clean)
+            gen = self._import("generate")
+            roles = gen.load_roles(gen.models_config.active_profile())
+            for row in roles:
+                self.assertIn(row["role"], clean)
+
+    def test_adr_0017_and_0007_amendment_and_superseding_decision_recorded(self):
+        # AC-14: the ADR skeleton exists, README rows for 0007/0017 are updated, the
+        # in-file amendment note lands near 0007's Decision 4, and the superseding
+        # decision is persisted in decisions-log.jsonl naming the old slug.
+        adr_dir = ROOT / "docs/adr"
+        self.assertTrue((adr_dir / "0017-pi-interactive-target.md").exists())
+        readme = (adr_dir / "README.md").read_text()
+        self.assertIn("0017", readme)
+        self.assertIn("superseded in part by 0017", readme.lower())
+        amended = (adr_dir / "0007-pi-lane.md").read_text()
+        self.assertIn("0017", amended)
+        decisions_log = ROOT / "ai/state/decisions-log.jsonl"
+        self.assertIn("ac09-ac10-pi-minimal-target-accepted", decisions_log.read_text())
 
     def test_roles_tsv_with_model_columns_rejected_with_hint(self):
         legacy_header = "\t".join([
@@ -3990,6 +4407,14 @@ class HarnessTests(unittest.TestCase):
         self.assertIn('"gh repo delete*": deny', gate)
 
     def test_rpl_p0a_package_gate_runner_is_opencode_only_and_strictly_scoped(self):
+        # AC-08 (016-audit-debt-repayment, ownership exception approved on P2-hygiene,
+        # scoped strictly to this test): the canonical template's client-specific
+        # absolute paths, baseline hash, and business-module identifiers were
+        # genericized to portable `<PLACEHOLDER>` tokens. This test now asserts the
+        # SAME structural invariants (opencode-only placement, strict scoping, the
+        # default-deny discipline, the 15 permission keys, ordering) against those
+        # placeholders instead of the removed literals, and additionally enforces
+        # AC-08 going forward: no client-specific literal is ever allowed to reappear.
         run("./build.sh")
         agent = ROOT / "Global/opencode/agents/package-gate-runner.md"
         text = agent.read_text()
@@ -3997,37 +4422,65 @@ class HarnessTests(unittest.TestCase):
         self.assertFalse((ROOT / "Global/claude-code/agents/package-gate-runner.md").exists())
         self.assertFalse((ROOT / "Global/codex/agents/package-gate-runner.toml").exists())
 
+        # AC-08: the frontmatter's `permission` block keeps exactly its 15 top-level
+        # keys, in order, after the cleanup -- the genericization touched only leaf
+        # values, never the permission structure itself.
+        frontmatter = text[text.index("---\n") + 4:text.index("\n---\n", 4)]
+        perm_start = frontmatter.index("permission:")
+        perm_block = frontmatter[perm_start:]
+        perm_keys = re.findall(r'^  ([A-Za-z_]+):', perm_block, re.MULTILINE)
+        self.assertEqual(perm_keys, [
+            "read", "edit", "glob", "grep", "list", "task", "question", "webfetch",
+            "websearch", "lsp", "skill", "todowrite", "doom_loop", "external_directory", "bash",
+        ])
+
         catch_all = text.index('    "*": deny', text.index("  bash:"))
         ownership = text.index(
             '    "python3 ai/scripts/check-owned-paths.py --state-file '
-            '/home/federico/iey/iey-ai/ai/state/features/replenishment-v2.json '
-            '--package-id RPL-P0A --baseline 4ef70b0ab6da": allow'
+            '<ABS_REPO_ROOT>/ai/state/features/<FEATURE_ID>.json '
+            '--package-id <PACKAGE_ID> --baseline <BASELINE_HASH>": allow'
         )
         self.assertLess(catch_all, ownership)
         self.assertIn('    "git *": deny', text)
         self.assertLess(text.index('    "git *": deny'), text.index('    "git status": allow'))
         self.assertIn('    "git log --oneline -5": allow', text)
         self.assertIn(
-            '    "/tmp/opencode/rpl-p0a-gates-4ef70b0ab6da/**": allow', text
+            '    "<ABS_WORKTREE>/**": allow', text
         )
         self.assertIn(
-            '    "/home/federico/iey/iey-ai/ai/state/features/replenishment-v2.json": allow', text
+            '    "<ABS_REPO_ROOT>/ai/state/features/<FEATURE_ID>.json": allow', text
         )
         self.assertIn(
-            '    "NODE_PATH=/home/federico/iey/iey-ai/node_modules '
-            '/home/federico/iey/iey-ai/node_modules/.bin/prisma validate": allow', text
+            '    "NODE_PATH=<ABS_REPO_ROOT>/node_modules '
+            '<ABS_REPO_ROOT>/node_modules/.bin/prisma validate": allow', text
         )
         self.assertIn(
-            '    "NODE_PATH=/home/federico/iey/iey-ai/node_modules '
-            '/home/federico/iey/iey-ai/node_modules/.bin/vitest run '
-            'src/lib/modules/contabilium-ingestion/repositories/__tests__/'
-            'ledger-rls.integration.test.ts": allow', text
+            '    "NODE_PATH=<ABS_REPO_ROOT>/node_modules '
+            '<ABS_REPO_ROOT>/node_modules/.bin/vitest run '
+            '<TARGET_INTEGRATION_TEST_FILE>": allow', text
         )
-        self.assertIn("record-gate replenishment-v2 --description *", text)
+        self.assertIn("record-gate <FEATURE_ID> --description *", text)
         self.assertIn('    "*--next-id*": deny', text)
         self.assertIn('    "*verify.sh*": deny', text)
         self.assertNotIn('    "*verify.sh*": allow', text)
         self.assertNotIn('    "NODE_PATH=*', text)
+
+        # AC-08: the genericized template's own placeholder markers must be present
+        # (a plain string search finding none of them would silently mean the
+        # cleanup regressed back to literal, machine-specific values without this
+        # test noticing).
+        for placeholder in ("<ABS_REPO_ROOT>", "<ABS_WORKTREE>", "<FEATURE_ID>", "<PACKAGE_ID>", "<BASELINE_HASH>"):
+            self.assertIn(placeholder, text)
+
+        # AC-08 (case-insensitive universe, same as the spec's own verification grep):
+        # none of the removed client-specific literals may ever reappear in the
+        # generated template.
+        lowered = text.lower()
+        for literal in (
+            "/home/", "/users/", "/tmp/opencode/", "4ef70b0ab6da",
+            "contabilium-ingestion", "replenishment-v2", "rpl-p0a", "iey-ai",
+        ):
+            self.assertNotIn(literal, lowered)
 
         orchestrator = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
         self.assertIn('    "package-gate-runner": allow', orchestrator)
@@ -4971,6 +5424,245 @@ class HarnessTests(unittest.TestCase):
                 data = json.loads(state.read_text())
             self.assertEqual(data["phase"], "PACKAGE_TESTING", label)
             self.assertEqual(data["metrics"]["repair_batches"], 0, label)
+
+    # ------------------------------------------------ contract 016 / P1-harness-debt
+
+    def _load_feature_state_module(self, name="feature_state_p1"):
+        spec = importlib.util.spec_from_file_location(name, FEATURE_STATE)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_repair_entry_recognized_values_are_authoritative_over_history(self):
+        # AC-02: package["repair_entry"] is read FIRST; when it holds one of the four
+        # known strings the answer never touches data["history"] -- proven here by
+        # attaching a history event that would infer the OPPOSITE answer.
+        module = self._load_feature_state_module()
+        infers_false = [{
+            "event": "record-testing", "from": "PACKAGE_TESTING", "to": "PACKAGE_REPAIR",
+            "package_id": "PKG-01", "actor": "gate-runner", "metadata": {},
+        }]
+        infers_true = [{
+            "event": "record-review", "from": "PACKAGE_REVIEW", "to": "PACKAGE_REPAIR",
+            "package_id": "PKG-01", "actor": "package-reviewer", "metadata": {},
+        }]
+        for value in ("review", "delta_review"):
+            data = {"packages": [{"package_id": "PKG-01", "repair_entry": value}], "history": infers_false}
+            self.assertTrue(module._repair_entered_from_review(data, "PKG-01"), value)
+        for value in ("testing", "runtime_qa"):
+            data = {"packages": [{"package_id": "PKG-01", "repair_entry": value}], "history": infers_true}
+            self.assertFalse(module._repair_entered_from_review(data, "PKG-01"), value)
+
+    def test_repair_entry_absent_or_unrecognized_falls_back_to_log_inference(self):
+        # AC-02 amendment (F-03): a value outside the four known strings is treated
+        # exactly like an absent key -- inference runs, never a raise, never a fixed
+        # default independent of the log.
+        module = self._load_feature_state_module()
+        infers_true = [{
+            "event": "record-review", "from": "PACKAGE_REVIEW", "to": "PACKAGE_REPAIR",
+            "package_id": "PKG-01", "actor": "package-reviewer", "metadata": {},
+        }]
+        infers_false = [{
+            "event": "record-testing", "from": "PACKAGE_TESTING", "to": "PACKAGE_REPAIR",
+            "package_id": "PKG-01", "actor": "gate-runner", "metadata": {},
+        }]
+        # Absent field: reproduces the pre-existing inference path identically to the
+        # behaviour before this contract.
+        self.assertTrue(module._repair_entered_from_review(
+            {"packages": [{"package_id": "PKG-01"}], "history": infers_true}, "PKG-01"))
+        self.assertFalse(module._repair_entered_from_review(
+            {"packages": [{"package_id": "PKG-01"}], "history": infers_false}, "PKG-01"))
+        # Present but unrecognized ("bogus"): falls to the same inference mechanism.
+        self.assertTrue(module._repair_entered_from_review(
+            {"packages": [{"package_id": "PKG-01", "repair_entry": "bogus"}], "history": infers_true}, "PKG-01"))
+        self.assertFalse(module._repair_entered_from_review(
+            {"packages": [{"package_id": "PKG-01", "repair_entry": "bogus"}], "history": infers_false}, "PKG-01"))
+
+    def test_cmd_transition_pops_stale_repair_entry_before_entering_repair(self):
+        # AC-01 (F-03): `cmd_transition`'s manual PACKAGE_REPAIR edge -- e.g. an
+        # orchestrator override -- carries no domain reason of its own, so a leftover
+        # value from an earlier repair pass must not survive into this one.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, verify=False)
+            package = json.loads(state.read_text())["packages"][0]
+            self.assertEqual(package["repair_entry"], "review")
+
+            # Close out the panel's findings; the package auto-escapes to PACKAGE_TESTING
+            # but the stale repair_entry from THIS pass is never cleared by that edge.
+            self.verify(state, self.REFUTED, json.dumps({
+                "id": "F-002", "verdict": "refuted", "reason": "already covered",
+                "evidence": "tests/test_example.py:9 asserts exactly this"}))
+            mid = json.loads(state.read_text())
+            self.assertEqual(mid["phase"], "PACKAGE_TESTING")
+            self.assertEqual(mid["packages"][0]["repair_entry"], "review")
+
+            # A late finding arrives while the package sits in PACKAGE_TESTING.
+            late = json.dumps({"id": "F-LATE", "severity": "low", "category": "testing"})
+            self.run_state(state, "record-late-review", "PKG-01", "architect",
+                           "--finding", late, "--evidence", self.LATE_EVIDENCE)
+
+            # A manual transition straight back into PACKAGE_REPAIR, bypassing every
+            # domain site that would normally set repair_entry.
+            self.run_state(state, "transition", "PACKAGE_REPAIR", "--package-id", "PKG-01",
+                           "--actor", "orchestrator", "--reason", "manual override")
+            after = json.loads(state.read_text())
+            self.assertNotIn("repair_entry", after["packages"][0])
+
+            # Behavioural proof, not just field absence: with the stale "review" value
+            # gone, refuting the only remaining open finding falls to log inference. The
+            # last event whose `to` is PACKAGE_REPAIR for this package is the manual
+            # "transition" itself, not a review event, so inference must answer False
+            # and the package must NOT auto-escape to PACKAGE_TESTING.
+            self.verify(state, json.dumps({
+                "id": "F-LATE", "verdict": "refuted", "reason": "already covered",
+                "evidence": "tests/test_example.py:9 asserts exactly this"}))
+            final = json.loads(state.read_text())
+        self.assertEqual(final["phase"], "PACKAGE_REPAIR",
+                         "without the pop the stale repair_entry would wrongly auto-escape this")
+
+    def _verification_args(self, *, actor="finding-verifier", package_id="PKG-01",
+                           skip_reason=None, verdict=None, evidence="e", event_id=None):
+        return argparse.Namespace(actor=actor, package_id=package_id, skip_reason=skip_reason,
+                                  verdict=verdict or [], evidence=evidence, event_id=event_id)
+
+    def _verdicts_fixture_data(self, *, findings):
+        return {
+            "phase": "PACKAGE_REPAIR",
+            "metrics": {"verifications": 0},
+            "budgets": {"max_verifications_per_package": 6},
+            "history": [{"event": "record-review", "from": "PACKAGE_REVIEW", "to": "PACKAGE_REPAIR",
+                        "package_id": "PKG-01", "actor": "package-reviewer", "metadata": {}}],
+            "packages": [{"package_id": "PKG-01", "repair_entry": "review", "status": "repair_required",
+                         "attempts": {}, "findings": findings, "verifications": []}],
+        }
+
+    def test_apply_verification_waiver_pinned_with_budget_available(self):
+        # AC-05(a) fixture 1/4: waiver, budget available.
+        module = self._load_feature_state_module()
+        data = self._verdicts_fixture_data(
+            findings=[{"id": "F-LOW", "severity": "low", "category": "testing", "status": "open"}])
+        package = data["packages"][0]
+        attempts = package["attempts"]
+        args = self._verification_args(actor="orchestrator", skip_reason="all-findings-low", evidence="ev")
+        with mock.patch.object(module, "now", return_value="2026-01-01T00:00:00+00:00"):
+            with mock.patch.object(module, "record_event") as recorder:
+                result = module._apply_verification_waiver(
+                    data, package, attempts, [], data["budgets"]["max_verifications_per_package"], args)
+        self.assertTrue(result)
+        self.assertEqual(package["verifications"],
+                         [{"skipped": True, "reason": "all-findings-low", "at": "2026-01-01T00:00:00+00:00",
+                           "evidence": "ev"}])
+        self.assertEqual(attempts["verification_waivers"], 1)
+        self.assertEqual(data["metrics"]["verifications"], 1)
+        self.assertEqual(data["phase"], "PACKAGE_REPAIR")
+        recorder.assert_called_once_with(
+            data, "record-verification", "PACKAGE_REPAIR", "PACKAGE_REPAIR", "orchestrator",
+            "PKG-01", {"skipped": True, "reason": "all-findings-low"}, None)
+
+    def test_apply_verification_waiver_pinned_with_budget_exhausted(self):
+        # AC-05(a) fixture 2/4: waiver, budget exhausted -- a physical block, not a raise.
+        module = self._load_feature_state_module()
+        data = self._verdicts_fixture_data(
+            findings=[{"id": "F-LOW", "severity": "low", "category": "testing", "status": "open"}])
+        package = data["packages"][0]
+        attempts = package["attempts"]
+        attempts["verification_waivers"] = data["budgets"]["max_verifications_per_package"]
+        args = self._verification_args(actor="orchestrator", skip_reason="all-findings-low", evidence="ev")
+        with mock.patch.object(module, "now", return_value="2026-01-01T00:00:00+00:00"):
+            result = module._apply_verification_waiver(
+                data, package, attempts, [], data["budgets"]["max_verifications_per_package"], args)
+        self.assertTrue(result)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertEqual(data["final_state"], "BLOCKED")
+        self.assertEqual(data["blockers"][-1]["reason"], "verification waiver budget exhausted for PKG-01")
+        self.assertEqual(package["verifications"], [])   # never reached the append
+        self.assertEqual(attempts["verification_waivers"], data["budgets"]["max_verifications_per_package"])  # unchanged
+
+    def test_apply_verdicts_pinned_refuted_empties_open_findings(self):
+        # AC-05(a) fixture 3/4: verdicts, refuted empties the open set -> auto-escape to
+        # PACKAGE_TESTING, gated on `_repair_entered_from_review` (repair_entry="review").
+        module = self._load_feature_state_module()
+        data = self._verdicts_fixture_data(
+            findings=[{"id": "F-001", "severity": "high", "category": "correctness", "status": "open"}])
+        package = data["packages"][0]
+        attempts = package["attempts"]
+        verdicts = module.normalize_verdicts([json.dumps({
+            "id": "F-001", "verdict": "refuted", "reason": "the cited path is guarded upstream",
+            "evidence": "src/example.py:42 rejects the input before the cited branch"})])
+        args = self._verification_args(actor="finding-verifier", evidence="ev")
+        with mock.patch.object(module, "now", return_value="2026-01-01T00:00:00+00:00"):
+            with mock.patch.object(module, "record_event") as recorder:
+                result = module._apply_verdicts(
+                    data, package, attempts, verdicts, data["budgets"]["max_verifications_per_package"], args)
+        self.assertTrue(result)
+        finding = package["findings"][0]
+        self.assertEqual(finding["status"], "refuted")
+        self.assertEqual(finding["verified_verdict"], "refuted")
+        self.assertEqual(finding["verified_by"], "finding-verifier")
+        self.assertEqual(finding["verified_at"], "2026-01-01T00:00:00+00:00")
+        self.assertEqual(package["verifications"],
+                         [{"refuted": ["F-001"], "upheld": [], "at": "2026-01-01T00:00:00+00:00", "evidence": "ev"}])
+        self.assertEqual(attempts["verifications"], 1)
+        self.assertEqual(data["metrics"]["verifications"], 1)
+        self.assertEqual(data["phase"], "PACKAGE_TESTING")
+        self.assertEqual(package["status"], "testing_required")
+        recorder.assert_called_once_with(
+            data, "record-verification", "PACKAGE_REPAIR", "PACKAGE_TESTING", "finding-verifier",
+            "PKG-01", {"refuted": 1, "upheld": 0}, None)
+
+    def test_apply_verdicts_pinned_upheld_does_not_empty_open_findings(self):
+        # AC-05(a) fixture 4/4: verdicts, upheld leaves the finding open -> no escape.
+        module = self._load_feature_state_module()
+        data = self._verdicts_fixture_data(
+            findings=[{"id": "F-002", "severity": "medium", "category": "testing", "status": "open"}])
+        package = data["packages"][0]
+        attempts = package["attempts"]
+        verdicts = module.normalize_verdicts([json.dumps({"id": "F-002", "verdict": "upheld"})])
+        args = self._verification_args(actor="finding-verifier", evidence="ev")
+        with mock.patch.object(module, "now", return_value="2026-01-01T00:00:00+00:00"):
+            with mock.patch.object(module, "record_event") as recorder:
+                result = module._apply_verdicts(
+                    data, package, attempts, verdicts, data["budgets"]["max_verifications_per_package"], args)
+        self.assertTrue(result)
+        finding = package["findings"][0]
+        self.assertEqual(finding["status"], "open")
+        self.assertEqual(finding["verified_verdict"], "upheld")
+        self.assertEqual(package["verifications"],
+                         [{"refuted": [], "upheld": ["F-002"], "at": "2026-01-01T00:00:00+00:00", "evidence": "ev"}])
+        self.assertEqual(attempts["verifications"], 1)
+        self.assertEqual(data["metrics"]["verifications"], 1)
+        self.assertEqual(data["phase"], "PACKAGE_REPAIR")   # unchanged: still open
+        recorder.assert_called_once_with(
+            data, "record-verification", "PACKAGE_REPAIR", "PACKAGE_REPAIR", "finding-verifier",
+            "PKG-01", {"refuted": 0, "upheld": 1}, None)
+
+    def test_apply_verdicts_pinned_rejection_paths_raise_exact_state_errors(self):
+        # AC-05(a): the two rejection paths of the verdicts branch that AC-05(a) names
+        # explicitly -- a verdict on a finding that is not open, and refuting without
+        # authorization -- pinned as StateError with their exact message.
+        module = self._load_feature_state_module()
+        closed = self._verdicts_fixture_data(
+            findings=[{"id": "F-001", "severity": "high", "category": "correctness", "status": "closed"}])
+        package = closed["packages"][0]
+        verdicts = module.normalize_verdicts([json.dumps({"id": "F-001", "verdict": "upheld"})])
+        args = self._verification_args(actor="finding-verifier", evidence="ev")
+        with self.assertRaises(module.StateError) as ctx:
+            module._apply_verdicts(closed, package, package["attempts"], verdicts,
+                                   closed["budgets"]["max_verifications_per_package"], args)
+        self.assertEqual(str(ctx.exception), "finding is not open: F-001 (closed)")
+
+        unauthorized = self._verdicts_fixture_data(
+            findings=[{"id": "F-001", "severity": "high", "category": "correctness", "status": "open"}])
+        package = unauthorized["packages"][0]
+        verdicts = module.normalize_verdicts([json.dumps({
+            "id": "F-001", "verdict": "refuted", "reason": "r",
+            "evidence": "src/example.py:42 guards the cited branch"})])
+        args = self._verification_args(actor="implementer", evidence="ev")
+        with self.assertRaises(module.StateError) as ctx:
+            module._apply_verdicts(unauthorized, package, package["attempts"], verdicts,
+                                   unauthorized["budgets"]["max_verifications_per_package"], args)
+        self.assertEqual(str(ctx.exception),
+                         "implementer cannot refute findings; only finding-verifier may")
 
     def test_verification_budget_survives_two_review_cycles(self):
         # The budget is a runaway backstop, not the anti-retry control: a flow inside

@@ -169,10 +169,224 @@ def _project_root_or_harness() -> Path:
     return PROJECT_ROOT or ROOT
 
 
+# --------------------------------------------------- 014-model-preference-policy (AC-02)
+#
+# One real, per-harness-install sibling config file next to `APP_CONFIG` (the same
+# private `STATE_DIR`, `write_app_config`'s own directory) -- NEVER routed through
+# `write_app_config` (its flat `key = value` serializer, `:XXX` below, corrupts a nested
+# preference table) or `app_config()` (its silent parse-failure-as-`{}` swallow). This
+# file gets its OWN dedicated, atomic, fail-closed round-trip: `atomic_write` (already
+# established for the Claude settings JSON writer above) for the temp-file+`os.replace`
+# discipline, and a small, purpose-built two-table TOML serializer for a schema this
+# contract fully owns and closes (`[preference]`, `[role_override]`) -- not a
+# general-purpose nested-TOML writer (round-2 finding R2-F-04).
+MODEL_PREFERENCE_PATH = STATE_DIR / "model-preference.toml"
+
+# The closed, four-provider universe `_PAIR_COMMANDS` already probes
+# (`routing_core/catalog.py:133-140`) -- defined independently here, never importing or
+# referencing the catalog module's own billing-kind classification table (AC-06 non-goal).
+_MODEL_PREFERENCE_PROVIDERS = ("openai-codex", "anthropic", "opencode-zen", "opencode-go")
+_MODEL_PREFERENCE_CLASSES = ("decision", "grunt", "build")
+# AC-02's inertness note: the six roles with real, live effect today (`### Honest scope`,
+# spec) -- every other in-scope role, and the whole `decision` class, is genuinely inert.
+_MODEL_PREFERENCE_LIVE_ROLES = frozenset({
+    "delta-reviewer", "finding-verifier", "package-reviewer", "security-auditor",
+    "implementer", "debugger",
+})
+
+
+class ModelPreferenceError(ValueError):
+    """AC-02: fail-closed error for the sibling `model-preference.toml` file/CLI -- a
+    malformed value never degrades to a silent default (round-1 F-07, round-3 R3-F-04)."""
+
+
+def _model_preference_die(message):
+    raise ModelPreferenceError(message)
+
+
+def _validate_preference_providers(class_name, providers):
+    """AC-02 resolution states 1/2/4d: shared by the config-load path and the CLI write
+    path (`load_model_preference`/`cmd_model_preference_set` below) -- a malformed value
+    can never even be WRITTEN by the CLI to begin with; a hand-edited file is the only way
+    to reach this same check at load time."""
+    if not isinstance(providers, (list, tuple)) or not providers:
+        _model_preference_die(f"model-preference.toml: [preference].{class_name} must be a non-empty list of providers")
+    validated = []
+    for token in providers:
+        if not isinstance(token, str) or token not in _MODEL_PREFERENCE_PROVIDERS:
+            _model_preference_die(f"model-preference.toml: [preference].{class_name} contains unknown provider {token!r}")
+        validated.append(token)
+    if len(validated) != len(set(validated)):
+        _model_preference_die(f"model-preference.toml: [preference].{class_name} contains a duplicate provider")
+    return tuple(validated)
+
+
+def _validate_role_override_entry(role, class_name, roster_roles):
+    """AC-02 resolution states 3/4: reuses the exact `models_config.load_roles` unknown-
+    role precedent shape (per-role-named `die()`, `models_config.py:274-276`), and rejects
+    `"unscoped"` (a resolution OUTCOME, never a legal override target)."""
+    if role not in roster_roles:
+        _model_preference_die(f"model-preference.toml: [role_override].{role} does not match any role in roles.tsv")
+    if not isinstance(class_name, str) or class_name not in _MODEL_PREFERENCE_CLASSES:
+        _model_preference_die(f"model-preference.toml: [role_override].{role} names unknown class {class_name!r}")
+    return class_name
+
+
+def _read_model_preference_raw():
+    """Fail-closed parse only -- never `app_config()`'s silent `except: return {}}` swallow
+    (round-3 R3-F-04(a)); a malformed file loudly fails every caller, load or write alike."""
+    try:
+        raw = MODEL_PREFERENCE_PATH.read_text()
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        _model_preference_die(f"model-preference.toml: {exc}")
+    try:
+        doc = tomllib.loads(raw)
+    except tomllib.TOMLDecodeError as exc:
+        _model_preference_die(f"model-preference.toml: {exc}")
+    if not isinstance(doc, dict) or set(doc) - {"preference", "role_override"}:
+        _model_preference_die("model-preference.toml: unknown top-level key")
+    return doc
+
+
+def load_model_preference(roster_roles=None):
+    """AC-02/AC-03: the config-load path. Returns
+    `{"preference": {class: (providers...)}, "role_override": {role: class}}` --
+    absent file is the unbiased default (both tables empty), never a crash. `roster_roles`
+    is an optional pre-loaded `{role, ...}` set (the CLI's own composition already has
+    one); when omitted, the roster is loaded fresh from `roles.tsv`."""
+    doc = _read_model_preference_raw()
+    preference_table = doc.get("preference", {})
+    if not isinstance(preference_table, dict):
+        _model_preference_die("model-preference.toml: [preference] must be a table")
+    preference = {}
+    for class_name, providers in preference_table.items():
+        if class_name not in _MODEL_PREFERENCE_CLASSES:
+            _model_preference_die(f"model-preference.toml: [preference] has unknown class {class_name!r}")
+        preference[class_name] = _validate_preference_providers(class_name, providers)
+    override_table = doc.get("role_override", {})
+    if not isinstance(override_table, dict):
+        _model_preference_die("model-preference.toml: [role_override] must be a table")
+    roles = roster_roles if roster_roles is not None else {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
+    role_override = {}
+    for role, class_name in override_table.items():
+        role_override[role] = _validate_role_override_entry(role, class_name, roles)
+    return {"preference": preference, "role_override": role_override}
+
+
+def _config_with_model_preference(config, roster):
+    """AC-04: the one channel available to feed AC-02's resolved preference tables into
+    `RoutingService` without touching `routing.py`'s read-only `compose()` signature --
+    injected under an internal-marker key `RoutingService.__init__` reads and strips,
+    the same underscore-prefixed convention `models_config.py` already uses for
+    `config["_source_schema"]` (never itself re-serialized to models.toml). A malformed
+    sibling file fails closed exactly like a malformed `models.toml` already does --
+    `ModelPreferenceError` bubbles to the caller's own existing except clause."""
+    roster_roles = {row["role"] for row in roster}
+    config["_model_preference"] = load_model_preference(roster_roles)
+    return config
+
+
+def _serialize_model_preference(doc):
+    """The small, purpose-built, fixed-shape emitter this schema's own closure makes safe
+    -- exactly two tables, each a flat mapping to a closed-vocabulary list/string. NOT a
+    general nested-TOML writer (R2-F-04); every value is `json.dumps`-quoted, which is
+    valid TOML string syntax for these ASCII, punctuation-free tokens."""
+    lines = []
+    preference = doc.get("preference") or {}
+    if preference:
+        lines.append("[preference]")
+        for class_name in sorted(preference):
+            rendered = ", ".join(json.dumps(token) for token in preference[class_name])
+            lines.append(f"{class_name} = [{rendered}]")
+        lines.append("")
+    role_override = doc.get("role_override") or {}
+    if role_override:
+        lines.append("[role_override]")
+        for role in sorted(role_override):
+            lines.append(f"{role} = {json.dumps(role_override[role])}")
+        lines.append("")
+    return ("\n".join(lines).rstrip("\n") + "\n") if (preference or role_override) else ""
+
+
+def _model_preference_class_inert(class_name):
+    """AC-02: re-baselined round 4 (F-01) -- only `decision` is inert as a WHOLE class
+    today; `grunt`/`build` each have at least one live tiered role, so a class-scoped
+    write to either never fires the note even though some of that class's own non-tiered
+    members individually would (checked per-role by `_model_preference_role_inert`)."""
+    return class_name == "decision"
+
+
+def _model_preference_role_inert(role):
+    """AC-02: true for every role except the six with real, live effect today."""
+    return role not in _MODEL_PREFERENCE_LIVE_ROLES
+
+
+_MODEL_PREFERENCE_NOTE_SUFFIX = "(see docs/specs/014-model-preference-policy/spec.md ### Honest scope)"
+
+
+def cmd_model_preference_set(class_name, providers):
+    """AC-02: `--model-preference-set CLASS --provider NAME [--provider NAME ...]` --
+    writes/replaces `[preference].<CLASS>`, leaving every other key untouched (the
+    round-trip regression test proves this isolation)."""
+    validated = _validate_preference_providers(class_name, providers)
+    # RF14-06: the ENTIRE existing document -- not just the class/role this write
+    # touches -- must validate via `load_model_preference`'s own validators before any
+    # merge/re-serialize; a pre-existing invalid entry (e.g. a hand-edited non-list
+    # value) must `die()` here rather than reach `_serialize_model_preference`, whose
+    # `", ".join(... for token in preference[class_name])` would silently iterate a
+    # string value character by character and corrupt the file.
+    load_model_preference()
+    doc = _read_model_preference_raw()
+    preference = dict(doc.get("preference") or {})
+    preference[class_name] = list(validated)
+    doc = {**doc, "preference": preference}
+    atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    if _model_preference_class_inert(class_name):
+        print(f"MODEL_PREFERENCE_NOTE class={class_name} has no observable effect on the primary lane today {_MODEL_PREFERENCE_NOTE_SUFFIX}", file=sys.stderr)
+    print(f"MODEL_PREFERENCE_SET class={class_name} providers=" + ",".join(validated))
+    return 0
+
+
+def cmd_model_preference_role_override(role, class_name):
+    """AC-02: `--model-preference-role-override ROLE CLASS` -- writes/replaces
+    `[role_override].<ROLE>`, moving that one role into a different class than AC-01's
+    default resolution."""
+    roster_roles = {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
+    validated_class = _validate_role_override_entry(role, class_name, roster_roles)
+    # RF14-06: same fail-closed whole-document validation as cmd_model_preference_set above.
+    load_model_preference(roster_roles)
+    doc = _read_model_preference_raw()
+    role_override = dict(doc.get("role_override") or {})
+    role_override[role] = validated_class
+    doc = {**doc, "role_override": role_override}
+    atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    if _model_preference_role_inert(role):
+        print(f"MODEL_PREFERENCE_NOTE role={role} has no observable effect on the primary lane today {_MODEL_PREFERENCE_NOTE_SUFFIX}", file=sys.stderr)
+    print(f"MODEL_PREFERENCE_ROLE_OVERRIDE role={role} class={validated_class}")
+    return 0
+
+
+def cmd_model_preference_show():
+    """AC-02 resolution state (e): read-only, prints the sibling file's current, fully-
+    resolved `[preference]`/`[role_override]` contents, or a clear no-preferences line."""
+    data = load_model_preference()
+    if not data["preference"] and not data["role_override"]:
+        print("MODEL_PREFERENCE_NONE")
+        return 0
+    for class_name in sorted(data["preference"]):
+        print(f"MODEL_PREFERENCE preference.{class_name}=" + ",".join(data["preference"][class_name]))
+    for role in sorted(data["role_override"]):
+        print(f"MODEL_PREFERENCE role_override.{role}=" + data["role_override"][role])
+    return 0
+
+
 def routing_catalog(simulation=False):
     """Compose trusted v2 inputs; callers never supply a catalog or route ID."""
     config = models_config.load_config(ROOT / "models.toml")
     roster = models_config.load_roster(ROOT / "roles.tsv")
+    config = _config_with_model_preference(config, roster)
     # No optimistic defaults: each real invocation gets a fresh exact probe.
     return routing.compose(config, roster, simulate=simulation, store=None if simulation else _routing_store()), config
 
@@ -209,6 +423,8 @@ def cmd_route_explain(task_class, human=False):
         return 0
     except models_config.ModelsError:
         _routing_output(routing.cli_envelope(False, "route-explain", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    except ModelPreferenceError as exc:
+        _routing_output(routing.cli_envelope(False, "route-explain", {"message": str(exc)}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
     except (routing.RoutingError, OSError):
         _routing_output(routing.cli_envelope(False, "route-explain", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
 
@@ -244,8 +460,17 @@ _DECIDE_OK_NON_EXECUTABLE_REASONS = ((), ("REVIEW_IDENTITY_UNVERIFIED",))
 
 
 def _decide_status(decision):
-    """(ok, exit_code) for a `route-decide` RouteDecision — the reason->exit table (F01)."""
-    if decision.execution_enabled or decision.reason_codes in _DECIDE_OK_NON_EXECUTABLE_REASONS:
+    """(ok, exit_code) for a `route-decide` RouteDecision — the reason->exit table (F01).
+
+    P2F-01: `RUNTIME_REDIRECTED requested=X effective=Y` is informational only (AC-09,
+    non-blocking runtime redirection) and never participates in the ok/exit classification.
+    It is filtered out of the reason codes before the closed-table membership check below,
+    so a redirect-only decision still matches `()` and a redirect alongside
+    REVIEW_IDENTITY_UNVERIFIED still matches that single-element tuple — both exactly as
+    before this code existed. Every other (hard-failure) reason code is untouched.
+    """
+    codes = tuple(code for code in decision.reason_codes if not code.startswith("RUNTIME_REDIRECTED"))
+    if decision.execution_enabled or codes in _DECIDE_OK_NON_EXECUTABLE_REASONS:
         return True, 0
     return False, 1
 
@@ -425,6 +650,7 @@ def cmd_route_decide(source, human=False, fresh=False):
         context_flag = bool(context_ok)
         unverified_review = role_class == "review" and not review_of
         simulate = not writer and not (role_class == "review" and review_of)
+        config = _config_with_model_preference(config, roster)
         service = routing.compose(config, roster, simulate=simulate, fresh_probes=fresh,
                                   store=None if simulate else _routing_store())
         request = routing.TaskRequest(role=role, operation="inspection" if task_class == "inspection" else "change",
@@ -446,6 +672,8 @@ def cmd_route_decide(source, human=False, fresh=False):
         return exit_code
     except models_config.ModelsError:
         _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    except ModelPreferenceError as exc:
+        _routing_output(routing.cli_envelope(False, "route-decide", {"message": str(exc)}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
     # SEC-A02: any unvalidated internal edge (a malformed feature-state.json field, an
     # out-of-range value reaching the store) degrades to ROUTING_UNAVAILABLE — never an
     # uncaught traceback breaking the schema-2 envelope / one-JSON-line contract.
@@ -2575,6 +2803,15 @@ def main():
     parser.add_argument("--private", action="store_true",
                         help="con --vault-link: las notas viven en el vault y el repo queda con un symlink excluido de git")
     parser.add_argument("--company", metavar="NAME")
+    # 014-model-preference-policy AC-02: --provider is repeatable-ordered, the same idiom
+    # --feature-id already establishes above (order of appearance IS the ranked list).
+    parser.add_argument("--model-preference-set", metavar="CLASS", choices=_MODEL_PREFERENCE_CLASSES,
+                        help="escribe [preference].CLASS en model-preference.toml; combinar con --provider (repetible, ordenado)")
+    parser.add_argument("--provider", action="append", metavar="NAME",
+                        help="con --model-preference-set: proveedor, repetible, el orden en la línea de comando es la preferencia")
+    parser.add_argument("--model-preference-role-override", nargs=2, metavar=("ROLE", "CLASS"),
+                        help="escribe [role_override].ROLE = CLASS en model-preference.toml")
+    parser.add_argument("--model-preference-show", action="store_true", help="lee model-preference.toml (solo lectura)")
     args = parser.parse_args()
 
     # This gate is intentionally outside the ordinary routing modes.  It has no
@@ -2674,6 +2911,36 @@ def main():
     if args.auto_update:
         set_auto_update(args.auto_update == "on")
         return 0
+    if args.model_preference_show:
+        try:
+            return cmd_model_preference_show()
+        except ModelPreferenceError as exc:
+            print(f"model-preference: {exc}", file=sys.stderr)
+            return 2
+    # 014-model-preference-policy AC-02, round-3 R3-F-04(b)/(c): --provider is co-required
+    # with --model-preference-set (an argparse-level rejection, not a silent ignore), and
+    # a --model-preference-set with zero --provider is rejected before any write.
+    if args.model_preference_set is not None or args.provider:
+        if args.model_preference_set is None:
+            print("model-preference: --provider requires --model-preference-set", file=sys.stderr)
+            return 2
+        if not args.provider:
+            print("model-preference: --model-preference-set requires at least one --provider", file=sys.stderr)
+            return 2
+        if len(args.provider) != len(set(args.provider)):
+            print("model-preference: duplicate --provider value", file=sys.stderr)
+            return 2
+        try:
+            return cmd_model_preference_set(args.model_preference_set, args.provider)
+        except ModelPreferenceError as exc:
+            print(f"model-preference: {exc}", file=sys.stderr)
+            return 2
+    if args.model_preference_role_override:
+        try:
+            return cmd_model_preference_role_override(*args.model_preference_role_override)
+        except ModelPreferenceError as exc:
+            print(f"model-preference: {exc}", file=sys.stderr)
+            return 2
     if args.tools:
         return cmd_tools()
     if args.tools_install:

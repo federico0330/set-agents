@@ -1,39 +1,44 @@
-# Feature 014 — model-preference-policy, contract 3.1.0
+# Feature 014 — model-preference-policy, contract 3.2.0
 
-Status: `revision_required` after SPEC_CHALLENGE round 3 (8 findings, R3-F-01..R3-F-08, 2 blocking) — a
-**correction pass, not a rescope**: round 3 found this contract's "real effect today" claim was overstated
-(it inherited an "already silently defeated in production" framing from `015`'s own since-superseded round-1
-draft, and separately overclaimed live effect for `implementer`/`debugger` on the primary lane without
-verifying this machine's actual credential shape), plus six lower-severity citation/precision findings. All
-eight are fixed here; no acceptance criterion, class, role count, or invariant confirmed clean in round 3 is
-touched — see `## Historial de challenge` for the full disposition. This round also surfaces a genuinely good
-update, not just corrections: `015-anthropic-dispatch-parity` was redesigned in parallel (now its own contract
-**2.0.0**, `docs/specs/015-anthropic-dispatch-parity/spec.md`) around a cross-lane provider redirect that,
-once shipped, gives `014` real effect on BOTH its `build` class AND its `grunt` class — not only `build`, as
-round 2 believed. No package opened, `feature-state.py init` not run. Depends, non-blockingly, on
-`008-dynamic-selection`'s P1 (`accepted` per `ai/state/features/008-dynamic-selection.json` →
-`packages[] where package_id="P1-uninterrupted-delegation" → status="accepted"`, though `008/spec.md`'s own
-header prose still reads "P1 contract drafted" — a stale status line in that file, not touched by this
-contract, cited here only so this dependency claim is grounded in the real state machine, not stale prose) and
-on `012-discovered-inventory`'s P1 (`accepted`, same state-file pattern,
+Status: `approve-with-amendments` after SPEC_CHALLENGE round 4 (6 findings, F-01..F-06, 1 blocking) — a
+**re-baseline, not a rescope**: round 4 reviewed this contract against the post-`015` tree —
+`015-anthropic-dispatch-parity` is **DONE and merged**, `_PROVIDER_RUNTIME_REDIRECTS =
+{"anthropic": "claude-code"}` is live at `ai/scripts/routing_core/service.py:33`, and this machine's Claude
+Code lane is live-authenticated — and found round 3's entire "zero live effect on the primary lane today, for
+every class, no exceptions" framing (F-01, high, blocking) is now **inverted**: it must be replaced with a
+contract that ASSUMES AND VERIFIES REAL EFFECT for the roles the redirect actually reaches. All six findings
+are fixed here, on the user's explicit decision (2026-08-02, recorded verbatim in `## Historial de challenge`);
+no acceptance criterion, class, role count, or invariant round 3 confirmed clean and this round did not touch
+is disturbed — see `## Historial de challenge` for the full disposition. No package opened, `feature-state.py
+init` not run. Depends, non-blockingly, on `008-dynamic-selection`'s P1 (`accepted` per
+`ai/state/features/008-dynamic-selection.json` → `packages[] where
+package_id="P1-uninterrupted-delegation" → status="accepted"`, though `008/spec.md`'s own header prose still
+reads "P1 contract drafted" — a stale status line in that file, not touched by this contract, cited here only
+so this dependency claim is grounded in the real state machine, not stale prose) and on
+`012-discovered-inventory`'s P1 (`accepted`, same state-file pattern,
 `ai/state/features/012-discovered-inventory.json`). This is a **sibling** of `008-dynamic-selection`'s P3
 sketch (budget-aware selection, scoped-not-contracted, blocked on `007-P2`), not an amendment to it — P3 stays
 exactly as blocked as it already is; this contract does not touch `docs/specs/008-dynamic-selection/spec.md`
 and has no dependency on `011-quota-failover`.
 
-**Corrected this round, stated once here and precisely, not as a vague forward-pointer:** `014` has **zero
-code dependency** on `015` — it never edits routing/doctrine, only a sort-key bias consulted strictly after
-routing already happened, so nothing in this file's own mechanism requires `015` to exist. But `014`'s
-**observable, real-world effect** on the primary `opencode` lane is a different question, and round 3 found it
-was answered wrong in 3.0.0: verified live this session, `('opencode','anthropic')` probes to **zero** models
-on this machine (`opencode auth list --pure` lists four credentials, none `Anthropic`; `opencode models
-anthropic --pure` → `Error: Provider not found: anthropic`), so `014`'s mechanism has **zero live, observable
-effect on the primary lane today, full stop — for all three classes alike, including `implementer`/`debugger`,
-previously (3.0.0) claimed to be "the entire real, live, working scope."** This is `015`'s prerequisite gap,
-not `014`'s bug — see `### Honest scope` for the exact per-lane, per-class breakdown (including the one real
-exception, the `pi` lane, live-verified this round, not `[runtime].primary`) and the new `### Dependency on
-015` subsection for what `015`'s contract 2.0.0 (pre-challenge as of this citation) concretely changes once it
-ships, with its own real AC numbers. No other feature's approved contract is edited by this file, and
+**Re-baselined this round, stated once here and precisely, not as a vague forward-pointer:** `014` still has
+**zero code dependency** on `015` — it never edited routing/doctrine, only a sort-key bias consulted strictly
+after routing already happens, so `014` needed zero code change once `015` shipped, exactly as rounds 1-3
+predicted. What changed is `014`'s **observable, real-world effect** on the primary `opencode` lane, now that
+`015` is DONE and merged: an `anthropic` candidate's authentication is resolved against the **effective
+runtime** `_effective_runtime()` computes (`service.py:133-158`) — `claude-code` for `anthropic`
+(`_PROVIDER_RUNTIME_REDIRECTS`, `service.py:33`), which this machine's `claude auth status --json` probe
+already authenticates live (`catalog.py:135`) — instead of the requested `opencode` runtime, which still has
+no live `anthropic` credential of its own. **This means `grunt`'s four tiered roles (`delta-reviewer`,
+`finding-verifier`, `package-reviewer`, `security-auditor`) and `build`'s two tiered roles (`implementer`,
+`debugger`) now have real, live, observable effect on the primary lane, verified against the live effective-
+runtime inventory, not a synthetic or injected fixture — the exact reversal of round 3's headline claim.**
+`decision`'s seven roles, and the fourteen non-tiered `grunt`/`build` roles, stay genuinely inert — not because
+of any credential gap (that gap is what `015` closed), but because the shipped orchestrator doctrine never
+invokes `--route-decide` for them at all (`Global/_canonical/agents/orchestrator.md:157-158`), an operational
+fact `015` cannot touch and this round does not re-litigate. See `### Honest scope` for the exact per-class,
+per-role breakdown, verified live against the effective-runtime inventory this session, not carried forward
+from round 3's now-superseded numbers. No other feature's approved contract is edited by this file, and
 `Global/_canonical/**` and its three generated copies are never touched by this contract, in this round or any
 other.
 
@@ -90,7 +95,7 @@ this class could be designed at all) confirms it is the *same* integration point
 ### The architectural question this widening forces, resolved by reading the real code (F-06)
 
 Round 1 found `execution_enabled=True` (`service.py:216`, gated at `service.py:175`) is reachable only when
-`role_class == "writer"` (`RoutingService`'s own internal `_role_class`, `service.py:221`) — and, separately,
+`role_class == "writer"` (`RoutingService`'s own internal `_role_class`, `service.py:302`) — and, separately,
 this repo has an older, pre-existing static mechanism: `models.toml`'s `[areas.<duty>]` → `[roles.<role>]`
 tables, resolved by `models_config.py`'s `resolve_role` (`models_config.py:238-264`, base→area→role merge),
 governed by Accepted `ADR-0003`. Round 1 did not resolve which of these two mechanisms actually selects the
@@ -105,7 +110,7 @@ pipeline, for different purposes, and only one of them is a per-decision selecto
 1. **`RoutingService.route()` builds exactly one candidate list and runs exactly one `candidates.sort(...)`
    call (`service.py:135-171`), for every `role_class` value alike** — `"writer"`, `"review"`, and `"other"`
    all go through the identical exclusion loop and the identical sort. `role_class` is computed once, early
-   (`service.py:113`), and is consulted only *after* the sort to decide (a) whether independence exclusions
+   (`service.py:170`), and is consulted only *after* the sort to decide (a) whether independence exclusions
    apply (`role_class == "review"`, lines 115-126) and (b) whether the terminal branch returns a
    non-executable report or mints a durable authorization (`role_class == "writer"` and not `simulate`, lines
    175-216). **`candidates[0]` — the actual selected route — is decided by the SAME sort key regardless of
@@ -162,8 +167,8 @@ source of truth in the sense F-08 warned about, for three concrete reasons, not 
 2. **Keyed by the same signal, not an independently hand-maintained table.** P0's real defect (the objection
    F-08 raised) was a hand-written, per-role provider table disconnected from any existing structure. This
    contract's classes are not that: `grunt` is, by definition, the exact predicate `RoutingService._role_class`
-   already computes as `"review"` (`service.py:222`); the new `build` class is, by definition, the exact
-   predicate the same function already computes as `"writer"` (`service.py:221`); `decision` and `unscoped`
+   already computes as `"review"` (`service.py:303`); the new `build` class is, by definition, the exact
+   predicate the same function already computes as `"writer"` (`service.py:302`); `decision` and `unscoped`
    are the two ways of splitting what that same function already buckets as `"other"` (`orchestrator` +
    `duty="docs"` vs. everything else not otherwise classed). Every one of this contract's four classes is
    derived from `roles.tsv`'s own `capability`/`duty` columns — the same axis `ADR-0003`'s own `[areas.<duty>]`
@@ -232,8 +237,8 @@ narrative):** *"que el orquestador elija el modelo y el effort entre TODO lo dis
 corre, siendo crítico sobre responsabilidad, tokens y tiempo restante de sesión."* A fixed role→provider table
 is the literal opposite of that: it removes from the selector exactly the decision the user wants it to keep
 making. Two-thirds of what P0 promised were already true without it — `models.toml`'s `[areas.implement]
-claude="sonnet"` / `[areas.audit] claude="opus"` (`/home/federico/SET-AGENTES/models.toml:81,93`, unchanged
-since) already governed the Claude Code lane, and `REVIEW_PROVIDER_CONFLICT` (`service.py:166`) already forced
+claude="sonnet"` / `[areas.audit] claude="opus"` (`/home/federico/SET-AGENTS/models.toml:81,93`, unchanged
+since) already governed the Claude Code lane, and `REVIEW_PROVIDER_CONFLICT` (`service.py:241`) already forced
 a reviewer onto a different provider than the writer's.
 
 **Why this contract's design is not the same shape, stated precisely, not just asserted:**
@@ -242,7 +247,7 @@ a reviewer onto a different provider than the writer's.
   *which candidates exist* and *which roles they serve* — a change to route **eligibility**. This contract
   (AC-04) never edits `routes.v1.toml`'s `roles`/`tools`/`tier` membership and never adds or removes a
   candidate; it only ever reorders **already-eligible, already-authenticated** candidates that survived every
-  one of `RoutingService.route()`'s existing hard exclusions (`service.py:136-169` — identity, exhaustion,
+  one of `RoutingService.route()`'s existing hard exclusions (`service.py:197-244` — identity, exhaustion,
   authentication, role compatibility, tools, context, and all three review-independence checks). A preference
   that happens to name a currently-unauthenticated provider can never cause a fallback out of the dynamic
   system, because an unauthenticated provider produces no candidate at all — the exact failure mode of P0's
@@ -265,7 +270,7 @@ confirmed by direct count) along an axis close to, but not identical to, what th
 live: `capability="review-ro" AND duty IN {"audit","judge"}` selects exactly six roles — `spec-challenger`,
 `package-reviewer`, `delta-reviewer`, `security-auditor`, `finding-verifier`, `adversarial-judge`
 (`roles.tsv:9,20-24`) — and this is **not a new observation this contract invents**: it is the *exact*
-predicate `RoutingService._role_class` (`ai/scripts/routing_core/service.py:218-223`) already computes,
+predicate `RoutingService._role_class` (`ai/scripts/routing_core/service.py:299-304`) already computes,
 today, for an unrelated purpose (deciding which decisions may carry a `review_of_run_id` and be checked for
 writer-independence) — and the identical predicate is duplicated verbatim as `_role_class_of`
 (`ai/scripts/set_agents_app.py:230-233`), a pre-existing, small, un-shared duplication this contract notes but
@@ -285,7 +290,7 @@ role-class-scoped at all.** `ai/catalogs/routes.v1.toml` has exactly six rows (c
 `grep -c '^\[\[routes\]\]'` → 6), `provider ∈ {"openai-codex","anthropic"}` only (confirmed:
 `grep '^provider = '` → both values, no third). Every `openai-codex` row carries `curated_priority = 10`;
 every `anthropic` row carries `curated_priority = 20` (`routes.v1.toml:14,24,34,44,54,64`, all six checked
-directly). Because `candidates.sort(...)` (`service.py:171`) orders ascending by `curated_priority` as its
+directly). Because `candidates.sort(...)` (`service.py:246`) orders ascending by `curated_priority` as its
 third key, **`openai-codex` (GPT) already wins every tie today, for every role, at every tier, whenever both
 providers are simultaneously authenticated** — this is not a hypothetical this contract introduces; it is the
 literal, already-shipped behavior, uniform across `orchestrator`, `adversarial-judge`, and `implementer` alike.
@@ -296,7 +301,7 @@ the cheap/disposable option, or toward whichever provider actually implements. *
 contract closes: a role-class-scoped bias, replacing one undifferentiated global number.**
 
 **The live per-decision credential check the new bias must reuse, not duplicate.** `RoutingService.route()`
-excludes a candidate with `reason="PROVIDER_UNAUTHENTICATED"` (`service.py:145`) whenever `route.model` is
+excludes a candidate with `reason="PROVIDER_UNAUTHENTICATED"` (`service.py:220`) whenever `route.model` is
 absent from `self.inventory.get((facts.selected_runtime, route.provider), frozenset())` — `self.inventory` is
 built, on every `RoutingService` construction, from `probe_inventory(config, ...)`
 (`routing_core/catalog.py:426`), which only ever probes the closed `(runtime, provider)` pairs in
@@ -313,26 +318,27 @@ detection, not a manual edit and not a scheduled date — for the four providers
 read-only, keys only, never values (same discipline as `pi_auth_provider_keys()`, `catalog.py:243-258`):
 `~/.pi/agent/auth.json`'s key set is exactly `{"anthropic","openai-codex"}`. `opencode auth list --pure`
 reports exactly four credentials on this machine: `OpenCode Go`, `OpenAI`, `GitHub Copilot`, `OpenCode Zen` —
-no standalone `Kimi` entry. `/home/federico/SET-AGENTES/models.toml`'s `[catalog].opencode_zen` and
+no standalone `Kimi` entry. `/home/federico/SET-AGENTS/models.toml`'s `[catalog].opencode_zen` and
 `[catalog].opencode_go` allowlists (`models.toml:26-27`) both already list `kimi-k2.5`, `kimi-k2.6`,
 `kimi-k2.7-code`, `kimi-k3` — but strictly as model ids reachable *through* the `opencode-zen`/`opencode-go`
 subscriptions, which already have their own probe pairs and their own billing-kind entries
 (`PROVIDER_BILLING_KIND = {"opencode-zen": "metered", "opencode-go": "subscription"}`, `catalog.py:148`).
 (Note, so nobody confuses the two: `tests/fixtures/models.toml` is an unrelated test fixture with its own
 independent, smaller content — every citation in this contract to `models.toml` bare or with a line number
-means the real file at `/home/federico/SET-AGENTES/models.toml`, never the fixture. **Same disambiguation
+means the real file at `/home/federico/SET-AGENTS/models.toml`, never the fixture. **Same disambiguation
 applies to `roles.tsv` — round 3, R3-F-08(a):** `tests/fixtures/roles.tsv` is a separate, smaller decoy fixture
 (confirmed live, `find . -iname roles.tsv` returns both); every citation in this contract to `roles.tsv` bare
-or with a line number means the real file at `/home/federico/SET-AGENTES/roles.tsv`, never the fixture.) **What could not be
-verified, stated plainly: whether the user's actual $40/month "Kimi Code" product is (a) a standalone
-credential surface this repo has never seen — in which case it needs a brand-new provider onboarding (new
-`_PAIR_COMMANDS` pair, new probe-response parser, new billing-kind entry, new `routes.v1.toml` rows — the same
-shape of work `012-discovered-inventory`'s AC-01/AC-02 did for `opencode-zen`/`opencode-go`), a real, named,
-external dependency this contract does **not** deliver — or (b) informally the user's name for the Kimi models
-already reachable through `opencode-go`'s existing, already-probed subscription. No trace of (a) exists on
-this machine today; this draft does not guess between the two and names the ambiguity for `USER_APPROVAL`
-rather than fabricating a detection mechanism for a credential surface that may not exist.** Either way, a
-second, independent, deeper blocker applies regardless of which reading is correct — see the next paragraph.
+or with a line number means the real file at `/home/federico/SET-AGENTS/roles.tsv`, never the fixture.)
+**Settled this round (round 4, user decision #1, 2026-08-02) — no longer an open question for
+`USER_APPROVAL`: the user's actual $40/month "Kimi Code" product IS a standalone credential surface this repo
+has never seen.** It requires a brand-new provider onboarding (a new `_PAIR_COMMANDS` pair, new
+probe-response parser, new billing-kind entry, new `routes.v1.toml` rows — the same shape of work
+`012-discovered-inventory`'s AC-01/AC-02 did for `opencode-zen`/`opencode-go`) — recorded here, explicitly, as
+a real, named, external dependency this contract does **not** deliver, and as a non-goal (see Non-goals). No
+trace of it exists on this machine today (verified live, above); this contract does not build a detection
+mechanism for it, does not guess at its provider shape, and does not wait on it — `014`'s own taxonomy,
+mechanism, and configuration surface are fully specified and complete independent of when or whether Kimi Code
+onboarding ever happens. A second, independent, deeper blocker applies regardless — see the next paragraph.
 
 **A structurally deeper blocker than credentials: Kimi-hosted models are not routable at all today, regardless
 of any credential question.** `012-discovered-inventory`'s own accepted contract states this as an explicit
@@ -349,8 +355,10 @@ disposable option" and "build-work bias toward the currently-implementing option
 (see Non-goals), not discovered later as a surprise.
 
 ### Honest scope — which of the three classes have real, live effect today, verified directly against
-`models.toml`, per-lane and per-class (round 3 correction — R3-F-01, blocking; supersedes round 2's own
-"2 real roles" claim, which did not verify the primary lane's actual credential shape)
+`models.toml`, per-lane and per-class (round 4 re-baseline — F-01, high, blocking; supersedes round 3's own
+"zero effect everywhere today" claim, written before `015` shipped, and inverts it now that `015` is DONE and
+merged, per the user's explicit 2026-08-02 decision to assume and verify real effect for the roles the redirect
+actually reaches)
 
 Round 2 (9 findings, `revision_required`) found something round 1 never checked: this contract's role-class
 bias only ever fires for a role whose candidate selection is **dynamically tiered** — i.e. a role that has its
@@ -381,64 +389,67 @@ prose, `models.toml` backs that same set with real per-tier OpenCode variant dat
 `models_config.py:308-366`, which builds the multiple `<role>@<tier>` OpenCode variant files the doctrine's
 "Match by MODEL" step spawns). Both signals agree; neither is guessed from the other's name.
 
-Crossed against AC-01's three in-scope classes, role by role:
+Crossed against AC-01's three in-scope classes, role by role — **re-derived this round against the live
+effective-runtime inventory `_effective_runtime()`/`RoutingService.route()` actually compute today
+(`service.py:133-158,220,241`), not an injected fixture, per the user's explicit "assume and verify real
+effect" decision (F-01):**
 
 - **`decision` (7 roles: `orchestrator`, `product-analyst`, `project-bootstrapper`, `architect`,
-  `agent-factory`, `ux-ui-designer`, `package-planner`) — ZERO of the six tiered roles are members.** This is
-  not "reduced effect" — it is **no reachable effect at all, full stop.** The orchestrator's own doctrine never
-  invokes `--route-decide` for any of these seven roles (they are not named in the "tiered roles" sentence
-  above); every one of them is spawned as the BASE static agent directly, governed exclusively by the static
-  `[areas.<duty>]`/`[roles.<role>]` resolution
-  (`models_config.resolve_role`) baked at generation time, exactly as it is today, with or without this
-  contract. A configured `decision`-class preference is legal to write (AC-02) and produces byte-identical
-  observable behavior to no preference at all, on every one of these seven roles, unconditionally — not
-  "usually," not "on today's catalog," unconditionally, because the mechanism these seven roles use has no
-  concept of a per-decision sort at all.
+  `agent-factory`, `ux-ui-designer`, `package-planner`) — ZERO of the six tiered roles are members, and this
+  class stays genuinely inert, unchanged by `015`.** This is not "reduced effect" — it is **no reachable
+  effect at all, full stop.** The orchestrator's own doctrine never invokes `--route-decide` for any of these
+  seven roles (they are not named in the "tiered roles" sentence, `Global/_canonical/agents/
+  orchestrator.md:157-158`); every one of them is spawned as the BASE static agent directly, governed
+  exclusively by the static `[areas.<duty>]`/`[roles.<role>]` resolution (`models_config.resolve_role`) baked
+  at generation time, exactly as it is today, with or without this contract, and `015`'s redirect changes
+  nothing here — `015` only changes which candidates a `--route-decide` call produces, never whether
+  `--route-decide` is invoked in the first place. A configured `decision`-class preference is legal to write
+  (AC-02) and produces byte-identical observable behavior to no preference at all, on every one of these seven
+  roles, unconditionally, because the mechanism these seven roles use has no concept of a per-decision sort at
+  all.
 - **`grunt` (6 roles: `spec-challenger`, `package-reviewer`, `delta-reviewer`, `security-auditor`,
   `finding-verifier`, `adversarial-judge`) — 4 of 6 are tiered (`package-reviewer`, `delta-reviewer`,
-  `security-auditor`, `finding-verifier`); 2 of 6 are not (`spec-challenger`, `adversarial-judge`, which
-  behave exactly like `decision`-class roles above — no reachable effect, full stop, for a second,
-  independent reason).** For the 4 that ARE tiered, **corrected this round (R3-F-01/R3-F-03) from "one
-  provider survives, nothing to reorder" to the actual mechanism on the real, live primary-lane credential
-  shape:** on `opencode` (`[runtime].primary`), `PROVIDER_UNAUTHENTICATED` (`service.py:145`) excludes every
-  `anthropic` candidate first (`('opencode','anthropic')` probes to zero models, verified live this round —
-  see the corrected header claim above), and `REVIEW_PROVIDER_CONFLICT` (`service.py:166`) separately excludes
-  every `openai-codex` candidate that shares the writer's provider — leaving **ZERO** survivors, not one, and
-  the decision returns `REVIEWER_INDEPENDENCE_UNAVAILABLE`, a hard refusal (shipped doctrine's own
-  `Global/_canonical/agents/orchestrator.md:199-205` HARD DENIAL branch: HALT, raise `HUMAN_DECISION_REQUIRED`
-  — see Non-goals for the corrected framing). There is nothing to reorder because there is nothing left to
-  sort, a stronger and different claim than "one survivor already decided the outcome." **This still makes
-  the AC-01 byte-identical-`RouteDecision` regression test true** (a configured `grunt`-class preference
-  cannot change a decision with zero candidates either way) — but the test's own assertion must check the
-  actual `reason_codes` (`("REVIEWER_INDEPENDENCE_UNAVAILABLE",)`), not merely `RouteDecision` equality, so a
-  future reader sees the moment this shape changes (once this lane gains a real Anthropic credential, the
-  shape becomes the ORIGINAL "one survivor, tiered-but-inert" case round 1/2 described; once `015` ships and
-  redirects the effective runtime for `anthropic` candidates, the shape changes again — see `### Dependency on
-  015` below). **`spec-challenger`/`adversarial-judge`** are *not tiered at all* (doctrine never invokes
-  `--route-decide` for them), unchanged from round 2's finding.
+  `security-auditor`, `finding-verifier`) and, with `015` shipped, now have real, live effect on the primary
+  lane; 2 of 6 are not tiered at all (`spec-challenger`, `adversarial-judge`, which behave exactly like
+  `decision`-class roles above — no reachable effect, for the same operational reason).** **Re-derived this
+  round (F-01), replacing round 3's now-superseded "zero survivors" mechanism:** on `opencode`
+  (`[runtime].primary`), a reviewer candidate naming `anthropic` no longer has its authentication evaluated
+  against `opencode`'s own (unauthenticated) inventory — `_effective_runtime(facts.selected_runtime,
+  route.provider)` (`service.py:133-158`) redirects it to `claude-code` per `_PROVIDER_RUNTIME_REDIRECTS`
+  (`service.py:33`), and `claude-code`'s Anthropic OAuth credential is live-authenticated on this machine
+  (`catalog.py:135`, `claude auth status --json`). The `anthropic` candidate therefore now survives
+  `PROVIDER_UNAUTHENTICATED` (`service.py:220`) — and, being a different provider than an `openai-codex`
+  writer, also survives `REVIEW_PROVIDER_CONFLICT` (`service.py:241`, which excludes only a reviewer candidate
+  sharing the writer's own provider). **A real, non-empty, provider-diverse candidate set now reaches this
+  contract's sort-key element (`service.py:246`) for these four roles, on the primary lane, today** — the
+  regression test for this AC-01 bullet must be derived from this live effective-runtime inventory (evaluate
+  `anthropic` against `('claude-code','anthropic')`, not against `('opencode','anthropic')`, and never against
+  an injected missing-pair fixture), asserting the configured `grunt`-class preference genuinely changes
+  `RouteDecision.provider` when it ranks `anthropic` differently than the pre-existing
+  `curated_priority`/`route_id` tie-break would. **`spec-challenger`/`adversarial-judge`** stay *not tiered at
+  all* (doctrine never invokes `--route-decide` for them), unchanged from round 2's finding and unaffected by
+  `015`.
 - **`build` (7 roles: `test-writer`, `implementer`, `frontend-engineer`, `refactor-specialist`, `debugger`,
-  `repair-agent`, `integrator`) — 2 of 7 are tiered and doctrine-invoked (`implementer`, `debugger`); 5 of 7
-  are not tiered at all (`test-writer`, `frontend-engineer`, `refactor-specialist`, `repair-agent`,
-  `integrator`, governed solely by `[areas.implement]`'s static default, no reachable effect from this
-  contract).** **Corrected this round (R3-F-01, the round's headline blocking finding):** round 2 claimed
-  `implementer`/`debugger` were "the entire honest, real, live scope of this contract as it now ships" — this
-  is **wrong on the primary lane, verified live, not assumed.** `implementer`/`debugger` are writer-class
-  decisions (`role_class == "writer"`), so `REVIEW_PROVIDER_CONFLICT` never applies to them — but
-  `PROVIDER_UNAUTHENTICATED` still excludes all three `anthropic` tier rows on `opencode` today, leaving
-  exactly **ONE** surviving candidate (`openai-codex`) at every tier. A sort key with exactly one candidate to
-  sort has nothing to reorder: `candidates[0]` is fixed regardless of any configured `build`-class preference.
-  **`implementer` and `debugger` therefore have ZERO observable effect from this contract on the primary lane
-  today too — the same bottom line as every other role in the roster, for a narrower, code-level reason
-  (single-survivor, not doctrine non-invocation) rather than the wide-reaching, honest exception round 2
-  believed they were.** A regression test that asserts this must inject an inventory shaped like this
-  machine's real live probe (no `("opencode","anthropic")` key), not a more generous test fixture — the same
-  faithfulness requirement `015`'s own AC-01 states explicitly for its own tests, adopted here for the same
-  reason (see Verificación).
+  `repair-agent`, `integrator`) — 2 of 7 are tiered and doctrine-invoked (`implementer`, `debugger`), and now
+  have real, live effect on the primary lane; 5 of 7 are not tiered at all (`test-writer`,
+  `frontend-engineer`, `refactor-specialist`, `repair-agent`, `integrator`, governed solely by
+  `[areas.implement]`'s static default, no reachable effect from this contract).** **Re-derived this round
+  (F-01), replacing round 3's now-superseded "one survivor, nothing to reorder" mechanism:** `implementer`/
+  `debugger` are writer-class decisions (`role_class == "writer"`), so no independence exclusion ever applies
+  to them — the only exclusion in play is `PROVIDER_UNAUTHENTICATED` (`service.py:220`), and with the redirect
+  live, an `anthropic` candidate's authentication is now checked against `claude-code`'s live-authenticated
+  inventory, not `opencode`'s unauthenticated one. **A real second surviving candidate (`anthropic`, alongside
+  `openai-codex`) now reaches this contract's sort-key element at every tier where both providers have a
+  curated row** — a configured `build`-class preference genuinely has something to reorder for the first time
+  on the primary lane. The regression test for this bullet must, like `grunt`'s above, be derived from the
+  live effective-runtime inventory (`('claude-code','anthropic')` authenticated, `('opencode','anthropic')`
+  still absent — the redirect, not a change to `opencode`'s own credential, is what carries the effect),
+  asserting the configured preference changes `RouteDecision.provider` relative to the unbiased default order.
 
 **R2-F-03's predicate fix, verified, does not change this membership.** Round 2 found `AC-01`'s `build`
 predicate (`duty == "implement" AND capability == "code-rw"`) was not provably identical to the code it
-claimed to reuse — the real predicate, `RoutingService._role_class` (`service.py:221`), is the single-conjunct
-`capability == "code-rw"` alone, with no `duty` conjunct (verified directly, `service.py:218-223`, reproduced
+claimed to reuse — the real predicate, `RoutingService._role_class` (`service.py:302`), is the single-conjunct
+`capability == "code-rw"` alone, with no `duty` conjunct (verified directly, `service.py:299-304`, reproduced
 in `### The architectural question` above). Re-checked against `roles.tsv:11-17` directly: every one of the
 seven `capability == "code-rw"` rows also carries `duty == "implement"` — there is no row with `code-rw` and a
 different duty, and no row with `duty == "implement"` and a different capability. **The two predicates select
@@ -466,103 +477,87 @@ vs. off-lane degrade), never both at once, and neither is silently overridden by
 composition/precedence question left to resolve for this pair; R2-F-05 is closed by this precise reading, not
 by further design.
 
-**The one real, live exception today — the `pi` lane, verified this round, and precisely scoped so it is not
-mistaken for the contract's main claim.** `_PAIR_COMMANDS` (`catalog.py:133-140`) audits `("pi","anthropic")`
-and `("pi","openai-codex")` as two separate, independent pairs from the `opencode` ones. Live-probed this
-session (`pnpm dlx --package @earendil-works/pi-coding-agent@0.81.1 pi --list-models`, the exact probe
-`_PAIR_COMMANDS` runs): **both pairs return real, populated model lists** — 15 `anthropic` models (`claude-*`)
-and 6 `openai-codex` models (`gpt-5.*`) — confirming `~/.pi/agent/auth.json`'s `anthropic`/`openai-codex` keys
-(both OAuth-shaped: `type`/`refresh`/`access`/`expires`) are live-authenticated credentials, not stale ones.
-**This means a `RoutingService.route()` call made with `facts.selected_runtime == "pi"` genuinely has BOTH
-providers' candidates surviving `PROVIDER_UNAUTHENTICATED` today** — a `grunt`-class preference on the pi lane
-would face `REVIEW_PROVIDER_CONFLICT`'s single-survivor exclusion exactly as round 1/2 originally described
-(one survivor, tiered-but-inert, not zero), and a `build`-class preference on the pi lane would have TWO
-surviving candidates with something real to reorder. **Stated precisely, not overclaimed: this is a real
-exception to "zero effect everywhere today," but it is not this contract's main claim** — `pi` is not
-`[runtime].primary` (`models.toml:36`, still `opencode`), and the pi-lane's own end-to-end delegation doctrine
-(`013-pi-interactive-target`) was still `PACKAGE_PLANNING`, not shipped, as of this session — so whether any
-current, real delegation flow actually issues a `--route-decide` call with `selected_runtime="pi"` for a
-`grunt`/`build`-class role today is a separate, not-fully-verified operational question this contract does not
-resolve. The mechanism-level fact (the probe pairs are live) is confirmed; the doctrine-level fact (whether
-that lane's real delegation path reaches this contract's sort key today) is not, and is named here as an open
-question rather than assumed either way.
+**The `pi` lane, still worth naming precisely, though no longer the contract's only live exception.**
+`_PAIR_COMMANDS` (`catalog.py:133-140`) audits `("pi","anthropic")` and `("pi","openai-codex")` as two
+separate, independent pairs from the `opencode`/`claude-code` ones; both continue to probe live, real,
+populated model lists on this machine, unaffected by the redirect (which never touches `pi`'s own dispatch
+lane, by `015`'s own explicit non-goal). This is no longer this contract's headline exception — the primary
+`opencode` lane itself now has real effect for six of its twenty in-scope roles, via the redirect — but `pi`
+remains a second, independent lane where both providers survive `PROVIDER_UNAUTHENTICATED` on their own,
+without needing any redirect at all.
 
-**Why this doesn't make the contract pointless, stated plainly.** The mechanism is correct, uniform, and fully
-specified for all three classes (proven by the mechanism-correctness tests in Verificación, which inject a
-synthetic inventory rather than depend on any lane's live credential state) — it simply has **zero observable
-effect on the primary `opencode` lane today, for every class, full stop**, corrected from round 2's belief that
-`implementer`/`debugger` were a working exception. `decision` in full, `grunt` in full, and `build` in full are
-kept in the taxonomy anyway — never removed — for exactly the reason round 1 already established: no role
-should be pinned to a hardcoded model by construction, ready with zero further code change the moment more
-roles become tiered, the primary lane gains a real Anthropic credential, or (see `### Dependency on 015`
-immediately below) `015` ships its cross-lane redirect. Their current, observable, real-world effect on the
-primary lane is stated here as **zero, for all 20 in-scope roles, no exceptions**, with a regression test
-proving it — not a silent gap, an audited fact.
+**Why the taxonomy was never pointless, restated now that the mechanism is live rather than hypothetical.**
+The mechanism is correct, uniform, and fully specified for all three classes (proven by the mechanism-
+correctness tests in Verificación, which exercise a synthetic inventory to prove the sort key itself is
+uniform across classes) — and, as of this round, it also has **real, live, observable effect on the primary
+`opencode` lane today for `grunt`'s four tiered roles and `build`'s two tiered roles (six of the twenty
+in-scope roles)**, verified against the live effective-runtime inventory, not asserted from a synthetic
+fixture. `decision` in full, and the fourteen non-tiered `grunt`/`build` roles, stay kept in the taxonomy
+anyway — never removed — for the same "no role hardcoded by construction" reason round 1 already established:
+they become live the moment more roles become dynamically tiered, with zero further code change to this
+contract either way.
 
-### Dependency on `015` — precisely, with real AC numbers, not a vague forward-pointer (round 3, resolves the
-open question round 3's challenge raised: does `014` target the lane `015` is designing toward, ship gated on
-an external prerequisite, or wait for `015`?)
+### `015` dependency — closed (round 4; `015-anthropic-dispatch-parity` is DONE and merged, superseding round
+3's forward-looking framing)
 
-**Answer: `014` ships as specified now — its mechanism is complete and correct — and its real-world effect on
-the primary lane is contingent on `015`, an external prerequisite `014` does not deliver and does not need to
-wait for**, because `014` never edits routing/doctrine and needs zero code change once `015` lands. `015` was
-completely redesigned in parallel this session (now its own contract **2.0.0**, pre-challenge as of this
-citation, `docs/specs/015-anthropic-dispatch-parity/spec.md`) around a cross-lane provider redirect: **AC-01**
-("Provider-aware effective-runtime resolution") makes `RoutingService.route()` resolve a route's
+**`015` shipped, exactly as rounds 1-3 predicted it would, with zero code change required to `014`.** `015`'s
+own **AC-01** ("Provider-aware effective-runtime resolution") makes `RoutingService.route()` resolve a route's
 authentication against an **effective runtime** — `facts.selected_runtime` for `openai-codex` (unchanged), or
-`claude-code` for `anthropic` (the one redirect `015` configures) — "for both writer and review decisions"
-(`015/spec.md` AC-01, verbatim). **AC-04** ("Review-independence gap closed via the redirect") adds an explicit
-orchestrator-doctrine branch so the everyday verified-review shape spawns via the redirect instead of hitting
-`REVIEWER_INDEPENDENCE_UNAVAILABLE`, while `015`'s own AC-04 second regression test explicitly preserves the
-`REVIEWER_INDEPENDENCE_UNAVAILABLE` HALT when no redirect exists anywhere (ADR-0011 D4 untouched).
+`claude-code` for `anthropic` (`_PROVIDER_RUNTIME_REDIRECTS`, `service.py:33`) — for both writer and review
+decisions, and it is live on this machine (`catalog.py:135`, `claude auth status --json`, live-authenticated).
+`015`'s **AC-04** ("Review-independence gap closed via the redirect") added the explicit orchestrator-doctrine
+branch so the everyday verified-review shape spawns via the redirect instead of hitting
+`REVIEWER_INDEPENDENCE_UNAVAILABLE`, while still preserving the `REVIEWER_INDEPENDENCE_UNAVAILABLE` HALT when
+no redirect exists anywhere (ADR-0011 D4 untouched, shipped doctrine's own HARD DENIAL branch,
+`Global/_canonical/agents/orchestrator.md:255-261`).
 
-**Concretely, for `014`, once `015` ships (both, per `015`'s own AC-01 wording, "for both writer and review
-decisions"):**
-- `014`'s **`build` class** (`implementer`, `debugger`, its only 2 tiered roles) gains real effect: `anthropic`
-  candidates stop being excluded by `PROVIDER_UNAUTHENTICATED` on the primary lane (the effective runtime
-  becomes `claude-code`, which is already live-authenticated, `015` §C), restoring the second candidate this
-  contract's sort key needs to have anything to reorder.
+**Concretely, for `014`, now that `015` has shipped:**
+- `014`'s **`build` class** (`implementer`, `debugger`, its only 2 tiered roles) has real effect: `anthropic`
+  candidates are no longer excluded by `PROVIDER_UNAUTHENTICATED` (`service.py:220`) on the primary lane —
+  the effective runtime resolves to `claude-code`, live-authenticated — restoring the second candidate this
+  contract's sort key needs to have anything to reorder. See `### Honest scope` above for the mechanism.
 - `014`'s **`grunt` class** (its 4 tiered roles: `delta-reviewer`, `finding-verifier`, `package-reviewer`,
-  `security-auditor`) *also* gains real effect — not just `build`, correcting round 2's belief that only
-  `build` would benefit. Once the redirect resolves an `anthropic` reviewer candidate against `claude-code`'s
-  live credential, it survives `PROVIDER_UNAUTHENTICATED` and — being a different provider than an
-  `openai-codex` writer — survives `REVIEW_PROVIDER_CONFLICT` too, so a real, non-empty candidate set (not a
-  `REVIEWER_INDEPENDENCE_UNAVAILABLE` refusal) reaches this contract's sort-key element for the first time on
-  the primary lane.
-- `014`'s **`decision` class** (0 tiered roles) **stays permanently inert under both scenarios, worth stating
-  plainly since it is the one class `015` can never help**: the reason `decision`'s seven roles have no
-  reachable effect is not a credential/exclusion problem `015` fixes — it is that the shipped orchestrator
-  doctrine never invokes `--route-decide` for any of them at all (see the `decision` bullet above). `015`'s
-  redirect only ever changes which candidates a `--route-decide` call produces; it has no effect on whether
-  `--route-decide` is invoked in the first place.
+  `security-auditor`) also has real effect, not just `build`. Once the redirect resolves an `anthropic`
+  reviewer candidate against `claude-code`'s live credential, it survives `PROVIDER_UNAUTHENTICATED` and —
+  being a different provider than an `openai-codex` writer — survives `REVIEW_PROVIDER_CONFLICT`
+  (`service.py:241`) too, so a real, non-empty candidate set (not a `REVIEWER_INDEPENDENCE_UNAVAILABLE`
+  refusal) reaches this contract's sort-key element on the primary lane.
+- `014`'s **`decision` class** (0 tiered roles) **stays permanently inert, the one class `015` was never able
+  to help**: the reason `decision`'s seven roles have no reachable effect is not a credential/exclusion
+  problem `015` closes — it is that the shipped orchestrator doctrine never invokes `--route-decide` for any
+  of them at all (see the `decision` bullet above). `015`'s redirect only ever changes which candidates a
+  `--route-decide` call produces; it has no effect on whether `--route-decide` is invoked in the first place.
 
-**No code change to `014` is required for either of the above** — this contract's own sort-key element
-(AC-04) already reorders whatever candidates the exclusion loop leaves standing; `015`'s change happens
-entirely upstream of it, inside the exclusion loop itself. This dependency is named here as the accurate
-answer to round 3's open question, not resolved by shipping `014` gated on `015`, nor by waiting for `015` to
-land first: `014`'s own spec, taxonomy, config surface, and mechanism are complete and correct today,
-independent of `015`'s timeline.
+**No code change to `014` was required for either of the above** — this contract's own sort-key element
+(AC-04) already reorders whatever candidates the exclusion loop leaves standing; `015`'s change happened
+entirely upstream of it, inside the exclusion loop itself, exactly as designed and predicted. This section is
+now a closed, historical record of a dependency that has been satisfied, kept here (rather than deleted) so a
+future reader sees why `014`'s mechanism needed no rework once `015` landed.
 
 ## Alcance
 
 In scope: a configurable, role-class-scoped tie-break weight, consulted at one precise point inside the
 already-accepted dynamic selector (`RoutingService.route()`), plus the configuration surface, its CLI writer,
-and the role-class taxonomy that feed it. **Corrected this round (R3-F-01, blocking) — stated once here,
-prominently, and never contradicted below: on the primary `opencode` lane, today, this mechanism has ZERO
-observable, live effect for ALL 20 in-scope roles, across all three classes alike, no exceptions —
-`implementer`/`debugger` included.** `('opencode','anthropic')` probes to zero models on this machine, so
-`PROVIDER_UNAUTHENTICATED` excludes every `anthropic` candidate on this lane; `build`'s two tiered roles are
-left with exactly one surviving candidate (nothing to reorder) and `grunt`'s four tiered roles are left with
-zero surviving candidates (`REVIEWER_INDEPENDENCE_UNAVAILABLE`, a hard refusal). This is a real, verified,
-observable-effect claim about the primary lane today — not a hypothetical — and it is `015`'s prerequisite gap
-(cross-lane Anthropic dispatch), not a defect of this contract's own design; see `### Dependency on 015`
-(Contexto) for exactly how, and for which classes, that changes once `015` ships, with zero code change to
-`014`. The one real exception is the `pi` lane (not `[runtime].primary`), where both `anthropic` and
-`openai-codex` probe live today — named precisely, not as this contract's main claim, in `### Honest scope`.
-Every in-scope role is legal to configure (AC-02) and the taxonomy is kept in full regardless, for the same
-"no role hardcoded by construction" reason round 1 established — but its real, current, observable effect on
-the primary lane is zero, proven by regression test, not merely asserted. See `### Honest scope` in Contexto
-for the full, verified, per-lane breakdown.
+and the role-class taxonomy that feed it. **Re-baselined this round (F-01, high, blocking) — stated once here,
+prominently, and never contradicted below: on the primary `opencode` lane, today, `015-anthropic-dispatch-
+parity` is DONE and merged, and this mechanism has REAL, observable, live effect for six of the twenty
+in-scope roles — `grunt`'s four tiered roles (`delta-reviewer`, `finding-verifier`, `package-reviewer`,
+`security-auditor`) and `build`'s two tiered roles (`implementer`, `debugger`).** The redirect
+(`_PROVIDER_RUNTIME_REDIRECTS = {"anthropic": "claude-code"}`, `service.py:33`) resolves an `anthropic`
+candidate's authentication against `claude-code`'s live-authenticated inventory instead of `opencode`'s own
+unauthenticated one, so the `anthropic` candidate now survives `PROVIDER_UNAUTHENTICATED` (`service.py:220`)
+and, for a reviewer decision, also survives `REVIEW_PROVIDER_CONFLICT` (`service.py:241`) whenever the writer
+is `openai-codex` — a real, non-empty, provider-diverse candidate set now reaches this contract's sort-key
+element (`service.py:246`) for these six roles, on the primary lane, today. **`decision`'s seven roles, and
+the fourteen non-tiered `grunt`/`build` roles, remain genuinely inert** — not a credential gap, but because
+the shipped orchestrator doctrine never invokes `--route-decide` for them at all
+(`Global/_canonical/agents/orchestrator.md:157-158`), an operational fact `015` cannot change. The `pi` lane
+(not `[runtime].primary`) remains a second, independent lane where both `anthropic` and `openai-codex` probe
+live without needing any redirect — named precisely in `### Honest scope`, not this contract's main claim any
+more now that the primary lane itself has real effect. Every in-scope role is legal to configure (AC-02) and
+the taxonomy is kept in full regardless, for the same "no role hardcoded by construction" reason round 1
+established. See `### Honest scope` in Contexto for the full, verified, per-role breakdown, derived from the
+live effective-runtime inventory, not an injected fixture.
 
 - A closed, three-class, disjoint role taxonomy (`decision`, `grunt`, `build`) over `roles.tsv`'s existing
   `capability`/`duty` columns, with every other role explicitly `unscoped` (AC-01) — kept in full even though
@@ -583,10 +578,11 @@ for the full, verified, per-lane breakdown.
 - The ADR that records this design, required as a delivery criterion of the package, not before
   `USER_APPROVAL` (AC-09).
 
-**Explicitly out of scope, stated once here and restated in Non-goals:** fixing the pre-existing, system-wide
-gap that currently discards any routed decision naming `anthropic` in all three lanes (separate feature `015`);
-widening which roles are dynamically tiered (a static-roster fact this contract observes, never edits); and the
-future "gateway" model idea (see `## Future work`).
+**Explicitly out of scope, stated once here and restated in Non-goals:** the cross-lane Anthropic-dispatch fix
+itself (already delivered by `015-anthropic-dispatch-parity`, DONE and merged — `014` only ever consumed its
+effect, never delivered or maintained it); widening which roles are dynamically tiered (a static-roster fact
+this contract observes, never edits); onboarding a standalone "Kimi Code" credential surface (see below); and
+the future "gateway" model idea (see `## Future work`).
 
 ## Non-goals (explicit, so a later package does not assume them included)
 
@@ -608,8 +604,8 @@ future "gateway" model idea (see `## Future work`).
   "per-harness-install" name the same physical location and trust domain in this repo (both are the
   operator's own `$HOME`, both already trusted per `ADR-0008`'s own table) and are used interchangeably below.
 - **No dependency on `011-quota-failover`.** This contract's weight consults only the existing
-  `PROVIDER_UNAUTHENTICATED` live-inventory exclusion (`service.py:145`); it never reads `provider_exhausted`
-  (conditionally consulted at `service.py:143` only when `self.store is not None` — never on the
+  `PROVIDER_UNAUTHENTICATED` live-inventory exclusion (`service.py:220`); it never reads `provider_exhausted`
+  (conditionally consulted at `service.py:214` only when `self.store is not None` — never on the
   simulate/explain lane — and backed by `011`'s `provider_exhaustions` table) and behaves identically whether
   `011` is ever accepted or stays `BLOCKED`.
 - **No cost model, no daily-USD ceiling, no metered-vs-subscription comparison of any kind.** This contract
@@ -635,8 +631,9 @@ future "gateway" model idea (see `## Future work`).
   feature; this contract makes it somewhat more likely (decisions can now concentrate deliberately on one
   provider) but does not create a new failure mode. It closes automatically once `011` is ever accepted, with
   no action needed from this contract.
-- **The `grunt` class's current live inertness on the two-provider catalog is accepted, kept, and proven, not
-  removed.** See AC-01.
+- **`grunt`'s two non-tiered roles (`spec-challenger`, `adversarial-judge`) and `decision`'s seven roles stay
+  genuinely inert, accepted as-is, not mitigated here (re-baselined this round, F-01) — `grunt`'s four tiered
+  roles are NOT inert any more, now that `015` has shipped.** See AC-01, `### Honest scope`.
 - **Absent configuration at every layer (no file, or the role is `unscoped`) produces byte-identical candidate
   ordering to today's** — the default behavior of `008-dynamic-selection`'s P1-accepted selector is unbiased
   and unchanged (AC-04, AC-06).
@@ -649,58 +646,21 @@ future "gateway" model idea (see `## Future work`).
   have zero observable effect from this contract today — not a defect of this contract's design, a fact about
   which roles the rest of the harness has chosen to route dynamically at all. Widening that roster is real,
   separate, prerequisite work this contract does not scope or deliver. See `### Honest scope` in Contexto.
-- **No fix to the pre-existing, cross-lane gap that excludes every `anthropic` candidate on the primary
-  `opencode` lane today — corrected this round (R3-F-02, blocking): this is a fail-CLOSED availability/liveness
-  problem, not a fail-open security defeat, and `014` neither causes nor fixes it (`015`'s prerequisite, see
-  `### Dependency on 015`, Contexto).** `014`'s own prior draft (contract 3.0.0) imported an "already silently
-  defeated in practice, today... the common case, not an edge case" framing from `015`'s own round-1
-  (contract 1.0.0) draft — round 3 found `015`'s own round-1 challenge already corrected this before `014`'s
-  3.0.0 was written, and `014` had not picked up the correction. The real, verified behavior, read from `015`'s
-  current spec (`docs/specs/015-anthropic-dispatch-parity/spec.md` §D.1, a live hermetic reproduction, not a
-  hypothetical) and from the shipped doctrine's own text (`Global/_canonical/agents/orchestrator.md:199-205`,
-  byte-identical across all three generated copies): on this machine, today, a routed review decision that
-  would need `anthropic` for provider-diversity does **not** silently degrade to a same-provider reviewer — it
-  hits **zero** surviving candidates (`PROVIDER_UNAUTHENTICATED` excludes the `anthropic` side,
-  `REVIEW_PROVIDER_CONFLICT` excludes the `openai-codex` side) and returns `REVIEWER_INDEPENDENCE_UNAVAILABLE`,
-  which the shipped doctrine's own fail-closed HARD DENIAL branch treats as a HALT requiring
-  `HUMAN_DECISION_REQUIRED` (`Global/_canonical/agents/orchestrator.md:199-205`, explicit in its own text: "the
-  routing brain actively REFUSING the request... do not spawn anything... Stop and raise
-  `HUMAN_DECISION_REQUIRED`"). **This is a real availability problem — reviews cannot run at all when only one
-  provider is available — not a silent bypass of the independence guarantee.** Two distinct, both pre-existing,
-  neither caused nor fixed by `014`:
-  1. **Writer-side (`build`-class relevant).** Read directly, byte-identical across all three generated copies
-     of the shipped orchestrator doctrine (`Global/claude-code/agents/orchestrator.md:199-201`,
-     `Global/opencode/agents/orchestrator.md`, `Global/codex/agents/orchestrator.toml:192-194` — none touched by
-     this contract): whenever a routed decision comes back `ok=true, execution_enabled=true` with
-     `data.provider != "openai-codex"`, the doctrine treats it as a legitimate "off-lane model" degrade, closes
-     the run, and spawns the BASE static agent instead, for every lane alike. **On the primary lane today, this
-     branch is structurally unreachable for `014`'s `build`-class roles anyway** — a routed decision can never
-     name `anthropic` in the first place, because `PROVIDER_UNAUTHENTICATED` already excludes it from the
-     candidate list before the sort key runs (see `### Honest scope`, Contexto).
-  2. **Reviewer-side (`grunt`-class relevant) — a hard, fail-closed HALT, not a fail-open degrade, corrected
-     this round from 3.0.0's wrong framing.** `015`'s own §D investigation (`docs/specs/015-anthropic-
-     dispatch-parity/spec.md:156-176`, a live-executed hermetic reproduction against this machine's real
-     credential shape, not a static trace) found the doctrine never reaches the ambiguous shape 1.0.0's
-     original trace worried about (`ok=true`, `data.provider="anthropic"`, `execution_enabled=false`) — that
-     shape assumed `('opencode','anthropic')` was authenticated, which it is not on this machine. The real
-     shape is `REVIEWER_INDEPENDENCE_UNAVAILABLE`, a hard denial the doctrine's own HARD DENIAL branch (3c)
-     halts on unconditionally. **This is directly the same mechanism this contract's own `grunt`-class
-     inertness proof (AC-01) rests on** — `PROVIDER_UNAUTHENTICATED` and `REVIEW_PROVIDER_CONFLICT` together
-     narrow the candidate list to **zero survivors** on the primary lane today (corrected from 3.0.0's "at most
-     one survivor" — R3-F-03), before this contract's sort-key element is ever consulted, which is why a
-     `grunt`-class preference has zero effect on `RouteDecision` regardless. Severe (it blocks every ordinary
-     review's throughput today, requiring a human every time), but a fail-closed severity, not a fail-open one.
-  **Neither manifestation is caused by `014`, and `014` fixes neither** — `015` (its own contract 2.0.0,
-  pre-challenge as of this citation) addresses both, per its own AC-01/AC-04 (see `### Dependency on 015`,
-  Contexto, for the exact mechanism and which of `014`'s classes benefit). **Corrected this round: `014`'s own
-  `decision`/`grunt`/`build`-class preferences toward `anthropic` are fully specified but, on the primary lane
-  today, do NOT genuinely reorder anything toward `anthropic`** — an `anthropic` candidate is excluded from the
-  candidate list entirely by `PROVIDER_UNAUTHENTICATED` before this contract's sort key ever runs, so there is
-  nothing for the preference to reorder toward, on any class, today (this corrects 3.0.0's claim that the
-  sort-key mechanism "genuinely reorders `RouteDecision.provider` toward `anthropic` when so configured" — that
-  claim was only ever true against a synthetic test inventory with `anthropic` authenticated, never against
-  this machine's real, live credential shape). See `### Honest scope` and `### Dependency on 015` in Contexto,
-  and the Verificación section's rewritten fixture-that-would-fool-it test.
+- **No fix to any cross-lane Anthropic-dispatch gap — closed, historical, kept here only as the record of what
+  used to be true (round 4, F-01, high, blocking, supersedes round 3's still-open framing entirely).**
+  `015-anthropic-dispatch-parity` is DONE and merged: the primary `opencode` lane's `anthropic` candidates now
+  resolve their authentication against `claude-code`'s live-authenticated inventory
+  (`_PROVIDER_RUNTIME_REDIRECTS`, `service.py:33`), so the gap rounds 1-3 documented at length — a reviewer
+  decision needing `anthropic` for provider-diversity hitting zero surviving candidates and returning
+  `REVIEWER_INDEPENDENCE_UNAVAILABLE`, the shipped doctrine's own fail-closed HARD DENIAL branch
+  (`Global/_canonical/agents/orchestrator.md:255-261`) halting on it — no longer reproduces on this machine for
+  `014`'s six now-live tiered roles. `014` never delivered this fix and never owns it; it only consumes its
+  effect, exactly as `### 015 dependency — closed` (Contexto) states. **`014`'s own `decision`/`grunt`/`build`-
+  class preferences toward `anthropic` now DO genuinely reorder `RouteDecision.provider`** for `grunt`'s four
+  tiered roles and `build`'s two tiered roles, on the primary lane, verified against the live effective-runtime
+  inventory — the exact reversal of round 3's "do NOT genuinely reorder anything toward `anthropic`" claim. See
+  `### Honest scope` and `### 015 dependency — closed` in Contexto, and the Verificación section's rewritten
+  fixture-that-would-fool-it rule.
 - **No unset/remove CLI mechanism for the sibling `model-preference.toml` file (round 3, R3-F-04(e)).**
   `--model-preference-show` (read-only, AC-02) is delivered by this contract; removing or clearing an existing
   `[preference]`/`[role_override]` entry is not — that is separate, deferred, follow-up work. Until it lands,
@@ -725,9 +685,10 @@ have to rediscover it from a chat transcript.
 ## Acceptance Criteria
 
 - **AC-01 — a closed, disjoint, three-class taxonomy derived from `roles.tsv`'s real columns, with the
-  adversarial-judge contradiction resolved explicitly, and — new this round, replacing round 2's blended
-  "inertness" claims — a precise, per-class, per-role statement of which of the taxonomy's 20 in-scope roles
-  have real, live, observable effect TODAY and which do not, and why (round 2 → round 3, R2-F-02).** Three
+  adversarial-judge contradiction resolved explicitly, and a precise, per-class, per-role statement of which of
+  the taxonomy's 20 in-scope roles have real, live, observable effect TODAY and which do not, and why
+  (re-baselined round 4, F-01, against the post-`015` tree — `015-anthropic-dispatch-parity` is DONE and
+  merged).** Three
   in-scope classes, cross-checked directly this round against `models.toml`'s `[roles.<role>.tiers.*]` tables
   (`models.toml:151-232` — the closed, six-role universe of dynamically-tiered roles: `debugger`,
   `delta-reviewer`, `finding-verifier`, `implementer`, `package-reviewer`, `security-auditor`; no other role
@@ -736,8 +697,9 @@ have to rediscover it from a chat transcript.
     `product-analyst`, `project-bootstrapper`, `agent-factory`, `ux-ui-designer`, `package-planner` —
     `roles.tsv:4-8,10`). Seven roles total. `orchestrator` and `architect` are the user's own two named
     examples; the other four `duty="docs"` roles are swept in by the same generalization ("by extension any
-    role that makes judgment calls") the user's own prose already invoked — stated here as an explicit product
-    decision, flagged for `USER_APPROVAL`, not a rediscovered rule.
+    role that makes judgment calls") the user's own prose already invoked — an explicit product decision,
+    **confirmed correct by the user, verbatim, round 4 (user decision #2, 2026-08-02)**, not a rediscovered
+    rule.
     **Real-effect statement (honest scope, this round): ZERO of these seven roles are dynamically tiered, and
     the reason is operational, not a `RouteDecision`-level code exclusion — stated precisely so the claim is
     not overstated in either direction (round 2 → round 3 self-correction, verified by re-reading the code, not
@@ -762,50 +724,45 @@ have to rediscover it from a chat transcript.
     effect" claim rests on the doctrine citation above, not on a byte-identical-`RouteDecision` assertion,
     which would be false if attempted. See Verificación for how AC-01's regression coverage is split
     accordingly between the mechanism-correctness proof (all 28 roles, all four classes alike) and the
-    real-world-reachability proof (doctrine citation, for the 22 non-tiered roles; code-level hard-exclusion
-    test, for `grunt`'s 4 tiered-but-inert roles).
+    real-world-reachability proof (doctrine citation, for the 22 non-tiered roles; a live-effective-runtime
+    regression test, for `grunt`'s four and `build`'s two now-live tiered roles, per F-01's re-baseline).
   - **`grunt`** = `capability == "review-ro" AND duty IN {"audit", "judge"}` — `spec-challenger`,
     `package-reviewer`, `delta-reviewer`, `security-auditor`, `finding-verifier`, `adversarial-judge`
     (`roles.tsv:9,20-24`). Six roles total. **This is the exact predicate `RoutingService._role_class` already
-    computes as `"review"` (`service.py:222`)** — reused by definition, not re-derived.
-    **`adversarial-judge` is placed here, definitively, resolving the contradiction named in Contexto:**
-    its real `roles.tsv` shape (`temperature=0.0`, `capability=review-ro`, `duty=judge`) is structurally
-    identical to the other five roles the user's own second bullet named as the grunt/bulk-verification
-    archetype, and has nothing in common with `architect`'s shape (`temperature=0.2`, `capability=docs-rw`,
-    `duty=docs`) — the parenthetical mention of "adversarial judges" alongside "architect" in the user's first
-    bullet is read as a drafting slip, not a deliberate reclassification of the review pipeline.
-    **Real-effect statement, corrected this round (R3-F-03, mechanical) to state TWO distinct, independent
-    reasons instead of one blended claim — and to correct which kind of proof applies to each, and the actual
-    survivor count on the primary lane today:** (a) `package-reviewer`, `delta-reviewer`, `security-auditor`,
-    `finding-verifier` — 4 of 6 — ARE dynamically tiered (named in the doctrine's own "tiered roles" sentence,
+    computes as `"review"` (`service.py:303`)** — reused by definition, not re-derived.
+    **`adversarial-judge` is placed here, definitively, resolving the contradiction named in Contexto, and
+    confirmed correct by the user, verbatim, round 4 (user decision #2, 2026-08-02):** its real `roles.tsv`
+    shape (`temperature=0.0`, `capability=review-ro`, `duty=judge`) is structurally identical to the other five
+    roles the user's own second bullet named as the grunt/bulk-verification archetype, and has nothing in
+    common with `architect`'s shape (`temperature=0.2`, `capability=docs-rw`, `duty=docs`) — the parenthetical
+    mention of "adversarial judges" alongside "architect" in the user's first bullet is read as a drafting
+    slip, not a deliberate reclassification of the review pipeline.
+    **Real-effect statement, re-derived this round (F-01, high, blocking — replacing round 3's now-superseded
+    "zero survivors" claim) against the post-`015` tree, where `015-anthropic-dispatch-parity` is DONE and
+    merged:** (a) `package-reviewer`, `delta-reviewer`, `security-auditor`, `finding-verifier` — 4 of 6 — ARE
+    dynamically tiered (named in the doctrine's own "tiered roles" sentence,
     `Global/_canonical/agents/orchestrator.md:157-158`, and `--route-decide` genuinely IS invoked for them in
-    real operation), but are *tiered-yet-inert-by-hard-exclusion*. **Corrected this round: on the primary
-    `opencode` lane today, the mechanism is not "one provider survives" — it is ZERO survivors.**
-    `PROVIDER_UNAUTHENTICATED` (`service.py:145`) excludes every `anthropic` candidate first (verified live,
-    `('opencode','anthropic')` probes to zero models on this machine), and `REVIEW_PROVIDER_CONFLICT`
-    (`service.py:166`, see AC-04's corrected attribution) separately excludes every `openai-codex` candidate
-    that shares the writer's provider — together leaving no candidate at all, and the decision returns
-    `REVIEWER_INDEPENDENCE_UNAVAILABLE` (a hard refusal the shipped doctrine halts on,
-    `Global/_canonical/agents/orchestrator.md:199-205` — see Non-goals), before this contract's preference is
-    ever consulted. **This is still provable by a byte-identical-`RouteDecision` regression test** (a
-    configured preference cannot reorder a candidate list of length zero either way), **but the test's own
-    assertion must check the actual `reason_codes`** — `assertEqual(decision.reason_codes,
-    ("REVIEWER_INDEPENDENCE_UNAVAILABLE",))` — not merely `RouteDecision` equality, so a future reader can see
-    this test's meaning change the day this lane gains a real Anthropic credential (the shape reverts to the
-    ORIGINAL "one survivor, tiered-but-inert" case, still byte-identical but for a different reason) or the day
-    `015` ships its cross-lane redirect (the shape changes again — see `### Dependency on 015`, Contexto — and
-    the test must then assert the preference DOES change `RouteDecision.provider`, no longer byte-identical).
-    It becomes observably active the moment a third provider gains real `routes.v1.toml` rows OR `015` ships,
-    with zero further code change to `014` either way. (b) `spec-challenger`, `adversarial-judge` — 2 of 6 —
-    are **not dynamically tiered at all**, the same operational reason `decision`'s seven roles are inert (the
-    doctrine never invokes `--route-decide` for them either) — **not** provable by a byte-identical-
-    `RouteDecision` test (that would be false if attempted, for the same reason explained under `decision`
-    above: the sort key would genuinely reorder their candidates if the CLI were invoked directly); proven
-    instead by the same doctrine-citation argument. Both facts are named, precisely, with the correct proof
-    mechanism for each, not blended into one claim or one test.
+    real operation) and now have **real, live effect on the primary `opencode` lane**, verified against the
+    live effective-runtime inventory, not an injected fixture. `_effective_runtime(facts.selected_runtime,
+    route.provider)` (`service.py:133-158`) redirects an `anthropic` candidate's authentication check to
+    `claude-code` (`_PROVIDER_RUNTIME_REDIRECTS`, `service.py:33`), which is live-authenticated on this
+    machine — so the `anthropic` candidate now survives `PROVIDER_UNAUTHENTICATED` (`service.py:220`), and,
+    being a different provider than an `openai-codex` writer, also survives `REVIEW_PROVIDER_CONFLICT`
+    (`service.py:241`, see AC-04's attribution). **The regression test for this bullet must be derived from
+    this live effective-runtime inventory (evaluate `anthropic` against `('claude-code','anthropic')`, not
+    `('opencode','anthropic')`, and never against an injected missing-pair fixture)**, asserting a configured
+    `grunt`-class preference genuinely changes `RouteDecision.provider` relative to the unbiased
+    `curated_priority`/`route_id` tie-break — no longer a byte-identical-output assertion, the exact reversal
+    of round 3's "zero survivors, `REVIEWER_INDEPENDENCE_UNAVAILABLE`" mechanism, which described a real state
+    of this machine before `015` shipped but is stale now. (b) `spec-challenger`, `adversarial-judge` — 2 of 6
+    — are **not dynamically tiered at all**, the same operational reason `decision`'s seven roles are inert
+    (the doctrine never invokes `--route-decide` for them either) — **not** provable by a byte-identical-
+    `RouteDecision` test (the sort key would genuinely reorder their candidates if the CLI were invoked
+    directly); proven instead by the same doctrine-citation argument. Both facts are named, precisely, with
+    the correct proof mechanism for each, not blended into one claim or one test.
   - **`build`** (scope-widened in round 1, predicate corrected this round — R2-F-03) = **`capability ==
     "code-rw"`** — the literal, single-conjunct predicate `RoutingService._role_class` already computes as
-    `"writer"` (`service.py:221`), reused by definition, the same way `grunt` reuses `"review"` — **not**
+    `"writer"` (`service.py:302`), reused by definition, the same way `grunt` reuses `"review"` — **not**
     `duty == "implement" AND capability == "code-rw"` as previously stated, which round 2 found was not
     provably identical to the code it claimed to reuse. Re-verified directly against `roles.tsv:11-17`: every
     `code-rw` row also carries `duty == "implement"` and vice versa, so **membership is unchanged** —
@@ -814,46 +771,46 @@ have to rediscover it from a chat transcript.
     compound one asserted to be equivalent. See `### The architectural question` in Contexto for why this
     class shares AC-04's integration point unchanged, and `### Design decision` for why this does not recreate
     a second source of truth against `[areas.implement]`.
-    **Real-effect statement — corrected this round (R3-F-01, blocking; this is the round's headline finding,
-    reversing round 2's own headline claim): 2 of 7 are dynamically tiered and doctrine-invoked — `implementer`,
-    `debugger` (both named in the doctrine's own "tiered roles" sentence,
-    `Global/_canonical/agents/orchestrator.md:157-158`) — but on the primary `opencode` lane today, they have
-    the SAME zero observable effect as every other role in the roster, for a third, distinct reason.** Unlike
-    `grunt`'s reviewer decisions, no independence exclusion applies to a writer-class decision — so
-    `PROVIDER_UNAUTHENTICATED` (`service.py:145`) is the ONLY exclusion in play, and it excludes all three
-    `anthropic` tier rows on this lane (verified live, `('opencode','anthropic')` probes to zero models),
-    leaving exactly **ONE** surviving candidate (`openai-codex`) at every tier. A sort key with one candidate to
-    sort has nothing to reorder: `candidates[0]` is fixed regardless of any configured `build`-class preference.
-    **Round 2's claim that these two roles were "the entire real, live, working scope of this contract as it
-    now ships" did not verify this machine's actual credential shape and is retracted** — a hermetic regression
-    test using `tests/test_routing.py`'s own more generous default fixture (which DOES include an authenticated
-    `('opencode','anthropic')` key) would have gone green on that claim even though it is false against the
-    real, live catalog; this contract's own real-effect tests must instead inject an inventory shaped like this
-    machine's real probe (no such key), the same faithfulness requirement `015`'s own AC-01 states for its
-    tests. The other 5 — `test-writer`, `frontend-engineer`, `refactor-specialist`, `repair-agent`,
+    **Real-effect statement — re-derived this round (F-01, high, blocking; the round's headline finding,
+    reversing round 3's own headline claim now that `015-anthropic-dispatch-parity` is DONE and merged): 2 of 7
+    are dynamically tiered and doctrine-invoked — `implementer`, `debugger` (both named in the doctrine's own
+    "tiered roles" sentence, `Global/_canonical/agents/orchestrator.md:157-158`) — and now have real, live
+    effect on the primary `opencode` lane.** Unlike `grunt`'s reviewer decisions, no independence exclusion
+    applies to a writer-class decision — so `PROVIDER_UNAUTHENTICATED` (`service.py:220`) is the ONLY
+    exclusion in play, and, with the redirect live, an `anthropic` candidate's authentication now resolves
+    against `claude-code`'s live-authenticated inventory instead of `opencode`'s own — surviving the exclusion
+    and producing a real second candidate (`anthropic`, alongside `openai-codex`) at every tier where both
+    providers have a curated row. **A configured `build`-class preference now genuinely has something to
+    reorder**, the exact reversal of round 3's "`candidates[0]` is fixed regardless of any configured
+    `build`-class preference" claim, which described a real state of this machine before `015` shipped but is
+    stale now. The regression test for this bullet must be derived from the live effective-runtime inventory
+    (`('claude-code','anthropic')` authenticated, `('opencode','anthropic')` still absent — the redirect, not a
+    change to `opencode`'s own credential, carries the effect), asserting the configured preference changes
+    `RouteDecision.provider` relative to the unbiased default order — no longer a byte-identical-output
+    assertion. The other 5 — `test-writer`, `frontend-engineer`, `refactor-specialist`, `repair-agent`,
     `integrator` — remain not dynamically tiered at all, the same operational reason as `decision`'s seven
     roles: the doctrine never invokes `--route-decide` for them, spawning the BASE static agent directly,
     governed solely by `[areas.implement]`'s static default. **Not provable by a byte-identical-`RouteDecision`
     test** (as with `decision`'s roles and `grunt`'s two non-tiered roles, the sort key would genuinely reorder
     their candidates if `--route-decide` were invoked for them directly — the mechanism is uniform by design);
     proven instead by the same doctrine-citation argument used for `decision`'s roles (see Verificación). See
-    `### Dependency on 015` (Contexto) for the concrete, cited mechanism by which `implementer`/`debugger`
-    regain real effect once `015` ships.
+    `### 015 dependency — closed` (Contexto) for the concrete, cited mechanism by which `implementer`/
+    `debugger` regained real effect once `015` shipped.
   - **Every other role (8 of 28: `brainstormer`, `image-describer`, both `gate`-duty roles,
     `github-release-manager`, `memory-scribe`, `app-runner`, `runtime-verifier`) is `unscoped`** — untouched by
     this contract's configuration or code path, exactly today's behavior. (Round 1's `unscoped` set of 15 loses
     the seven roles that now form `build`; 15 − 7 = 8, arithmetic checked directly.)
-  - **The taxonomy itself is not narrowed by any of the above** — the user's explicit "honest scope" decision
-    this round (verbatim: *"Por el momento me conformo con los 2 roles reales con modelos Hardcodeados... si es
-    que lo ves bien asi"*) keeps all four classes exactly as defined; only the STATED real-world effect of
-    every class changes, from "live for `implementer`/`debugger`, inert elsewhere" (round 2's framing,
-    retracted — R3-F-01) to "zero on the primary lane today, for every class, for two distinct code-level
-    reasons (`grunt`: zero survivors, a refusal; `build`'s two tiered roles: one survivor, nothing to reorder)
-    plus one operational reason (`decision` and the non-tiered roles: doctrine never invokes `--route-decide`),
-    contingent on `015` for `build`/`grunt` once it ships, or on the tiered roster widening, or on this lane
-    gaining a real Anthropic credential" (this round's corrected, honest framing — see `### Honest scope`,
-    Contexto). Widening which roles are tiered is real, separate, out-of-scope work (Non-goals); the user
-    separately floated, and explicitly deferred, a bigger "gateway" redesign — see `## Future work`.
+  - **The taxonomy itself is not narrowed by any of the above** — kept, across all four rounds, exactly as
+    defined; only the STATED real-world effect of every class changes as the live tree changes underneath it.
+    **Round 4's re-baseline (F-01), on the user's explicit 2026-08-02 decision:** now that
+    `015-anthropic-dispatch-parity` is DONE and merged, six of the twenty in-scope roles — `grunt`'s four
+    tiered roles and `build`'s two tiered roles — have **real, live, observable effect on the primary
+    `opencode` lane today**, verified against the live effective-runtime inventory; `decision`'s seven roles
+    and the fourteen non-tiered `grunt`/`build` roles remain genuinely inert, for the operational reason
+    stated above (the doctrine never invokes `--route-decide` for them), unaffected by `015` and unlikely to be
+    affected by any future credential change either. Widening which roles are tiered is real, separate,
+    out-of-scope work (Non-goals); the user separately floated, and explicitly deferred, a bigger "gateway"
+    redesign — see `## Future work`.
   - **Disjointness is enforced, not assumed** — directly mitigating `007-P0`'s finding 2
     (`decisions-log.jsonl:22`, F-07): a regression test enumerates the full 28-role roster from `roles.tsv` and
     asserts every role maps to exactly one of `{decision, grunt, build, unscoped}`, never two, and that the
@@ -976,21 +933,30 @@ have to rediscover it from a chat transcript.
     provider/class tokens, point 3 for role names), so a malformed value can never even be written by this CLI
     to begin with — a hand-edited file is the only way to reach the load-time `die()` path at all.
   - **Should the command warn when the configuration has no observable effect on the current roster/catalog?
-    Yes — corrected this round (R3-F-01 changed the answer, not just the wording): the write still proceeds
-    always (the taxonomy is deliberately kept live-but-inert, per the user's own "no role hardcoded"
-    principle), but `cmd_model_preference_set`/`cmd_model_preference_role_override` print an additional,
-    non-blocking line to stderr whenever the resolved class/role currently has zero observable effect — which,
-    per this round's corrected honest scope, is **every** in-scope class/role on the primary lane today,
-    `implementer`/`debugger` included, not only `decision`/`grunt`/`build`'s five non-tiered roles as round 2
-    believed.** `MODEL_PREFERENCE_NOTE class=<CLASS> has no observable effect on the primary lane today (see
-    docs/specs/014.../spec.md ### Honest scope)` — so a user who configures anything is told immediately, at
-    write time, not left to discover it by reading this spec. [UNVERIFIED for architecture: whether this check
-    is purely structural (doctrine-invocation — the same static, `--build.sh`-time-stable fact used throughout
-    this spec, cheap and always available at CLI-write time) or additionally re-probes live credentials to
-    detect the day this lane gains a real Anthropic key (in which case the note for `build`'s two tiered roles
-    would correctly stop firing without a `014` code change, matching how the mechanism itself already behaves)
-    — the requirement is that the note is truthful about today's real effect, not which of the two checks
-    implements it.]
+    Yes, but re-baselined this round (F-01, high, blocking — the trigger condition itself changed, not just
+    its wording): the write still proceeds always (the taxonomy is deliberately kept live-but-inert for the
+    classes/roles it does not reach, per the user's own "no role hardcoded" principle), but
+    `cmd_model_preference_set`/`cmd_model_preference_role_override` print an additional, non-blocking line to
+    stderr ONLY when the resolved class/role is one of the genuinely-inert ones today — `decision`'s seven
+    roles, or one of `grunt`/`build`'s fourteen non-tiered roles (`spec-challenger`, `adversarial-judge`,
+    `test-writer`, `frontend-engineer`, `refactor-specialist`, `repair-agent`, `integrator`).** With
+    `015-anthropic-dispatch-parity` DONE and merged, `grunt`'s four tiered roles and `build`'s two tiered roles
+    now have real, live effect on the primary lane, so a write targeting them must NOT print this note — the
+    note firing on every write, unconditionally, is exactly round 3's now-superseded behavior and would be a
+    regression against the user's own "the note must be truthful about today's real effect" bar. `role`-scoped
+    writes (`--model-preference-role-override`) check the specific role named; class-scoped writes
+    (`--model-preference-set`) check whether the target class has at least one currently-live role (`grunt`/
+    `build`: yes; `decision`: no) — a class-scoped `grunt`/`build` write never fires the note even though some
+    of that class's own roles (its non-tiered members) individually would, since the class as a whole is not
+    inert. `MODEL_PREFERENCE_NOTE class=<CLASS> has no observable effect on the primary lane today (see
+    docs/specs/014.../spec.md ### Honest scope)` — so a user who configures a genuinely inert class/role is
+    told immediately, at write time, not left to discover it by reading this spec. [UNVERIFIED for
+    architecture: whether this check is purely structural (doctrine-invocation and the tiered-roster fact, both
+    static, `--build.sh`-time-stable facts already used throughout this spec, cheap and always available at
+    CLI-write time) or additionally re-probes live credentials (in which case the note would correctly track
+    any further credential change with zero `014` code change, matching how the mechanism itself already
+    behaves) — the requirement is that the note is truthful about today's real effect, not which of the two
+    checks implements it.]
   - **Why a small, purpose-built serializer for this file closes R2-F-04's "unscoped general TOML writer"
     concern, stated explicitly:** this sibling file's schema is fully closed and fully owned by this contract —
     exactly two tables (`[preference]`, `[role_override]`), each a flat mapping to either a list of closed-
@@ -1047,8 +1013,8 @@ have to rediscover it from a chat transcript.
   `opencode-zen`, `opencode-go` (the closed universe of `_PAIR_COMMANDS`, `catalog.py:133-140`), this
   contract's weight consults **no new credential probe**: the ranked preference in AC-02 only ever reorders
   candidates that already survived `RoutingService.route()`'s existing exclusions — unconditionally,
-  `PROVIDER_UNAUTHENTICATED` (`service.py:145`); conditionally, only when `self.store is not None` (never on
-  the simulate/explain lane), `PROVIDER_EXHAUSTED` (`service.py:143`) — this contract's preference reorders
+  `PROVIDER_UNAUTHENTICATED` (`service.py:220`); conditionally, only when `self.store is not None` (never on
+  the simulate/explain lane), `PROVIDER_EXHAUSTED` (`service.py:214`) — this contract's preference reorders
   whatever the exclusion loop leaves standing either way, never bypassing or duplicating either check. This is
   also the whole mechanism by which "no manual reconfiguration needed when the subscription mix changes" (the
   user's own explicit choice this session, over a manual edit or a scheduled date) is satisfied for real,
@@ -1068,17 +1034,17 @@ have to rediscover it from a chat transcript.
   `role_class` alike (`"writer"`, `"review"`, `"other"`) — so `decision`, `grunt`, and `build` share this single
   integration point; no second one is designed. **Precision correction this round (R2-F-08(a)) — "`role_class`
   is consulted only after the sort" is imprecise as a blanket claim and is now stated per `role_class`
-  instead:** `role_class` itself is computed once, early, for every decision alike (`service.py:113` region).
+  instead:** `role_class` itself is computed once, early, for every decision alike (`service.py:170` region).
   For `role_class == "writer"` (this contract's `build` class) and `role_class == "other"` (this contract's
   `decision` class and `unscoped`), that early computation genuinely has no further consequence before the
   sort — `writer` (the local variable holding the prior-run's writer identity) stays `None` for both, no
   pre-sort branch keys off `role_class` again, and the sort key element this contract adds is the first place
   `role_class`'s classification has any effect on candidate ORDER. For `role_class == "review"` (this
   contract's `grunt` class), by contrast, `role_class` genuinely IS consulted before the sort: it gates the
-  `if role_class == "review":` branch (`service.py:115-126`) that resolves the prior writer's identity via
+  `if role_class == "review":` branch (`service.py:172-182`) that resolves the prior writer's identity via
   `self.store.implementation_identity(review_of_run_id)` — and that resolved `writer` identity then feeds BOTH
-  the hard exclusion `REVIEW_PROVIDER_CONFLICT` (`service.py:166`, inside the exclusion loop, before the sort
-  runs) AND sort-tuple position 1 (`(x[0].provider == writer.provider) if writer else False`, `service.py:171`)
+  the hard exclusion `REVIEW_PROVIDER_CONFLICT` (`service.py:241`, inside the exclusion loop, before the sort
+  runs) AND sort-tuple position 1 (`(x[0].provider == writer.provider) if writer else False`, `service.py:246`)
   — two genuinely pre-sort, `role_class`-gated consultations that do not exist for `"writer"`/`"other"`. This
   contract's own new sort-key element (position 3, all three classes alike) is unaffected either way — it is
   always inserted after the existing sort key's independence/tier elements regardless of which `role_class`
@@ -1086,7 +1052,7 @@ have to rediscover it from a chat transcript.
   `build`/`decision`, not for `grunt`, whose hard-exclusion/position-1 pre-sort machinery this AC's point 1
   below already relies on and correctly attributes. Inside `RoutingService.route()`, the class-scoped ranked
   preference from AC-02 participates **only** as one additional element of the existing candidate sort key
-  (`candidates.sort(key=lambda x: (...))`, `service.py:171`), inserted **between** the existing
+  (`candidates.sort(key=lambda x: (...))`, `service.py:246`), inserted **between** the existing
   `TIER_ORDER[route.tier]` element (position 2) and the existing `curated_priority` element (today's position
   3, shifting to 4): `(independence_boolean, tier_order, role_class_preference_rank, curated_priority,
   route_id)`. Non-negotiable, and each clause a direct, named mitigation of the `007-P0` failure modes in
@@ -1096,13 +1062,13 @@ have to rediscover it from a chat transcript.
      **Corrected attribution (round-1 finding F-10, low-medium):** position 1
      (`(x[0].provider == writer.provider) if writer else False`) does **not itself** prevent a same-provider-
      as-writer candidate from winning — every candidate reaching the sort has already had that exact case
-     hard-excluded by `REVIEW_PROVIDER_CONFLICT` (`service.py:166`), so position 1 evaluates to the constant
+     hard-excluded by `REVIEW_PROVIDER_CONFLICT` (`service.py:241`), so position 1 evaluates to the constant
      `False` for every surviving candidate on every decision, review or not, and is vestigial for this specific
      guarantee. The real guarantee — no same-provider-as-writer reviewer candidate can ever be selected — is
-     attributed correctly to the hard exclusion at `service.py:166`, which this contract's new element (at
+     attributed correctly to the hard exclusion at `service.py:241`, which this contract's new element (at
      position 3, after position 1) can never reorder past or bypass, exactly as it could never reorder past or
      bypass any other hard exclusion.
-  2. **Never a change to the exclusion loop that builds `candidates`** (`service.py:136-169`) — every existing
+  2. **Never a change to the exclusion loop that builds `candidates`** (`service.py:197-244`) — every existing
      `reason=...` exclusion (`RUNTIME_UNAVAILABLE`, `PROVIDER_EXHAUSTED`, `PI_SIMULATION_ONLY`,
      `PROVIDER_UNAUTHENTICATED`, `ROLE_INCOMPATIBLE`, `TOOLS_MISSING`, `CONTEXT_MISSING`,
      `REVIEW_FAMILY_CONFLICT`, `REVIEW_MODEL_CONFLICT`, `REVIEW_PROVIDER_CONFLICT`, `TIER_INSUFFICIENT`) fires
@@ -1131,7 +1097,7 @@ have to rediscover it from a chat transcript.
   role-by-role provider list, which would reopen `007-P0`'s exact flaw of an unaudited, hand-maintained,
   per-role table disconnected from a class model. **Named explicitly so it is not repeated a third time:** this
   repo already has one small, un-shared duplication of an adjacent role-class predicate (`_role_class`,
-  `service.py:218-223`, vs. `_role_class_of`, `set_agents_app.py:230-233`, verbatim-identical bodies, two
+  `service.py:299-304`, vs. `_role_class_of`, `set_agents_app.py:230-233`, verbatim-identical bodies, two
   independent definitions) — this contract's own role→class resolver must be written once and consumed
   everywhere it is needed, not copied a second time the way that pre-existing pair already was. [UNVERIFIED for
   architecture: whether this resolver lives in `models_config.py` alongside `resolve_role`'s existing
@@ -1140,34 +1106,37 @@ have to rediscover it from a chat transcript.
 - **AC-06 — non-goals restated as testable negative assertions** (see Non-goals above for the full list):
   no change to `008-P1`'s accepted doctrine or generated text; no change to `[areas.<duty>]`'s static default
   resolution or to `codex_orchestrator()`; no genuine per-project configuration layer; no dependency on
-  `011-quota-failover` (`provider_exhausted`, `service.py:143`, is never read unconditionally by this
+  `011-quota-failover` (`provider_exhausted`, `service.py:214`, is never read unconditionally by this
   contract's own code); no cost/USD-ceiling logic of any kind; no new `routes.v1.toml` rows and no new
   provider onboarding (both named as external dependencies, not delivered here); no change to the
-  session-window/context-budget problem; no quick-fix shipped ahead of the full contract; **new this round**:
-  no widening of which roles are dynamically tiered, and no fix to the pre-existing cross-lane anthropic-degrade
-  gap (`015`'s scope, not `014`'s); the quota-exhaustion-exposure risk, the `grunt`-class inertness, and (new
-  this round) the `decision`-class and non-tiered-`build`-role inertness are all accepted and tested, not
-  mitigated further. **R2-F-06's coverage gap closed:** every one of these negatives now has an explicit
+  session-window/context-budget problem; no quick-fix shipped ahead of the full contract; no widening of which
+  roles are dynamically tiered; no delivery of the cross-lane Anthropic-dispatch fix (`015`'s scope, already
+  shipped and merged, `014` only ever consumed its effect — see `### 015 dependency — closed`, Contexto); the
+  quota-exhaustion-exposure risk, and (re-baselined round 4, F-01) the `decision`-class and the fourteen
+  non-tiered `grunt`/`build`-role inertness, are all accepted and tested, not mitigated further — `grunt`'s
+  four tiered roles are no longer among the accepted-inertness set, since they now have real, live effect.
+  **R2-F-06's coverage gap closed:** every one of these negatives now has an explicit
   Verificación bullet (see `## Verificación` below) rather than being asserted only in prose here — each was
   individually re-checked this round for whether it is actually mechanically verifiable (all are: either a
   byte-identical-output regression test against a real code path, or a source-level absence-of-reference check,
   never an unfalsifiable "and nothing else changed" claim).
-- **AC-07 — the named composition point with `008-dynamic-selection`'s P3 sketch, now much narrower given
-  honest scope (R2-F-06).** P3's own two-layer model (`docs/specs/008-dynamic-selection/spec.md:240-267`:
-  layer 1, any `subscription`-billed provider with quota wins with no cost comparison, gated on
-  `011-quota-failover`'s `provider_exhaustions`; layer 2, a `metered` provider only below a daily USD ceiling)
-  and this contract's role-class preference are **orthogonal axes over the same candidate-sort position** —
-  both are soft, post-hard-exclusion tie-break inputs. **Given honest scope (`### Honest scope`, Contexto),
-  what's actually left to compose is narrow, stated precisely rather than left as a blanket "undecided"
-  claim:** `decision` and `grunt` have no live sort-key participation today regardless of P3, so there is
-  nothing for P3 to compose with for those 13 roles; the composition question has real substance only for
-  `build`'s two live roles, `implementer`/`debugger` — if P3 ever lands, ITS sort-key element and THIS
-  contract's `build`-class rank would both be live, simultaneously, for exactly these two roles, and this
-  contract still does **not** decide their relative order (e.g., `independence > tier > [P3 layer] > [014
-  role-class rank] > curated_priority > route_id`, or some other order) — it names this as the concrete open
-  integration question for whichever of the two packages lands second. AC-04's point 5 tripwire test guarantees
-  this silent-drift risk is caught mechanically for all classes alike, not left to memory, even though only
-  `build` currently has anything real to drift.
+- **AC-07 — the named composition point with `008-dynamic-selection`'s P3 sketch, re-scoped this round (F-01)
+  now that `015` has shipped and widened which roles have anything real to compose.** P3's own two-layer model
+  (`docs/specs/008-dynamic-selection/spec.md:240-267`: layer 1, any `subscription`-billed provider with quota
+  wins with no cost comparison, gated on `011-quota-failover`'s `provider_exhaustions`; layer 2, a `metered`
+  provider only below a daily USD ceiling) and this contract's role-class preference are **orthogonal axes over
+  the same candidate-sort position** — both are soft, post-hard-exclusion tie-break inputs. **Given the
+  post-`015` live-effect picture (`### Honest scope`, Contexto), what's actually left to compose is wider than
+  round 3 stated, not narrower:** `decision` still has no live sort-key participation regardless of P3, so
+  there is nothing for P3 to compose with for those seven roles, nor for `grunt`/`build`'s fourteen non-tiered
+  roles; the composition question now has real substance for **six** live roles — `build`'s two
+  (`implementer`, `debugger`) AND `grunt`'s four (`delta-reviewer`, `finding-verifier`, `package-reviewer`,
+  `security-auditor`), not only `build`'s two as round 3 stated before `015` shipped. If P3 ever lands, ITS
+  sort-key element and THIS contract's role-class rank would both be live, simultaneously, for these six
+  roles, and this contract still does **not** decide their relative order (e.g., `independence > tier > [P3
+  layer] > [014 role-class rank] > curated_priority > route_id`, or some other order) — it names this as the
+  concrete open integration question for whichever of the two packages lands second. AC-04's point 5 tripwire
+  test guarantees this silent-drift risk is caught mechanically for all classes alike, not left to memory.
 - **AC-08 (new, round-1 finding F-08, medium; field renamed this round, R2-F-09) — the resolved role-class and
   applied preference are observable on the decision output itself, under a name that does not collide with an
   existing, differently-valued field in the same JSON envelope.** `RouteDecision`
@@ -1191,22 +1160,22 @@ have to rediscover it from a chat transcript.
   early `FACTS_INCOMPLETE`/`REVIEW_IDENTITY_INVALID` refusals" blended two refusal shapes with different
   timing under one label, and understated a third):** `role_class` (the service's own internal 3-value
   classification, which AC-05's role→class resolver piggybacks on the same `facts.role` lookup to compute) is
-  computed at exactly one line, `service.py:113`, immediately after the request/facts shape checks and before
+  computed at exactly one line, `service.py:170`, immediately after the request/facts shape checks and before
   any review-identity or conflict check. **`bias_class` is `None` only for the two refusals that fire strictly
-  BEFORE that line** — both currently carrying `reason_codes=("FACTS_INCOMPLETE",)` (`service.py:107` — the
-  issuer/consume guard — and `service.py:112` — the request-risk/required-tools shape guard). **`bias_class` IS
-  populated for every refusal reachable only AFTER `service.py:113`**, a strictly larger set than round 2's
-  text implied: both `REVIEW_IDENTITY_INVALID` refusals (`service.py:119` — no `review_of_run_id` offered and
-  not `unverified_review` — and `service.py:125` — a `review_of_run_id` offered but rejected by
+  BEFORE that line** — both currently carrying `reason_codes=("FACTS_INCOMPLETE",)` (`service.py:164` — the
+  issuer/consume guard — and `service.py:169` — the request-risk/required-tools shape guard). **`bias_class` IS
+  populated for every refusal reachable only AFTER `service.py:170`**, a strictly larger set than round 2's
+  text implied: both `REVIEW_IDENTITY_INVALID` refusals (`service.py:176` — no `review_of_run_id` offered and
+  not `unverified_review` — and `service.py:182` — a `review_of_run_id` offered but rejected by
   `self.store.implementation_identity`) fire only after `role_class` is already known, contrary to being
   grouped with the "early, pre-resolution" refusals; **and a third, previously-uncounted refusal** — the
-  `conflicts` check (`service.py:127-130`) — also fires only after `service.py:113`, yet returns the exact
+  `conflicts` check (`service.py:188-191`) — also fires only after `service.py:170`, yet returns the exact
   same `reason_codes=("FACTS_INCOMPLETE",)` as the two early guard clauses. **`reason_codes` alone therefore
   cannot predict whether `bias_class` is populated**: two `RouteDecision`s with byte-identical
   `reason_codes=("FACTS_INCOMPLETE",)` can differ in `bias_class` (`None` for the early guard-clause refusal,
   populated for the later `conflicts` refusal) depending only on control-flow position relative to
-  `service.py:113` — the regression test for this AC (Verificación) must exercise all four refusal sites
-  (`:107`, `:112`, `:119`, `:125`, plus the `:130` `conflicts` path) individually, not infer that the two
+  `service.py:170` — the regression test for this AC (Verificación) must exercise all four refusal sites
+  (`:164`, `:169`, `:176`, `:182`, plus the `:191` `conflicts` path) individually, not infer that the two
   `FACTS_INCOMPLETE`-reason-code sites are interchangeable; and
   `preference_configured: bool = False` (name unchanged — no collision) — true only when AC-02's config
   supplied a non-default (non-empty `[preference]`) entry for the resolved class, false when the class fell
@@ -1226,23 +1195,24 @@ have to rediscover it from a chat transcript.
   recording: the three-class taxonomy and its reuse of `_role_class`'s existing predicates (AC-01); the single
   shared integration point and the F-06 investigation that established it (AC-04); and the `### Design
   decision` reconciliation with `ADR-0003` above (that this contract coexists with, and does not replace or
-  compete with, `[areas.<duty>]`). **ADR number is deliberately not pinned now:** `0017` is explicitly claimed
-  by `013-pi-interactive-target`'s own AC-14 (`docs/specs/013-pi-interactive-target/spec.md:361-362`, naming
-  `docs/adr/0017-pi-interactive-target.md`) even though that file does not yet exist on disk (`013` is still
-  `PACKAGE_PLANNING` as of this session) — so the next unclaimed number at spec-writing time is `0018`, but
-  whoever writes this contract's ADR must re-check `docs/adr/README.md` live at that time rather than assume
-  `0018` still is: a hole (an unclaimed number becoming claimed by something else first) is recoverable, a
-  collision on the same number is not, the same distinction `008-dynamic-selection`'s own P1 AC-10 note
-  already established for this repo. **Re-confirmed live this round, not carried over stale:** `docs/adr/README.md`
-  still lists `0002..0016` as the highest materialized entries (`0016-discovered-inventory.md`, `Accepted`,
-  `2026-07-31`); `0017` is still claimed-not-materialized by `013`; `0018` is still the next unclaimed number
-  AT THIS SPEC-WRITING MOMENT — restated, not re-decided, because this fact can only ever be trusted live, at
-  ADR-write time, never from any spec's prose (this one's prior round included). **R2-F-06's coverage gap
-  closed:** the Verificación section below now states explicitly, as a required package-acceptance-time check
-  (not a unit test — this is a documentation-existence fact, not code behavior), that (a) the ADR file exists
-  on disk at whatever path/number was actually claimed, (b) `docs/adr/README.md` carries a matching row with
-  `Status = Accepted`, and (c) the ADR number was re-verified live against `docs/adr/README.md` at the moment
-  the ADR was actually written, not assumed from this spec's `0018` note.
+  compete with, `[areas.<duty>]`). **ADR number is deliberately not pinned now, re-checked live this round
+  (F-06) — the picture has moved since round 3, and moves again before this contract's own ADR is written:**
+  `0017` is now Accepted and materialized (`docs/adr/0017-pi-interactive-target.md`, `013-pi-interactive-
+  target`'s own AC-14 — no longer merely claimed, as round 3 found it); `0018` is a genuine, currently-unclaimed
+  hole; `0019` is Accepted and materialized (`docs/adr/0019-anthropic-dispatch-parity.md`,
+  `015-anthropic-dispatch-parity`'s own ADR, filed while `014` was still in `SPEC_CHALLENGE`). **So the next
+  unclaimed number at THIS spec-writing moment is `0018` — a hole between two materialized entries, not the
+  highest number on disk** — but whoever writes this contract's ADR must re-check `docs/adr/README.md` live at
+  that time rather than assume `0018` still is: a hole (an unclaimed number becoming claimed by something else
+  first) is recoverable, a collision on the same number is not, the same distinction `008-dynamic-selection`'s
+  own P1 AC-10 note already established for this repo, and the same instruction round 3 already gave that this
+  round's own re-check (finding `0017` now materialized and a new `0019` filed in the interim) confirms was
+  necessary, not excessive caution. **R2-F-06's coverage gap closed:** the Verificación section below states
+  explicitly, as a required package-acceptance-time check (not a unit test — this is a documentation-existence
+  fact, not code behavior), that (a) the ADR file exists on disk at whatever path/number was actually claimed,
+  (b) `docs/adr/README.md` carries a matching row with `Status = Accepted`, and (c) the ADR number was
+  re-verified live against `docs/adr/README.md` at the moment the ADR was actually written, not assumed from
+  this spec's `0018` note.
 
 ### Audit (self-review)
 
@@ -1307,7 +1277,7 @@ have to rediscover it from a chat transcript.
   the writer-independence sort element (position 1, now correctly attributed as vestigial for this purpose, see
   AC-04 point 1) — AC-04 states plainly these are never reordered or bypassed; a `grunt`-class preference can
   never place a same-provider-as-writer reviewer candidate ahead of a cross-provider one, because the hard
-  exclusion at `service.py:166` already removed it from the candidate list before the sort runs at all. (4) A
+  exclusion at `service.py:241` already removed it from the candidate list before the sort runs at all. (4) A
   role in `decision`/`build` class whose only live candidates are also under `TIER_INSUFFICIENT` for the task's
   required tier — AC-04 confirms tier sufficiency (position 2) is evaluated before this contract's preference
   (position 3), so a "premium" preference can never promote a candidate whose tier is too low for the task; it
@@ -1323,40 +1293,33 @@ have to rediscover it from a chat transcript.
   named as a proposal, not a pin), and the shared validator functions those two paths both call; AC-04's exact
   code site for retaining resolved preference tables on `RoutingService`; AC-05's exact module for the
   role→class resolver; AC-09's exact ADR number, to be re-checked live at ADR-write time rather than assumed
-  now (`0018` is the next unclaimed number at spec-writing time, re-confirmed live this round too, but `0017`
-  being claimed-not-yet-materialized by `013` means this must be re-verified, not assumed, when AC-09 is
-  actually done) — left to `architect`.
-- **What I could not verify, stated plainly rather than omitted:** (1) whether the user's actual "Kimi Code"
-  $40/month product is a standalone credential surface this repo has never seen, or an informal name for the
-  Kimi models already reachable through `opencode-go`'s existing subscription — named as a real open question
-  for `USER_APPROVAL`, not resolved by guessing (Contexto, AC-03). (2) The `decision`-class generalization from
-  `orchestrator`+`architect` to all six `duty="docs"` roles is this draft's own product decision, not something
-  the user stated for the other five roles by name — flagged for confirmation, not silently assumed settled;
-  round 2/3's finding that this whole class is currently zero-effect does not change this open question, it
-  only lowers the immediate stakes of getting it wrong. (3) The `adversarial-judge` classification (AC-01)
-  resolves a real contradiction in the user's own two bullets on the evidence available; it is this draft's
-  call, not a re-statement of something the user explicitly disambiguated themselves. (4) Whether the widened
-  `build`-class scope changes the user's own intuition about which providers should appear in
-  `[preference].build`'s ordered list (e.g., should `build` default toward the SAME premium provider as
-  `decision`, or toward the cheaper option, or toward whichever is "currently implementing" in some sense this
-  contract does not define) — the user's two verbatim quotes state that the mechanism must exist and must
-  reach writer roles, not what the actual preference ORDER should be; this draft leaves the list's actual
-  contents fully user-configured (AC-02), not defaulted to any particular provider, and flags this as worth
-  confirming explicitly at `USER_APPROVAL` so nobody assumes a default that was never stated. **(5) New this
-  round: whether the user wants the CLI's non-blocking `MODEL_PREFERENCE_NOTE` inertness warning (AC-02) to
-  ever become a hard `--yes`-gated confirmation instead of a pure stderr note — this draft's own call, proposed
-  as the least surprising default (never block a legal, future-proofing configuration), flagged for
-  confirmation, not assumed settled. **(6) Corrected this round (R3-F-07): round 2/3.0.0 said whether `015`'s
-  eventual fix changes anything about this contract's own acceptance criteria was "not verified against a spec
-  that does not exist yet" — that framing was already an internal contradiction by the time it was written
-  (`015`'s spec.md file existed, per round 3's own finding) and is now definitively stale: `015`'s spec.md
-  exists, is real, and was read directly this round (`docs/specs/015-anthropic-dispatch-parity/spec.md`,
-  contract 2.0.0).** Whether `015`'s fix changes anything about `014`'s own acceptance criteria remains
-  answered "no, by design" (`014` never depends on `015`'s internals, only on the pre-existing routing/doctrine
-  boundary already described, per `### Dependency on 015`, Contexto) — the real residual uncertainty, restated
-  precisely, is that `015`'s own design was still in-flight/pre-challenge at the time of this citation (its
-  spec exists and was read, but has not yet been through `SPEC_CHALLENGE`, so its AC numbers/content could
-  still shift before its own `USER_APPROVAL`) — not that the file itself was hypothetical.**
+  now (`0018` is a genuine, currently-unclaimed hole between `0017` and `0019`, both now Accepted and
+  materialized, re-confirmed live this round — F-06; the picture already moved twice since round 3, which is
+  exactly why this must be re-verified, not assumed, when AC-09 is actually done) — left to `architect`.
+- **What was open, now settled by the user's four verbatim round-4 decisions (2026-08-02), stated plainly
+  rather than left as residual uncertainty:** (1) **Settled (user decision #1):** the user's actual "Kimi
+  Code" $40/month product IS a standalone credential surface this repo has never seen, requiring new provider
+  onboarding — a real, named, external dependency `014` does not deliver (Contexto, AC-03, Non-goals). No
+  longer an open question for `USER_APPROVAL`. (2) **Settled (user decision #2):** the `decision`-class
+  generalization from `orchestrator`+`architect` to all seven `duty="coord"`/`duty="docs"` roles, as this
+  spec already has it, is confirmed correct — no narrower reading was intended. (3) **Settled (user decision
+  #2, same verbatim decision as (2)):** `adversarial-judge` stays in `grunt`, resolving the contradiction in
+  the user's own two original bullets in favor of AC-01's existing reading, not `architect`'s. (4) **Settled
+  (user decision #3):** `[preference].build`'s recommended provider order is premium-first, the same criterion
+  as `decision`'s — the user's own reasoning being that cost is regulated by quota (`008-dynamic-selection`'s
+  P3 sketch, still `BLOCKED`/scoped-not-contracted), not by this contract's preference axis. This is guidance
+  for the value a human operator would sensibly configure, not a hardcoded default this contract's own code
+  ships with — `AC-02`'s configuration surface stays fully user-configurable, with no built-in default order
+  for any class; recorded here so a future reader does not assume the list's actual contents were left
+  arbitrary. **(5) Still open, not addressed by this round's four decisions:** whether the user wants the
+  CLI's non-blocking `MODEL_PREFERENCE_NOTE` inertness warning (AC-02) to ever become a hard `--yes`-gated
+  confirmation instead of a pure stderr note — this draft's own call, proposed as the least surprising default
+  (never block a legal, future-proofing configuration), flagged for confirmation, not assumed settled. **(6)
+  Closed (round 4, F-01): `015-anthropic-dispatch-parity` is DONE and merged**, so the residual uncertainty
+  round 3 named (whether `015`'s own design would still shift before its `USER_APPROVAL`) is resolved: `015`
+  shipped exactly as designed, and `014` needed zero code change, confirming the "no, by design" answer rounds
+  1-3 already gave to "does `015`'s fix change anything about `014`'s own acceptance criteria" — see `### 015
+  dependency — closed`, Contexto.**
 
 ## Verificación
 
@@ -1367,35 +1330,39 @@ stale before implementation starts) — must rise, never fall, no test skipped, 
 
 - **AC-01.** The disjoint-partition enumeration test over the real 28-role roster across all four classes; the
   `models.toml`-`.tiers.*`-cross-check enumeration test (tiered-vs-not partition, code-level); the
-  doctrine-consistency check, corrected this round (R3-F-06) to read all FOUR orchestrator-doctrine files
+  doctrine-consistency check, corrected round 3 (R3-F-06) to read all FOUR orchestrator-doctrine files
   (canonical plus its three generated copies) and assert the six doctrine-named "tiered roles" match
   `models.toml`'s `.tiers.*` six-role set byte-for-byte in each. **Real-effect proofs, split by which kind of
-  proof actually applies, and corrected this round (R3-F-01/R3-F-03) to reflect the real, live primary-lane
-  credential shape rather than a more generous test fixture:** (i) a regression test reproducing `grunt`'s four
-  tiered roles' real mechanism on the primary lane — **using an inventory shaped like this machine's real live
-  probe (no `("opencode","anthropic")` key), not `tests/test_routing.py`'s own more generous default fixture**
-  — asserting `reason_codes == ("REVIEWER_INDEPENDENCE_UNAVAILABLE",)` with vs. without a configured
-  preference (byte-identical either way, since zero candidates survive: `PROVIDER_UNAUTHENTICATED` excludes
-  `anthropic`, `REVIEW_PROVIDER_CONFLICT` excludes `openai-codex`, `service.py:145,166`); a SEPARATE test,
-  using a fixture WITH `("opencode","anthropic")` authenticated (the original, hypothetical "one survivor"
-  shape round 1/2 described), asserts the byte-identical-`RouteDecision` claim for that shape too, so both are
-  proven, not conflated; (ii) a **mechanism-correctness** test (not a "zero effect" test — the opposite claim)
-  proving the sort-key element genuinely reorders `RouteDecision.provider` when `RoutingService.route()` is
-  invoked directly, with a synthetic multi-provider-authenticated inventory, for a role in ANY of the four
-  classes alike, including `decision`'s roles, `grunt`'s two non-tiered roles, and `build`'s roles — this is
-  expected, correct, uniform behavior (AC-04), not a defect to hide; (iii) the real-world zero-reachability
-  claim for `decision`'s seven roles, `grunt`'s two non-tiered roles, and `build`'s five non-tiered roles rests
-  on the doctrine-citation evidence above (all four orchestrator-doctrine files never naming these 14 roles as
-  "tiered"), not on a Python regression test; (iv) **new this round (R3-F-01) — `build`'s two tiered roles**
-  (`implementer`, `debugger`) get their OWN real-world zero-effect proof, distinct from (iii)'s doctrine-
-  citation argument, because `--route-decide` genuinely IS invoked for them: a regression test, using the same
-  live-machine-shaped inventory as (i) (no `("opencode","anthropic")` key), asserts a configured `build`-class
-  preference produces byte-identical `RouteDecision` output to no preference configured, because
-  `PROVIDER_UNAUTHENTICATED` leaves exactly one surviving candidate (`openai-codex`) regardless — this is the
-  test that would have caught round 2's overclaim had it been written against the real credential shape instead
-  of a synthetic one with `anthropic` authenticated. Stated explicitly so a future reader does not go looking
-  for a byte-identical-output test for (iii)'s 14 roles that was never written because it would be false there,
-  while correctly expecting one for (i)/(iv)'s roles because a real, code-level mechanism forces it.
+  proof actually applies, re-derived this round (F-01, high, blocking) against the live effective-runtime
+  inventory now that `015-anthropic-dispatch-parity` is DONE and merged, never an injected missing-pair
+  fixture:** (i) a regression test reproducing `grunt`'s four tiered roles' real mechanism on the primary lane
+  — **using the live effective-runtime inventory (`('claude-code','anthropic')` authenticated,
+  `('opencode','anthropic')` absent), derived from the actual `_effective_runtime()`/`_PROVIDER_RUNTIME_
+  REDIRECTS` mechanism, never a synthetic fixture asserting the redirect away** — asserting the `anthropic`
+  reviewer candidate now survives both `PROVIDER_UNAUTHENTICATED` (`service.py:220`) and
+  `REVIEW_PROVIDER_CONFLICT` (`service.py:241`, since the writer is `openai-codex`), and that a configured
+  `grunt`-class preference genuinely changes `RouteDecision.provider` relative to the unbiased
+  `curated_priority`/`route_id` order — no longer a byte-identical-output assertion, the exact reversal of
+  round 3's "zero survivors, `REVIEWER_INDEPENDENCE_UNAVAILABLE`" test, which proved a real, now-superseded
+  state of this machine; (ii) a **mechanism-correctness** test proving the sort-key element genuinely reorders
+  `RouteDecision.provider` when `RoutingService.route()` is invoked directly, with a synthetic
+  multi-provider-authenticated inventory, for a role in ANY of the four classes alike, including `decision`'s
+  roles, `grunt`'s two non-tiered roles, and `build`'s roles — this is expected, correct, uniform behavior
+  (AC-04), not a defect to hide, and stays required alongside (i)/(iv)'s live-effect proofs, not replaced by
+  them; (iii) the real-world zero-reachability claim for `decision`'s seven roles, `grunt`'s two non-tiered
+  roles, and `build`'s five non-tiered roles still rests on the doctrine-citation evidence above (all four
+  orchestrator-doctrine files never naming these 14 roles as "tiered"), not on a Python regression test — `015`
+  changed candidate authentication, never whether `--route-decide` is invoked, so this proof is unaffected; (iv)
+  **re-derived this round (F-01) — `build`'s two tiered roles** (`implementer`, `debugger`) get their OWN
+  real-world EFFECT proof, distinct from (iii)'s doctrine-citation argument, using the same live
+  effective-runtime inventory as (i): a regression test asserts a configured `build`-class preference now
+  changes `RouteDecision.provider` relative to the unbiased default, because the `anthropic` candidate survives
+  `PROVIDER_UNAUTHENTICATED` via the redirect, producing a real second candidate to reorder at every tier both
+  providers curate a row for — no longer a byte-identical-output assertion, the exact reversal of round 3's
+  "`PROVIDER_UNAUTHENTICATED` leaves exactly one surviving candidate (`openai-codex`) regardless" test. Stated
+  explicitly so a future reader does not go looking for a byte-identical-output test for (iii)'s 14 roles that
+  was never written because it would be false there, while correctly expecting a REAL-CHANGE assertion (not a
+  byte-identical one) for (i)/(iv)'s six now-live roles.
 - **AC-02.** The two-level precedence resolution (role-override-in-file > class-default-in-file > built-in
   default) exercised with the sibling file present and absent; the round-trip write+read test proving no
   corruption of unrelated `config.toml` keys and of unrelated `[preference]`/`[role_override]` keys already in
@@ -1404,10 +1371,13 @@ stale before implementation starts) — must rise, never fall, no test skipped, 
   the new CLI subcommand's write path — `--model-preference-set`/`--model-preference-role-override` — exercised
   end-to-end (flags → validated write → file on disk matches the schema) and its shared validator functions
   asserted to be the SAME functions the config-load path calls (single-source-of-truth, not two copies); the
-  `MODEL_PREFERENCE_NOTE` inertness warning — **corrected this round (R3-F-01 changed the expected assertion,
-  not just its wording)** — asserted present on stderr for every write today, `decision`/`grunt`-class writes,
-  all seven `build`-class roles including `implementer`/`debugger` alike, since all 20 in-scope roles have zero
-  observable effect on the primary lane today (`### Honest scope`, Contexto); the five new CLI write/read
+  `MODEL_PREFERENCE_NOTE` inertness warning — **re-baselined this round (F-01 changed the expected assertion,
+  not just its wording)** — asserted present on stderr only for genuinely-inert writes today (`decision`-class
+  writes, and role-scoped writes naming one of `grunt`/`build`'s fourteen non-tiered roles) and asserted ABSENT
+  for `grunt`/`build`-class writes and for role-scoped writes naming one of the six now-live tiered roles
+  (`delta-reviewer`, `finding-verifier`, `package-reviewer`, `security-auditor`, `implementer`, `debugger`),
+  since those six now have real, live observable effect on the primary lane, per `### Honest scope` (Contexto);
+  the five new CLI write/read
   states (R3-F-04): the parse-failure-fails-closed test, the zero-`--provider` rejection, the
   `--provider`-without-`--model-preference-set` argparse-level rejection, the duplicate-`--provider`-token
   rejection, and `--model-preference-show`'s read-only output, each with its own dedicated test; the atomic
@@ -1436,30 +1406,32 @@ stale before implementation starts) — must rise, never fall, no test skipped, 
   mirror image of AC-04(c)'s proof that absence of one has zero effect on the sort); no change to
   `codex_orchestrator()`'s return value under the same before/after sibling-file-presence check; no
   unconditional read of `provider_exhausted` (a test asserts this contract's own new code path never calls
-  `self.store.provider_exhausted` directly — only the pre-existing conditional call at `service.py:143`,
+  `self.store.provider_exhausted` directly — only the pre-existing conditional call at `service.py:214`,
   untouched, does); no `PROVIDER_BILLING_KIND` reference anywhere in this contract's own new module(s) (a
   source-inspection assertion, not a behavioral one — grep-equivalent, asserting the string is absent from the
   new files' source); no new `routes.v1.toml` rows (a checksum/row-count assertion: the file's row count and
-  provider set are unchanged by this package's diff); the `grunt`-class and (new this round) `decision`-class
-  and `build`'s-five-non-tiered-roles inertness are covered by AC-01's own tests above, not re-asserted here.
-- **AC-07 (R2-F-06 — narrowed given honest scope, and now has an explicit bullet instead of none).** There is
-  no additional runtime test beyond AC-04(d)'s tripwire — `008-P3` does not exist as code yet, so there is
-  nothing to compose against today. What IS verified: the tripwire test's sort-tuple-shape pin (AC-04(d)) is
-  confirmed to cover `build`'s live pair (`implementer`/`debugger`) specifically, since that is the only
-  in-scope class where a future `008-P3` element would ever coexist with a LIVE `014` element on the same
-  decision — for `decision`/`grunt`, the tripwire still fires on any shape change (protecting future-tiered
-  roles too), but there is no current live interaction to additionally prove.
+  provider set are unchanged by this package's diff); the `decision`-class and `grunt`/`build`'s fourteen
+  non-tiered-roles inertness, and (re-baselined round 4, F-01) `grunt`/`build`'s six now-live tiered roles'
+  real effect, are covered by AC-01's own tests above, not re-asserted here.
+- **AC-07 (re-scoped round 4, F-01, given the post-`015` live-effect picture).** There is no additional runtime
+  test beyond AC-04(d)'s tripwire — `008-P3` does not exist as code yet, so there is nothing to compose against
+  today. What IS verified: the tripwire test's sort-tuple-shape pin (AC-04(d)) is confirmed to cover all six of
+  `grunt`/`build`'s live roles (`delta-reviewer`, `finding-verifier`, `package-reviewer`, `security-auditor`,
+  `implementer`, `debugger`), not only `build`'s two as round 3 stated before `015` shipped — these are the
+  roles where a future `008-P3` element would coexist with a LIVE `014` element on the same decision; for
+  `decision` and `grunt`/`build`'s fourteen non-tiered roles, the tripwire still fires on any shape change
+  (protecting future-tiered roles too), but there is no current live interaction to additionally prove.
 - **AC-08.** The new `bias_class`/`preference_configured` `RouteDecision` fields, asserted present and
   correctly populated on both an executable and a non-executable decision; **new this round (R2-F-09)** — a
   dedicated test asserts `bias_class` and the pre-existing `role_class` envelope key
   (`set_agents_app.py:440`) are both present, simultaneously, in the same `cmd_route_decide` JSON envelope,
   with their independently correct, disjoint-vocabulary values (`{"decision","grunt","build","unscoped"}` vs.
   `{"writer","review","other"}`) — proving the coexistence is intentional and non-colliding, not merely that
-  the rename avoided a string clash by luck. **New this round (R3-F-05)** — a dedicated test exercises all four
-  early-refusal sites individually (`service.py:107`, `:112`, `:119`, `:125`, plus the `:130` `conflicts`
-  path) and asserts `bias_class is None` for exactly the two before `service.py:113`
-  (`:107`, `:112`) and populated for the other three (`:119`, `:125`, `:130`) — including the two
-  `reason_codes=("FACTS_INCOMPLETE",)` sites (`:112` and `:130`) asserted to differ in `bias_class` despite
+  the rename avoided a string clash by luck. **New this round (R3-F-05, re-cited round 4 per F-02)** — a
+  dedicated test exercises all four early-refusal sites individually (`service.py:164`, `:169`, `:176`,
+  `:182`, plus the `:191` `conflicts` path) and asserts `bias_class is None` for exactly the two before
+  `service.py:170` (`:164`, `:169`) and populated for the other three (`:176`, `:182`, `:191`) — including the
+  two `reason_codes=("FACTS_INCOMPLETE",)` sites (`:169` and `:191`) asserted to differ in `bias_class` despite
   sharing the identical reason code, so the test cannot be satisfied by branching on `reason_codes` alone.
 - **AC-09 (R2-F-06 — was implicit, now explicit).** Not a unit test — a required package-acceptance-time
   checklist item, re-verified live, not assumed from this spec's prose: (a) the ADR file exists on disk at
@@ -1479,52 +1451,53 @@ substituted for `STATE_DIR` (monkeypatch or an explicit-path parameter, mirrorin
 takes an explicit root rather than trusting an environment default), so no test run ever reads, writes, or
 depends on the real machine's actual sibling file or `config.toml`.
 
-**This feature's own fixture-that-would-fool-it, named explicitly per the faithfulness rule — rewritten again
-this round (R3-F-01, because round 2's own version of this section was itself fooled by exactly the fixture
-class it warns about).** A hermetic test that only exercises `RoutingService._for_tests`'s synthetic
-snapshot/inventory (never the real `routes.v1.toml`/`models.toml`) would go green on every AC above even if the
-real, on-disk `routes.v1.toml` still only carried two providers — proving the sort-key mechanics without ever
-proving the mechanism has any effect on this machine's real, current candidate set. **Round 3's own correction
-is a second, sharper instance of this exact failure mode, and is named honestly here rather than only in the
-Historial:** round 2's version of this section (quoted and retracted below) claimed a `build`-class preference
-"measurably changes `implementer`'s selected route... live, on the real catalog" — that claim was true only
-against a synthetic test inventory with `("opencode","anthropic")` authenticated (mirroring
-`tests/test_routing.py`'s own generous default fixture), never against this machine's real, live probe result.
-**Corrected fixture-that-would-fool-it rule, going forward: any test backing a "real-world effect" claim in
-this spec must use an inventory shaped like this machine's actual live probe (no
-`("opencode","anthropic")` key), never `tests/test_routing.py`'s own default `setUp` fixture** — the same
-faithfulness requirement `015`'s own AC-01 states explicitly for its own tests, adopted here for the identical
-reason.
+**This feature's own fixture-that-would-fool-it, named explicitly per the faithfulness rule — re-baselined
+this round (F-01, high, blocking, because round 3's own version of this rule, while correct at the time, is
+now the wrong instruction for a post-`015` tree).** A hermetic test that only exercises
+`RoutingService._for_tests`'s synthetic snapshot/inventory (never the real `routes.v1.toml`/`models.toml`)
+would go green on every AC above even if the real, on-disk `routes.v1.toml` still only carried two providers —
+proving the sort-key mechanics without ever proving the mechanism has any effect on this machine's real,
+current candidate set. **Round 3 corrected this rule to require an inventory shaped like `opencode`'s own
+unauthenticated `anthropic` state (no `("opencode","anthropic")` key) — the right rule for a pre-`015` tree,
+where that IS the live state. That rule is now the wrong one, on the user's explicit round-4 decision (F-01):
+`015-anthropic-dispatch-parity` is DONE and merged, so the live state a faithful test must reproduce is the
+live EFFECTIVE-RUNTIME inventory, not the requested-lane one.** **Corrected fixture-that-would-fool-it rule,
+going forward: any test backing a "real-world effect" claim for `grunt`'s four tiered roles or `build`'s two
+tiered roles must evaluate `anthropic` against `('claude-code','anthropic')` (live-authenticated on this
+machine, via the redirect, `_PROVIDER_RUNTIME_REDIRECTS`, `service.py:33`), never against
+`('opencode','anthropic')` directly and never against an injected missing-pair fixture that assumes the
+redirect does not exist** — a test that still injects the pre-`015` shape (no `('claude-code','anthropic')`
+key at all) would go green on a "zero effect" assertion that is no longer true, exactly the mirror image of
+round 3's own fooling. This is the same faithfulness requirement `015`'s own AC-01 states explicitly for its
+tests, applied here to `014` now that `015`'s effect is live and consumable.
 
-- **What CAN be honestly proven, live, against the real catalog today:** **mechanism correctness across all
-  four classes alike, and nothing more** — a `decision`-class preference for `"anthropic"` measurably changes
-  `orchestrator`'s selected route at the `balanced` tier **when tested against a synthetic inventory with both
-  providers authenticated** (today's default order is `openai-codex` first, per Contexto), observed in the
-  returned `RouteDecision` when `RoutingService.route()` is invoked directly for `role="orchestrator"`. **This
-  is real and correctly demonstrates the sort-key mechanism works uniformly — it is explicitly captioned as a
-  mechanism-correctness proof, not a real-world-effect proof**, both because the shipped orchestrator doctrine
-  never invokes `--route-decide` for `orchestrator` in actual operation, AND — new this round — because even a
-  role for which `--route-decide` genuinely IS invoked (`implementer`, `debugger`) shows the SAME
-  synthetic-inventory dependency: against this machine's real, live credential shape, neither role's
-  `RouteDecision` changes at all (see AC-01(iv)). **There is no role, of 28, for which this contract's
-  preference measurably changes a `RouteDecision` computed against the real, live primary-lane catalog today —
-  round 2's claim that `implementer` was such a role is retracted (R3-F-01).**
-- **What CANNOT be honestly proven today, restated and sharpened (this round corrects round 2's own R2-F-07
-  resolution, which itself rested on the now-retracted claim):** no test in this contract's Verificación can
-  honestly claim a real, live `RouteDecision`-level change on the primary lane today, for any class — this is a
-  stronger, more honest statement than round 2's "the `RouteDecision` boundary is proven, only the spawn layer
-  isn't." Both boundaries are unproven live today: the `RouteDecision` layer, because `PROVIDER_UNAUTHENTICATED`
-  removes every `anthropic` candidate before the sort key runs, leaving nothing to reorder (AC-01); and the
-  spawned-agent layer, for the same downstream reason round 2 already identified (the shipped doctrine's
-  off-lane/hard-denial handling — see Non-goals) — which is moot today anyway, since the `RouteDecision` layer
-  never even produces an `anthropic` result to hand it. **Conclusion, stated precisely: this contract's proof
-  obligation today is exactly the mechanism-correctness proof (synthetic inventory, all four classes, uniform
-  behavior) plus the real-world zero-effect proof (live-machine-shaped inventory, byte-identical output) — both
-  fully deliverable and required by AC-01/AC-04's own tests — and nothing claiming more than that.** The
-  moment `015` ships (`### Dependency on 015`, Contexto), `build`'s two tiered roles and `grunt`'s four tiered
-  roles gain a real `RouteDecision`-level proof obligation this contract's own tests do not yet need to (and
-  today, honestly, cannot) satisfy — named here as the concrete trigger for revisiting this section, not left
-  implicit.
+- **What CAN now be honestly proven, live, against the real catalog today (re-baselined, F-01):** **both
+  mechanism correctness across all four classes AND real, live effect for six of the twenty in-scope roles.**
+  A `grunt`-class preference for `"anthropic"` measurably changes `delta-reviewer`'s (or
+  `finding-verifier`'s/`package-reviewer`'s/`security-auditor`'s) selected route when `RoutingService.route()`
+  is invoked with the live effective-runtime inventory (`('claude-code','anthropic')` authenticated,
+  `('opencode','anthropic')` absent) — the redirect resolves the `anthropic` reviewer candidate's
+  authentication, and the candidate survives both `PROVIDER_UNAUTHENTICATED` and `REVIEW_PROVIDER_CONFLICT`. A
+  `build`-class preference for `"anthropic"` measurably changes `implementer`'s (or `debugger`'s) selected
+  route the same way, against the same live inventory. **Both are real-world-effect proofs, not merely
+  mechanism-correctness proofs** — the exact reversal of round 3's "there is no role, of 28, for which this
+  contract's preference measurably changes a `RouteDecision` computed against the real, live primary-lane
+  catalog today" claim, which was true before `015` shipped and is retracted now (F-01). `decision`'s
+  `orchestrator` role still only demonstrates mechanism correctness under a synthetic multi-provider-
+  authenticated inventory (today's default order is `openai-codex` first, per Contexto) — `015`'s redirect
+  changes candidate authentication, not whether `--route-decide` is invoked at all, so `decision`'s zero-
+  reachability claim is unaffected.
+- **What still CANNOT be honestly proven today, restated and narrowed to what remains true (F-01 narrows this
+  from round 3's blanket claim to the two classes `015` was never able to help):** no test in this contract's
+  Verificación can honestly claim a real, live `RouteDecision`-level change for `decision`'s seven roles or the
+  fourteen non-tiered `grunt`/`build` roles, because the shipped orchestrator doctrine never invokes
+  `--route-decide` for any of them at all — an operational fact `015`'s credential-level redirect cannot touch.
+  **Conclusion, stated precisely: this contract's proof obligation today is the mechanism-correctness proof
+  (synthetic inventory, all four classes, uniform behavior), the real-world EFFECT proof for `grunt`'s four and
+  `build`'s two tiered roles (live effective-runtime inventory, non-byte-identical output), and the real-world
+  zero-EFFECT proof for `decision`'s seven roles and the fourteen non-tiered roles (doctrine-citation, not a
+  Python test) — all three fully deliverable and required by AC-01/AC-04's own tests, and nothing claiming more
+  than that.**
 
 ## Historial de challenge
 
@@ -1558,7 +1531,7 @@ every finding:
 - **F-09 (medium, flaky test risk)** — test isolation pinned to the existing `tempfile.TemporaryDirectory()` +
   `_for_tests` hermetic seam precedent, extended to this contract's own sibling config file. See Verificación.
 - **F-10-attribution (low-medium, wrong causal claim)** — AC-04 point 1 corrected to attribute the
-  same-provider-as-writer guarantee to the `service.py:166` hard exclusion, not to the (vestigial) sort-tuple
+  same-provider-as-writer guarantee to the `service.py:241` hard exclusion, not to the (vestigial) sort-tuple
   position 1.
 - **F-11/F-05-quota-risk (blocking-ish, accepted by user)** — quota-exhaustion-exposure risk stated explicitly
   in Non-goals as accepted, unchanged from today, closing automatically once `011` lands.
@@ -1618,7 +1591,7 @@ user decisions this session reshaped scope**, resolving the two blocking finding
    the other 22 roles), not a code-level `RoutingService.route()` restriction (the CLI/service are role-agnostic
    by design and would reorder any role's candidates if invoked) — this contract's own regression coverage is
    split accordingly between a mechanism-correctness proof (all 28 roles, uniform) and a real-world-reachability
-   proof (doctrine citation for 21 roles; `service.py:166` hard-exclusion test for `grunt`'s 4 tiered-inert
+   proof (doctrine citation for 21 roles; `service.py:241` hard-exclusion test for `grunt`'s 4 tiered-inert
    roles) — a more precise, more defensible claim than a single blended "byte-identical for everyone" assertion
    would have been. **A second idea the user floated and explicitly deferred, not built now:** a future
    lightweight "gateway" agent fronting every role so only one agent in the system ever has a hardcoded model —
@@ -1758,7 +1731,7 @@ corrected.
   `015`'s spec.md exists and was read directly; the real residual uncertainty restated as "`015`'s design was
   in-flight/pre-challenge at the time of citation," not that the file was hypothetical.
 - **R3-F-08** — four citation fixes: (a) `roles.tsv` citations disambiguated with its real full path
-  `/home/federico/SET-AGENTES/roles.tsv`, matching how `models.toml` was already disambiguated from its own
+  `/home/federico/SET-AGENTS/roles.tsv`, matching how `models.toml` was already disambiguated from its own
   `tests/fixtures/` decoy; (b) AC-02's "six conditions OR'd into one `if`" corrected to the actual count, ten
   boolean sub-conditions across five fields; (c) the Audit's `find Global -iname orchestrator.md -o -iname
   orchestrator.toml` sweep corrected from "three-lane universe" to the real four-file count (canonical
@@ -1772,3 +1745,84 @@ sort-key integration point and its five invariants (AC-04); the `build`-class pr
 fixed, the field and its rename stand); AC-02's sibling-file architectural premise (only R3-F-04's undefined
 states were fixed, the file mechanism itself stands); the "gateway V2" forward note (`## Future work`);
 Kimi-out-of-scope; `adversarial-judge`→`grunt`; the six-role `decision`-class definition.
+
+### Round 4 — `approve-with-amendments` (6 findings, F-01..F-06, 1 blocking) — a re-baseline against the
+post-`015` tree, plus four user decisions closing every remaining open question
+
+Verdict: **`approve-with-amendments`.** `spec-challenger` reviewed contract 3.1.0 against the tree as it stands
+today, not as it stood when round 3 wrote it: `015-anthropic-dispatch-parity` is **DONE and merged**,
+`_PROVIDER_RUNTIME_REDIRECTS = {"anthropic": "claude-code"}` is live at `ai/scripts/routing_core/service.py:33`,
+and this machine's Claude Code lane is live-authenticated. This file bumps to contract **3.2.0** — a
+re-baseline of what is honestly TRUE about the mechanism's real-world reach, not a rescope of what the
+mechanism IS; no class, role count, sort-key invariant, or configuration-surface requirement changes.
+
+**Changelog, 3.1.0 → 3.2.0:** (1) inverted the "zero live effect" framing (F-01) to "real, live effect for six
+of twenty in-scope roles" now that `015` has shipped; (2) re-cited every `service.py` line the redirect's
+insertion shifted (F-02); (3) confirmed `models.toml` tier citations unchanged (F-03); (4) re-cited the
+orchestrator-doctrine HARD DENIAL branch's shifted line range (F-04); (5) fixed a repo-name typo
+(`SET-AGENTES` → `SET-AGENTS`) in five citations (F-05); (6) re-checked and corrected the illustrative
+next-free ADR number (F-06); and recorded four user decisions (2026-08-02) that close every open question the
+Audit had previously flagged for `USER_APPROVAL`.
+
+**The finding, disposition by finding:**
+
+- **F-01 (high, blocking) — the "zero live effect" framing is inverted post-`015`.** Fixed by re-baselining
+  `### Honest scope`, `### Dependency on 015` (renamed `### 015 dependency — closed`), `## Alcance`, AC-01's
+  `grunt`/`build` real-effect bullets, AC-02's `MODEL_PREFERENCE_NOTE` trigger condition, and the Verificación
+  fixture-that-would-fool-it rule and its AC-01 test bullet — all now require deriving acceptance tests from
+  the live effective-runtime inventory (evaluate `anthropic` against `('claude-code','anthropic')`, never an
+  injected missing-pair fixture). AC-01(i)'s `grunt` assertion (that `REVIEWER_INDEPENDENCE_UNAVAILABLE` fires)
+  and AC-01(iv)'s byte-identical `RouteDecision` claim for `build` are both retracted and replaced with
+  real-change assertions: with the live redirect, the `anthropic` candidate survives both
+  `PROVIDER_UNAUTHENTICATED` (`service.py:220`) and `REVIEW_PROVIDER_CONFLICT` (`service.py:241`). `decision`'s
+  seven roles and the fourteen non-tiered `grunt`/`build` roles remain genuinely inert — an operational fact
+  (the doctrine never invokes `--route-decide` for them) `015` cannot touch.
+- **F-02 (high) — every `service.py` line the redirect's insertion shifted, re-cited and verified live, not
+  trusted blindly.** `role_class` assignment now at `:170` (was `:113`); `PROVIDER_UNAUTHENTICATED` at `:220`;
+  `REVIEW_PROVIDER_CONFLICT` at `:241`; `candidates.sort(...)` at `:246`; `_role_class`'s def now spans
+  `:299-304` (`"writer"` at `:302`, `"review"` at `:303`); the exclusion loop now spans `:197-244`;
+  `PROVIDER_EXHAUSTED` now at `:214`; the `role_class == "review"` pre-sort branch now spans `:172-182`. AC-08's
+  four refusal sites re-cited: `FACTS_INCOMPLETE` at `:164`, `:169`, `:191`; `REVIEW_IDENTITY_INVALID` at
+  `:176`, `:182`; the `conflicts` check spanning `:188-191`. Every one of these was opened and read directly
+  this round before being written down, per the assignment's own "do not trust blindly" instruction.
+  `domain.py` citations were re-checked and found correct, left untouched.
+- **F-03 (medium) — `models.toml` tier citations re-checked live, found unchanged and correct.**
+  `debugger.tiers` at `184/187/190`, `delta-reviewer` at `193/196/199`, `finding-verifier` at `202/205/208`,
+  `implementer` at `217/220/223`, `package-reviewer` at `232/235/238`, `security-auditor` at `259/262/265` — the
+  six-tiered-role set stands exactly as round 3 left it, no drift.
+- **F-04 (medium) — orchestrator.md citations re-cited.** The "tiered roles" sentence stays at `~:156-158`
+  (unchanged, confirmed live); the HARD DENIAL branch moved to `:255-261` (was `:199-205`) — fixed everywhere
+  it is cited, including AC-01's `grunt` bullet and Non-goals.
+- **F-05 (low) — repo-name typo fixed.** `/home/federico/SET-AGENTES/{models.toml,roles.tsv}` corrected to
+  `/home/federico/SET-AGENTS/{models.toml,roles.tsv}` in all five citations.
+- **F-06 (low) — ADR next-free number re-checked live, updated.** `docs/adr/README.md` now lists `0017`
+  (`013-pi-interactive-target`) as Accepted and materialized — no longer merely claimed, as round 3 found it —
+  and a NEW `0019` (`015-anthropic-dispatch-parity`) filed in the interim. `0018` is confirmed to still be a
+  genuine, currently-unclaimed hole between the two. AC-09's re-check-live instruction is kept verbatim; only
+  the illustrative snapshot of what `docs/adr/README.md` shows today was updated.
+
+**The four user decisions (2026-08-02), recorded verbatim, closing every open question the Audit had
+previously flagged for `USER_APPROVAL`:**
+
+1. **Kimi Code = STANDALONE credential surface requiring new provider onboarding — an external dependency
+   `014` does NOT deliver.** Recorded as an explicit assumption/non-goal (Contexto, AC-03, Non-goals),
+   replacing the prior draft's open (a)/(b) ambiguity. Audit item (1) closed.
+2. **`decision` class = the seven `duty="coord"`/`duty="docs"` roles exactly as this spec already has it**
+   (`orchestrator`, `architect`, `product-analyst`, `project-bootstrapper`, `agent-factory`, `ux-ui-designer`,
+   `package-planner`); **`adversarial-judge` stays in `grunt`.** Both confirmed correct, no narrower or
+   different reading intended. Audit items (2) and (3) closed.
+3. **`[preference].build`'s recommended provider order = premium-first, the same criterion as `decision`'s**
+   — the user's own reasoning: cost is regulated by quota (`008-P3`'s scope, still `BLOCKED`), not by this
+   contract's preference axis. Recorded as guidance for a human operator's own configuration, not a hardcoded
+   default this contract's code ships with — AC-02's surface stays fully user-configurable. Audit item (4)
+   closed.
+4. **Live-effect framing per F-01 above** — the contract's baseline now ASSUMES AND VERIFIES real effect for
+   the six roles the redirect reaches, rather than re-deriving inertness from first principles as a
+   hypothetical the way rounds 1-3 had to before `015` existed.
+
+**What round 4 confirmed correct, untouched by this round:** everything round 3's own "do not touch" list
+already named (see above), plus round 3's own corrections themselves (the citation/precision fixes R3-F-03
+through R3-F-08 remain valid statements about what round 3 did, even where the underlying line numbers have
+since moved again — this round's F-02 supersedes only the numbers, not the historical record of round 3's own
+disposition). The three-class taxonomy, the sort-key integration point and its five invariants, the
+configuration surface's schema and CLI, and the ADR requirement are unchanged.

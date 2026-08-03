@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-02T15:03:09+00:00
+Actualizado: 2026-08-03T00:38:55+00:00
 
 [2026-07-30T16:16:54+00:00] product-analyst · started
 Cliente: Arrancamos el contrato del cambio seguro de proveedor cuando una suscripción se agota.
@@ -27,3 +27,15 @@ Ingeniería: Corregiremos el contrato para usar una operación SQLite atómica d
 [2026-07-30T16:39:42+00:00] spec-challenger · done
 Cliente: El contrato de 011 pasó su desafío sin preguntas abiertas. Como me pediste implementar el plan aprobado y las correcciones no cambiaron decisiones de producto, lo tomo como aprobación de este contrato final.
 Ingeniería: Inicializaré 011 con el hash de sus bytes aprobados, luego crearé un paquete único de implementación y recién entonces delegaré la migración/transición atómica.
+
+[2026-08-02T15:04:27+00:00] product-analyst · started
+Cliente: Un analista esta redactando el contrato de una feature corta para saldar la deuda de auditoria priorizada y una limpieza menor, que luego pasara por desafio y tu aprobacion.
+Ingeniería: REQUIREMENTS/SPEC_DRAFT 016-audit-debt-repayment: P1=PR-07/PR-08/PR-09, P2=cleanup (package-gate-runner paths, effective-runtime reason-code). Out: PR-06/PR-10/PR-11.
+
+[2026-08-02T15:09:12+00:00] spec-challenger · started
+Cliente: Un desafiador independiente esta revisando el contrato recien redactado de la feature de deuda de auditoria, antes de traertelo para aprobacion.
+Ingeniería: SPEC_CHALLENGE 016-audit-debt-repayment v1.0.0: read-only challenge for contradictions, undefined states, testability gaps, scope leaks vs PR-06/10/11 non-goals.
+
+[2026-08-02T15:51:55+00:00] product-analyst · started
+Cliente: Dos analistas estan corrigiendo los contratos de 014 y 016 con lo que encontraron los desafiadores y con tus cuatro decisiones de producto, antes de traertelos para aprobacion final.
+Ingeniería: SPEC amendments in parallel: 014 v3.2.0 (re-baseline post-015 per F-01/F-02, user answers: real-effect framing, Kimi standalone=external non-goal, classes as-spec, premium-first build) and 016 v1.1.0 (F-01..F-08: PROYECTO twin, AC-05 reformulation, cmd_transition 6th entry, grep case, xrefs, 5 shapes, cmd fixes).

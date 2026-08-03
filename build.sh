@@ -9,7 +9,7 @@ YES=0
 TARGETS=()
 
 usage() {
-  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|local] [--output DIR] [--target opencode|claude-code|codex] [--yes]"
+  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|local] [--output DIR] [--target opencode|claude-code|codex|pi] [--yes]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -75,9 +75,10 @@ case "$MODE" in
     diff -ruN "$ROOT/Global/opencode" "$STAGING/opencode" || true
     diff -ruN "$ROOT/Global/claude-code" "$STAGING/claude-code" || true
     diff -ruN "$ROOT/Global/codex" "$STAGING/codex" || true
+    diff -ruN "$ROOT/Global/pi" "$STAGING/pi" || true
     ;;
   generate)
-    for harness in opencode claude-code codex; do
+    for harness in opencode claude-code codex pi; do
       rm -rf "$ROOT/Global/$harness"
       cp -a "$STAGING/$harness" "$ROOT/Global/$harness"
     done

@@ -238,12 +238,18 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
         return "failure", {"reason": "TASK_LOOKS_LIKE_FLAG"}
     own_scratch = cwd is None
     work_dir = Path(cwd) if cwd is not None else Path(tempfile.mkdtemp(prefix="pi-spawn-"))
-    # T-304 guards: --no-session, --no-extensions, and --no-context-files are
-    # UNCONDITIONAL — never gated by guard_tools, never omitted. Only the -t allowlist
-    # varies by tier.
+    # T-304 guards: --no-session, --no-extensions, --no-context-files, --no-skills, and
+    # --no-prompt-templates are UNCONDITIONAL — never gated by guard_tools, never
+    # omitted. Only the -t allowlist varies by tier. The last two close 013-
+    # pi-interactive-target AC-01/AC-12: once Global/pi/skills/** and
+    # Global/pi/prompts/** are installed under ~/.pi/agent/, every dispatch-lane pi
+    # child would otherwise auto-discover and load this harness's own skill catalog
+    # and prompt library too — added context weight the dispatch lane's original,
+    # minimal-and-auditable design never accounted for (see docs/adr/0007-pi-lane.md,
+    # amended by docs/adr/0017-pi-interactive-target.md).
     argv = catalog.pi_pinned_argv(
         "--model", target_id, "--print", "--mode", "json", "--no-session", "--no-extensions",
-        "--no-context-files", "--tools", ",".join(guard_tools),
+        "--no-context-files", "--no-skills", "--no-prompt-templates", "--tools", ",".join(guard_tools),
         "--append-system-prompt", str(prompt_path), task,
     )
     try:

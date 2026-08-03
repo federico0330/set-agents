@@ -20,7 +20,7 @@ from models_config import MANAGED_MCP
 parser = argparse.ArgumentParser()
 parser.add_argument("--staging", required=True)
 parser.add_argument("--home", required=True)
-parser.add_argument("--target", action="append", choices=("opencode", "claude-code", "codex"))
+parser.add_argument("--target", action="append", choices=("opencode", "claude-code", "codex", "pi"))
 parser.add_argument("--preview", action="store_true")
 args = parser.parse_args()
 
@@ -30,6 +30,7 @@ all_targets = {
     "opencode": home / ".config/opencode",
     "claude-code": home / ".claude",
     "codex": home / ".codex",
+    "pi": home / ".pi/agent",
 }
 selected = set(args.target or all_targets)
 targets = {name: path for name, path in all_targets.items() if name in selected}
@@ -277,6 +278,39 @@ orphans = [
     path for path in previous_targets()
     if path not in new_targets and path not in special_targets and path.exists()
 ]
+
+# AC-09 (013-pi-interactive-target): fail-closed collision guard, scoped to
+# ~/.pi/agent/agents/ — the one write target among the four generated harness trees
+# where real, pre-existing third-party content is a standing risk (the gentle-ai
+# leftovers, or any future pi-subagents override file a human drops there). A
+# pre-existing file this installer would write to but did NOT itself record writing
+# last run (per MANIFEST/previous_targets()) means this run is about to clobber
+# content it never owned — ADR-0008 D2's "never touch third-party content" doctrine.
+# Fires identically in --preview and write mode (round 2, N-01): a dry run must not
+# hide a collision a real run would fail on. Exit code 2, matching install.py's own
+# INSTALL_ABORTED_UNSAFE_ROOT precedent and check-drift.sh's internal-error
+# convention — deliberately NOT 1, which would be indistinguishable from ordinary
+# DRIFT_DETECTED (round 3, R3-03).
+if "pi" in targets:
+    pi_agents_root = all_targets["pi"] / "agents"
+    previously_managed = set(previous_targets())
+    collisions = sorted(
+        str(target.relative_to(home))
+        for target in new_targets
+        if pi_agents_root in target.parents
+        and (target.is_symlink() or target.exists())
+        and target not in previously_managed
+    )
+    if collisions:
+        print(
+            "INSTALL_ABORTED_UNSAFE_COLLISION targets=" + ",".join(collisions) + "\n"
+            "  ~/.pi/agent/agents/ already has file(s) this installer never recorded writing.\n"
+            "  Resolve BY HAND, outside the installer (move/rename/delete the file yourself),\n"
+            "  then re-run install.py --target pi. No override flag exists — this guard never\n"
+            "  silently overwrites third-party content.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
 if args.preview:
     changes = 0

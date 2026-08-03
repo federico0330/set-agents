@@ -22,7 +22,7 @@ git diff --check
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 ./build.sh --output "$STAGING" >/dev/null
-for harness in opencode claude-code codex; do
+for harness in opencode claude-code codex pi; do
   diff -ruN "Global/$harness" "$STAGING/$harness"
 done
 python3 - "$ROOT" <<'PY'

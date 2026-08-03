@@ -267,6 +267,22 @@ def claude_tools(capability, roles, role=None):
     return "Read, Grep, Glob, Edit, Write, Bash"
 
 
+def pi_tools(capability, role=None):
+    """AC-03: pi-subagents' own tools vocabulary (comma-separated, lowercase — observed
+    values: read, grep, find, ls, bash, edit, write, plus the open `subagent` delegation
+    token). The ceiling invariant: no capability CLASS granted here that the same role's
+    Claude Code grant (claude_tools()) lacks — Glob has no single pi equivalent, so
+    `find`/`ls` together stand in for it; `subagent` is the one deliberate, documented
+    divergence, granted only to the coord-ro class (see AC-03 user decision 3)."""
+    if role == "local-gate-runner":
+        return "read, bash"
+    if capability == "coord-ro":
+        return "read, grep, find, ls, bash, subagent"
+    if capability in READ_ONLY or capability in {"gate-ro", "release", "run-ro"}:
+        return "read, grep, find, ls, bash"
+    return "read, grep, find, ls, bash, edit, write"
+
+
 def frontmatter_hook(capability, role=None):
     if role == "local-gate-runner":
         return """hooks:
@@ -296,8 +312,46 @@ def copy_tree(source, target):
         shutil.copytree(source, target, dirs_exist_ok=True)
 
 
+def generate_pi_prompts(out):
+    """AC-06: Global/_canonical/commands/*.md -> Global/pi/prompts/*.md. `$ARGUMENTS`
+    needs no translation (pi's own template engine treats it as a native alias for
+    `$@`) and copies through verbatim. The `agent:` frontmatter key has no pi
+    prompt-template equivalent (docs/prompt-templates.md's Format section only
+    recognizes `description`/`argument-hint`) — per user decision 2 it is never
+    silently dropped: it is stripped from the emitted frontmatter and folded into the
+    body as an explicit `subagent({ agent: ..., task: ... })` instruction instead, so
+    the role binding still exists somewhere `pi-subagents` can act on it."""
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    for path in sorted((CANON / "commands").glob("*.md")):
+        text = path.read_text()
+        if not (text.startswith("---\n") and "\n---\n" in text[4:]):
+            die(f"{path}: invalid frontmatter")
+        end = text.index("\n---\n", 4)
+        header_lines = text[4:end].splitlines()
+        body = text[end + 5:]
+        agent = None
+        kept_lines = []
+        for line in header_lines:
+            if line.startswith("agent:"):
+                agent = line.split(":", 1)[1].strip()
+                continue
+            kept_lines.append(line)
+        out_lines = ["---", *kept_lines, "---", ""]
+        if agent:
+            out_lines.append(
+                f'Before doing anything else, invoke `subagent({{ agent: "{agent}", '
+                f'task: "<the request/arguments below>" }})` to delegate this to the `{agent}` role — '
+                "never handle it directly."
+            )
+            out_lines.append("")
+        out_lines.append(body)
+        (out / path.name).write_text("\n".join(out_lines))
+
+
 def write_indexes(out):
-    for harness in ("opencode", "claude-code", "codex"):
+    for harness in ("opencode", "claude-code", "codex", "pi"):
         base = out / harness
         files = sorted(str(p.relative_to(base)) for p in base.rglob("*") if p.is_file() and p.name != "managed-files.txt")
         (base / "managed-files.txt").write_text("\n".join(files) + "\n")
@@ -340,7 +394,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     yolo = models_config.permission_profile(models_path) == "yolo"
     if out.exists():
         shutil.rmtree(out)
-    for harness in ("opencode", "claude-code", "codex"):
+    for harness in ("opencode", "claude-code", "codex", "pi"):
         (out / harness).mkdir(parents=True)
 
     bodies = {}
@@ -395,6 +449,18 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(codex)
 
+        pi_lines = [
+            "---", f"name: {row['role']}", f"description: {json.dumps(desc)}",
+            f"tools: {pi_tools(row['capability'], row['role'])}", "systemPromptMode: replace",
+        ]
+        if row["capability"] == "coord-ro":
+            pi_lines.append("maxSubagentDepth: 2")
+        pi_lines += ["---", "", body]
+        pi = "\n".join(pi_lines)
+        path = out / "pi/agents" / f"{row['role']}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(pi)
+
     # Tier variants (contract 004 T-202): additive, OpenCode-ONLY `<role>@<tier>` agents
     # for the roles models.toml declares tiered (models_config.load_role_tiers). Same
     # prompt body, same permissions, same step budget as the base agent — the ONLY line
@@ -422,13 +488,15 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
 
     for harness in ("opencode", "claude-code"):
         copy_tree(CANON / "commands", out / harness / "commands")
-    for harness in ("opencode", "claude-code", "codex"):
+    for harness in ("opencode", "claude-code", "codex", "pi"):
         copy_tree(CANON / "skills", out / harness / "skills")
+    generate_pi_prompts(out / "pi/prompts")
 
     shutil.copy2(SHARED / "AGENTS.opencode.md", out / "opencode/AGENTS.md")
     shutil.copy2(SHARED / "CLAUDE.md", out / "claude-code/CLAUDE.md")
     shutil.copy2(SHARED / "AGENTS.codex.md", out / "codex/AGENTS.md")
     shutil.copy2(SHARED / "config.codex.snippet.toml", out / "codex/config.snippet.toml")
+    shutil.copy2(SHARED / "AGENTS.pi.md", out / "pi/AGENTS.md")
 
     oc_config = json.loads((SHARED / "opencode.json").read_text())
     oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
@@ -507,16 +575,21 @@ def check_variant_catalog_coherence(role_tiers, routes_path):
 
 
 def validate_pi_target(roles):
-    """AC-10 (contract 004 T-302, ADR-0007): pi gets NO generated agent tree — the
-    architecture's deliberate deviation is that pi's role artifact IS the canonical
-    prompt every other harness already derives from (`Global/_canonical/agents/<role>.md`,
-    read verbatim by `ai/scripts/set_agents_spawn.py` via `--append-system-prompt`), so
-    'semantically equivalent role artifacts' reduces to: every role the spawner can
-    address has that canonical prompt on disk. `load_roles` already enforces this for
-    the three generated harnesses; this re-asserts it explicitly so a 'pi target' verify
-    surface exists, per AC-10, without duplicating a generated tree that would only ever
-    re-copy the same file `install.py` never needs to manage (there is no per-user pi
-    settings surface this repo owns — see docs/adr/0007-pi-lane.md)."""
+    """013-pi-interactive-target AC-02 (round 2, C-01): kept, not removed. pi DOES get
+    a generated agent tree now — the per-role loop above emits a real
+    `Global/pi/agents/<role>.md` for every active-roster role. This function is the
+    explicit, pi-target-scoped
+    assertion that every active-roster role's canonical prompt (`Global/_canonical/
+    agents/<role>.md`) exists on the SOURCE side — the one invariant every generated
+    `Global/pi/agents/<role>.md` file transitively depends on, since each is a direct
+    copy of that same canonical body. `load_roles` already enforces this upstream in
+    every path that reaches `validate()`; this re-asserts it as a second, explicit,
+    pi-named check. It is distinct from, and not duplicated by, the two `validate()`
+    loops above that gained a `pi` tuple member: those check the GENERATED pi output
+    (frontmatter validity, role-set completeness); this one checks the source. The
+    dispatch lane (`ai/scripts/set_agents_spawn.py`) also still reads the same
+    canonical prompt verbatim via `--append-system-prompt` — see docs/adr/0007-pi-lane.md,
+    amended by docs/adr/0017-pi-interactive-target.md for this feature's own additions."""
     for row in roles:
         if not (CANON / "agents" / f"{row['role']}.md").is_file():
             die(f"pi target: {row['role']}: missing canonical prompt")
@@ -536,7 +609,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
         for key in ("name", "description", "developer_instructions", "model", "sandbox_mode"):
             if not data.get(key):
                 die(f"{path}: missing {key}")
-    for harness in ("opencode", "claude-code"):
+    for harness in ("opencode", "claude-code", "pi"):
         for path in (out / harness / "agents").glob("*.md"):
             text = path.read_text()
             if not text.startswith("---\n") or "\n---\n" not in text[4:]:
@@ -544,7 +617,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
     expected = {r["role"] for r in roles}
     variant_expected = {f"{role}@{tier}" for role, tiers in role_tiers.items() for tier in tiers}
     opencode_only = {p.stem for p in (CANON / "opencode-agents").glob("*.md")}
-    for harness, suffix in (("opencode", ".md"), ("claude-code", ".md"), ("codex", ".toml")):
+    for harness, suffix in (("opencode", ".md"), ("claude-code", ".md"), ("codex", ".toml"), ("pi", ".md")):
         actual = {p.stem for p in (out / harness / "agents").glob(f"*{suffix}")}
         harness_expected = expected | opencode_only | variant_expected if harness == "opencode" else expected
         if actual != harness_expected:

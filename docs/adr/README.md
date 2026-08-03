@@ -11,7 +11,7 @@
 | [0004](0004-adaptive-routing-pi-runtime.md) | Deterministic adaptive routing with opt-in Pi runtime | Superseded in part by 0005 | 2026-07-24 | — | 0005 (routing journal only) |
 | [0005](0005-trusted-routing-sqlite-lifecycle.md) | Trusted routing lifecycle in local SQLite | Accepted | 2026-07-24 | 0004 (routing journal only) | — |
 | [0006](0006-adaptive-dispatch-cache-and-facts.md) | Adaptive dispatch: hybrid fact derivation and probe cache (AM-1/AM-2) | Accepted | 2026-07-26 | — | — |
-| [0007](0007-pi-lane.md) | Pi lane: CLI-subprocess spawner, guards-as-flags, exact pin, gated flip | Accepted | 2026-07-27 | — | — |
+| [0007](0007-pi-lane.md) | Pi lane: CLI-subprocess spawner, guards-as-flags, exact pin, gated flip | Accepted; superseded in part by 0017 | 2026-07-27 | — | 0017 (install.py target + dispatch-lane skills/prompt-templates closure only) |
 | [0008](0008-two-roots-portability.md) | Two roots: `HARNESS_HOME` vs `PROJECT_ROOT`, install-time baking, project-scoped routing | Accepted | 2026-07-27 | — | — |
 | [0009](0009-finding-verification.md) | Adversarial refutation of review findings before repair | Accepted | 2026-07-27 | — | — |
 | [0010](0010-spawn-accounting.md) | Spawn accounting: what a Pi spawn actually cost, persisted and not fabricated | Accepted | 2026-07-29 | — | — |
@@ -21,4 +21,6 @@
 | [0014](0014-spawn-provenance-node.md) | Spawn provenance node: a package-scoped mint, not a rename of `run_id` | Accepted | 2026-07-30 | 0013 (spawn node deferral only) | — |
 | [0015](0015-quota-failover.md) | Quota failover is a new linked dispatch, not fallback-window reuse | Proposed | 2026-07-30 | — | — |
 | [0016](0016-discovered-inventory.md) | Discovered inventory: two providers, two maps, four gates, one collision rule | Accepted | 2026-07-31 | — | — |
+| [0017](0017-pi-interactive-target.md) | Pi interactive target: fourth generated harness tree, install target, collision guard, dispatch-lane closure | Accepted | 2026-08-02 | 0007 (install.py target + dispatch-lane skills/prompt-templates closure only) | — |
+| [0018](0018-model-preference-policy.md) | Model preference policy: a closed role-class taxonomy, one tie-break sort-key element, never a second decision-maker | Accepted | 2026-08-02 | — | — |
 | [0019](0019-anthropic-dispatch-parity.md) | Anthropic dispatch parity: the Claude-Code-lane redirect, its tool ceiling, and the day-13 boundary | Accepted | 2026-08-01 | — | — |

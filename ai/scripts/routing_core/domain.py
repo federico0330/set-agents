@@ -59,6 +59,39 @@ def combined_risk(observed: str, requested: str) -> str:
     return observed if RISK_ORDER[observed] >= RISK_ORDER[requested] else requested
 
 
+# AC-01/AC-05 (014-model-preference-policy): the single, closed four-value role-class
+# resolver every consumer of this contract's taxonomy reuses -- never re-derived a
+# second time. `build`/`grunt` are, by definition, the exact predicates
+# `RoutingService._role_class` already computes as `"writer"`/`"review"`
+# (service.py:312-317) -- reused literally, not reconstructed as an equivalent compound
+# condition (R2-F-03). `decision` is a new predicate (`duty in {"coord","docs"}`) this
+# contract adds; every other role is `unscoped`. An explicit `role_override` (AC-02's
+# `[role_override]` table, keyed by role name -> one of the three named classes) takes
+# precedence over the default predicate below -- never the other way around.
+BIAS_CLASSES = ("decision", "grunt", "build", "unscoped")
+_BIAS_DECISION_DUTIES = {"coord", "docs"}
+_BIAS_GRUNT_DUTIES = {"audit", "judge"}
+
+
+def resolve_bias_class(role: str, row: dict, role_override: dict | None = None) -> str:
+    """AC-01/AC-05: resolve `role`'s closed role-class from `row` (a roster item with at
+    least `capability`/`duty` keys), honoring AC-02's per-role override precedence.
+
+    Returns one of `BIAS_CLASSES`, never a role-by-role provider list -- that would
+    reopen `007-P0`'s exact flaw (a hand-maintained, per-role table disconnected from a
+    class model).
+    """
+    if role_override and role in role_override:
+        return role_override[role]
+    if row.get("capability") == "code-rw":
+        return "build"
+    if row.get("capability") == "review-ro" and row.get("duty") in _BIAS_GRUNT_DUTIES:
+        return "grunt"
+    if row.get("duty") in _BIAS_DECISION_DUTIES:
+        return "decision"
+    return "unscoped"
+
+
 def _fail(code: str) -> None:
     raise RoutingError(code)
 
@@ -171,6 +204,17 @@ class RouteDecision:
     # matched a real terminal writer AND survived the family+provider exclusion.
     # An unverified reviewer decision (or any non-review decision) never sets it.
     independence_verified: bool = False
+    # AC-08 (014-model-preference-policy): the resolved role-class (`resolve_bias_class`,
+    # one of `BIAS_CLASSES` above) and whether AC-02's config supplied a non-default
+    # preference for it. Deliberately named `bias_class`, not `role_class`, so it never
+    # collides with `cmd_route_decide`'s own, differently-valued `role_class` envelope
+    # key (`{"writer","review","other"}`, set_agents_app.py:230-233/418/449) -- same
+    # envelope, same decision, two independent classifications, disjoint vocabularies.
+    # `None` only for the two refusals strictly before `service.py:170` (`role_class`
+    # itself, which this resolver piggybacks the same `facts.role` lookup on, not yet
+    # known); populated for every refusal reachable only after that line.
+    bias_class: str | None = None
+    preference_configured: bool = False
     @property
     def identity(self):
         return None if None in (self.route_id, self.runtime, self.provider, self.model, self.family, self.effort) else (self.route_id, self.runtime, self.provider, self.model, self.family, self.effort)

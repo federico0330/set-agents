@@ -221,15 +221,18 @@ diffeable y offline. Ningún arnés SaaS lo tiene, porque su estado es el transc
 | 2 | ~~**005-P3 `tui`**~~ | **entregada** — 005 completa |
 | 3 | ~~**006-P3 `graph-view`**~~ | **entregada** e integrada (validación 2026-08-02, AC-20..29 pass). 006 queda en `PACKAGE_ACCEPTED` **para siempre** por su propia spec (P1/P2 fueron por waiver); el "próximo paso: INTEGRATION" del tablero es fraseo automático, no trabajo pendiente |
 | 4 | ~~Reparación de `migrate_from_v4` en la 005~~ | **entregada** por 007-P1 `schema-normalize` (2026-07-29): `_normalize_ddl()` ignora comentarios y es delimiter-aware en los tres sitios de comparación |
-| 5 | Deuda de la auditoría (`audit-debt-006-p2`) | 6 ítems registrados; PR-07/PR-08/PR-09 + limpieza van en la feature 016 (Pasada D del 2026-08-02); PR-06/PR-10/PR-11 diferidos — PR-11 (compare-and-swap en `mutate`) es la próxima candidata a paquete propio |
+| 5 | ~~Deuda de la auditoría (`audit-debt-006-p2`)~~ | **saldada parcialmente** por la feature 016 (`DONE` 2026-08-02): PR-07 (`repair_entry` autoritativo), PR-08 (extracción waiver/verdicts) y PR-09 (docs) cerradas. Siguen diferidas PR-06, PR-10 y PR-11 — PR-11 (compare-and-swap en `mutate`) sigue candidata a paquete propio. Deuda nueva low: P1F-01 (pop de `repair_entry` depende de `--package-id` opcional), fix exacto anotado en decisiones |
 
 **Pasada de integración 2026-08-02:** 008 y 012 transicionadas a `DONE` con gate global verde
 (verify.sh 558 tests OK, build check sin drift). 006 y 010 validadas con `pass` pero quedan en
 `PACKAGE_ACCEPTED` por diseño registrado (spec 006 §proceso; HANDOFF-PASO9 §5.5) — no son pendientes.
+En la misma pasada: **013** (`pi` como cuarto destino generado del arnés), **014** (política de
+preferencia de modelos, con efecto real en 6 roles vía el redirect de 015) y **016** (deuda de
+auditoría) llegaron a `DONE` con ciclo completo (panel → verificación adversarial → repair → delta →
+testing → QA → integración).
 
-**Deuda registrada, sin paquete:** `Global/_canonical/opencode-agents/package-gate-runner.md` sigue con paths
-absolutos y nombres de módulos de negocio de un proyecto cliente. Repo privado, pero se copia a cada máquina
-que instale el arnés, y esas entradas de permisos son código muerto.
+~~**Deuda registrada, sin paquete:**~~ **Cerrada por 016 AC-08** (2026-08-02): `package-gate-runner.md`
+quedó genericizado con placeholders; un test case-insensitive impide que los literales de cliente vuelvan.
 
 **Límite conocido, documentado en el ADR-0009:** `refuted` es irreversible. `reopen` no toca estados de
 hallazgos, así que una refutación equivocada solo se deshace editando el JSON a mano.

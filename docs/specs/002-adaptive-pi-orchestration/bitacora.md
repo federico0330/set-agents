@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-02T15:03:09+00:00
+Actualizado: 2026-08-03T00:38:55+00:00
 
 [2026-07-24T14:51:58+00:00] done
 Cliente: La instancia no arrancó por una restricción técnica; se reintenta sin ampliar alcance.

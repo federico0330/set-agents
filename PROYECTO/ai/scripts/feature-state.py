@@ -2016,6 +2016,15 @@ def cmd_transition(args: argparse.Namespace) -> int:
             package = package_by_id(data, args.package_id)
             if args.to_phase not in {"INTEGRATION", "DONE"}:
                 package["status"] = args.to_phase.lower()
+            if args.to_phase == "PACKAGE_REPAIR":
+                # A manual transition (e.g. orchestrator override) is a sixth entry point
+                # into PACKAGE_REPAIR that does not know WHY the package is here -- unlike
+                # the five domain sites above, it never sets a specific reason.  Pop any
+                # stale value left by an earlier repair pass so `_repair_entered_from_review`
+                # falls back to log inference instead of trusting a leftover string
+                # (F-03): byte-identical to today's behaviour for every state file, since
+                # none of them carry this key yet.
+                package.pop("repair_entry", None)
         if args.to_phase in TERMINAL:
             data["final_state"] = args.to_phase
         record_event(data, "transition", from_phase, args.to_phase, args.actor, args.package_id, {"reason": args.reason}, args.event_id)
@@ -2314,6 +2323,7 @@ def cmd_record_review(args: argparse.Namespace) -> int:
         if args.verdict == "repair_required":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
+            package["repair_entry"] = "review"
         elif args.verdict == "pass":
             data["phase"] = "PACKAGE_TESTING"
             package["status"] = "testing_required"
@@ -2471,6 +2481,7 @@ def cmd_finalize_review_panel(args: argparse.Namespace) -> int:
         if args.verdict == "repair_required":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
+            package["repair_entry"] = "review"
         elif args.verdict == "pass":
             if has_open_findings(package, {"critical", "high", "medium"}):
                 raise StateError("cannot pass review panel with blocking findings open")
@@ -2702,9 +2713,20 @@ def _repair_entered_from_review(data: dict[str, Any], package_id: str | None) ->
     """Did this package reach PACKAGE_REPAIR from the review panel, or from a red gate?
 
     PACKAGE_REPAIR has four entry points — review, delta review, a failed testing run and
-    a failed runtime QA.  Only the first is a findings problem; the other three carry an
-    obligation the finding set cannot see.
+    a failed runtime QA.  Review and delta review are a findings problem; testing and
+    runtime QA carry an obligation the finding set cannot see.
+
+    `package["repair_entry"]` is authoritative when present: `"review"`/`"delta_review"`
+    answer True, `"testing"`/`"runtime_qa"` answer False, all without touching
+    `data["history"]`.  When the key is absent, or present with a value outside those
+    four (a corrupt state or a future version of the field), this falls back to the log
+    inference below unchanged.
     """
+    repair_entry = package_by_id(data, package_id).get("repair_entry")
+    if repair_entry in {"review", "delta_review"}:
+        return True
+    if repair_entry in {"testing", "runtime_qa"}:
+        return False
     for event in reversed(data.get("history", [])):
         if event.get("from") == event.get("to"):
             # Intra-phase events carry `to = current phase` and never entered anything.
@@ -2764,11 +2786,107 @@ def require_verified(package: dict[str, Any], finding_id: str, action: str) -> d
     return finding
 
 
+def _apply_verification_waiver(data: dict[str, Any], package: dict[str, Any], attempts: dict[str, Any],
+                                verdicts: list[dict[str, Any]], budget: int, args: argparse.Namespace) -> bool:
+    """The `--skip-reason` branch of `record-verification`: waive instead of verdicting."""
+    if verdicts:
+        raise StateError("--skip-reason cannot be combined with --verdict")
+    # Waivers keep their own counter so the cheap path stays reachable once the
+    # verification budget is spent — but they are still a loop, and this harness
+    # caps every loop.  Same ceiling, separate dimension, no second key to drift.
+    if attempts.get("verification_waivers", 0) >= budget:
+        return block_with_reason(data, args.actor, args.package_id,
+                                 f"verification waiver budget exhausted for {args.package_id}")
+    # Physical waiver, not a prose one: skipping verification is legal only
+    # when nothing above `low` is open, where the spawn costs more than the
+    # repairs it would prevent.
+    if has_open_findings(package, {"critical", "high", "medium"}):
+        raise StateError("--skip-reason requires all open findings to be low severity")
+    if len(args.skip_reason) > MAX_VERDICT_FIELD or len(args.evidence or "") > MAX_VERDICT_FIELD:
+        raise StateError(f"waiver fields exceed {MAX_VERDICT_FIELD} chars")
+    record = {"skipped": True, "reason": args.skip_reason, "at": now(), "evidence": args.evidence}
+    package.setdefault("verifications", []).append(record)
+    # Its own counter, not the budgeted one: a waiver is the declaration that no
+    # pass was needed, so it must be VISIBLE without consuming the runaway
+    # backstop — otherwise the cheap path becomes unreachable at the ceiling.
+    attempts["verification_waivers"] = attempts.get("verification_waivers", 0) + 1
+    data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
+    record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor,
+                 args.package_id, {"skipped": True, "reason": args.skip_reason}, args.event_id)
+    return True
+
+
+def _apply_verdicts(data: dict[str, Any], package: dict[str, Any], attempts: dict[str, Any],
+                     verdicts: list[dict[str, Any]], budget: int, args: argparse.Namespace) -> bool:
+    """The `--verdict` branch of `record-verification`: refute/uphold each finding."""
+    if not verdicts:
+        raise StateError("record-verification requires --verdict or --skip-reason")
+
+    # Checked after the waiver branch on purpose: the two counters are separate
+    # dimensions, so spending the verification budget never makes the cheap path
+    # unreachable.
+    if attempts.get("verifications", 0) >= budget:
+        return block_with_reason(data, args.actor, args.package_id,
+                                 f"verification budget exhausted for {args.package_id}")
+
+    if any(item["verdict"] == "refuted" for item in verdicts) and args.actor not in REFUTING_ACTORS:
+        # Retiring a blocking finding with no code change is the verifier's verb
+        # alone.  Without this the implementer can clear the findings against its
+        # own diff and the package accepts with no repair and no delta review.
+        raise StateError(f"{args.actor} cannot refute findings; only {'/'.join(sorted(REFUTING_ACTORS))} may")
+
+    refuted, upheld = [], []
+    for verdict in verdicts:
+        finding = next((item for item in package.get("findings", []) if item.get("id") == verdict["id"]), None)
+        if not finding:
+            raise StateError(f"unknown finding: {verdict['id']}")
+        if finding.get("status", "open") in TERMINAL_FINDING_STATUSES:
+            raise StateError(f"finding is not open: {verdict['id']} ({finding.get('status')})")
+        if finding.get("verified_verdict") == "upheld":
+            # `upheld` is terminal for verification even though the finding stays
+            # open for repair.  Otherwise re-verifying is a retry-until-you-win loop
+            # in a harness that caps every other loop.
+            raise StateError(f"finding was already upheld and cannot be re-verified: {verdict['id']}")
+        if verdict["verdict"] == "refuted" and finding.get("source_role") == args.actor:
+            raise StateError(f"{args.actor} raised {verdict['id']} and cannot refute it")
+        finding["verified_by"] = args.actor
+        finding["verified_at"] = now()
+        finding["verified_verdict"] = verdict["verdict"]
+        if verdict["verdict"] == "refuted":
+            # The finding is never deleted: it keeps its verdict and evidence so the
+            # package record shows what was killed and on what grounds.
+            finding["status"] = "refuted"
+            finding["verdict_reason"] = verdict["reason"]
+            finding["verdict_evidence"] = verdict["evidence"]
+            refuted.append(finding["id"])
+        else:
+            upheld.append(finding["id"])
+
+    package.setdefault("verifications", []).append({
+        "refuted": refuted, "upheld": upheld, "at": now(), "evidence": args.evidence,
+    })
+    attempts["verifications"] = attempts.get("verifications", 0) + 1
+    data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
+
+    if not has_open_findings(package) and _repair_entered_from_review(data, args.package_id):
+        # Every finding was refuted: there is nothing left to repair, so the repair
+        # pass and its delta review are skipped entirely.  That is the whole point.
+        # Gated on WHY the package is in PACKAGE_REPAIR: a red test or a failed
+        # runtime QA put it here for a reason the finding set knows nothing about.
+        data["phase"] = "PACKAGE_TESTING"
+        package["status"] = "testing_required"
+    record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
+                 {"refuted": len(refuted), "upheld": len(upheld)}, args.event_id)
+    return True
+
+
 def cmd_record_verification(args: argparse.Namespace) -> int:
     """Adversarial refutation pass between the review panel and repair.
 
     This is NOT a review cycle: it never touches `deep_review_cycles`.  It is an
-    edge inside the cycle the panel already counted.
+    edge inside the cycle the panel already counted.  Dispatches to
+    `_apply_verification_waiver` (`--skip-reason`) or `_apply_verdicts` (`--verdict`)
+    after the guards shared by both branches.
     """
     path = state_file_arg(args)
 
@@ -2789,91 +2907,8 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         budget = data.get("budgets", {}).get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
 
         if args.skip_reason:
-            if verdicts:
-                raise StateError("--skip-reason cannot be combined with --verdict")
-            # Waivers keep their own counter so the cheap path stays reachable once the
-            # verification budget is spent — but they are still a loop, and this harness
-            # caps every loop.  Same ceiling, separate dimension, no second key to drift.
-            if attempts.get("verification_waivers", 0) >= budget:
-                return block_with_reason(data, args.actor, args.package_id,
-                                         f"verification waiver budget exhausted for {args.package_id}")
-            # Physical waiver, not a prose one: skipping verification is legal only
-            # when nothing above `low` is open, where the spawn costs more than the
-            # repairs it would prevent.
-            if has_open_findings(package, {"critical", "high", "medium"}):
-                raise StateError("--skip-reason requires all open findings to be low severity")
-            if len(args.skip_reason) > MAX_VERDICT_FIELD or len(args.evidence or "") > MAX_VERDICT_FIELD:
-                raise StateError(f"waiver fields exceed {MAX_VERDICT_FIELD} chars")
-            record = {"skipped": True, "reason": args.skip_reason, "at": now(), "evidence": args.evidence}
-            package.setdefault("verifications", []).append(record)
-            # Its own counter, not the budgeted one: a waiver is the declaration that no
-            # pass was needed, so it must be VISIBLE without consuming the runaway
-            # backstop — otherwise the cheap path becomes unreachable at the ceiling.
-            attempts["verification_waivers"] = attempts.get("verification_waivers", 0) + 1
-            data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
-            record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor,
-                         args.package_id, {"skipped": True, "reason": args.skip_reason}, args.event_id)
-            return True
-
-        if not verdicts:
-            raise StateError("record-verification requires --verdict or --skip-reason")
-
-        # Checked after the waiver branch on purpose: the two counters are separate
-        # dimensions, so spending the verification budget never makes the cheap path
-        # unreachable.
-        if attempts.get("verifications", 0) >= budget:
-            return block_with_reason(data, args.actor, args.package_id,
-                                     f"verification budget exhausted for {args.package_id}")
-
-        if any(item["verdict"] == "refuted" for item in verdicts) and args.actor not in REFUTING_ACTORS:
-            # Retiring a blocking finding with no code change is the verifier's verb
-            # alone.  Without this the implementer can clear the findings against its
-            # own diff and the package accepts with no repair and no delta review.
-            raise StateError(f"{args.actor} cannot refute findings; only {'/'.join(sorted(REFUTING_ACTORS))} may")
-
-        refuted, upheld = [], []
-        for verdict in verdicts:
-            finding = next((item for item in package.get("findings", []) if item.get("id") == verdict["id"]), None)
-            if not finding:
-                raise StateError(f"unknown finding: {verdict['id']}")
-            if finding.get("status", "open") in TERMINAL_FINDING_STATUSES:
-                raise StateError(f"finding is not open: {verdict['id']} ({finding.get('status')})")
-            if finding.get("verified_verdict") == "upheld":
-                # `upheld` is terminal for verification even though the finding stays
-                # open for repair.  Otherwise re-verifying is a retry-until-you-win loop
-                # in a harness that caps every other loop.
-                raise StateError(f"finding was already upheld and cannot be re-verified: {verdict['id']}")
-            if verdict["verdict"] == "refuted" and finding.get("source_role") == args.actor:
-                raise StateError(f"{args.actor} raised {verdict['id']} and cannot refute it")
-            finding["verified_by"] = args.actor
-            finding["verified_at"] = now()
-            finding["verified_verdict"] = verdict["verdict"]
-            if verdict["verdict"] == "refuted":
-                # The finding is never deleted: it keeps its verdict and evidence so the
-                # package record shows what was killed and on what grounds.
-                finding["status"] = "refuted"
-                finding["verdict_reason"] = verdict["reason"]
-                finding["verdict_evidence"] = verdict["evidence"]
-                refuted.append(finding["id"])
-            else:
-                upheld.append(finding["id"])
-
-        package.setdefault("verifications", []).append({
-            "refuted": refuted, "upheld": upheld, "at": now(), "evidence": args.evidence,
-        })
-        attempts["verifications"] = attempts.get("verifications", 0) + 1
-        data["metrics"]["verifications"] = data["metrics"].get("verifications", 0) + 1
-
-        if not has_open_findings(package) and _repair_entered_from_review(data, args.package_id):
-            # Every finding was refuted: there is nothing left to repair, so the repair
-            # pass and its delta review are skipped entirely.  That is the whole point.
-            # Gated on WHY the package is in PACKAGE_REPAIR: a red test or a failed
-            # runtime QA put it here for a reason the finding set knows nothing about.
-            data["phase"] = "PACKAGE_TESTING"
-            package["status"] = "testing_required"
-        record_event(data, "record-verification", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
-                     {"refuted": len(refuted), "upheld": len(upheld)}, args.event_id)
-        return True
+            return _apply_verification_waiver(data, package, attempts, verdicts, budget, args)
+        return _apply_verdicts(data, package, attempts, verdicts, budget, args)
 
     data, changed = mutate(path, args, "record-verification", update)
     return output_state(data, changed, path)
@@ -3077,6 +3112,7 @@ def cmd_record_delta_review(args: argparse.Namespace) -> int:
         elif args.verdict == "repair_required":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
+            package["repair_entry"] = "delta_review"
         else:
             return block_with_reason(data, args.actor, args.package_id, args.reason or "delta review blocked")
         record_event(data, "record-delta-review", "DELTA_REVIEW", data["phase"], args.actor, args.package_id, {"verdict": args.verdict, "requires_full_review": requires_full}, args.event_id)
@@ -3117,6 +3153,7 @@ def cmd_record_testing(args: argparse.Namespace) -> int:
         elif args.status == "fail":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
+            package["repair_entry"] = "testing"
         else:
             return block_with_reason(data, args.actor, args.package_id, args.evidence or "package testing blocked")
         record_event(data, "record-testing", "PACKAGE_TESTING", data["phase"], args.actor, args.package_id, {"status": args.status, "commands": args.command or []}, args.event_id)
@@ -3148,6 +3185,7 @@ def cmd_record_runtime_qa(args: argparse.Namespace) -> int:
         elif args.status == "fail":
             data["phase"] = "PACKAGE_REPAIR"
             package["status"] = "repair_required"
+            package["repair_entry"] = "runtime_qa"
         else:
             return block_with_reason(data, args.actor, args.package_id, args.evidence or "runtime QA blocked")
         record_event(data, "record-runtime-qa", "PACKAGE_RUNTIME_QA", data["phase"], args.actor, args.package_id, {"status": args.status, "url": args.url}, args.event_id)

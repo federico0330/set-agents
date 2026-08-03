@@ -111,6 +111,29 @@ Consecuencias de esta decisión, documentadas explícitamente para el panel de r
   ("install puede registrar pi como target para un marcador de settings/doctor si hace falta, nada más") —
   señalado explícitamente para que el panel de revisión lo escrutine.
 
+## Enmienda — ADR-0017 (013-pi-interactive-target, 2026-08-02)
+
+`docs/adr/0017-pi-interactive-target.md` amenda esta Decisión 4 en tres piezas — no las revierte, las
+reemplaza para una superficie DISTINTA (`pi` interactivo, no el carril de despacho de la Decisión 2):
+
+1. **Título y premisa de la Decisión 4** ("target `pi` MÍNIMO ... sin árbol generado", "Deliberadamente NO se
+   genera") quedan FALSOS para la superficie interactiva: `Global/pi/agents/**` es ahora un árbol generado
+   real, análogo a `out/opencode|claude-code|codex/agents/`. La razón original (el prompt canónico pasado
+   VERBATIM vía `--append-system-prompt` en el carril de despacho) sigue vigente Y sin cambios para ESE
+   carril — esta enmienda cubre exclusivamente el arranque interactivo, una sesión distinta.
+2. **La cláusula de `install.py`** ("NO gana un target `pi` nuevo") queda amendada: `install.py` SÍ gana un
+   cuarto target, `pi` → `~/.pi/agent`, porque la superficie interactiva sí lee `agents/`, `skills/` y
+   `prompts/` bajo esa raíz — algo que el carril de despacho, con sus propios flags `--no-extensions
+   --no-context-files --no-skills --no-prompt-templates`, nunca hace.
+3. **La consecuencia sobre `validate_pi_target`** queda INCOMPLETA, no falsa: la función se mantiene tal cual
+   la describe este texto (re-afirma el prompt canónico en disco por rol), pero deja de ser la ÚNICA
+   validación de la superficie pi — `generate.py`'s `validate()` gana además dos chequeos sobre la salida
+   GENERADA (`Global/pi/agents/*.md`: frontmatter válido, conjunto de roles completo).
+
+Esta enmienda también angosta el residual-risk framing de la Decisión 2: ADR-0017's propia AC-12 cierra el
+gap que esa decisión dejaba nombrado-pero-aceptado, agregando `--no-skills`/`--no-prompt-templates` al mismo
+argv fijo que ya lleva `--no-session --no-extensions --no-context-files` — ver ADR-0017.
+
 ## Decisión 5 — `--doctor --harness pi` (AC-09)
 
 `set_agents_app.py --doctor --harness pi --json` imprime un envelope schema-2 redactado

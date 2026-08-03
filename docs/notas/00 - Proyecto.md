@@ -14,8 +14,10 @@
 - [[features/010-spawn-provenance|010-spawn-provenance]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
 - [[features/011-quota-failover|011-quota-failover]] — fase `BLOCKED` · paquetes 0/1 · **BLOCKED**
 - [[features/012-discovered-inventory|012-discovered-inventory]] — fase `DONE` · paquetes 1/1 · **DONE**
-- [[features/013-pi-interactive-target|013-pi-interactive-target]] — fase `PACKAGE_PLANNING` · paquetes 0/0
+- [[features/013-pi-interactive-target|013-pi-interactive-target]] — fase `DONE` · paquetes 1/1 · **DONE**
+- [[features/014-model-preference-policy|014-model-preference-policy]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/015-anthropic-dispatch-parity|015-anthropic-dispatch-parity]] — fase `DONE` · paquetes 1/1 · **DONE**
+- [[features/016-audit-debt-repayment|016-audit-debt-repayment]] — fase `DONE` · paquetes 2/2 · **DONE**
 
 ## Qué falta
 
@@ -25,7 +27,7 @@
 - **010-spawn-provenance** → `INTEGRATION` — all packages accepted
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
-- **013-pi-interactive-target** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
+- **016-audit-debt-repayment** 1 hallazgos abiertos
 
 ## Quick-fixes recientes
 
@@ -34,21 +36,21 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-03 ac-01i-grunt-no-flip-en-verified-review-2-proveedores|AC-01(i): grunt no puede flippear provider en verified review con catalogo de 2 proveedores]]
+- [[decisiones/2026-08-03 audit-debt-006-p2-cierre-parcial-016|Cierre parcial de audit-debt-006-p2: PR-07/08/09 saldadas por 016; PR-06/10/11 siguen diferidas]]
+- [[decisiones/2026-08-02 p1f-01-repair-entry-pop-package-id-opcional|P1F-01 aceptado como deuda low: el pop de repair_entry depende del --package-id opcional]]
+- [[decisiones/2026-08-02 build-staging-no-concurrent-full-gates|Los gates de suite completa no se corren en paralelo: build.sh colisiona en staging compartido]]
+- [[decisiones/2026-08-02 ac-13-roster-half-environment-gated|AC-13: la mitad de discoverability viva del roster queda environment-gated, no BLOCKED de feature]]
+- [[decisiones/2026-08-02 ac09-ac10-pi-minimal-target-superseded-by-013|AC-08/AC-14 supersedes ac09-ac10-pi-minimal-target-accepted: pi gains a real install.py target and generated agent tree]]
 - [[decisiones/2026-08-02 pasada-integracion-2026-08-02|Pasada de integración 2026-08-02: 008 y 012 a DONE; 006 y 010 quedan PACKAGE_ACCEPTED por diseño]]
 - [[decisiones/2026-08-01 areas-ops-opencode-go-zen-colision-cerrada-f-03-ac-06a-queda-genericamente-cerrado|areas.ops.opencode.go-zen colision CERRADA (F-03); AC-06(a) queda genericamente cerrado, sin residuo]]
-- [[decisiones/2026-08-01 areas-judge-opencode-go-zen-colisión-cerrada-f-02-amplía-ac-06a-nuevo-residuo-areas-ops|areas.judge.opencode.go-zen colisión CERRADA (F-02, amplía AC-06a); nuevo residuo areas.ops]]
-- [[decisiones/2026-08-01 areas-judge-go-zen-colisiona-residuo-fuera-de-alcance|areas.judge.opencode.go-zen colisiona con la misma escalera implementer, fuera de alcance]]
-- [[decisiones/2026-08-01 setting-sources-user-confía-en-scope-generado-desde-el-propio-repo|setting-sources user confía en scope generado desde el propio repo]]
-- [[decisiones/2026-08-01 redirect-de-effective-runtime-es-silencioso-sin-reason-code|Redirect de _effective_runtime es silencioso, sin reason_code]]
-- [[decisiones/2026-07-31 013-pi-interactive-target-must-sequence-its-own-orchestrator-md-work-after-015-lands|013-pi-interactive-target must sequence its own orchestrator.md work after 015 lands]]
-- [[decisiones/2026-07-30 p2-discovered-inventory-pasa-a-ser-su-propia-feature-012|P2-discovered-inventory se separa de 008 y pasa a ser la feature 012, mismo patrón que 010/006]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-02T15:00:53+00:00_
+_Actualizado: 2026-08-03T00:38:12+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias
@@ -57,17 +59,21 @@ _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
 
 ### Lo que queda (actualizado 2026-08-02)
 
-**Pasada de integración 2026-08-02 (Pasada A):** 008 y 012 llegaron a `DONE` con gate global verde.
-006 y 010 fueron validadas en integración con `pass` pero quedan en `PACKAGE_ACCEPTED` **por diseño
-registrado** (spec 006 §proceso: P1/P2 salieron por waiver; HANDOFF-PASO9 §5.5 para 010) — su
-"próximo paso: INTEGRATION" en el tablero es fraseo automático, no pendiente real.
+**Pasada completa 2026-08-02 (A–D):** 008 y 012 a `DONE` con gate global verde; 006 y 010 validadas
+con `pass` pero quedan en `PACKAGE_ACCEPTED` **por diseño registrado** (spec 006 §proceso: P1/P2
+salieron por waiver; HANDOFF-PASO9 §5.5 para 010) — su "próximo paso: INTEGRATION" del tablero es
+fraseo automático, no pendiente real. Además, con ciclo completo cada una:
 
-- **013-pi-interactive-target** — contrato aprobado, todavía sin paquete. Falta `package-planner` +
-  implementación. Importante: su propio trabajo sobre `Global/_canonical/agents/orchestrator.md` debe
-  releer el texto POST-015 (ya registrado como decisión), no el que tenía antes.
-- **014-model-preference-policy** — contrato en 3.1.0, todavía sin pasar por aprobación final del
-  usuario. Ahora que 015 está `DONE`, su clase `build` (implementadores) y `grunt` (revisores) van a
-  tener efecto real apenas se apruebe e implemente — antes de 015 hubiera quedado inerte para ambas.
+- ~~**013-pi-interactive-target**~~ — **`DONE`**: `pi` interactivo es el cuarto destino generado
+  (`Global/pi/**` → `~/.pi/agent/`) con guardia anti-colisión fail-closed, E2E real contra pi 0.83.0,
+  cierre del dispatch-lane y ADR-0017. La mitad "roster vivo vía pi-subagents" de AC-13 quedó
+  environment-gated (test opt-in `SET_AGENTS_PI_E2E=1`, decisión registrada).
+- ~~**014-model-preference-policy**~~ — **`DONE`** con contrato 3.2.0 (re-baselineado post-015,
+  aprobado 2026-08-02): taxonomía decision/grunt/build/unscoped, `model-preference.toml` opt-in con
+  CLI, sesgo en posición 3 del sort-key (independencia y tier inviolables), ADR-0018. Efecto real
+  probado en vivo sobre 6 roles con tiers.
+- **016-audit-debt-repayment** — **`DONE`**: PR-07/08/09 saldadas + limpieza (AC-08) + reason-code
+  del redirect. Quedan diferidas PR-06/PR-10/PR-11 y la nueva deuda low P1F-01 (fix anotado).
 - **008-dynamic-selection P3 (budget-aware-selection)** — sigue bloqueada esperando a que
   **011-quota-failover** llegue a `accepted`. 011 a su vez está `BLOCKED` esperando un agotamiento real
   de cuota (decisión explícita del usuario: no forzarlo).

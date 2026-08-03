@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-02T15:03:09+00:00
+Actualizado: 2026-08-03T00:38:55+00:00
 
 ## Features
 
@@ -19,8 +19,10 @@ Actualizado: 2026-08-02T15:03:09+00:00
 | 010-spawn-provenance | feature | PACKAGE_ACCEPTED | P1-spawn-provenance (accepted) | 1/1 | 11/12 | 1/2 | 0 | - | INTEGRATION | 2026-08-02T14:44:35+00:00 record-spawn |
 | 011-quota-failover | feature | BLOCKED | P1-quota-failover (package_gates) | 0/1 | 3/12 | 0/2 | 0 | HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está v… | - | 2026-07-30T17:04:39+00:00 block |
 | 012-discovered-inventory | feature | DONE | P1-discovered-inventory (accepted) | 1/1 | 8/12 | 1/2 | 0 | - | - | 2026-08-02T15:00:53+00:00 transition |
-| 013-pi-interactive-target | feature | PACKAGE_PLANNING | - | 0/0 | 0/12 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-07-31T14:26:21+00:00 init |
+| 013-pi-interactive-target | feature | DONE | P1-pi-interactive-target (accepted) | 1/1 | 9/12 | 1/2 | 0 | - | - | 2026-08-02T22:40:39+00:00 transition |
+| 014-model-preference-policy | feature | DONE | P1-model-preference-policy (accepted) | 1/1 | 7/12 | 1/2 | 0 | - | - | 2026-08-03T00:38:12+00:00 transition |
 | 015-anthropic-dispatch-parity | feature | DONE | P1-anthropic-dispatch-parity (accepted) | 1/1 | 0/12 | 1/2 | 0 | - | - | 2026-08-01T22:46:55+00:00 transition |
+| 016-audit-debt-repayment | feature | DONE | P1-harness-debt (accepted) | 2/2 | 10/12 | 1/2 | 1 | - | - | 2026-08-03T00:02:59+00:00 transition |
 
 ## Quick-fixes recientes
 
@@ -29,63 +31,63 @@ Actualizado: 2026-08-02T15:03:09+00:00
 
 ## Bitácora (últimos 15)
 
-[2026-08-02T15:00:53+00:00] P1-discovered-inventory · integrator · done
-Cliente: El integrador confirmo que el inventario de modelos descubiertos quedo bien integrado: los 16 hallazgos de revision estan cerrados y verificados, y las compuertas de seguridad siguen cerradas como se acordo (se puede sondear, no rutear).
-Ingeniería: Integration validation PASS: AC-01..AC-12 verified in tree (pair commands, dual maps, lockstep allowlists, CANONICAL_MODEL aliasing closing SEC-001/002, billing kinds, ADR-0016 Accepted). Live gates: unittest 558 OK, verify.sh VERIFY_PASS. Non-goals honored: enabled_providers/ROUTING_PROVIDERS stay closed.
+[2026-08-03T00:35:25+00:00] P1-model-preference-policy · delta-reviewer · started
+Cliente: Un revisor distinto verifica que los ocho arreglos sean reales y esten bien acotados, sin reabrir la revision general.
+Ingeniería: DELTA_REVIEW 014 R1: verify except-clause mappings, production-plumbing test bites, full-doc validation both write paths, marker pop, deviation durably recorded.
 
-[2026-08-02T14:54:59+00:00] P1-spawn-provenance · integrator · done
-Cliente: El integrador confirmo que el registro de procedencia de cada delegacion funciona y quedo bien conectado: las cinco condiciones acordadas se cumplen y los pendientes del traspaso anterior ya estaban ejecutados. Igual que con la vista de grafo, esta ficha queda cerrada sin sello final, tal como se decidio en su momento.
-Ingeniería: Integration validation PASS: AC-01..AC-05 verified in tree (replay guard first, spawn nodes edge-free, ownership clean, done_ready resolved_at filter, 5/5 regression tests green). HANDOFF-PASO9 5.2/5.3 executed (ADR-0013 superseded note + log-decision ac-04). Per HANDOFF 5.5 + spec Origen, 010 stays PACKAGE_ACCEPTED; INTEGRATION/DONE never invoked. Non-blocking observation: exceptions field absen…
+[2026-08-03T00:13:23+00:00] P1-model-preference-policy · repair-agent · started
+Cliente: Un reparador cierra en una pasada los ocho detalles confirmados de la politica de modelos: errores que escapaban sin mensaje claro, un archivo editado a mano que se corrompia, la cobertura del camino real de produccion y dos textos de documentacion imprecisos.
+Ingeniería: PACKAGE_REPAIR 014 R1: except clauses (show/route-explain), dedicated MODEL_PREFERENCE_INVALID handling in route-decide, production-plumbing test with populated STATE_DIR, service-level role_override + AC-04e tests, full-doc validation before serialize (set AND role-override paths), pop marker in __init__, log-decision for AC-01i deviation. One record-repair call.
 
-[2026-08-02T14:53:45+00:00] orchestrator · done
-Cliente: La seleccion dinamica de modelos quedo oficialmente terminada: todas las pruebas del proyecto pasaron y la pieza convive bien con el resto. La parte que depende de medir cuotas reales queda en pausa hasta que eso sea posible.
-Ingeniería: 008 DONE: transition PACKAGE_ACCEPTED->INTEGRATION->DONE with global gate feature-008-integration pass (verify.sh 558 OK, build check). P3 budget-aware-selection remains deferred behind 011 (BLOCKED by design).
+[2026-08-03T00:08:38+00:00] P1-model-preference-policy · finding-verifier · started
+Cliente: Antes de reparar, un verificador intenta refutar los ocho hallazgos del panel de la politica de modelos.
+Ingeniería: FINDING_VERIFICATION 014: refute/uphold SEC14-01, RF14-01..07 with live reproduction where claimed.
 
-[2026-08-02T14:53:27+00:00] P1-uninterrupted-delegation · integrator · done
-Cliente: El integrador reviso la pieza que evita pausas innecesarias al delegar trabajo: las diez condiciones acordadas estan cumplidas y conviven bien con lo entregado despues. Solo falta la corrida final de pruebas globales antes del sello de terminado.
-Ingeniería: Integration validation PASS: AC-01..AC-10 verified in current tree (doctrine in 3 shared runtimes, build.sh --check CHECK_PASS SELF_SCAFFOLD_SYNC_OK, ADR-0011 linked, no conflict with 015 lane logic). P3 budget-aware-selection out of scope (blocked on 011). Pending: feature-level global gate (full verify.sh + unittest) before transition DONE.
+[2026-08-03T00:02:59+00:00] integrator · done
+Cliente: El integrador confirmo que las dos piezas de la feature de deuda conviven sin acoplarse y que el contrato quedo cubierto por completo: de las seis deudas originales, tres quedan saldadas y tres siguen diferidas por decision explicita.
+Ingeniería: Integration validation PASS: P1/P2 disjoint (grep zero cross-hits), 11/11 ACs mapped, non-goals untouched (PR-06/10/11 verified), no lifecycle restriction. Housekeeping: remaining-debt log-decision + BUENOS-DIAS update.
 
-[2026-08-02T14:47:21+00:00] P3-graph-view · integrator · done
-Cliente: El integrador confirmo que la vista de grafo funciona y encaja con todo lo entregado: las diez condiciones acordadas se cumplen y no aparecio ningun problema nuevo. La ficha de esta pieza queda cerrada tal como se acordo: completa, sin marcarla con un sello final que prometeria mas de lo que se rastreo.
-Ingeniería: Integration validation PASS: AC-20..AC-29 verified in tree (graph subcommand, mermaid oracle 0 violations, skeleton exit 0, grafo.md 8/8 clean, WAIVED retired, twin byte-identical). Per spec.md:198-204 006 stays PACKAGE_ACCEPTED; transition DONE is never invoked (P1/P2 delivered under waiver, only P3's 9 ACs tracked). Integration evidence recorded; no findings.
+[2026-08-03T00:00:33+00:00] P1-harness-debt · integrator · started
+Cliente: Un integrador valida que las dos piezas de la feature de deuda (motor de estado y higiene) funcionen juntas y cierren lo que la deuda original registraba.
+Ingeniería: INTEGRATION 016: read-only validation of P1-harness-debt + P2-hygiene together vs contract 1.1.0, debt ledger closure check (audit-debt-006-p2), no re-run of heavy gates (already recorded green).
 
-[2026-08-02T14:44:35+00:00] P1-discovered-inventory · integrator · started
-Cliente: Un integrador comprueba que el inventario descubierto se integra sin romper nada de lo existente.
-Ingeniería: INTEGRATION entry: read-only validation of P1-discovered-inventory against approved spec 012.
+[2026-08-02T23:59:53+00:00] P1-model-preference-policy · security-auditor · started
+Cliente: Un auditor revisa que el sesgo de preferencia no pueda debilitar la independencia de los revisores ni abrir una via de inyeccion por el archivo de configuracion.
+Ingeniería: PACKAGE_REVIEW 014: security-auditor read-only on sort-key placement vs REVIEWER_INDEPENDENCE, _model_preference internal-marker injection, TOML parsing fail-closed, atomic writes.
 
-[2026-08-02T14:44:35+00:00] P1-spawn-provenance · integrator · started
-Cliente: Un integrador verifica que el registro de procedencia de cada delegacion quedo bien conectado con el tablero y las notas.
-Ingeniería: INTEGRATION entry: read-only validation of P1-spawn-provenance against approved spec 010, including the ownership exception granted in HANDOFF-PASO9.
+[2026-08-02T23:59:53+00:00] P1-model-preference-policy · package-reviewer · started
+Cliente: Un revisor independiente lee toda la politica de preferencia de modelos de punta a punta contra el contrato aprobado.
+Ingeniería: PACKAGE_REVIEW 014: read-only vs contract 3.2.0; sort-key position, resolver partition, config surface, observability, ADR-0018; targeted tests only.
 
-[2026-08-02T14:44:35+00:00] P1-uninterrupted-delegation · integrator · started
-Cliente: Un integrador confirma que la seleccion dinamica de modelos convive bien con el resto del sistema antes de darla por terminada.
-Ingeniería: INTEGRATION entry: read-only validation of P1-uninterrupted-delegation against approved spec 008; P3 budget-aware-selection stays blocked on 011 and is out of scope.
+[2026-08-02T23:49:29+00:00] P1-model-preference-policy · gate-runner · started
+Cliente: Con los dos implementadores terminados, un unico verificador corre todas las pruebas del proyecto en orden, sin carreras.
+Ingeniería: PACKAGE_GATES 014 + PACKAGE_TESTING 016-P1: full discover, verify.sh, build.sh --check/--diff, git diff --check, serialized single-runner per build-staging race decision.
 
-[2026-08-02T14:44:35+00:00] P3-graph-view · integrator · started
-Cliente: Un integrador revisa que la vista de grafo terminada encaje con todo lo ya entregado antes de declararla lista: nada se marca como completo sin esa mirada de conjunto.
-Ingeniería: INTEGRATION entry: read-only validation of P3-graph-view (ACs 20-29) against approved spec 006, cross-package deps and vault artifacts; produces integration verdict for global gate.
+[2026-08-02T23:42:51+00:00] P1-harness-debt · package-reviewer · started
+Cliente: Un revisor independiente lee toda la cirugia del motor de estado, incluida la obligacion contractual de verificar en el diff que cada guardia quedo en exactamente una de las dos funciones extraidas.
+Ingeniería: PACKAGE_REVIEW P1: package-reviewer read-only vs AC-01..07/11; AC-05b: every guard line of old cmd_record_verification lands in exactly one extracted function; targeted tests only (014 edits test_routing concurrently).
 
-[2026-07-31T00:22:55+00:00] P1-discovered-inventory · delta-reviewer · started
-Cliente: Última verificación antes de cerrar el paquete.
-Ingeniería: delta-reviewer, contexto limpio, acotado a los 3 fixes de la ronda 2.
+[2026-08-02T23:37:06+00:00] P1-harness-debt · gate-runner · started
+Cliente: Un verificador independiente repite las pruebas del motor de estado sin confiar en las corridas del implementador.
+Ingeniería: PACKAGE_GATES P1: test_harness full module, 8 new tests + 9 AC-04 tests by name, twin byte-diff, build.sh --check, git diff --check. Full suite/verify.sh deferred to integration (test_routing under concurrent edit by 014).
 
-[2026-07-30T23:59:05+00:00] P1-discovered-inventory · repair-agent · started
-Cliente: El mismo agujero de seguridad que se cerró para Opus/Sonnet/Haiku se filtró para Fable, el modelo más nuevo. Se cierra ahora, acotado.
-Ingeniería: repair-agent, segunda ronda, alcance mínimo: 3 hallazgos.
+[2026-08-02T23:19:16+00:00] P1-harness-debt · implementer · started
+Cliente: Un implementador salda la deuda mas valiosa del motor de estado: la fase de reparacion pasa a registrarse con un campo autoritativo en vez de inferirse del historial, y la funcion mas enredada se parte en dos piezas claras, sin cambiar ningun comportamiento.
+Ingeniería: PACKAGE_IMPLEMENTATION P1-harness-debt (AC-01..07, AC-11): 6 repair_entry sites + cmd_transition pop + fallback, extract _apply_verification_waiver/_apply_verdicts with pinned behavioral tests, ADR-0009 D7 pointer, twin sync. Self-modification protocol: incremental syntactically-valid edits.
 
-[2026-07-30T23:35:12+00:00] P1-discovered-inventory · delta-reviewer · started
-Cliente: Un tercer revisor, que no vio ni la implementación original ni el panel, confirma que las reparaciones cierran los problemas sin abrir otros nuevos.
-Ingeniería: delta-reviewer, contexto limpio, acotado al diff de la reparación (catalog.py, service.py, models.toml, models_config.py, ADR-0016, README, test_routing.py).
+[2026-08-02T23:19:16+00:00] P1-model-preference-policy · implementer · started
+Cliente: Un implementador construye la politica de preferencia de modelos: el sistema aprende que clase de rol es cada agente (decision, construccion, revision) y sesga que proveedor prefiere cada clase, con efecto real inmediato para seis roles.
+Ingeniería: PACKAGE_IMPLEMENTATION 014-P1 (AC-01..09): role-class resolver, sibling config atomic writer + CLI, sort-key position 3, RouteDecision.bias_class observability, ADR-0018. Runs AFTER 016-P2 accepted (shared service.py/test_routing/set_agents_app now clear). No build.sh/verify.sh during development (staging race rule).
 
-[2026-07-30T22:39:33+00:00] P1-discovered-inventory · repair-agent · started
-Cliente: El panel de revisión encontró un agujero real de seguridad (un modelo podría revisarse a sí mismo bajo dos nombres de proveedor) y varios problemas menores. Se repara todo en una sola pasada.
-Ingeniería: repair-agent consolidado, orden por severidad: SEC-001 (critical) primero, F-01/F-02 (high, tests que no discriminan) segundo, resto después.
+[2026-08-02T23:15:20+00:00] P2-hygiene · delta-reviewer · started
+Cliente: Un revisor distinto verifica que el arreglo del contrato del CLI sea real y no haya tocado nada mas.
+Ingeniería: DELTA_REVIEW P2 R1: verify structural filter in _decide_status (scope: only _decide_status), CLI-boundary matrix rows, hard-failure rows untouched, no collateral edits.
 
-[2026-07-30T20:53:58+00:00] P1-discovered-inventory · security-auditor · started
-Cliente: Un segundo revisor, de seguridad, audita específicamente si la lógica que evita que un modelo se revise a sí mismo bajo dos nombres de proveedor es realmente sólida.
-Ingeniería: security-auditor, contexto limpio, panel RP-01, concurrente con package-reviewer.
+[2026-08-02T23:02:06+00:00] P2-hygiene · repair-agent · started
+Cliente: Un reparador hace que la nueva senal de redirect sea de verdad informativa: el CLI vuelve a responder igual que antes, la senal queda visible, y un test en la frontera lo garantiza.
+Ingeniería: PACKAGE_REPAIR P2 R1: structural classification in _decide_status (RUNTIME_REDIRECTED* neutral, subset matching, covers co-occurrence) under approved exception + CLI-boundary tests for redirect-only and unverified+redirect shapes. One record-repair call.
 
-[2026-07-30T20:53:58+00:00] P1-discovered-inventory · package-reviewer · started
-Cliente: Un revisor que nunca vio la implementación audita si el catálogo dinámico está bien construido.
-Ingeniería: package-reviewer, contexto limpio, panel RP-01.
+[2026-08-02T23:00:13+00:00] P2-hygiene · finding-verifier · started
+Cliente: Antes de reparar, un verificador intenta refutar los dos hallazgos del panel, incluida la reproduccion del corte en el contrato del CLI.
+Ingeniería: FINDING_VERIFICATION P2: refute/uphold P2F-01 (exact-tuple _decide_status regression) and P2F-02 (CLI-boundary test gap); reproduce live.
 
