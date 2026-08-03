@@ -28,6 +28,8 @@ GENERIC=(
   feature_state_lib/cli_repair.py
   feature_state_lib/cli_reporting.py
   feature_state_lib/parser.py
+  feature_state_lib/candidate_identity.py
+  feature_state_lib/cli_integration.py
   check-owned-paths.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh
 )
 

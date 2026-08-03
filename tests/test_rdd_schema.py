@@ -30,11 +30,110 @@ def _feature(packages):
     return data
 
 
-def _run(*args, check=True):
+def _run(*args, cwd=None, check=True):
     return subprocess.run(
         ["python3", str(FEATURE_STATE), *args],
-        cwd=ROOT, env=os.environ.copy(), text=True, capture_output=True, check=check,
+        cwd=cwd or ROOT, env=os.environ.copy(), text=True, capture_output=True, check=check,
     )
+
+
+def _git(*args, cwd):
+    return subprocess.run(["git", *args], cwd=cwd, env=os.environ.copy(),
+                          text=True, capture_output=True, check=True)
+
+
+def _make_repo(td):
+    """A small, isolated git repo with two commits -- never SET-AGENTES's own
+    history, so these tests don't drift as more commits land here."""
+    repo = Path(td) / "repo"
+    repo.mkdir()
+    _git("init", "-q", cwd=repo)
+    _git("config", "user.email", "test@example.com", cwd=repo)
+    _git("config", "user.name", "Test", cwd=repo)
+    (repo / "a.txt").write_text("one\ntwo\nthree\n")
+    _git("add", "a.txt", cwd=repo)
+    _git("commit", "-q", "-m", "base", cwd=repo)
+    base_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    (repo / "a.txt").write_text("one\ntwo\nthree\nfour\nfive\n")
+    (repo / "b.txt").write_text("new file\n")
+    _git("add", "-A", cwd=repo)
+    _git("commit", "-q", "-m", "candidate", cwd=repo)
+    candidate_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+    return repo, base_sha, candidate_sha
+
+
+class CandidateIdentityUnitTests(unittest.TestCase):
+    """freeze()/rederive_and_compare() against a real, isolated temp git repo."""
+
+    def test_freeze_resolves_trees_digest_and_changed_lines(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            cwd_before = os.getcwd()
+            os.chdir(repo)
+            try:
+                from feature_state_lib import candidate_identity as ci
+                frozen = ci.freeze(base_sha, candidate_sha)
+            finally:
+                os.chdir(cwd_before)
+            self.assertEqual(len(frozen["base_tree"]), 40)
+            self.assertEqual(len(frozen["candidate_tree"]), 40)
+            self.assertNotEqual(frozen["base_tree"], frozen["candidate_tree"])
+            self.assertTrue(frozen["paths_digest"].startswith("sha256:"))
+            # a.txt: +2/-0 lines changed (3->5 lines, same first 3); b.txt: +1/-0 new file.
+            self.assertEqual(frozen["changed_lines"], 3)
+
+    def test_rederive_matches_a_clean_freeze(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            cwd_before = os.getcwd()
+            os.chdir(repo)
+            try:
+                from feature_state_lib import candidate_identity as ci
+                frozen = ci.freeze(base_sha, candidate_sha)
+                matches, fresh = ci.rederive_and_compare(frozen)
+            finally:
+                os.chdir(cwd_before)
+            self.assertTrue(matches)
+            self.assertEqual(fresh["candidate_tree"], frozen["candidate_tree"])
+
+    def test_rederive_detects_a_tampered_candidate_tree(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            cwd_before = os.getcwd()
+            os.chdir(repo)
+            try:
+                from feature_state_lib import candidate_identity as ci
+                frozen = ci.freeze(base_sha, candidate_sha)
+                tampered = dict(frozen)
+                tampered["candidate_tree"] = "0" * 40
+                matches, fresh = ci.rederive_and_compare(tampered)
+            finally:
+                os.chdir(cwd_before)
+            self.assertFalse(matches)
+            # `fresh` is the live recomputation, unaffected by the tampering -- it must
+            # resolve to the REAL candidate commit's tree, not the tampered value.
+            real_tree = _git("rev-parse", f"{candidate_sha}^{{tree}}", cwd=repo).stdout.strip()
+            self.assertEqual(fresh["candidate_tree"], real_tree)
+            self.assertNotEqual(fresh["candidate_tree"], "0" * 40)
+
+    def test_rederive_detects_head_moving_after_freeze(self):
+        """The exact tamper-detection property the integration receipt depends on:
+        if `candidate_ref` was "HEAD" and more commits land after the freeze without
+        a re-freeze, re-derivation must catch it."""
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            cwd_before = os.getcwd()
+            os.chdir(repo)
+            try:
+                from feature_state_lib import candidate_identity as ci
+                frozen = ci.freeze(base_sha, "HEAD")
+                (repo / "c.txt").write_text("sneaked in after freeze\n")
+                _git("add", "-A", cwd=repo)
+                _git("commit", "-q", "-m", "post-freeze", cwd=repo)
+                matches, fresh = ci.rederive_and_compare(frozen)
+            finally:
+                os.chdir(cwd_before)
+            self.assertFalse(matches)
 
 
 class StrictTddCliTests(unittest.TestCase):
@@ -169,6 +268,113 @@ class RepairCeilingValidationTests(unittest.TestCase):
         data = _feature([pkg])
         data["acceptance_criteria"] = ["AC-01"]
         self.assertEqual(model.validate_state(data), [])
+
+
+class FreezeCandidateAndReceiptCliTests(unittest.TestCase):
+    """freeze-candidate/record-receipt exercised through the real CLI against an
+    isolated temp git repo (never SET-AGENTES's own history)."""
+
+    def _init(self, state, feature_id="feat"):
+        spec = Path(state).parent / f"{feature_id}-spec.md"
+        spec.parent.mkdir(parents=True, exist_ok=True)
+        spec.write_text("# contract\n")
+        digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+        _run("init", feature_id, str(spec), digest, "--state-file", str(state), "--approved-by", "test")
+
+    def _drive_to_gates(self, state, repo, package_id="PKG-01"):
+        self._init(state)
+        _run("create-package", package_id, "objective", "--state-file", str(state),
+             "--complexity", "small", "--ac", "AC-01", "--task", "T1", "--actor", "test", cwd=repo)
+        _run("transition", "PACKAGE_IMPLEMENTATION", "--package-id", package_id,
+             "--state-file", str(state), "--actor", "test", cwd=repo)
+        _run("start-task", package_id, "T1", "--state-file", str(state), "--actor", "test", cwd=repo)
+        _run("complete-task", package_id, "T1", "--validation", "local-check",
+             "--state-file", str(state), "--actor", "test", cwd=repo)
+        _run("update-package", package_id, "--state-file", str(state), "--actor", "test",
+             "--diff-ref", "candidate", "--integrated", "true", cwd=repo)
+        _run("transition", "PACKAGE_GATES", "--package-id", package_id,
+             "--state-file", str(state), "--actor", "test", cwd=repo)
+
+    def _advance_from_gates_to_runtime_qa_passed(self, state, repo, package_id="PKG-01"):
+        """Caller must already be at PACKAGE_GATES (via `_drive_to_gates`) --
+        this does not re-init/re-create the package."""
+        _run("transition", "PACKAGE_REVIEW", "--package-id", package_id,
+             "--state-file", str(state), "--actor", "test", cwd=repo)
+        _run("record-review", package_id, "pass", "--state-file", str(state), "--actor", "test",
+             "--evidence", "clean", cwd=repo)
+        _run("record-testing", package_id, "pass", "--state-file", str(state), "--actor", "test",
+             "--evidence", "clean", cwd=repo)
+        _run("record-runtime-qa", package_id, "pass", "--state-file", str(state), "--actor", "test",
+             "--evidence", "clean", cwd=repo)
+
+    def test_freeze_candidate_persists_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            state = Path(td) / "state.json"
+            self._drive_to_gates(state, repo)
+            result = _run("freeze-candidate", "PKG-01", "--state-file", str(state), "--actor", "test",
+                          "--baseline", base_sha, "--candidate-ref", candidate_sha, cwd=repo)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            data = json.loads(state.read_text())
+            identity = data["packages"][0]["candidate_identity"]
+            self.assertEqual(identity["generation"], 1)
+            self.assertEqual(identity["base_tree"], _git("rev-parse", f"{base_sha}^{{tree}}", cwd=repo).stdout.strip())
+
+    def test_freeze_candidate_rejects_wrong_phase(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            state = Path(td) / "state.json"
+            self._init(state)
+            _run("create-package", "PKG-01", "objective", "--state-file", str(state),
+                 "--complexity", "small", "--ac", "AC-01", "--actor", "test", cwd=repo)
+            result = _run("freeze-candidate", "PKG-01", "--state-file", str(state), "--actor", "test",
+                          "--baseline", base_sha, "--candidate-ref", candidate_sha, cwd=repo, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("cannot freeze candidate from phase", result.stdout)
+
+    def test_record_receipt_mints_after_full_acceptance_chain(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            state = Path(td) / "state.json"
+            self._drive_to_gates(state, repo)
+            _run("freeze-candidate", "PKG-01", "--state-file", str(state), "--actor", "test",
+                 "--baseline", base_sha, "--candidate-ref", candidate_sha, cwd=repo)
+            self._advance_from_gates_to_runtime_qa_passed(state, repo)
+            result = _run("record-receipt", "PKG-01", "--state-file", str(state), "--actor", "test", cwd=repo)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            data = json.loads(state.read_text())
+            receipt = data["packages"][0]["receipt"]
+            self.assertEqual(receipt["terminal_state"], "accepted")
+            self.assertEqual(receipt["review_verdict"], "pass")
+            self.assertEqual(receipt["candidate_tree"], data["packages"][0]["candidate_identity"]["candidate_tree"])
+
+    def test_record_receipt_fails_closed_without_a_freeze(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            state = Path(td) / "state.json"
+            self._drive_to_gates(state, repo)
+            self._advance_from_gates_to_runtime_qa_passed(state, repo)
+            result = _run("record-receipt", "PKG-01", "--state-file", str(state), "--actor", "test",
+                          cwd=repo, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("requires a prior freeze-candidate", result.stdout)
+
+    def test_record_receipt_fails_closed_when_candidate_drifted_after_freeze(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, base_sha, candidate_sha = _make_repo(td)
+            state = Path(td) / "state.json"
+            self._drive_to_gates(state, repo)
+            _run("freeze-candidate", "PKG-01", "--state-file", str(state), "--actor", "test",
+                 "--baseline", base_sha, "--candidate-ref", "HEAD", cwd=repo)
+            self._advance_from_gates_to_runtime_qa_passed(state, repo)
+            # Someone commits more after the freeze, without re-freezing.
+            (repo / "d.txt").write_text("post-freeze drift\n")
+            _git("add", "-A", cwd=repo)
+            _git("commit", "-q", "-m", "drift", cwd=repo)
+            result = _run("record-receipt", "PKG-01", "--state-file", str(state), "--actor", "test",
+                          cwd=repo, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("no longer matches its frozen identity", result.stdout)
 
 
 if __name__ == "__main__":

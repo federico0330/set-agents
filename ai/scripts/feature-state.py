@@ -72,6 +72,7 @@ from feature_state_lib.cli_reporting import (
     cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_sync_notes,
     run_dry_workflow, cmd_dry_run,
 )
+from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
 from feature_state_lib.parser import add_common_state_args
 
 
@@ -994,6 +995,20 @@ def build_parser() -> argparse.ArgumentParser:
     accept.add_argument("package_id")
     accept.add_argument("--feature-id")
     accept.set_defaults(func=cmd_accept_package)
+
+    freeze = sub.add_parser("freeze-candidate")
+    add_common_state_args(freeze)
+    freeze.add_argument("package_id")
+    freeze.add_argument("--feature-id")
+    freeze.add_argument("--baseline", required=True)
+    freeze.add_argument("--candidate-ref", default="HEAD")
+    freeze.set_defaults(func=cmd_freeze_candidate)
+
+    receipt = sub.add_parser("record-receipt")
+    add_common_state_args(receipt)
+    receipt.add_argument("package_id")
+    receipt.add_argument("--feature-id")
+    receipt.set_defaults(func=cmd_record_receipt)
 
     block = sub.add_parser("block")
     add_common_state_args(block)

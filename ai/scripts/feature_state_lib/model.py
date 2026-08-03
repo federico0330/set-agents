@@ -73,6 +73,8 @@ MUTATING_COMMANDS = {
     "accept-package",
     "block",
     "reopen",
+    "freeze-candidate",
+    "record-receipt",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
 # Refuting retires a blocking finding with no code change: it is an authorization verb,
