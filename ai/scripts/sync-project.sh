@@ -14,7 +14,22 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TEMPLATE="$ROOT/PROYECTO/ai/scripts"
 PROJECT="${1:?Uso: ai/scripts/sync-project.sh <project-dir> [--force]}"
 FORCE="${2:-}"
-GENERIC=(feature-state.py check-owned-paths.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh)
+GENERIC=(
+  feature-state.py
+  feature_state_lib/__init__.py
+  feature_state_lib/model.py
+  feature_state_lib/transitions.py
+  feature_state_lib/render_status.py
+  feature_state_lib/render_bitacora.py
+  feature_state_lib/render_notes.py
+  feature_state_lib/graph.py
+  feature_state_lib/cli_lifecycle.py
+  feature_state_lib/cli_review.py
+  feature_state_lib/cli_repair.py
+  feature_state_lib/cli_reporting.py
+  feature_state_lib/parser.py
+  check-owned-paths.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh
+)
 
 [ -d "$PROJECT" ] || { echo "SYNC_FAIL: no existe $PROJECT" >&2; exit 2; }
 PROJECT="$(cd "$PROJECT" && pwd)"
@@ -72,9 +87,10 @@ for script in "${GENERIC[@]}"; do
     continue
   fi
   if [ -f "$dst" ]; then
-    mkdir -p "$BACKUP"
-    cp -a "$dst" "$BACKUP/"
+    mkdir -p "$BACKUP/$(dirname "$script")"
+    cp -a "$dst" "$BACKUP/$script"
   fi
+  mkdir -p "$(dirname "$dst")"
   install -m 0755 "$src" "$dst"
   copied+=("$script")
 done
