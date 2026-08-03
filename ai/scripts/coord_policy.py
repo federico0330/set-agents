@@ -33,8 +33,16 @@ SAFE = [
     r"curl (?:-[A-Za-z]+\s+)*(?:http://)?(?:localhost|127\.0\.0\.1)(?::\d+)?(?:/|\s|$)",
     # Sanctioned mutation channel: the state CLI validates every transition and
     # writes only atomic JSON under ai/state/. FORBIDDEN_SYNTAX still blocks any
-    # shell composition around it.
+    # shell composition around it. `_blocks_integration_transition` (below) denies
+    # the one shape this blanket allow must NOT cover: a direct, unwrapped
+    # `transition ... INTEGRATION` -- that phase requires the receipt-checked
+    # wrapper (docs/adr/0020-*.md), the next SAFE entry.
     r"python3 ai/scripts/feature-state\.py \S+",
+    # docs/adr/0020-*.md: the receipt-checked integration wrapper. `integration_action.py`
+    # re-derives the frozen candidate_identity live and independently re-validates the
+    # command shape before running anything -- this allow only narrows WHICH Bash
+    # surface can reach it, never substitutes for its own checks.
+    r"python3 ~/\.claude/hooks/integration_action\.py \S+ \S+ (freeze-candidate|record-receipt|transition) -- .+",
 ]
 
 # Exact argv comparison keeps a baked path with spaces auditable without turning it
@@ -106,6 +114,31 @@ def always_denied(command: str) -> bool:
     return bool(ALWAYS_DENY.search(command.strip()))
 
 
+def _transition_blocks_integration(argv: list[str]) -> bool:
+    """A `feature-state.py transition` invocation whose resolved `to_phase`
+    positional is INTEGRATION must go through the wrapped `integration_action.py`
+    path (docs/adr/0020-*.md), never the direct blanket `feature-state.py` allow.
+
+    This walks argv the same way argparse actually resolves `transition`'s one
+    positional among its all-value-taking flags (`--feature-id`, `--package-id`,
+    `--reason`, plus the common `--state-file`/`--expect-revision`/`--actor`/
+    `--event-id`) -- a plain substring/prefix check on the raw command string
+    would miss `feature-state.py transition --actor x INTEGRATION --package-id y`,
+    which argparse parses identically to `transition INTEGRATION --actor x
+    --package-id y` but a naive `"transition INTEGRATION"` regex would not catch.
+    """
+    if len(argv) < 3 or argv[1] != "ai/scripts/feature-state.py" or argv[2] != "transition":
+        return False
+    i = 3
+    while i < len(argv):
+        token = argv[i]
+        if token.startswith("--"):
+            i += 2  # every flag `transition` accepts takes exactly one value
+            continue
+        return token == "INTEGRATION"
+    return False
+
+
 def _argv_allowed(argv: list[str]) -> bool:
     if len(argv) < 3:
         return False
@@ -124,6 +157,10 @@ def allowed(command: str) -> bool:
     try:
         argv = shlex.split(command)
     except ValueError:
+        return False
+    # Checked before both allow-paths below, so neither SAFE_ARGV nor a SAFE regex
+    # match can let a direct `transition ... INTEGRATION` through by construction.
+    if _transition_blocks_integration(argv):
         return False
     if _argv_allowed(argv):
         return True

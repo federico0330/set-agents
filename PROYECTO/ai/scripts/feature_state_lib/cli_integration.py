@@ -4,12 +4,12 @@ mints its `receipt` once every existing acceptance gate already passes and
 the frozen identity re-derives clean against the live repo. Same
 argparse/mutate shape as cli_lifecycle.py's other commands.
 
-`integration_ready` lives here rather than in model.py to avoid a circular
-import: it needs `candidate_identity.rederive_and_compare`, and
-`candidate_identity` itself imports from `model`. It is NOT yet called from
-`cmd_transition` -- wiring `--to-phase INTEGRATION` to this precondition, and
-the tool-call-blocking hook triad that makes it un-bypassable, is a later,
-separately-reviewed package (docs/adr/0020-*.md's integration-receipt ADR).
+`integration_ready` (the precondition `--to-phase INTEGRATION` is gated on)
+lives in `candidate_identity.py`, not here: `transitions.py`'s
+`check_transition` needs it, and `cli_lifecycle.py` (which `check_transition`
+is imported by) is itself imported by this module -- defining it here would
+close a cycle (transitions -> cli_integration -> cli_lifecycle -> transitions).
+`candidate_identity.py` has no such dependency.
 """
 
 from __future__ import annotations
@@ -96,32 +96,3 @@ def cmd_record_receipt(args: argparse.Namespace) -> int:
 
     data, changed = model.mutate(path, args, "record-receipt", update)
     return output_state(data, changed, path)
-
-
-def integration_ready(package: dict[str, Any]) -> list[str]:
-    """Preconditions for `INTEGRATION`, re-derived live -- not yet called by
-    `cmd_transition` (see module docstring). Mirrors `package_accept_ready`'s
-    shape: a list of reasons, empty means ready."""
-    errors: list[str] = []
-    receipt = package.get("receipt")
-    if not receipt:
-        errors.append("receipt is required")
-        return errors
-    if receipt.get("terminal_state") != "accepted":
-        errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")
-    frozen = package.get("candidate_identity")
-    if not frozen:
-        errors.append("candidate_identity is missing even though a receipt exists")
-        return errors
-    for field in ("base_tree", "candidate_tree", "paths_digest"):
-        if receipt.get(field) != frozen.get(field):
-            errors.append(f"receipt.{field} does not match the current candidate_identity.{field}")
-    if errors:
-        return errors
-    matches, fresh = candidate_identity.rederive_and_compare(frozen)
-    if not matches:
-        errors.append(
-            "candidate_identity no longer matches the live repo "
-            f"(candidate_tree {frozen.get('candidate_tree')} -> {fresh['candidate_tree']})"
-        )
-    return errors

@@ -112,6 +112,8 @@ permission:
     "curl localhost*": allow
     "curl 127.0.0.1*": allow
     "python3 ai/scripts/feature-state.py *": allow
+    "python3 ai/scripts/feature-state.py transition INTEGRATION*": deny
+    "python3 ~/.config/opencode/hooks/integration_action.py*": allow
     "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route*": allow
     "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing*": allow
     "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --context*": allow

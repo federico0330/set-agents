@@ -222,6 +222,14 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
         # granularity `--route*`/`--context*` already use above.
         lines += ["  bash:", '    "*": deny', *safe,
                   '    "python3 ai/scripts/feature-state.py *": allow',
+                  # docs/adr/0020-*.md: narrower than coord_policy.py's positional-aware
+                  # check can express in this glob-only permission format, but denies the
+                  # canonical invocation shape orchestrator.md's own doctrine always emits
+                  # (`transition INTEGRATION` immediately, never reordered) -- placed AFTER
+                  # the blanket allow above so it overrides, matching this list's existing
+                  # last-match-wins convention (see hard_denies below).
+                  '    "python3 ai/scripts/feature-state.py transition INTEGRATION*": deny',
+                  '    "python3 ~/.config/opencode/hooks/integration_action.py*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --context*": allow',
@@ -523,6 +531,19 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         shutil.copy2(ROOT / "ai/scripts/release_action.py", hooks / "release_action.py")
         shutil.copy2(ROOT / "ai/scripts/release_gate.py", hooks / "release_gate.py")
     shutil.copy2(ROOT / "ai/scripts/release_gate.py", out / "claude-code/hooks/release_gate.py")
+    # docs/adr/0020-*.md: the integration triad. Unlike release_gate.py (fully
+    # self-contained JSON I/O), integration_gate.py genuinely imports
+    # feature_state_lib.candidate_identity -- reusing the one freeze/re-derive
+    # implementation rather than forking a second copy of git tree-hash logic into
+    # the hooks directory. A live hooks install has no other feature_state_lib on
+    # its sys.path (hooks live outside any project's ai/scripts/, per ADR-0008's
+    # HARNESS_HOME/PROJECT_ROOT split), so the package is copied alongside it.
+    for harness in ("claude-code", "opencode", "codex"):
+        hooks = out / harness / "hooks"
+        shutil.copy2(ROOT / "ai/scripts/integration_gate.py", hooks / "integration_gate.py")
+        shutil.copy2(ROOT / "ai/scripts/integration_action.py", hooks / "integration_action.py")
+        shutil.copytree(ROOT / "ai/scripts/feature_state_lib", hooks / "feature_state_lib",
+                        dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__"))
     write_indexes(out)
     validate(out, roles, role_tiers, routes_path)
 

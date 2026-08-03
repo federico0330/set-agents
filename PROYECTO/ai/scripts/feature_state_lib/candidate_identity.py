@@ -113,3 +113,36 @@ def rederive_and_compare(frozen: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         fresh[field] == frozen.get(field) for field in ("base_tree", "candidate_tree", "paths_digest")
     )
     return matches, fresh
+
+
+def integration_ready(package: dict[str, Any]) -> list[str]:
+    """Preconditions for the `INTEGRATION` transition (docs/adr/0020-*.md),
+    re-derived live -- never trusting a stored boolean. Mirrors
+    `model.package_accept_ready`'s shape: a list of reasons, empty means
+    ready. Lives here (not model.py, not cli_integration.py) precisely so
+    `transitions.check_transition` can call it without a circular import --
+    see cli_integration.py's module docstring for the cycle this avoids.
+    """
+    errors: list[str] = []
+    receipt = package.get("receipt")
+    if not receipt:
+        errors.append("receipt is required")
+        return errors
+    if receipt.get("terminal_state") != "accepted":
+        errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")
+    frozen = package.get("candidate_identity")
+    if not frozen:
+        errors.append("candidate_identity is missing even though a receipt exists")
+        return errors
+    for field in ("base_tree", "candidate_tree", "paths_digest"):
+        if receipt.get(field) != frozen.get(field):
+            errors.append(f"receipt.{field} does not match the current candidate_identity.{field}")
+    if errors:
+        return errors
+    matches, fresh = rederive_and_compare(frozen)
+    if not matches:
+        errors.append(
+            "candidate_identity no longer matches the live repo "
+            f"(candidate_tree {frozen.get('candidate_tree')} -> {fresh['candidate_tree']})"
+        )
+    return errors

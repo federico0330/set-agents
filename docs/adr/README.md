@@ -28,3 +28,4 @@
 | [0021](0021-readability-resilience-checklists.md) | Readability/resilience as `package-reviewer` checklist dimensions, not new agents | Accepted | 2026-08-03 | — | — |
 | [0022](0022-strict-tdd-opt-in.md) | Strict TDD as an opt-in per-package mode, additive to the default flow | Accepted | 2026-08-03 | — | — |
 | [0023](0023-bounded-repair-ceiling.md) | Bounded repair: a line-count ceiling frozen once per cycle, tied to the existing retry budget | Accepted | 2026-08-03 | — | — |
+| [0024](0024-integration-receipt-hook.md) | Integration receipt: a git tree-hash freeze gating `PACKAGE_ACCEPTED→INTEGRATION` | Accepted | 2026-08-03 | — | — |
