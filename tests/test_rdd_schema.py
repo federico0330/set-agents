@@ -6,7 +6,12 @@ tests/test_harness.py or tests/test_routing.py.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -15,12 +20,62 @@ sys.path.insert(0, str(ROOT / "ai/scripts"))
 
 from feature_state_lib import model  # noqa: E402
 
+FEATURE_STATE = ROOT / "PROYECTO/ai/scripts/feature-state.py"
+
 
 def _feature(packages):
     data = model.base_state("F-01", "docs/specs/F-01/spec.md", "deadbeef")
     data["packages"] = packages
     data["current_package_id"] = packages[0]["package_id"] if packages else None
     return data
+
+
+def _run(*args, check=True):
+    return subprocess.run(
+        ["python3", str(FEATURE_STATE), *args],
+        cwd=ROOT, env=os.environ.copy(), text=True, capture_output=True, check=check,
+    )
+
+
+class StrictTddCliTests(unittest.TestCase):
+    """--strict-tdd on create-package/update-package, exercised via the real CLI
+    (PROYECTO twin), same convention tests/test_harness.py's run()/init_state() use."""
+
+    def _init(self, state, feature_id="feat"):
+        spec = Path(state).parent / f"{feature_id}-spec.md"
+        spec.parent.mkdir(parents=True, exist_ok=True)
+        spec.write_text("# contract\n")
+        digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+        _run("init", feature_id, str(spec), digest, "--state-file", str(state), "--approved-by", "test")
+
+    def test_create_package_strict_tdd_defaults_false(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "state.json"
+            self._init(state)
+            _run("create-package", "PKG-01", "objective", "--state-file", str(state),
+                 "--complexity", "small", "--ac", "AC-01", "--actor", "test")
+            data = json.loads(state.read_text())
+            self.assertIs(data["packages"][0]["strict_tdd"], False)
+
+    def test_create_package_strict_tdd_true_is_persisted(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "state.json"
+            self._init(state)
+            _run("create-package", "PKG-01", "objective", "--state-file", str(state),
+                 "--complexity", "small", "--ac", "AC-01", "--actor", "test", "--strict-tdd", "true")
+            data = json.loads(state.read_text())
+            self.assertIs(data["packages"][0]["strict_tdd"], True)
+
+    def test_update_package_can_flip_strict_tdd(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "state.json"
+            self._init(state)
+            _run("create-package", "PKG-01", "objective", "--state-file", str(state),
+                 "--complexity", "small", "--ac", "AC-01", "--actor", "test")
+            _run("update-package", "PKG-01", "--state-file", str(state),
+                 "--actor", "test", "--strict-tdd", "true")
+            data = json.loads(state.read_text())
+            self.assertIs(data["packages"][0]["strict_tdd"], True)
 
 
 class CompactPackageDefaultsTests(unittest.TestCase):

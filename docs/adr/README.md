@@ -26,3 +26,4 @@
 | [0019](0019-anthropic-dispatch-parity.md) | Anthropic dispatch parity: the Claude-Code-lane redirect, its tool ceiling, and the day-13 boundary | Accepted | 2026-08-01 | — | — |
 | [0020](0020-direct-read-vs-delegated-explore-threshold.md) | Direct-read vs. delegated-explore threshold: a file-count rule for the orchestrator's own reading | Accepted | 2026-08-03 | — | — |
 | [0021](0021-readability-resilience-checklists.md) | Readability/resilience as `package-reviewer` checklist dimensions, not new agents | Accepted | 2026-08-03 | — | — |
+| [0022](0022-strict-tdd-opt-in.md) | Strict TDD as an opt-in per-package mode, additive to the default flow | Accepted | 2026-08-03 | — | — |

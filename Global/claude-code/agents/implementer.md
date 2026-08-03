@@ -35,10 +35,15 @@ inside a package.
 ## Procedure
 1. Load `bounded-implementation`, `safe-implementation`, and any domain skill relevant to the touched surface:
    `clean-architecture`, `data-structure-selection`, `db-integrity`, `error-handling-http`,
-   `performance-scalability`, or `context7` for uncertain external APIs.
+   `performance-scalability`, or `context7` for uncertain external APIs. If the package state carries
+   `strict_tdd: true` (docs/adr/0022-*.md), also load `strict-tdd` — its cycle REPLACES step 2 below for this
+   package; every other package keeps the default flow unchanged.
 2. Implement the assigned work packet with the smallest safe diff. In quick-fix and small scoped packages the
    focused tests for the change are part of your deliverable: write them with the implementation. You never run
    them as an approval gate — `gate-runner` executes them and `package-reviewer` reviews them with the diff.
+   **When `strict_tdd: true`**, follow `strict-tdd`'s RED→GREEN→TRIANGULATE→REFACTOR cycle instead: write the
+   failing test first, the minimum code to pass, triangulate, then refactor with tests green throughout — and
+   report the resulting `tdd_evidence` table in your Output (below).
 3. After each task or coherent subtask, run local validation: typecheck/compile, lint on touched files, focused
    unit/contract tests, smoke checks, and ownership checks as available. When a local validation fails, fix and
    re-run it yourself — repeat this fix-verify loop as many times as it takes to converge. This local loop is
@@ -77,3 +82,6 @@ Return structured Markdown or JSON:
   "blockers": []
 }
 ```
+When `strict_tdd: true`, add `"tdd_evidence": []` — one entry per task, the exact shape `strict-tdd`'s
+"Required output addition" section defines. `package-reviewer` re-verifies this table via `strict-tdd-verify`;
+an omitted table on a `strict_tdd` package is itself a finding, not a silent gap.

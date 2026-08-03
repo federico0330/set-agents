@@ -59,8 +59,13 @@ After USER_APPROVAL of the spec/Feature Contract and before implementation.
    - test owner: in quick-fix and small scoped packages, focused tests are part of the implementer's
      deliverable (executed by `gate-runner`); declare `test-writer` only for feature mode or when the risk
      surface warrants independent end-stage regression tests.
+   - `--strict-tdd true` (docs/adr/0022-*.md) is an OPT-IN, off by default, additive to whichever test owner
+     you just declared: it changes HOW `implementer` writes its own tests (test-first, RED→GREEN→TRIANGULATE→
+     REFACTOR, independently re-verified by `package-reviewer`), it does not replace `test-writer` for feature
+     mode's end-stage regression tests. Reach for it on logic-dense, high-branching, or previously-buggy
+     surfaces where a test-first cycle is worth the extra ceremony — not as a default.
 9. Persist or propose commands for `ai/scripts/feature-state.py create-package` with `--complexity`,
-   `--selected-role`, `--selected-model`, `--routing-reason`, `--runtime-surface`,
+   `--selected-role`, `--selected-model`, `--routing-reason`, `--runtime-surface`, `--strict-tdd`,
    and `--context-pack docs/specs/<feature_id>/context/<PACKAGE_ID>.md`.
 
 ## Package fields
@@ -69,7 +74,7 @@ Each package must include:
 - `owned_paths`, `read_only_paths`, `shared_paths`, `risks`, `local_validations`, `package_gates`
 - `early_checkpoints`, `done_conditions`
 - `complexity`, `selected_role`, `selected_model`, `routing_reason`, `required_reviewers`, `context_pack`,
-  `runtime_surface`, test owner (implementer vs `test-writer`)
+  `runtime_surface`, `strict_tdd` (default `false`), test owner (implementer vs `test-writer`)
 
 ## Must NOT
 - Create one package per function/file.

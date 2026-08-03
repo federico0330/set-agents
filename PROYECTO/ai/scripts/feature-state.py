@@ -823,6 +823,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--routing-reason")
     create.add_argument("--context-pack")
     create.add_argument("--runtime-surface")
+    create.add_argument("--strict-tdd")
     create.set_defaults(func=cmd_create_package)
 
     update = sub.add_parser("update-package")
@@ -831,6 +832,7 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--feature-id")
     update.add_argument("--integrated")
     update.add_argument("--runtime-surface")
+    update.add_argument("--strict-tdd")
     update.add_argument("--diff-ref")
     update.add_argument("--complexity", choices=["small", "medium", "high"])
     update.add_argument("--selected-role")

@@ -22,7 +22,12 @@ Two modes, same agent and same checklist depth:
 - Gate results and explicit assumptions.
 
 ## Procedure
-1. Load `package-review` (or `audit-diff` in quick mode), `structured-findings`, and `test-gap-analysis`.
+1. Load `package-review` (or `audit-diff` in quick mode), `structured-findings`, and `test-gap-analysis`. If
+   the package state carries `strict_tdd: true` (docs/adr/0022-*.md), also load `strict-tdd-verify` and
+   independently audit the implementer's `tdd_evidence` table — re-run the cited RED/GREEN tests yourself and
+   scan the touched test files for banned assertion patterns, per that skill. Findings from this audit are
+   ordinary structured findings (`category: testing`), consolidated into the one report below — not a second
+   review pass.
 2. Load `security-review` only when security risk/surface is present (or hand off to `security-auditor` for a
    dedicated offensive+defensive pass on auth/payments/PII/tenant-isolation surfaces).
 3. **Data-integrity checklist** — walk this explicitly whenever the diff touches schema, migrations, money,

@@ -87,6 +87,8 @@ skills/solution-baselines/references/ecommerce-landing.md
 skills/solution-baselines/references/gestion-dashboard.md
 skills/solution-baselines/references/scraping-datos-ml.md
 skills/spec-challenge/SKILL.md
+skills/strict-tdd-verify/SKILL.md
+skills/strict-tdd/SKILL.md
 skills/structured-findings/SKILL.md
 skills/system-design-decisions/SKILL.md
 skills/test-gap-analysis/SKILL.md

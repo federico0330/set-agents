@@ -183,6 +183,10 @@ def cmd_create_package(args: argparse.Namespace) -> int:
         # Fail-safe default: runtime QA is required unless the planner explicitly
         # declares the package has no observable runtime surface.
         package["runtime_surface"] = parse_bool(args.runtime_surface, default=True)
+        # RDD-inspired opt-in (docs/adr/0022-*.md): strict TDD is off by default, same
+        # precedent as runtime_surface's fail-safe default but inverted -- this one adds
+        # ceremony, so it never turns on silently.
+        package["strict_tdd"] = parse_bool(getattr(args, "strict_tdd", None), default=False)
         for task_id in args.task or []:
             package["tasks"].append({"id": task_id, "status": "planned", "local_validations": [], "blockers": []})
         if len(package["tasks"]) < 2 and package["complexity"] != "small":
@@ -208,6 +212,8 @@ def cmd_update_package(args: argparse.Namespace) -> int:
             package["integrated"] = parse_bool(args.integrated)
         if args.runtime_surface is not None:
             package["runtime_surface"] = parse_bool(args.runtime_surface)
+        if getattr(args, "strict_tdd", None) is not None:
+            package["strict_tdd"] = parse_bool(args.strict_tdd)
         if args.diff_ref:
             package["diff_ref"] = args.diff_ref
         if args.complexity:
