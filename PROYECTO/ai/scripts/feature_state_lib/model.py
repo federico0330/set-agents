@@ -229,6 +229,16 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "selected_model": None,
         "routing_reason": None,
         "context_pack": None,
+        # RDD-inspired additions (docs/adr/0020-*.md and siblings 0021-0024). Same precedent
+        # as `late_reviews`/`spawns` above: every reader uses `.get()`, no backfill for
+        # packages that predate these keys.
+        "candidate_identity": None,   # {generation, base_tree, candidate_tree, paths_digest,
+                                       #  changed_lines, frozen_at, frozen_by} -- set by freeze-candidate
+        "receipt": None,              # {schema, package_id, generation, base_tree, candidate_tree,
+                                       #  paths_digest, review_verdict, delta_review_verdict,
+                                       #  verifications_summary, terminal_state, minted_at, minted_by}
+        "repair_ceiling": None,       # {original_changed_lines, budget_lines, cap_source, frozen_at}
+        "strict_tdd": False,          # declared by package-planner at create-package time
     }
 
 
@@ -309,6 +319,23 @@ def validate_state(data: dict[str, Any]) -> list[str]:
             errors.append(f"{pid}: verification budget exceeded")
         if attempts.get("verification_waivers", 0) > verification_budget:
             errors.append(f"{pid}: verification waiver budget exceeded")
+        # RDD-inspired additions (docs/adr/0020-*.md and siblings). Both are static, pure-dict
+        # backstop tripwires -- like `gate_failures` above, real enforcement happens at the
+        # command that writes the value (it must never let a violating write land in the first
+        # place), so these should never actually fire in normal operation.
+        receipt = package.get("receipt")
+        if receipt:
+            candidate = package.get("candidate_identity") or {}
+            for field in ("base_tree", "candidate_tree", "paths_digest"):
+                if receipt.get(field) != candidate.get(field):
+                    errors.append(f"{pid}: receipt.{field} does not match candidate_identity.{field}")
+        ceiling = package.get("repair_ceiling")
+        if ceiling:
+            budget_lines = ceiling.get("budget_lines")
+            for repair in package.get("repairs", []):
+                changed = repair.get("changed_lines")
+                if isinstance(changed, int) and isinstance(budget_lines, int) and changed > budget_lines:
+                    errors.append(f"{pid}: repair changed_lines ({changed}) exceeds repair_ceiling.budget_lines ({budget_lines})")
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")
