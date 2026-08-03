@@ -956,6 +956,9 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--verification", action="append")
     repair.add_argument("--skip-delta", action="store_true")
     repair.add_argument("--commit", help="AC-21: sha of the commit that repaired this finding (7-40 hex)")
+    repair.add_argument("--changed-lines", type=int,
+                        help="docs/adr/0023-*.md: self-reported repair diff size, bookkeeping only -- "
+                             "check-repair-ceiling.py independently re-measures before trusting it")
     repair.set_defaults(func=cmd_record_repair)
 
     delta = sub.add_parser("record-delta-review")

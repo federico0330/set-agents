@@ -356,6 +356,13 @@ it:
    - If every finding is refuted there is nothing to repair: the CLI moves the package straight to testing.
      Refuted findings stay in the record with their reason and evidence — they are never deleted, and the
      `adversarial-judge` sees them in the final bundle.
+   - **After `repair-agent` returns, before `delta-reviewer`**: `gate-runner` runs `python3
+     ai/scripts/check-repair-ceiling.py --state-file ai/state/features/<feature_id>.json --package-id <PKG>`
+     and records it with `record-gate --name repair-ceiling --status pass|fail`. A `fail` here blocks
+     immediately — `HUMAN_DECISION_REQUIRED`, not a second repair attempt (docs/adr/0023-*.md: exactly one
+     repair attempt is admitted per cycle, by design, mirroring the retry-budget discipline that already
+     governs everything else in this doctrine). A package whose repair never had a `candidate_identity` to
+     compute a ceiling from passes trivially — the mechanism is additive, not retroactive.
 10. `delta-reviewer` reviews the repair delta and previous findings — UNLESS the repair legally recorded the
     physical waiver (`record-repair --skip-delta`: every repaired finding ≤ medium AND ≤ 3 changed files; the
     CLI enforces both and records the waiver in the event). It performs a full re-review only if the repair

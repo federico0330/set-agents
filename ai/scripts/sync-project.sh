@@ -30,7 +30,7 @@ GENERIC=(
   feature_state_lib/parser.py
   feature_state_lib/candidate_identity.py
   feature_state_lib/cli_integration.py
-  check-owned-paths.py classify-risk.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh
+  check-owned-paths.py classify-risk.py check-repair-ceiling.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh
 )
 
 [ -d "$PROJECT" ] || { echo "SYNC_FAIL: no existe $PROJECT" >&2; exit 2; }

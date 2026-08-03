@@ -102,7 +102,9 @@ After `package-reviewer` or a focused checkpoint returns `repair_required`.
 
 ## Stop conditions
 Return `BLOCKED` when a finding requires secrets/prod access, an irreversible operation, an incompatible product
-decision, or the same failure repeats after the retry budget.
+decision, the same failure repeats after the retry budget, or the repair diff exceeds the package's frozen
+`repair_ceiling.budget_lines` (docs/adr/0023-*.md) — that ceiling admits exactly one repair attempt per cycle,
+by design; a breach is `HUMAN_DECISION_REQUIRED`, never a second silent attempt at a smaller diff.
 
 ## Output
 Return package repair evidence:

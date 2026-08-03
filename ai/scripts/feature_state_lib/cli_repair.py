@@ -33,6 +33,12 @@ def cmd_record_gate(args: argparse.Namespace) -> int:
                 break
         else:
             target.append(gate)
+        if not args.global_gate and args.name == "repair-ceiling" and args.status == "fail":
+            # docs/adr/0023-*.md: a repair-ceiling breach is not retryable by design -- the
+            # package gets exactly one repair attempt per cycle (gentle-ai's "ordinary
+            # lineage admits exactly one correction"), so this bypasses the generic
+            # gate_failures 3-strikes accumulator entirely and blocks on the first breach.
+            return block_with_reason(data, args.actor, args.package_id, "repair exceeded its frozen line ceiling")
         if not args.global_gate and data["phase"] == "PACKAGE_GATES" and args.status == "fail":
             package = package_by_id(data, args.package_id)
             attempts = package.setdefault("attempts", {})
@@ -172,6 +178,25 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_REPAIR":
             raise StateError(f"cannot record repair from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        # docs/adr/0023-*.md: freeze the repair ceiling on the FIRST record-repair of this
+        # cycle (never reset here -- a new deep-review cycle starting fresh at PACKAGE_GATES
+        # re-freezes candidate_identity, and the next repair after THAT will see a None
+        # repair_ceiling again once that cycle's reviewer sends it back). Additive-only: a
+        # package with no candidate_identity yet (freeze-candidate never ran) simply gets no
+        # ceiling -- check-repair-ceiling.py treats an absent ceiling as nothing to check.
+        if package.get("repair_ceiling") is None:
+            original = (package.get("candidate_identity") or {}).get("changed_lines")
+            if original is not None:
+                cap_by_complexity = {"small": 40, "medium": 100, "high": 200}
+                complexity = package.get("complexity")
+                cap = cap_by_complexity.get(complexity, 100)
+                budget = -(-original // 2)  # ceil(original / 2) without importing math
+                package["repair_ceiling"] = {
+                    "original_changed_lines": original,
+                    "budget_lines": min(cap, budget),
+                    "cap_source": f"complexity:{complexity or 'medium(default, complexity unset)'}",
+                    "frozen_at": now(),
+                }
         attempts = package.setdefault("attempts", {})
         ids = args.finding_id or []
         changed_files = args.changed_file or []
@@ -208,6 +233,10 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
                 return block_with_reason(data, args.actor, args.package_id, f"repair budget exhausted for {finding['id']}")
             finding["status"] = "closed"
         repair = {"finding_ids": ids, "changed_files": changed_files, "verification": args.verification or [], "at": now()}
+        if getattr(args, "changed_lines", None) is not None:
+            # Self-reported bookkeeping only -- check-repair-ceiling.py independently
+            # re-measures from git before anything trusts this number as a gate verdict.
+            repair["changed_lines"] = args.changed_lines
         if commit:
             # AC-21: absent when `--commit` was not declared -- the graph's `reparó`
             # edge never extends past the finding for this repair (AC-20, never a
