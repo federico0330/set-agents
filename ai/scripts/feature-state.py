@@ -1070,8 +1070,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    global RENDER_SKIP
-    RENDER_SKIP = bool(getattr(args, "no_render", False))
+    model.RENDER_SKIP = bool(getattr(args, "no_render", False))
     try:
         return args.func(args)
     except (OSError, json.JSONDecodeError, StateError) as exc:

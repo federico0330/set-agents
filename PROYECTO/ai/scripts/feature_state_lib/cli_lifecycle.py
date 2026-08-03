@@ -1,0 +1,350 @@
+"""Extracted from ai/scripts/feature-state.py by a behavior-preserving refactor
+(mechanical reorganization only -- no logic changes). See feature-state.py's own
+module docstring and the package-level notes for the split rationale.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+
+from feature_state_lib import model
+from feature_state_lib.model import (
+    StateError, now, state_path, print_json, parse_json_object, parse_bool, base_state,
+    compact_package, load_state, atomic_write, validate_state, fail_if_invalid,
+    package_by_id, task_by_id, MODE_BUDGETS, TERMINAL,
+)
+from feature_state_lib.transitions import check_transition, next_transition
+from feature_state_lib.render_status import render_status
+from feature_state_lib.render_bitacora import render_bitacora
+
+
+def output_state(data: dict[str, Any], changed: bool = False, path: Path | None = None) -> int:
+    print_json({"ok": True, "changed": changed, "state_file": str(path) if path else None, "state": data, "next": next_transition(data)})
+    return 0
+
+
+def state_file_arg(args: argparse.Namespace) -> Path:
+    if getattr(args, "state_file", None):
+        return Path(args.state_file)
+    if getattr(args, "feature_id", None):
+        return state_path(args.feature_id)
+    raise StateError("--state-file or feature_id is required")
+
+
+def verify_spec_hash(spec_path: str, spec_hash: str) -> None:
+    """Refuse to open a record that attests bytes nobody can produce.
+
+    `PHASES` holds REQUIREMENTS, SPEC_DRAFT, SPEC_CHALLENGE and USER_APPROVAL, and
+    `LEGAL_TRANSITIONS` has an entry for none of them, so the `"from": "USER_APPROVAL"`
+    this command writes was a label nothing could check -- 009's own state file carried
+    an approval timestamp while its spec still read "Not yet challenged".  Whether a
+    human said yes is not observable from a file.  *Which bytes* they said it about is,
+    and that is the part this enforces.
+    """
+    spec = Path(spec_path)
+    if not spec.is_file():
+        raise StateError(
+            f"SPEC_NOT_FOUND: {spec_path} — init records the approval of concrete bytes, "
+            "and there are none here to hash"
+        )
+    digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+    if digest != spec_hash:
+        raise StateError(
+            f"SPEC_HASH_MISMATCH: recorded={spec_hash} disk={digest} path={spec_path} — "
+            f"run `sha256sum {spec_path}`; if the spec changed after approval, it needs "
+            "approving again rather than a record that attests the old bytes"
+        )
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    path = Path(args.state_file) if args.state_file else state_path(args.feature_id)
+    if path.exists() and not args.force:
+        raise StateError(f"state exists: {path}")
+    verify_spec_hash(args.spec_path, args.spec_hash)
+    data = base_state(args.feature_id, args.spec_path, args.spec_hash)
+    data["acceptance_criteria"] = args.ac or []
+    data["mode"] = args.mode
+    data["budgets"].update(MODE_BUDGETS[args.mode])
+    for key in ("max_deep_review_cycles", "max_repairs_per_finding", "max_package_subdivisions", "max_spawns_per_package"):
+        value = getattr(args, key)
+        if value is not None:
+            data["budgets"][key] = value
+    model.record_event(
+        data, "init", "USER_APPROVAL", "PACKAGE_PLANNING", args.actor,
+        metadata={
+            "spec_path": args.spec_path,
+            "spec_hash_verified": True,
+            "approved_by": args.approved_by,
+        },
+    )
+    atomic_write(path, data)
+    render_status(path)
+    render_bitacora(path, only_feature=args.feature_id)
+    model.render_notes(path, only_feature=args.feature_id)
+    return output_state(data, True, path)
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+    data = load_state(path)
+    errors = validate_state(data)
+    if errors:
+        print_json({"ok": False, "errors": errors, "state_file": str(path)})
+        return 2
+    print_json({"ok": True, "state_file": str(path), "revision": data.get("revision"), "phase": data.get("phase"), "next": next_transition(data)})
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+    data = load_state(path)
+    fail_if_invalid(data)
+    return output_state(data, False, path)
+
+
+def cmd_next(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+    data = load_state(path)
+    fail_if_invalid(data)
+    print_json({"ok": True, "state_file": str(path), "next": next_transition(data)})
+    return 0
+
+
+def cmd_transition(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        from_phase = data["phase"]
+        if from_phase == args.to_phase:
+            return False
+        check_transition(data, args.to_phase, args.package_id, args.actor)
+        data["phase"] = args.to_phase
+        if args.package_id:
+            data["current_package_id"] = args.package_id
+            package = package_by_id(data, args.package_id)
+            if args.to_phase not in {"INTEGRATION", "DONE"}:
+                package["status"] = args.to_phase.lower()
+        if args.to_phase == "PACKAGE_REPAIR":
+            # A manual transition (e.g. orchestrator override) is a sixth entry point
+            # into PACKAGE_REPAIR that does not know WHY the package is here -- unlike
+            # the five domain sites above, it never sets a specific reason.  Pop any
+            # stale value left by an earlier repair pass so `_repair_entered_from_review`
+            # falls back to log inference instead of trusting a leftover string
+            # (F-03): byte-identical to today's behaviour for every state file, since
+            # none of them carry this key yet.
+            #
+            # --package-id is optional on this command (P1F-01): resolve via
+            # package_by_id, which falls back to current_package_id, so the stale
+            # key is still popped when the caller omits --package-id.  If no
+            # package can be resolved at all, there is nothing to pop.
+            try:
+                package_by_id(data, args.package_id).pop("repair_entry", None)
+            except StateError:
+                pass
+        if args.to_phase in TERMINAL:
+            data["final_state"] = args.to_phase
+        model.record_event(data, "transition", from_phase, args.to_phase, args.actor, args.package_id, {"reason": args.reason}, args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "transition", update)
+    return output_state(data, changed, path)
+
+
+def cmd_create_package(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+    if args.package_id == "grafo":
+        # AC-24: package notes are written at docs/notas/features/<fid>/<pid>.md with
+        # the RAW package_id, never slugified -- "grafo" is the only string that can
+        # actually collide with the execution-graph note render_notes() also writes
+        # there. Case-sensitive on purpose: that is how the raw path is compared too.
+        raise StateError("package_id 'grafo' is reserved for the execution-graph note (AC-24)")
+
+    def update(data: dict[str, Any]) -> bool:
+        if data["phase"] not in {"PACKAGE_PLANNING", "PACKAGE_ACCEPTED"}:
+            raise StateError(f"cannot create package from phase {data['phase']}")
+        if any(package.get("package_id") == args.package_id for package in data.get("packages", [])):
+            return False
+        package = compact_package(args.package_id, args.objective)
+        package["acceptance_criteria"] = args.ac or []
+        package["dependencies"] = args.depends_on or []
+        package["owned_paths"] = args.owned_path or []
+        package["read_only_paths"] = args.read_only_path or []
+        package["shared_paths"] = args.shared_path or []
+        package["risks"] = args.risk or []
+        package["complexity"] = args.complexity
+        package["selected_role"] = args.selected_role
+        package["selected_model"] = args.selected_model
+        package["routing_reason"] = args.routing_reason
+        package["context_pack"] = args.context_pack
+        # Fail-safe default: runtime QA is required unless the planner explicitly
+        # declares the package has no observable runtime surface.
+        package["runtime_surface"] = parse_bool(args.runtime_surface, default=True)
+        for task_id in args.task or []:
+            package["tasks"].append({"id": task_id, "status": "planned", "local_validations": [], "blockers": []})
+        if len(package["tasks"]) < 2 and package["complexity"] != "small":
+            raise StateError("normal packages must contain multiple tasks; mark complexity=small for tiny scoped packages")
+        data.setdefault("packages", []).append(package)
+        data["current_package_id"] = args.package_id
+        if data["phase"] == "PACKAGE_ACCEPTED":
+            data["phase"] = "PACKAGE_PLANNING"
+        model.record_event(data, "create-package", data["phase"], data["phase"], args.actor, args.package_id, {"tasks": args.task or []}, args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "create-package", update)
+    return output_state(data, changed, path)
+
+
+def cmd_update_package(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        package = package_by_id(data, args.package_id)
+        before = deepcopy(package)
+        if args.integrated is not None:
+            package["integrated"] = parse_bool(args.integrated)
+        if args.runtime_surface is not None:
+            package["runtime_surface"] = parse_bool(args.runtime_surface)
+        if args.diff_ref:
+            package["diff_ref"] = args.diff_ref
+        if args.complexity:
+            package["complexity"] = args.complexity
+        if args.selected_role:
+            package["selected_role"] = args.selected_role
+        if args.selected_model:
+            package["selected_model"] = args.selected_model
+        if args.routing_reason:
+            package["routing_reason"] = args.routing_reason
+        if args.context_pack:
+            package["context_pack"] = args.context_pack
+        for exception in args.exception or []:
+            item = parse_json_object(exception)
+            if not item.get("path") or item.get("status") != "approved":
+                raise StateError("exception requires path and status=approved")
+            if item not in package["approved_exceptions"]:
+                package["approved_exceptions"].append(item)
+        if before != package:
+            model.record_event(data, "update-package", data["phase"], data["phase"], args.actor, args.package_id, {}, args.event_id)
+            return True
+        return False
+
+    data, changed = model.mutate(path, args, "update-package", update)
+    return output_state(data, changed, path)
+
+
+def cmd_start_task(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        if data["phase"] != "PACKAGE_IMPLEMENTATION":
+            raise StateError(f"cannot start task from phase {data['phase']}")
+        task = task_by_id(package_by_id(data, args.package_id), args.task_id)
+        if task.get("status") == "in_progress":
+            return False
+        if task.get("status") == "completed":
+            return False
+        task["status"] = "in_progress"
+        model.record_event(data, "start-task", data["phase"], data["phase"], args.actor, args.package_id, {"task_id": args.task_id}, args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "start-task", update)
+    return output_state(data, changed, path)
+
+
+def cmd_complete_task(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        if data["phase"] != "PACKAGE_IMPLEMENTATION":
+            raise StateError(f"cannot complete task from phase {data['phase']}")
+        task = task_by_id(package_by_id(data, args.package_id), args.task_id)
+        validations = args.validation or []
+        if not validations:
+            raise StateError("complete-task requires at least one local validation")
+        if task.get("status") == "completed" and set(validations).issubset(set(task.get("local_validations", []))):
+            return False
+        task["status"] = "completed"
+        task.setdefault("local_validations", [])
+        for validation in validations:
+            if validation not in task["local_validations"]:
+                task["local_validations"].append(validation)
+        model.record_event(data, "complete-task", data["phase"], data["phase"], args.actor, args.package_id, {"task_id": args.task_id, "validations": validations}, args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "complete-task", update)
+    return output_state(data, changed, path)
+
+
+def cmd_fail_task(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        task = task_by_id(package_by_id(data, args.package_id), args.task_id)
+        task["status"] = "blocked"
+        task.setdefault("blockers", []).append({"reason": args.reason, "at": now()})
+        data["phase"] = "BLOCKED"
+        data["final_state"] = "BLOCKED"
+        data.setdefault("blockers", []).append({"package_id": args.package_id, "task_id": args.task_id, "reason": args.reason, "at": now()})
+        model.record_event(data, "fail-task", data["phase"], "BLOCKED", args.actor, args.package_id, {"task_id": args.task_id, "reason": args.reason}, args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "fail-task", update)
+    return output_state(data, changed, path)
+
+
+def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, reason: str) -> bool:
+    from_phase = data["phase"]
+    data["phase"] = "BLOCKED"
+    data["final_state"] = "BLOCKED"
+    data.setdefault("blockers", []).append({"package_id": package_id, "reason": reason, "at": now()})
+    model.record_event(data, "block", from_phase, "BLOCKED", actor, package_id, {"reason": reason})
+    return True
+
+
+def cmd_block(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        return block_with_reason(data, args.actor, args.package_id, args.reason)
+
+    data, changed = model.mutate(path, args, "block", update)
+    return output_state(data, changed, path)
+
+
+def cmd_reopen(args: argparse.Namespace) -> int:
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        from_phase = data["phase"]
+        if from_phase != "BLOCKED":
+            raise StateError(f"cannot reopen from phase {from_phase}; reopen only applies to BLOCKED")
+        if not args.reason or not args.authorized_by:
+            raise StateError("reopen requires explicit --reason and --authorized-by")
+        resolved_at = now()
+        for blocker in data.get("blockers", []):
+            blocker.setdefault("resolved_at", resolved_at)
+            blocker.setdefault("resolved_reason", args.reason)
+            blocker.setdefault("resolved_by", args.authorized_by)
+        data["phase"] = "PACKAGE_PLANNING"
+        data.pop("final_state", None)
+        model.record_event(
+            data,
+            "reopen",
+            from_phase,
+            "PACKAGE_PLANNING",
+            args.actor,
+            args.package_id,
+            {"reason": args.reason, "authorized_by": args.authorized_by},
+            args.event_id,
+        )
+        return True
+
+    data, changed = model.mutate(path, args, "reopen", update)
+    return output_state(data, changed, path)
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    return cmd_next(args)
