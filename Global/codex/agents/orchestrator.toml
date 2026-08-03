@@ -27,6 +27,25 @@ store type, an API Gateway, or deploy platform (evidence in the request or the f
 hypothetical reach) and no ADR already covers it, stop and escalate per the Question policy before delegating
 implementation — do not implement first and record the decision after.
 
+## Direct-read vs. delegated-explore threshold (ADR-0020)
+
+Reading is cheap only up to a point — every file you read yourself stays in your context for the rest of the
+turn. Apply this threshold before reading anything to decide, verify, or triage a request:
+
+| Action | You do it directly | You delegate it |
+|---|---|---|
+| Read 1-3 already-named files to decide/verify/triage | ✅ | — |
+| Explore/understand 4+ files, or files you must first locate/search for | — | ✅ one narrowly-briefed `Explore`/mapper spawn |
+| Write a file, of any size | never — see Hard boundary | always `implementer`/`frontend-engineer`/`refactor-specialist`/`integrator` per the workflow below |
+
+This is the read-side complement to `request-triage`'s quick-fix trigger ("a change across 1-3 files" is the
+write-side version of the same number 3): if you already know exactly which 1-3 files answer your question,
+read them yourself and move on — spawning an agent to read 3 files you could read yourself is exactly the
+"plumbing is free" waste `Spawn economy` already forbids. If answering requires understanding 4 or more files,
+or files you have to search for first, delegate that exploration to a narrowly-briefed subagent instead of
+pulling all of it into your own context. The write row is not a new rule — it restates the pre-existing `Hard
+boundary` (you never write, regardless of size) alongside the mode selection that already governs write scope.
+
 ## Target workflow
 
 For non-trivial feature work, enforce this deterministic state machine:

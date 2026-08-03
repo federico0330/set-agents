@@ -73,7 +73,9 @@ axis) — "this feels big" is a reason to scope the package better, not to escal
 
 ### 3. Quick-fix — the DEFAULT for small and medium bounded work
 Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
-tweak, a change across 1-3 files, copy/config, one function or one component. This is the default lane: most
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the write-side half of
+the same 1-3 number `orchestrator.md`'s "Direct-read vs. delegated-explore threshold" (ADR-0020) uses for the
+read side — the two are kept as one cross-referenced constant, not two independent numbers. This is the default lane: most
 day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
 `gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
 to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature

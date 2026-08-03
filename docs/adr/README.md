@@ -24,3 +24,4 @@
 | [0017](0017-pi-interactive-target.md) | Pi interactive target: fourth generated harness tree, install target, collision guard, dispatch-lane closure | Accepted | 2026-08-02 | 0007 (install.py target + dispatch-lane skills/prompt-templates closure only) | — |
 | [0018](0018-model-preference-policy.md) | Model preference policy: a closed role-class taxonomy, one tie-break sort-key element, never a second decision-maker | Accepted | 2026-08-02 | — | — |
 | [0019](0019-anthropic-dispatch-parity.md) | Anthropic dispatch parity: the Claude-Code-lane redirect, its tool ceiling, and the day-13 boundary | Accepted | 2026-08-01 | — | — |
+| [0020](0020-direct-read-vs-delegated-explore-threshold.md) | Direct-read vs. delegated-explore threshold: a file-count rule for the orchestrator's own reading | Accepted | 2026-08-03 | — | — |
