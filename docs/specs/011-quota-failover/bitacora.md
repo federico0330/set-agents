@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-03T00:38:55+00:00
+Actualizado: 2026-08-03T02:37:32+00:00
 
 [2026-07-30T16:42:25+00:00] package-planner · started
 Cliente: El contrato de cuotas quedó aceptado y se inició como trabajo nuevo, separado del historial de selección previa.

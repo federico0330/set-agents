@@ -2016,15 +2016,23 @@ def cmd_transition(args: argparse.Namespace) -> int:
             package = package_by_id(data, args.package_id)
             if args.to_phase not in {"INTEGRATION", "DONE"}:
                 package["status"] = args.to_phase.lower()
-            if args.to_phase == "PACKAGE_REPAIR":
-                # A manual transition (e.g. orchestrator override) is a sixth entry point
-                # into PACKAGE_REPAIR that does not know WHY the package is here -- unlike
-                # the five domain sites above, it never sets a specific reason.  Pop any
-                # stale value left by an earlier repair pass so `_repair_entered_from_review`
-                # falls back to log inference instead of trusting a leftover string
-                # (F-03): byte-identical to today's behaviour for every state file, since
-                # none of them carry this key yet.
-                package.pop("repair_entry", None)
+        if args.to_phase == "PACKAGE_REPAIR":
+            # A manual transition (e.g. orchestrator override) is a sixth entry point
+            # into PACKAGE_REPAIR that does not know WHY the package is here -- unlike
+            # the five domain sites above, it never sets a specific reason.  Pop any
+            # stale value left by an earlier repair pass so `_repair_entered_from_review`
+            # falls back to log inference instead of trusting a leftover string
+            # (F-03): byte-identical to today's behaviour for every state file, since
+            # none of them carry this key yet.
+            #
+            # --package-id is optional on this command (P1F-01): resolve via
+            # package_by_id, which falls back to current_package_id, so the stale
+            # key is still popped when the caller omits --package-id.  If no
+            # package can be resolved at all, there is nothing to pop.
+            try:
+                package_by_id(data, args.package_id).pop("repair_entry", None)
+            except StateError:
+                pass
         if args.to_phase in TERMINAL:
             data["final_state"] = args.to_phase
         record_event(data, "transition", from_phase, args.to_phase, args.actor, args.package_id, {"reason": args.reason}, args.event_id)

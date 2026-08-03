@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-03T00:38:55+00:00
+Actualizado: 2026-08-03T02:37:32+00:00
 
 ## Features
 
@@ -26,10 +26,19 @@ Actualizado: 2026-08-03T00:38:55+00:00
 
 ## Quick-fixes recientes
 
+- [2026-08-03T02:36:03+00:00] P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id is optional on transition, a manual transition without it skipped the pop and let a stale repair_entry from a prior cycle auto-escape review inference. Hoisted the pop to always run on to_phase==PACKAGE_REPAIR, resolving the package via package_by_id (falls back to current_package_id) inside try/except StateError. — archivos: ai/scripts/feature-state.py, PROYECTO/ai/scripts/feature-state.py, tests/test_harness.py — gate: git diff --check: clean — resultado: done
 - [2026-07-30T01:22:42+00:00] P2-vault-mandatory (accepted): exclude_notes_from_git/_notes_currently_excluded chequeaban (project/'.git').is_dir(), falso para un git worktree enlazado (.git es archivo ahi) -- docs/notas quedaba trackeado por git en vez de excluido, contradiciendo DEC-5. Fix: resolver via 'git rev-parse --show-toplevel/--git-common-dir' anclado a que el proyecto SEA el top-level (no solo estar dentro de un repo), con env purgado de GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR/GIT_INDEX_FILE, timeout y manejo de git ausente. Bono: vault_doctor_report ahora distingue dangling de un symlink cuyo target fue borrado (antes reportaba healthy). Encontrado migrando ~/iey de verdad; revisado por un segundo agente (package-reviewer) que encontro 7 hallazgos adicionales sobre el primer fix, todos reparados y re-verificados con pass. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass (2da pasada) — resultado: done
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-03T02:37:32+00:00] implementer · done
+Cliente: El arreglo chico quedo aplicado y revisado por un segundo agente: la limpieza del registro de entrada a reparacion ahora funciona aunque la transicion manual no nombre el paquete.
+Ingeniería: QUICK-FIX P1F-01 done: pop hoisted with package_by_id/current_package_id fallback in try/except StateError; new test bites on revert; twins byte-identical; full suite + verify.sh + build.sh --check green; delta-reviewer pass.
+
+[2026-08-03T02:26:14+00:00] implementer · started
+Cliente: Un implementador aplica el arreglo chico que quedo anotado ayer: que la limpieza del registro de entrada a reparacion funcione tambien cuando la transicion manual no nombra el paquete.
+Ingeniería: QUICK-FIX P1F-01 (from decision p1f-01-repair-entry-pop-package-id-opcional): hoist repair_entry pop out of if args.package_id in cmd_transition, resolve via package_by_id fallback current_package_id in try/except StateError, + test variant without --package-id. Twin sync + gates.
 
 [2026-08-03T00:35:25+00:00] P1-model-preference-policy · delta-reviewer · started
 Cliente: Un revisor distinto verifica que los ocho arreglos sean reales y esten bien acotados, sin reabrir la revision general.
@@ -82,12 +91,4 @@ Ingeniería: PACKAGE_IMPLEMENTATION 014-P1 (AC-01..09): role-class resolver, sib
 [2026-08-02T23:15:20+00:00] P2-hygiene · delta-reviewer · started
 Cliente: Un revisor distinto verifica que el arreglo del contrato del CLI sea real y no haya tocado nada mas.
 Ingeniería: DELTA_REVIEW P2 R1: verify structural filter in _decide_status (scope: only _decide_status), CLI-boundary matrix rows, hard-failure rows untouched, no collateral edits.
-
-[2026-08-02T23:02:06+00:00] P2-hygiene · repair-agent · started
-Cliente: Un reparador hace que la nueva senal de redirect sea de verdad informativa: el CLI vuelve a responder igual que antes, la senal queda visible, y un test en la frontera lo garantiza.
-Ingeniería: PACKAGE_REPAIR P2 R1: structural classification in _decide_status (RUNTIME_REDIRECTED* neutral, subset matching, covers co-occurrence) under approved exception + CLI-boundary tests for redirect-only and unverified+redirect shapes. One record-repair call.
-
-[2026-08-02T23:00:13+00:00] P2-hygiene · finding-verifier · started
-Cliente: Antes de reparar, un verificador intenta refutar los dos hallazgos del panel, incluida la reproduccion del corte en el contrato del CLI.
-Ingeniería: FINDING_VERIFICATION P2: refute/uphold P2F-01 (exact-tuple _decide_status regression) and P2F-02 (CLI-boundary test gap); reproduce live.
 

@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-03T00:38:55+00:00
+Actualizado: 2026-08-03T02:37:32+00:00
 
 [2026-07-30T16:16:54+00:00] product-analyst · started
 Cliente: Arrancamos el contrato del cambio seguro de proveedor cuando una suscripción se agota.
@@ -39,3 +39,11 @@ Ingeniería: SPEC_CHALLENGE 016-audit-debt-repayment v1.0.0: read-only challenge
 [2026-08-02T15:51:55+00:00] product-analyst · started
 Cliente: Dos analistas estan corrigiendo los contratos de 014 y 016 con lo que encontraron los desafiadores y con tus cuatro decisiones de producto, antes de traertelos para aprobacion final.
 Ingeniería: SPEC amendments in parallel: 014 v3.2.0 (re-baseline post-015 per F-01/F-02, user answers: real-effect framing, Kimi standalone=external non-goal, classes as-spec, premium-first build) and 016 v1.1.0 (F-01..F-08: PROYECTO twin, AC-05 reformulation, cmd_transition 6th entry, grep case, xrefs, 5 shapes, cmd fixes).
+
+[2026-08-03T02:26:14+00:00] implementer · started
+Cliente: Un implementador aplica el arreglo chico que quedo anotado ayer: que la limpieza del registro de entrada a reparacion funcione tambien cuando la transicion manual no nombra el paquete.
+Ingeniería: QUICK-FIX P1F-01 (from decision p1f-01-repair-entry-pop-package-id-opcional): hoist repair_entry pop out of if args.package_id in cmd_transition, resolve via package_by_id fallback current_package_id in try/except StateError, + test variant without --package-id. Twin sync + gates.
+
+[2026-08-03T02:37:32+00:00] implementer · done
+Cliente: El arreglo chico quedo aplicado y revisado por un segundo agente: la limpieza del registro de entrada a reparacion ahora funciona aunque la transicion manual no nombre el paquete.
+Ingeniería: QUICK-FIX P1F-01 done: pop hoisted with package_by_id/current_package_id fallback in try/except StateError; new test bites on revert; twins byte-identical; full suite + verify.sh + build.sh --check green; delta-reviewer pass.

@@ -5520,6 +5520,41 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(final["phase"], "PACKAGE_REPAIR",
                          "without the pop the stale repair_entry would wrongly auto-escape this")
 
+    def test_cmd_transition_pops_stale_repair_entry_without_package_id(self):
+        # P1F-01: --package-id is optional on `transition`. The manual PACKAGE_REPAIR
+        # edge must still pop a stale repair_entry via the current_package_id fallback
+        # when the caller omits --package-id, not just when it is passed explicitly.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, verify=False)
+            package = json.loads(state.read_text())["packages"][0]
+            self.assertEqual(package["repair_entry"], "review")
+
+            self.verify(state, self.REFUTED, json.dumps({
+                "id": "F-002", "verdict": "refuted", "reason": "already covered",
+                "evidence": "tests/test_example.py:9 asserts exactly this"}))
+            mid = json.loads(state.read_text())
+            self.assertEqual(mid["phase"], "PACKAGE_TESTING")
+            self.assertEqual(mid["packages"][0]["repair_entry"], "review")
+
+            late = json.dumps({"id": "F-LATE", "severity": "low", "category": "testing"})
+            self.run_state(state, "record-late-review", "PKG-01", "architect",
+                           "--finding", late, "--evidence", self.LATE_EVIDENCE)
+
+            # current_package_id is already "PKG-01" from the earlier transitions
+            # in create_ready_package; this manual transition omits --package-id
+            # entirely and must still resolve the package via that fallback.
+            self.run_state(state, "transition", "PACKAGE_REPAIR",
+                           "--actor", "orchestrator", "--reason", "manual override")
+            after = json.loads(state.read_text())
+            self.assertNotIn("repair_entry", after["packages"][0])
+
+            self.verify(state, json.dumps({
+                "id": "F-LATE", "verdict": "refuted", "reason": "already covered",
+                "evidence": "tests/test_example.py:9 asserts exactly this"}))
+            final = json.loads(state.read_text())
+        self.assertEqual(final["phase"], "PACKAGE_REPAIR",
+                         "without the pop the stale repair_entry would wrongly auto-escape this")
+
     def _verification_args(self, *, actor="finding-verifier", package_id="PKG-01",
                            skip_reason=None, verdict=None, evidence="e", event_id=None):
         return argparse.Namespace(actor=actor, package_id=package_id, skip_reason=skip_reason,
