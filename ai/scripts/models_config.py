@@ -34,8 +34,14 @@ TIER_FIELD = "tiers"
 RUNTIMES = ("opencode", "claude-code", "codex", "pi")
 MODEL_TIERS = ("fast", "balanced", "frontier")
 ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
+# ADR-0029 (017 PKG-B2): providers eligible for SYNTHESIZED routes (probe-discovered,
+# tier/family inferred). Distinct from ROUTING_PROVIDERS on purpose — the curated
+# allowlist stays closed (immutable contract "probeable, never routable, by 012 alone");
+# this is the separate, opt-in surface that makes a discovered model routable.
+DISCOVERABLE_PROVIDERS = {"openai-codex", "anthropic", "opencode-zen", "opencode-go"}
 ROUTING_DEFAULTS = {
     "enabled_providers": ["openai-codex", "anthropic"], "xhigh_benchmarked": False,
+    "discovered_providers": [],
     "max_enabled": False, "fallback_limit": 1, "single_writer": True,
     "sla": {"fast": {"checkpoint_minutes": 18, "cutoff_minutes": 20, "ceiling_minutes": 30}},
     "budgets": {"direct_spawns": 0, "fast_spawns": 1, "scoped_spawns": 4,
@@ -187,7 +193,8 @@ def _normalize_schema2(config, source_schema):
     if runtime["primary"] == "pi" and not ({"gpt-5.6", "gpt-5.6-sol"} & set(config["catalog"]["codex"])):
         die("models.toml: Pi primary requires a catalog Sol parent")
     _table(config, "routing", {k: v for k, v in ROUTING_DEFAULTS.items() if k not in ("sla", "budgets")},
-           ("enabled_providers", "xhigh_benchmarked", "max_enabled", "fallback_limit", "single_writer", "sla", "budgets"))
+           ("enabled_providers", "xhigh_benchmarked", "max_enabled", "fallback_limit", "single_writer", "sla", "budgets",
+            "discovered_providers"))
     routing = config["routing"]
     if not isinstance(routing.get("sla", {}), dict) or set(routing.get("sla", {})) - {"fast"}:
         die("models.toml: [routing.sla] has unknown field")
@@ -195,6 +202,12 @@ def _normalize_schema2(config, source_schema):
         die("models.toml: [routing.budgets] has unknown field")
     routing["sla"] = {**ROUTING_DEFAULTS["sla"], **routing.get("sla", {})}
     routing["budgets"] = {**ROUTING_DEFAULTS["budgets"], **routing.get("budgets", {})}
+    # ADR-0029: closed to the audited probe set; empty (the default) disables the
+    # synthesized-routes path entirely — production behavior identical to pre-017.
+    discovered = routing.get("discovered_providers", [])
+    if (not isinstance(discovered, list) or len(discovered) != len(set(discovered))
+            or not all(isinstance(x, str) and x in DISCOVERABLE_PROVIDERS for x in discovered)):
+        die("models.toml: [routing].discovered_providers must be a unique list within the audited provider set")
     if (not isinstance(routing["enabled_providers"], list) or not routing["enabled_providers"] or not all(isinstance(x, str) and x in ROUTING_PROVIDERS for x in routing["enabled_providers"])
             or len(routing["enabled_providers"]) != len(set(routing["enabled_providers"]))
             or not isinstance(routing["xhigh_benchmarked"], bool) or routing["max_enabled"] is not False
@@ -455,6 +468,11 @@ def emit(config):
         if key in config["catalog"]:
             values = ", ".join(_value(item) for item in sorted(config["catalog"][key]))
             lines.append(f"{key} = [{values}]")
+    # ADR-0029: discovered-model vetoes ("provider:model" strings), preserved like the
+    # allowlists above and for the same site-5 reason.
+    if config["catalog"].get("exclude"):
+        values = ", ".join(_value(item) for item in sorted(config["catalog"]["exclude"]))
+        lines.append(f"exclude = [{values}]")
     if config.get("providers"):
         lines.append("")
         lines.append("[providers]")
@@ -480,6 +498,11 @@ def emit(config):
     lines.extend(["", "[routing]"])
     for key in ("enabled_providers", "xhigh_benchmarked", "max_enabled", "fallback_limit", "single_writer"):
         lines.append(f"{key} = {_value(config['routing'][key])}")
+    # ADR-0029: preserved across re-emits (the "site 5" lesson from the opencode_zen/
+    # opencode_go allowlists — a key the wizard drops on rewrite is data loss). Only
+    # emitted when configured, so an untouched repo emits byte-identical output.
+    if config["routing"].get("discovered_providers"):
+        lines.append(f"discovered_providers = {_value(config['routing']['discovered_providers'])}")
     lines.extend(["", "[routing.sla.fast]"])
     for key in ("checkpoint_minutes", "cutoff_minutes", "ceiling_minutes"):
         lines.append(f"{key} = {config['routing']['sla']['fast'][key]}")

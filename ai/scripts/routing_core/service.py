@@ -5,6 +5,7 @@ import secrets
 import time
 from pathlib import Path
 from .catalog import build_snapshot, canonical_model, probe_inventory
+from .inference import vendor_stem as _vendor_stem
 from .domain import (RISK_ORDER, TIER_ORDER, RoutingError, StaticRoute, TaskRequest, _ObservedTaskFacts,
                      combined_risk, required_tier, RouteDecision, resolve_bias_class)
 
@@ -123,12 +124,30 @@ class RoutingService:
         model_preference = config.pop("_model_preference", None) if isinstance(config, dict) else None
         preference = dict((model_preference or {}).get("preference") or {})
         role_override = dict((model_preference or {}).get("role_override") or {})
-        self._seal(build_snapshot(catalog_path, roster, config), roster,
-                   probe_inventory(config, cache_root=cache_root, fresh=fresh_probes, cache_write=not simulate),
+        inventory = probe_inventory(config, cache_root=cache_root, fresh=fresh_probes, cache_write=not simulate)
+        # ADR-0029 (017 PKG-B2): the OPT-IN discovered-routes path. With
+        # [routing].discovered_providers empty (the default), this branch is dead and
+        # composition is byte-for-byte the pre-017 sealed shape — same builder, same
+        # recheck lambda. With providers declared, the snapshot (and the authorization
+        # revalidation recheck) both flow through build_effective_snapshot, so a
+        # synthesized route revalidates against the same effective universe it was
+        # selected from — never against the narrower curated snapshot (which would
+        # fail every synthesized authorization as AUTHORIZATION_INVALID).
+        discovered = tuple((config.get("routing") or {}).get("discovered_providers") or ()) if isinstance(config, dict) else ()
+        if discovered:
+            from .catalog import build_effective_snapshot
+            snapshot, inferred_ids = build_effective_snapshot(catalog_path, roster, config, inventory)
+            recheck = lambda: build_effective_snapshot(  # noqa: E731
+                catalog_path, roster, config,
+                probe_inventory(config, cache_root=cache_root, cache_write=not simulate))[0]
+        else:
+            snapshot, inferred_ids = build_snapshot(catalog_path, roster, config), frozenset()
+            recheck = lambda: build_snapshot(catalog_path, roster, config)  # noqa: E731
+        self._seal(snapshot, roster, inventory,
                    store, simulate, clock,
-                   recheck=lambda: build_snapshot(catalog_path, roster, config),
+                   recheck=recheck,
                    reprobe=None if simulate else (lambda pairs: probe_inventory(config, pairs=pairs)),
-                   preference=preference, role_override=role_override)
+                   preference=preference, role_override=role_override, inferred_ids=inferred_ids)
 
     @classmethod
     def _for_tests(cls, snapshot, roster, inventory, store=None, simulate=False, clock=time.time, reprobe=None,
@@ -148,7 +167,7 @@ class RoutingService:
                        preference=preference, role_override=role_override)
         return service
 
-    def _seal(self, snapshot, roster, inventory, store, simulate, clock, recheck, reprobe, preference=None, role_override=None):
+    def _seal(self, snapshot, roster, inventory, store, simulate, clock, recheck, reprobe, preference=None, role_override=None, inferred_ids=frozenset()):
         self.snapshot = snapshot
         self.roster = {item["role"]: item for item in roster}
         self.inventory = {key: frozenset(values) for key, values in inventory.items()}
@@ -156,6 +175,10 @@ class RoutingService:
         self._facts = {}
         self._recheck = recheck
         self._reprobe = reprobe
+        # ADR-0029: route_ids whose tier/family are inferred (empty on the curated path
+        # and in every pre-017 composition, including _for_tests callers that never
+        # pass the parameter).
+        self._inferred_ids = frozenset(inferred_ids)
         self._issuer = _AuthorizationIssuer()
         # AC-02/AC-04: preference values are stored as tuples (an ordered rank, `_bias_rank`
         # indexes into it) -- never mutated after construction, matching the sealed-composition
@@ -275,6 +298,13 @@ class RoutingService:
             elif not set(facts.required_tools).union(request.required_tools).issubset(route.tools): reason="TOOLS_MISSING"
             elif needs_context and (not facts.context_present or not facts.critical_coverage): reason="CONTEXT_MISSING"
             elif writer and route.family == writer.family: reason="REVIEW_FAMILY_CONFLICT"
+            # ADR-0029 d.3: inference only ever REMOVES independence. A synthesized
+            # candidate compares by coarse vendor stem against the writer's model —
+            # an inferred kimi-* reviewer is never independent of any kimi-* writer,
+            # whatever the curated (finer) families would have said. Curated-vs-curated
+            # pairs never reach this branch (the set is empty on the curated path).
+            elif (writer and route.route_id in self._inferred_ids
+                  and _vendor_stem(route.model) == _vendor_stem(writer.model)): reason="REVIEW_FAMILY_CONFLICT"
             # Repair SEC-001 (panel RP-01, security-auditor, critical, 012 repair):
             # defense in depth, independent of AC-07's build_snapshot-time guard above. A
             # reviewer candidate whose (provider, model) normalizes to the SAME canonical
@@ -316,6 +346,12 @@ class RoutingService:
             (f"RUNTIME_REDIRECTED requested={facts.selected_runtime} effective={identity[1]}",)
             if identity[1] != facts.selected_runtime else ()
         )
+        # ADR-0029: a decision carried by a synthesized route says so, always — the
+        # inferred tier/family are surfaced next to the selection instead of passing
+        # as curation-grade fact. Purely additive to reason_codes, like the redirect.
+        if selected.route_id in self._inferred_ids:
+            redirect_reason = redirect_reason + (
+                f"MODEL_METADATA_INFERRED tier={selected.tier} family={selected.family}",)
         if self.simulate or role_class != "writer":
             # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
             # reason code — true only for a review decision that matched a real terminal writer and

@@ -566,3 +566,78 @@ def build_snapshot(catalog_path: Path, roster: list[dict], config: dict, digest=
                          for r in routes
                          for runtime in (route_runtimes[r.route_id] or audited.get(r.provider, set())))
     return CatalogSnapshot(tuple(routes), identities)
+
+
+# --------------------------------------------------------------------------- ADR-0029
+# 017 PKG-B1: the ADDITIVE discovered-routes path. `build_snapshot` above is the
+# audited, curated snapshot and does not change (its immutable-test contract:
+# "a runtime can never widen the audited model set" holds — this wrapper is a
+# DIFFERENT entry point that a caller opts into via [routing].discovered_providers,
+# absent by default, and the curated allowlist path never flows through it).
+
+def discovered_models(config: dict, provider: str, inventory: dict) -> set[str]:
+    """Every model the probe actually observed for `provider`, across runtimes.
+
+    Unlike `_configured_models` (curated ceiling, intersection semantics), this is
+    the raw observed pool — the [catalog] allowlist already shaped what the probe
+    could return for the two OpenCode-lane providers, and the synthesized-route
+    layer applies its own exclusions on top.
+    """
+    pool: set[str] = set()
+    for (_, prov), models in inventory.items():
+        if prov == provider:
+            pool |= {m for m in models if isinstance(m, str) and m}
+    return pool
+
+
+def build_effective_snapshot(catalog_path: Path, roster: list[dict], config: dict,
+                             inventory: dict, digest=None):
+    """Curated snapshot ∪ synthesized routes for discovered, uncurated models.
+
+    Returns `(CatalogSnapshot, frozenset[str])` — the second element is the set of
+    route_ids whose tier/family are INFERRED (routing_core/inference.py), so the
+    decision layer can mark them `MODEL_METADATA_INFERRED` and apply the
+    inference-only-removes-independence rule. Precedence rules (ADR-0029 d.2):
+    a curated row with the same (provider, canonical_model) wins — no synthesized
+    twin is ever added; `[catalog].exclude` entries (`"provider:model"` strings in
+    models.toml) veto individual discovered ids; providers outside the audited
+    `_PAIR_COMMANDS` set are never synthesized, no matter what the config says.
+    """
+    from .inference import synthesize_route_row
+    base = build_snapshot(catalog_path, roster, config, digest)
+    providers = (config.get("routing") or {}).get("discovered_providers") or []
+    if not providers:
+        return base, frozenset()
+    roster_names = tuple(sorted({row["role"] for row in roster}))
+    curated_ids = {(r.provider, canonical_model(r.provider, r.model)) for r in base.routes}
+    exclusions = set()
+    for item in (config.get("catalog") or {}).get("exclude") or []:
+        if isinstance(item, str) and ":" in item:
+            exclusions.add(tuple(item.split(":", 1)))
+    audited: dict[str, set[str]] = {}
+    for runtime, prov in _PAIR_COMMANDS:
+        audited.setdefault(prov, set()).add(runtime)
+    routes = list(base.routes)
+    identities = set(base.identities)
+    inferred: set[str] = set()
+    for provider in providers:
+        if provider not in audited:
+            continue
+        for model in sorted(discovered_models(config, provider, inventory)):
+            if (provider, canonical_model(provider, model)) in curated_ids:
+                continue
+            if (provider, model) in exclusions:
+                continue
+            row = synthesize_route_row(provider, model, roster_names)
+            roles = tuple(sorted(row["roles"]))
+            tools = tuple(sorted(row["tools"]))
+            rid = StaticRoute.identifier(2, provider, model, row["family"], row["effort"],
+                                         (row["tier"],), roles, tools, row["curated_priority"])
+            route = StaticRoute(2, provider, model, row["family"], row["effort"], row["tier"],
+                                roles, tools, row["curated_priority"], rid)
+            routes.append(route)
+            inferred.add(rid)
+            for runtime in audited[provider]:
+                if model in inventory.get((runtime, provider), set()):
+                    identities.add((rid, runtime, provider, model, row["family"], row["effort"]))
+    return CatalogSnapshot(tuple(routes), frozenset(identities)), frozenset(inferred)
