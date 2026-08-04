@@ -69,7 +69,7 @@ from feature_state_lib.cli_repair import (
     FINDING_BOOKKEEPING, COMMIT_SHA_RE, GIT_TIMEOUT_SECONDS,
 )
 from feature_state_lib.cli_reporting import (
-    cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_sync_notes,
+    cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_sync_notes, cmd_digest,
     run_dry_workflow, cmd_dry_run,
 )
 from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
@@ -189,6 +189,11 @@ def _hub_body(states: list[dict[str, Any]], out_dir: Path, decisions: list[dict[
     lines += ["", "## Qué falta", ""]
     pending_any = False
     for data in states:
+        # ADR-0027: a feature with a recorded final_state is closed by design —
+        # its machine-advisor "next step" is not a real pending item, and listing
+        # it is exactly the drift the hand-maintained digest suffered from.
+        if data.get("final_state"):
+            continue
         for bit in _pending_bits(data):
             lines.append(f"- **{data.get('feature_id')}** {bit}")
             pending_any = True
@@ -1069,6 +1074,12 @@ def build_parser() -> argparse.ArgumentParser:
     notes.add_argument("--notes-dir")
     notes.add_argument("--project-name")
     notes.set_defaults(func=cmd_sync_notes)
+
+    digest = sub.add_parser("digest")
+    digest.add_argument("--since", help="ISO/prefijo, 'ayer' (default, 24h) o 'hoy'")
+    digest.add_argument("--state-dir")
+    digest.add_argument("--notes-dir")
+    digest.set_defaults(func=cmd_digest)
 
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")

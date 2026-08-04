@@ -137,6 +137,113 @@ def cmd_sync_notes(args: argparse.Namespace) -> int:
     return 0
 
 
+def _digest_since(raw: str | None) -> str:
+    """Resolve --since to an ISO prefix. Default and 'ayer' = 24h ago; 'hoy' = today
+    00:00 local. Anything else is taken as an ISO timestamp/prefix verbatim (the
+    logs' `at` fields are ISO, so plain string comparison is the right filter)."""
+    from datetime import datetime, timedelta
+    if raw and raw not in ("ayer", "hoy"):
+        return raw
+    if raw == "hoy":
+        return datetime.now().strftime("%Y-%m-%dT00:00:00")
+    return (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def cmd_digest(args: argparse.Namespace) -> int:
+    """017/AC-09 (ADR-0027): the morning-coffee digest, DERIVED from state.
+
+    Regenerates docs/notas/BUENOS-DIAS.md between the notas:auto markers
+    (human text outside them is preserved by merge_note) from the three JSONL
+    logs plus the live feature states. The hand-written predecessor of this
+    file went stale twice and cost two ACs to correct — deriving it is the fix.
+    """
+    from feature_state_lib.render_bitacora import collect_narrative
+    from feature_state_lib.render_notes import _short, write_note, notes_root, _pending_bits
+    from feature_state_lib.render_status import status_root
+
+    state_dir = Path(args.state_dir) if args.state_dir else Path("ai/state")
+    anchor = state_dir / "features" / "_anchor.json"
+    features_dir, out_dir = status_root(anchor)
+    since = _digest_since(args.since)
+
+    states = []
+    for path in sorted(features_dir.glob("*.json")):
+        if path.name == "_anchor.json":
+            continue
+        try:
+            states.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+    lines = [f"_Ventana: desde `{since}` · generado {now()}_", ""]
+
+    finished = [e for e in collect_narrative(features_dir, out_dir)
+                if e.get("at", "") >= since and e.get("result") not in ("started", "-", "")]
+    lines += ["## Qué quedó listo", ""]
+    if finished:
+        for entry in finished[-20:]:
+            head = " · ".join(p for p in (entry.get("feature_id"), entry.get("package_id"),
+                                          entry.get("role")) if p and p != "-")
+            lines.append(f"- **{head}** — {_short(entry.get('client') or entry.get('tech'), 300)}")
+    else:
+        lines.append("- _sin cierres registrados en la ventana_")
+
+    lines += ["", "## Qué se está haciendo", ""]
+    active = [d for d in states if not d.get("final_state")]
+    if active:
+        for data in active:
+            lines.append(f"- **{data.get('feature_id')}** — fase `{data.get('phase')}`")
+    else:
+        lines.append("- _ninguna feature activa_")
+
+    lines += ["", "## Qué falta", ""]
+    pending_any = False
+    for data in active:
+        for bit in _pending_bits(data):
+            lines.append(f"- **{data.get('feature_id')}** {bit}")
+            pending_any = True
+    if not pending_any:
+        lines.append("- _nada pendiente_ ✅")
+
+    from feature_state_lib.render_bitacora import read_jsonl as _read
+    from feature_state_lib.render_notes import DECISIONS_LOG as _DECISIONS
+    decisions = [e for e in _read(out_dir / _DECISIONS) if e.get("at", "") >= since]
+    if decisions:
+        lines += ["", "## Decisiones nuevas", ""]
+        for entry in decisions:
+            lines.append(f"- **{entry.get('title', '')}** — {_short(entry.get('decision', ''), 200)}")
+
+    quickfixes = [e for e in _read(out_dir / "quickfix-log.jsonl") if e.get("at", "") >= since]
+    if quickfixes:
+        lines += ["", "## Quick-fixes", ""]
+        for entry in quickfixes:
+            lines.append(f"- {_short(entry.get('summary', ''), 200)} ({entry.get('result', '')})")
+
+    notes_dir = Path(args.notes_dir) if args.notes_dir else notes_root(anchor, None)
+    if notes_dir is None:
+        print_json({"ok": False, "error": "notes root unresolved (state dir is not ai/state)"})
+        return 2
+    target = notes_dir / "BUENOS-DIAS.md"
+    # One-time migration: the hand-written predecessor has no notas:auto markers, and
+    # merge_note would otherwise DISCARD it. Move it whole under "Notas propias" so the
+    # human text survives exactly like in every other living note.
+    from feature_state_lib.render_notes import NOTES_AUTO_BEGIN, NOTES_AUTO_END
+    if target.exists():
+        existing = target.read_text(encoding="utf-8")
+        if NOTES_AUTO_BEGIN not in existing:
+            target.write_text(
+                "# Buenos días — digest del proyecto\n\n"
+                f"{NOTES_AUTO_BEGIN}\n{NOTES_AUTO_END}\n\n"
+                "## Notas propias (contenido manual previo, preservado)\n\n" + existing,
+                encoding="utf-8",
+            )
+    write_note(target, "Buenos días — digest del proyecto", "\n".join(lines))
+    print(f"DIGEST_WRITTEN file={target} since={since}")
+    print_json({"ok": True, "file": str(target), "since": since,
+                "finished": len(finished), "decisions": len(decisions), "quickfixes": len(quickfixes)})
+    return 0
+
+
 def run_dry_workflow(feature_id: str) -> dict[str, Any]:
     data = base_state(feature_id, "docs/specs/example/spec.md", "dry-run")
     data["acceptance_criteria"] = ["AC-1", "AC-2", "AC-3"]

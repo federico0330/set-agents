@@ -1,3 +1,54 @@
+# Buenos días — digest del proyecto
+
+<!-- notas:auto -->
+_Ventana: desde `2026-08-01` · generado 2026-08-04T18:23:43+00:00_
+
+## Qué quedó listo
+
+- **006-execution-graph · P3-graph-view · integrator** — El integrador confirmo que la vista de grafo funciona y encaja con todo lo entregado: las diez condiciones acordadas se cumplen y no aparecio ningun problema nuevo. La ficha de esta pieza queda cerrada tal como se acordo: completa, sin marcarla con un sello final que prometeria mas de lo que se ras…
+- **008-dynamic-selection · P1-uninterrupted-delegation · integrator** — El integrador reviso la pieza que evita pausas innecesarias al delegar trabajo: las diez condiciones acordadas estan cumplidas y conviven bien con lo entregado despues. Solo falta la corrida final de pruebas globales antes del sello de terminado.
+- **008-dynamic-selection · orchestrator** — La seleccion dinamica de modelos quedo oficialmente terminada: todas las pruebas del proyecto pasaron y la pieza convive bien con el resto. La parte que depende de medir cuotas reales queda en pausa hasta que eso sea posible.
+- **010-spawn-provenance · P1-spawn-provenance · integrator** — El integrador confirmo que el registro de procedencia de cada delegacion funciona y quedo bien conectado: las cinco condiciones acordadas se cumplen y los pendientes del traspaso anterior ya estaban ejecutados. Igual que con la vista de grafo, esta ficha queda cerrada sin sello final, tal como se d…
+- **012-discovered-inventory · P1-discovered-inventory · integrator** — El integrador confirmo que el inventario de modelos descubiertos quedo bien integrado: los 16 hallazgos de revision estan cerrados y verificados, y las compuertas de seguridad siguen cerradas como se acordo (se puede sondear, no rutear).
+- **013-pi-interactive-target · package-planner** — El planificador termino: todo el objetivo interactivo de Pi cabe en un solo paquete de trabajo con siete tareas, e identifico que varias referencias del contrato quedaron desactualizadas por trabajo posterior (solo numeros de linea, no el contenido).
+- **013-pi-interactive-target · P1-pi-interactive-target · implementer** — El implementador termino las siete tareas: el agente Pi ya tiene su propio juego de agentes, habilidades e instrucciones instalable, con guardia contra pisar archivos ajenos, prueba real de arranque (verificada en vivo contra pi 0.83.0) y la documentacion de arquitectura al dia. Solo una mitad de l…
+- **013-pi-interactive-target · P1-pi-interactive-target · orchestrator** — El paquete de Pi quedo aceptado: implementado, revisado por dos revisores, reparado, re-revisado y probado de punta a punta. Falta solo la integracion final.
+- **013-pi-interactive-target · P1-pi-interactive-target · integrator** — El integrador confirmo que el destino Pi encaja con todo el sistema: los otros tres destinos quedaron intactos byte a byte, la doctrina de seguridad esta pareja en los cuatro runtimes y la documentacion de arquitectura es coherente.
+- **016-audit-debt-repayment · integrator** — El integrador confirmo que las dos piezas de la feature de deuda conviven sin acoplarse y que el contrato quedo cubierto por completo: de las seis deudas originales, tres quedan saldadas y tres siguen diferidas por decision explicita.
+- **sin-feature · implementer** — El arreglo chico quedo aplicado y revisado por un segundo agente: la limpieza del registro de entrada a reparacion ahora funciona aunque la transicion manual no nombre el paquete.
+
+## Qué se está haciendo
+
+- **006-execution-graph** — fase `PACKAGE_ACCEPTED`
+- **010-spawn-provenance** — fase `PACKAGE_ACCEPTED`
+
+## Qué falta
+
+- **006-execution-graph** → `INTEGRATION` — all packages accepted
+- **010-spawn-provenance** → `INTEGRATION` — all packages accepted
+
+## Decisiones nuevas
+
+- **Redirect de _effective_runtime es silencioso, sin reason_code** — No es una vulnerabilidad, pero _effective_runtime (service.py) redirige de un lane a otro sin dejar reason_code ni exclusion. El ADR-0019 (AC-08) debe registrar que el rastro de auditoría debería mos…
+- **setting-sources user confía en scope generado desde el propio repo** — --setting-sources user confía en ~/.claude/**, que build.sh --install puebla desde Global/claude-code/** de este mismo repo. Un spawn writer-class (dentro del límite de contención por cwd) puede edit…
+- **areas.judge.opencode.go-zen colisiona con la misma escalera implementer, fuera de alcance** — No se toca. El contrato aprobado (Non-goals) restringe AC-06 a exactamente dos celdas nombradas de models.toml ([areas.audit].opencode."go-zen" y [areas.audit]/[areas.judge].claude); [areas.judge].op…
+- **areas.judge.opencode.go-zen colisión CERRADA (F-02, amplía AC-06a); nuevo residuo areas.ops** — [areas.judge].opencode."go-zen" pasa de "openai/gpt-5.6-sol" a "openai/gpt-5.5" (mismo valor y mismo patrón que [areas.audit], models.toml:115). El test de AC-06(i) se reescribe genérico como el spec…
+- **areas.ops.opencode.go-zen colision CERRADA (F-03); AC-06(a) queda genericamente cerrado, sin residuo** — El usuario aprobo explicitamente cerrar tambien esta tercera celda, mismo patron que audit/judge. [areas.ops].opencode."go-zen" pasa de "openai/gpt-5.6-terra" a "openai/gpt-5.4-mini" (models.toml:141…
+- **Pasada de integración 2026-08-02: 008 y 012 a DONE; 006 y 010 quedan PACKAGE_ACCEPTED por diseño** — 008-dynamic-selection y 012-discovered-inventory transicionan INTEGRATION->DONE con gate global registrado. 006-execution-graph NO transiciona: su spec (docs/specs/006-execution-graph/spec.md:198-204…
+- **AC-08/AC-14 supersedes ac09-ac10-pi-minimal-target-accepted: pi gains a real install.py target and generated agent tree** — This decision explicitly supersedes ac09-ac10-pi-minimal-target-accepted for the interactive surface: install.py gains a fourth target, pi -> ~/.pi/agent, and generate.py emits a real Global/pi/agent…
+- **AC-13: la mitad de discoverability viva del roster queda environment-gated, no BLOCKED de feature** — Se registra el gap como decision persistida en vez de blocker de fase: el test existe, degrada con nombre, y debe correrse en una maquina con pi-subagents instalado antes de considerar AC-13 completa…
+- **Los gates de suite completa no se corren en paralelo: build.sh colisiona en staging compartido** — Los gates que invocan build.sh (unittest discover completo, verify.sh) se ejecutan secuencialmente, nunca dos agentes a la vez. Un fallo de gate con build.sh exit 1 + FileNotFoundError en artefactos …
+- **P1F-01 aceptado como deuda low: el pop de repair_entry depende del --package-id opcional** — Se acepta como deuda registrada (no bloquea la aceptacion del paquete, verdict pass del panel). Fix exacto anotado: hoist del pop resolviendo via package_by_id con fallback a current_package_id, en t…
+- **Cierre parcial de audit-debt-006-p2: PR-07/08/09 saldadas por 016; PR-06/10/11 siguen diferidas** — De los 6 hallazgos de audit-debt-006-p2: PR-07 (repair_entry autoritativo, 6 sitios + fallback), PR-08 (extraccion _apply_verification_waiver/_apply_verdicts) y PR-09 (docstring + puntero ADR-0009 D7…
+- **AC-01(i): grunt no puede flippear provider en verified review con catalogo de 2 proveedores** — Se documenta esta limitacion como comportamiento esperado, no como defecto: el test de efecto real de grunt (test_grunt_class_live_effect_against_real_effective_runtime_inventory) prueba supervivenci…
+
+## Quick-fixes
+
+- P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id is optional on transition, a manual transition without it skipped the pop and l… (done)
+<!-- /notas:auto -->
+
+## Notas propias (contenido manual previo, preservado)
+
 # Buenos días, Fede
 
 Escrito la noche del 2026-07-27. Todo lo de abajo está commiteado, con gate verde y pusheado a `origin/main`.

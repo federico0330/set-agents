@@ -14,12 +14,15 @@ File-first and gate-driven. Durable state lives in repository files: specs, acce
 findings, gate logs, and memory summaries.
 
 ## Narration
-The coordinator narrates every instantiation in two labelled registers — `Cliente:` (business language, no
-jargon, copy-pasteable to a non-technical person) and `Ingeniería:` (which invariant, phase, or budget makes
-this instance necessary, and what it produces) — once before delegating and once when the instance returns.
-Narration is persisted, not just printed: `feature-state.py record-spawn --client --tech` for the opening
-block and `feature-state.py log-narrative` for every other block. It feeds `ai/state/STATUS.md` and the
-per-feature `bitacora.md`. See `## Narración — protocolo de transparencia` below for the full protocol.
+The coordinator narrates by MILESTONE, not by spawn (ADR-0027), in two labelled registers — `Cliente:`
+(business language, no jargon, copy-pasteable to a non-technical person) and `Ingeniería:` (which invariant,
+phase, or budget makes this instance necessary, and what it produces). Chat blocks appear only at: feature/
+package start, review/delta results, anything unexpected (blocker, gate failure, repair), package/feature
+close, and the end-of-turn block. EVERY spawn is still persisted with both registers
+(`feature-state.py record-spawn --client --tech` / `log-narrative`) — the complete story lives in
+`ai/state/STATUS.md`, the per-feature `bitacora.md`, and the generated digest
+(`feature-state.py digest` → `docs/notas/BUENOS-DIAS.md`).
+See `## Narración — protocolo de transparencia` below for the full protocol.
 
 ## Living documentation
 Project notes under `docs/notas/` (hub, per-feature, per-package, decisions — Obsidian-ready with
@@ -122,9 +125,11 @@ burned a week of quota in two days; treat them as invariants, not style advice.
 
 ## Narración — protocolo de transparencia
 
-You narrate in two registers, always labelled, in every mode. Three mandatory blocks:
+You narrate in two registers, always labelled, by MILESTONE (ADR-0027): chat blocks only at feature/package
+start, review/delta results, anything unexpected, package/feature close, and end of turn. Every other spawn
+is persisted (`record-spawn`/`log-narrative`) without a chat block. The blocks:
 
-**a) Before every instance**, immediately after `record-spawn`, BEFORE delegating:
+**a) At a narrated milestone that opens work**, immediately after `record-spawn`, BEFORE delegating:
 
 ```
 ▸ Instancio <role> — <qué va a hacer, una frase>
@@ -132,7 +137,7 @@ You narrate in two registers, always labelled, in every mode. Three mandatory bl
   Ingeniería: <por qué hace falta ESTA instancia: qué invariante, fase o presupuesto la exige, y qué produce>
 ```
 
-**b) When the instance comes back:**
+**b) At a narrated milestone that closes work:**
 
 ```
 ✓ <role> terminó — <resultado en pocas palabras>
