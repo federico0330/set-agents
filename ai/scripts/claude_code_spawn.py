@@ -120,6 +120,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config  # noqa: E402  (load_roster only -- the CLI entry point's own roster source)
 from routing_core.store import RoutingStore  # noqa: E402  (SEC-P1-003: the audit-trail sink's own 0700 root)
+from routing_core.domain import classify_pi_terminal_error  # noqa: E402  (017 PKG-C1: shared settled-signature allowlist)
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_CLI = ROOT / "ai/scripts/set_agents_app.py"
@@ -431,6 +432,15 @@ def _classify_result(returncode: int, stdout: str, stderr: str, provider: str, m
                   "is_error": doc.get("is_error"), "subtype": doc.get("subtype"),
                   "api_error_status": doc.get("api_error_status"),
                   "detail": _redact(str(doc.get("result") or ""))[:500]}
+        # 017 PKG-C1 (ADR-0029): normalize the fixed quota signature so the writer
+        # lifecycle can drive `--route-quota-exhausted` exactly like the Pi lane.
+        # Only the bounded allowlisted fields cross this boundary, never raw output.
+        normalized = {"settled": True, "provider": provider, "lane": "claude-code",
+                      "http_status": doc.get("api_error_status"),
+                      "type": doc.get("subtype"),
+                      "marker": _redact(str(doc.get("result") or ""))[:200]}
+        if classify_pi_terminal_error(normalized) == "quota_exhausted":
+            detail["quota_error"] = normalized
         return "failure", detail
     expected = _claude_code_canonical_model(model)
     model_usage = doc.get("modelUsage")
@@ -581,11 +591,49 @@ def dispatch_writer(role: str, task: str, run_id: str, provider: str, model: str
         latency_ms = max(0, int((time.time() - started) * 1000))
         terminal_outcome = "success" if outcome == "success" else "failure"
         terminal_args = ["--route-terminal", run_id, terminal_outcome, "--latency-ms", str(latency_ms), "--json"]
+        # 017 PKG-C1 (ADR-0029): the quota-exhausted close swaps the terminal verb for
+        # `--route-quota-exhausted` — the SAME durable failover rail the Pi lane uses
+        # (store.close_exhausted_and_authorize_replacement): closes this run, marks the
+        # provider exhausted, and returns the pre-authorized replacement identity.
+        if detail.get("quota_error"):
+            terminal_args = ["--route-quota-exhausted", run_id, "--quota-error",
+                             json.dumps(detail["quota_error"]),
+                             "--latency-ms", str(latency_ms), "--json"]
         usage = detail.get("modelUsage")
         if isinstance(usage, dict) and usage:
             terminal_args += ["--usage", json.dumps({"total_cost_usd": detail.get("total_cost_usd"),
                                                       "modelUsage": usage})]
         terminal = _run_app_cli(terminal_args, env=env, cwd=routing_cwd)
+        if detail.get("quota_error"):
+            quota_result = _last_json_line(terminal.stdout).get("data", {})
+            replacement_id = quota_result.get("replacement_run_id") if isinstance(quota_result, dict) else None
+            replacement_provider = quota_result.get("replacement_provider") if isinstance(quota_result, dict) else None
+            replacement_model = quota_result.get("replacement_model") if isinstance(quota_result, dict) else None
+            if replacement_id and isinstance(replacement_provider, str) and isinstance(replacement_model, str):
+                if replacement_provider == "anthropic":
+                    # Bounded single retry with the durable replacement (Pi-lane mirror).
+                    replacement_outcome, replacement_detail = spawn(
+                        role, task, replacement_provider, replacement_model, roster,
+                        expect_class="writer", cwd=spawn_cwd, timeout=timeout)
+                    replacement_args = ["--route-terminal", replacement_id,
+                                        "success" if replacement_outcome == "success" else "failure", "--json"]
+                    replacement_terminal = _run_app_cli(replacement_args, env=env, cwd=routing_cwd)
+                    detail = dict(detail, replacement_run_id=replacement_id,
+                                  replacement_status=replacement_outcome,
+                                  replacement_detail=replacement_detail,
+                                  replacement_terminal_exit_code=replacement_terminal.returncode)
+                    if replacement_outcome == "success":
+                        outcome = "success"
+                else:
+                    # This lane can only spawn anthropic (spawn() fails closed otherwise);
+                    # a cross-provider replacement is reported for the orchestrator to
+                    # dispatch through its own lane, and its authorization is released.
+                    _run_app_cli(["--route-terminal", replacement_id, "failure", "--json"],
+                                 env=env, cwd=routing_cwd)
+                    detail = dict(detail, replacement_run_id=replacement_id,
+                                  replacement_provider=replacement_provider,
+                                  replacement_model=replacement_model,
+                                  replacement_status="cross_lane_handoff")
     except Exception as exc:  # noqa: BLE001 - SEC-A03/PKG-N01: no orphaned authorized run
         try:
             _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env, cwd=routing_cwd)

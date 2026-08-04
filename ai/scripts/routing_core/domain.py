@@ -36,6 +36,20 @@ def classify_pi_terminal_error(error) -> str:
             and error.get("type") == "invalid_request_error"
             and error.get("marker") == "out of extra usage"):
         return "quota_exhausted"
+    # 017 PKG-C1 (ADR-0029): the SECOND settled signature — the Claude Code lane.
+    # `claude --print --output-format json` reports quota exhaustion as api_error_status
+    # 429 with the usage-limit wording in the result text (spec 015's live-proven error
+    # shape). The explicit `lane` discriminator keeps this DISJOINT from the Pi
+    # signature by construction: the immutable 011 contract pins that no variant of
+    # the Pi-shaped dict (which never carries `lane`) classifies at 429, and this
+    # branch can only ever match a dict the Claude Code adapter itself normalized.
+    if (error.get("settled") is True and error.get("provider") == "anthropic"
+            and error.get("lane") == "claude-code"
+            and error.get("http_status") == 429
+            and isinstance(error.get("marker"), str)
+            and ("out of extra usage" in error["marker"]
+                 or "usage limit" in error["marker"].lower())):
+        return "quota_exhausted"
     if error.get("rate_limited") is True:
         return "rate_limited"
     return "unknown_failure"
