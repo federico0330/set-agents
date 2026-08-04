@@ -29,3 +29,8 @@
 | [0022](0022-strict-tdd-opt-in.md) | Strict TDD as an opt-in per-package mode, additive to the default flow | Accepted | 2026-08-03 | — | — |
 | [0023](0023-bounded-repair-ceiling.md) | Bounded repair: a line-count ceiling frozen once per cycle, tied to the existing retry budget | Accepted | 2026-08-03 | — | — |
 | [0024](0024-integration-receipt-hook.md) | Integration receipt: a git tree-hash freeze gating `PACKAGE_ACCEPTED→INTEGRATION` | Accepted | 2026-08-03 | — | — |
+| [0025](0025-resolve-first-autonomy.md) | Autonomía "resolver primero, registrar siempre": credenciales, deploy nombrado, auto-instalación de CLIs/MCPs | Accepted | 2026-08-04 | — | — |
+| [0026](0026-evidence-over-memory.md) | Evidencia sobre memoria: fuentes obligatorias, WebSearch/WebFetch en análisis, skill spawn-prompt | Accepted | 2026-08-04 | — | — |
+| [0027](0027-milestone-narration-digest.md) | Narración por hito, digest matinal generado, notas como entrada | Accepted | 2026-08-04 | — | — |
+| [0028](0028-living-scope.md) | Alcance vivo: re-verificación de spec hash, amend-spec, supersede-package | Accepted | 2026-08-04 | — | — |
+| [0029](0029-probe-driven-model-selection.md) | "El probe manda": inventario descubierto como fuente de verdad de modelos | Accepted | 2026-08-04 | — | — |
