@@ -538,6 +538,39 @@ def cmd_doctor(harness, human=False):
     return 0 if ok else 1
 
 
+def cmd_doctor_all():
+    """017/AC-02: qué tiene esta máquina y qué va a usar el harness — harnesses
+    instalados, scope de instalación, CLIs del catálogo, y proveedores/modelos
+    realmente autenticados (probe con cache; nunca imprime credenciales)."""
+    from routing_core.catalog import probe_inventory
+    for harness, cli in (("claude-code", "claude"), ("opencode", "opencode"), ("codex", "codex"), ("pi", "pi")):
+        print(f"HARNESS {harness} installed={'yes' if shutil.which(cli) else 'no'}")
+    scope_path = STATE_DIR / "install-targets.json"
+    if scope_path.exists():
+        try:
+            scope = [t for t in json.loads(scope_path.read_text()) if isinstance(t, str)]
+            print("INSTALL_SCOPE " + (",".join(sorted(scope)) or "none"))
+        except (OSError, json.JSONDecodeError):
+            print("INSTALL_SCOPE unreadable")
+    else:
+        print("INSTALL_SCOPE all (sin registro: instalación previa a 017 o nunca instalado)")
+    for name, installed in _tools_data():
+        print(f"TOOL {name} installed={'yes' if installed else 'no'}")
+    try:
+        config = models_config.load_config()
+    except SystemExit:
+        print("PROVIDERS_UNKNOWN models.toml inválido — corré ./build.sh --check")
+        return 1
+    inventory = probe_inventory(config, cache_root=STATE_DIR)
+    pairs = {pair: models for pair, models in inventory.items() if models}
+    if not pairs:
+        print("PROVIDERS_NONE no se detectó ninguna suscripción activa (claude/codex/opencode/pi) — "
+              "logueate en al menos una herramienta y volvé a correr set-agents --doctor-all")
+    for (runtime, provider), models in sorted(pairs.items()):
+        print(f"PROVIDER {provider} runtime={runtime} models={len(models)}")
+    return 0
+
+
 def use_color():
     return sys.stdout.isatty() and not os.environ.get("NO_COLOR") and os.environ.get("TERM") != "dumb"
 
@@ -2141,6 +2174,7 @@ def main():
     parser.add_argument("--mcp-off", metavar="NAME")
     parser.add_argument("--harness", choices=("opencode", "claude", "codex", "cursor", "gemini", "pi"))
     parser.add_argument("--doctor", action="store_true", help="chequeo redactado del harness (usar con --harness pi)")
+    parser.add_argument("--doctor-all", action="store_true", help="qué detecta esta máquina: harnesses, CLIs y proveedores autenticados")
     parser.add_argument("--plugins", action="store_true")
     parser.add_argument("--plugin-on", metavar="NAME")
     parser.add_argument("--plugin-off", metavar="NAME")
@@ -2259,6 +2293,8 @@ def main():
         return cmd_routing_migrate()
     if args.doctor:
         return cmd_doctor(args.harness, human=routing_human)
+    if args.doctor_all:
+        return cmd_doctor_all()
 
     if args.status:
         return cmd_status(human=sys.stdout.isatty())

@@ -16,7 +16,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! command -v opencode >/dev/null 2>&1; then echo "⛔ E2E: opencode CLI no encontrado."; exit 127; fi
+# Runner: opencode si está; si no, claude (mismo agente runtime-verifier instalado en
+# ~/.claude/agents por build.sh --install). Un setup solo-Claude-Code corre el gate igual.
+RUNNER=""
+if command -v opencode >/dev/null 2>&1; then
+  RUNNER="opencode"
+elif command -v claude >/dev/null 2>&1; then
+  RUNNER="claude"
+else
+  echo "⛔ E2E: no encontré ni opencode ni claude CLI."; exit 127
+fi
 if [ ! -f ./ai/scripts/run.sh ]; then echo "⛔ E2E: falta ai/scripts/run.sh — el proyecto no define arranque."; exit 2; fi
 
 # 1. Levantar backend + frontend.
@@ -40,11 +49,14 @@ EVIDENCE_FILE="$EVIDENCE_DIR/e2e-$(date +%Y%m%d-%H%M%S).md"
   echo "- browser mode: ${BROWSER_MODE}"
   echo ""
 } > "$EVIDENCE_FILE"
-timeout "$E2E_TIMEOUT" opencode run --agent runtime-verifier \
-  "Verify task ${TASK_ID} in the RUNNING app. Read docs/specs/${TASK_ID}/acceptance.md. Drive the UI via the
+E2E_PROMPT="Verify task ${TASK_ID} in the RUNNING app. Read docs/specs/${TASK_ID}/acceptance.md. Drive the UI via the
 available browser MCP (${BROWSER_MODE}), read screenshots, and check endpoint status codes (e.g. 200 vs 409). Exercise only the flows the
-task names. Save any screenshots/log excerpts under docs/specs/${TASK_ID}/evidence/. Return RUNTIME_PASS or concrete problems (where / expected vs actual / evidence)." \
-  | tee -a "$EVIDENCE_FILE"
+task names. Save any screenshots/log excerpts under docs/specs/${TASK_ID}/evidence/. Return RUNTIME_PASS or concrete problems (where / expected vs actual / evidence)."
+if [ "$RUNNER" = "opencode" ]; then
+  timeout "$E2E_TIMEOUT" opencode run --agent runtime-verifier "$E2E_PROMPT" | tee -a "$EVIDENCE_FILE"
+else
+  timeout "$E2E_TIMEOUT" claude --print --agent runtime-verifier "$E2E_PROMPT" | tee -a "$EVIDENCE_FILE"
+fi
 rc=${PIPESTATUS[0]}
 echo "E2E_EVIDENCE=$EVIDENCE_FILE"
 [ "$rc" -eq 124 ] && echo "⏱️  runtime-verifier excedió ${E2E_TIMEOUT}s — E2E cortado por timeout."

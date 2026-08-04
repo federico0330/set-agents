@@ -12,9 +12,10 @@ DRY=0
 SKIP_AUTH=0
 SKIP_DEPS=0
 NO_INSTALL=0
+HARNESS="all"
 
 usage() {
-  echo "usage: ./install.sh [--yes] [--update] [--dry-run] [--skip-auth] [--skip-deps] [--no-install]"
+  echo "usage: ./install.sh [--yes] [--update] [--dry-run] [--skip-auth] [--skip-deps] [--no-install] [--harness claude|opencode|codex|all]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -25,11 +26,23 @@ while [ "$#" -gt 0 ]; do
     --skip-auth) SKIP_AUTH=1 ;;
     --skip-deps) SKIP_DEPS=1 ;;
     --no-install) NO_INSTALL=1 ;;
+    --harness)
+      shift
+      case "${1:-}" in
+        claude|opencode|codex|all) HARNESS="$1" ;;
+        *) echo "harness inválido: '${1:-}' (claude|opencode|codex|all)" >&2; exit 2 ;;
+      esac
+      ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
   shift
 done
+
+harness_wanted() {
+  # $1 cli name (opencode|claude|codex). With --harness all, everything is wanted.
+  [ "$HARNESS" = "all" ] || [ "$HARNESS" = "$1" ]
+}
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -203,12 +216,14 @@ path_hint() {
 }
 
 ensure_agent_clis() {
-  ensure_cli opencode install_opencode
-  ensure_cli claude install_claude
-  if have npm || have pnpm || [ "$DRY" -eq 1 ]; then
-    ensure_cli codex install_codex
-  else
-    echo "AVISO: sin npm/pnpm no se puede instalar codex; resolvé node/npm primero."
+  harness_wanted opencode && ensure_cli opencode install_opencode
+  harness_wanted claude && ensure_cli claude install_claude
+  if harness_wanted codex; then
+    if have npm || have pnpm || [ "$DRY" -eq 1 ]; then
+      ensure_cli codex install_codex
+    else
+      echo "AVISO: sin npm/pnpm no se puede instalar codex; resolvé node/npm primero."
+    fi
   fi
   [ "$DRY" -eq 1 ] && return 0
   path_hint "$HOME/.local/bin"
@@ -267,9 +282,9 @@ auth_claude() {
 
 guide_auth() {
   [ "$SKIP_AUTH" -eq 1 ] && return 0
-  auth_opencode
-  auth_codex
-  auth_claude
+  if harness_wanted opencode; then auth_opencode; fi
+  if harness_wanted codex; then auth_codex; fi
+  if harness_wanted claude; then auth_claude; fi
 }
 
 # ----------------------------------------------------------- ensure_app_link
@@ -301,11 +316,17 @@ repo_config() {
     echo "Para remapearlos por área/suscripción después: ./setup-models.sh (ver COMO-CAMBIAR-MODELO.md)."
   fi
   [ "$NO_INSTALL" -eq 1 ] && return 0
-  if [ "$YES" -eq 1 ]; then
-    "$ROOT/build.sh" --install --yes
-  else
-    "$ROOT/build.sh" --install
-  fi
+  local build_args=(--install)
+  # --harness scopes the managed install to the tree(s) the user actually uses.
+  # `claude` installs claude-code + pi (pi rides on the same Anthropic auth and
+  # costs nothing extra); anything else maps 1:1 to its build target.
+  case "$HARNESS" in
+    claude) build_args+=(--target claude-code --target pi) ;;
+    opencode) build_args+=(--target opencode) ;;
+    codex) build_args+=(--target codex) ;;
+  esac
+  [ "$YES" -eq 1 ] && build_args+=(--yes)
+  "$ROOT/build.sh" "${build_args[@]}"
 }
 
 # ------------------------------------------------------------- verify_final

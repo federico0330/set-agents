@@ -26,6 +26,13 @@ cd ~/SET-AGENTS
 ./set-agents         # abre la app de consola → elegí "Instalar / Reparar" con las flechas + Enter
 ```
 
+¿Usás una sola herramienta? Instalá solo esa (no te pide login de las otras):
+
+```bash
+./install.sh --harness claude     # solo Claude Code (también: opencode | codex | all)
+set-agents --doctor-all           # qué detectó: harnesses, CLIs y proveedores autenticados
+```
+
 ## Windows 10/11 (PowerShell, sin necesidad de saber qué es WSL)
 
 Recibís `install.ps1` (o lo bajás del repo si ya tenés acceso desde el navegador) y:

@@ -77,7 +77,8 @@ El detalle técnico completo (arquitectura, archivos, riesgos) vive en el plan a
 
 - AC-01 `install.sh --harness claude` instala/configura/autentica SOLO Claude Code y `build.sh --install`
   recibe `--target claude-code`; un usuario solo-Claude queda operativo sin OpenCode/Codex.
-- AC-02 `set-agents --doctor` reporta harnesses/CLIs/modelos detectados y qué usará el harness.
+- AC-02 `set-agents --doctor-all` reporta harnesses/CLIs/modelos detectados y qué usará el harness
+  (`--doctor` a secas conserva su contrato previo, fijado por test inmutable: solo `--harness pi`).
 - AC-03 Un pedido con plataforma nombrada ("deployá a Vercel") NO dispara pregunta de plataforma: se
   registra con `log-decision` y avanza; credenciales se piden solo tras fallar el flujo interactivo del CLI.
 - AC-04 El orquestador puede listar/instalar CLIs del catálogo (`--tools`, `--tools-install <name> --yes`)

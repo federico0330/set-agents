@@ -18,7 +18,30 @@ if ! python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" >/dev/null; then
   exit 2
 fi
 
-PREVIEW="$(python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "${DRIFT_HOME:-$HOME}" --preview 2>/dev/null | tail -5)"
+# Scope-aware: a machine that installed only some harness trees (install.py records
+# them in install-targets.json) is compared only against those trees. No record (or a
+# full record) keeps the historical behavior: compare everything.
+DRIFT_HOME_DIR="${DRIFT_HOME:-$HOME}"
+TARGET_ARGS=()
+SCOPE_FILE="$DRIFT_HOME_DIR/.local/state/set-agentes/install-targets.json"
+if [ -f "$SCOPE_FILE" ]; then
+  while IFS= read -r target; do
+    [ -n "$target" ] && TARGET_ARGS+=(--target "$target")
+  done < <(python3 - "$SCOPE_FILE" <<'PY'
+import json, sys
+try:
+    scope = json.load(open(sys.argv[1]))
+except Exception:
+    scope = []
+known = {"opencode", "claude-code", "codex", "pi"}
+scope = [t for t in scope if t in known]
+if scope and set(scope) != known:
+    print("\n".join(scope))
+PY
+)
+fi
+
+PREVIEW="$(python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$DRIFT_HOME_DIR" ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} --preview 2>/dev/null | tail -5)"
 COUNT="$(sed -n 's/^MANAGED_DIFF_FILES=//p' <<<"$PREVIEW")"
 
 if [ -z "$COUNT" ]; then

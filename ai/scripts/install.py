@@ -431,6 +431,20 @@ try:
             preserved = []
     managed = set(preserved) | {str(t.relative_to(home)) for t in new_targets}
     atomic_write(MANIFEST, json.dumps(sorted(managed), indent=2) + "\n")
+    # Scope record: which harness trees THIS machine manages, so check-drift.sh can
+    # compare only what was actually installed (a claude-only machine must not read
+    # the never-installed opencode/codex trees as drift). Merged, not replaced: a
+    # later `--target` run extends the scope, it never silently narrows it.
+    scope_path = STATE_DIR / "install-targets.json"
+    scope = set(targets)
+    if scope_path.exists():
+        try:
+            scope |= set(json.loads(scope_path.read_text()))
+        except (OSError, json.JSONDecodeError):
+            pass
+    if not args.target:
+        scope = set(all_targets)
+    atomic_write(scope_path, json.dumps(sorted(scope)) + "\n")
 except Exception:
     rollback()
     print(f"INSTALL_ROLLED_BACK backup={backup}")
