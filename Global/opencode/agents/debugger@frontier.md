@@ -5,6 +5,8 @@ model: openai/gpt-5.6-terra
 temperature: 0.1
 steps: 20
 permission:
+  webfetch: allow
+  websearch: allow
   edit: allow
   question: deny
   doom_loop: deny

@@ -5,6 +5,8 @@ model: openai/gpt-5.6-luna
 temperature: 0.0
 steps: 14
 permission:
+  webfetch: allow
+  websearch: allow
   edit: deny
   question: deny
   doom_loop: deny

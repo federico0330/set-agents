@@ -5,6 +5,8 @@ model: openai/gpt-5.4-fast
 temperature: 0.2
 steps: 14
 permission:
+  webfetch: allow
+  websearch: allow
   edit: allow
   question: deny
   doom_loop: deny

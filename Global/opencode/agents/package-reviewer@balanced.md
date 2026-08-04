@@ -6,6 +6,8 @@ temperature: 0.0
 steps: 18
 hidden: true
 permission:
+  webfetch: allow
+  websearch: allow
   edit: deny
   question: deny
   doom_loop: deny

@@ -11,5 +11,6 @@ Delegate in parallel to `brainstormer` (options + tradeoffs), `architect` (read-
 non-relational vs vector store, API Gateway, deploy platform, design patterns / clean architecture), and
 `security-auditor` if the idea touches auth/money/PII/external input. Synthesize ONE multi-lens analysis —
 data model, architecture/patterns, security, algorithms/complexity — with a recommendation and a runner-up,
-in plain language. End by asking whether to turn it into a spec (feature) or a scoped package. Never start
-the pipeline from here.
+in plain language, closing with a claims→evidence table (`file:line`, command output, or URL per claim;
+unverified claims marked "sin verificar" — ADR-0026). End by asking whether to turn it into a spec (feature)
+or a scoped package. Never start the pipeline from here.

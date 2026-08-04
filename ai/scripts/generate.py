@@ -114,6 +114,14 @@ def oc_hidden(role):
     }
 
 
+# ADR-0026: analysis roles whose claims need CURRENT sources (docs, prices, CVEs,
+# library APIs) get the web tools; mechanical/gate roles never do (least privilege).
+WEB_ANALYSIS_ROLES = {
+    "architect", "brainstormer", "package-reviewer", "security-auditor",
+    "debugger", "product-analyst",
+}
+
+
 def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
     safe = [
         '    "git status*": allow', '    "git diff*": allow', '    "git log*": allow',
@@ -268,18 +276,24 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
                   '    "./ai/scripts/mcp.sh status*": allow', *always_deny]
     else:
         lines += ["  edit: allow", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]
+    # ADR-0026: web tools for the analysis roles, in every capability branch that
+    # didn't already set them (coord-ro sets its own pair above and is not in the set).
+    if role in WEB_ANALYSIS_ROLES and not any(l.startswith("  webfetch:") for l in lines):
+        lines[1:1] = ["  webfetch: allow", "  websearch: allow"]
     return "\n".join(lines)
 
 
 def claude_tools(capability, roles, role=None):
+    # ADR-0026: the analysis set researches with sources; nothing else gets the web.
+    web = ", WebSearch, WebFetch" if role in WEB_ANALYSIS_ROLES else ""
     if role == "local-gate-runner":
         return "Read, Bash"
     if capability == "coord-ro":
         names = ", ".join(r["role"] for r in roles if r["role"] in ORCHESTRATOR_TASK_ALLOW)
-        return f"Read, Grep, Glob, Bash, Agent({names})"
+        return f"Read, Grep, Glob, Bash{web}, Agent({names})"
     if capability in READ_ONLY or capability in {"gate-ro", "release", "run-ro"}:
-        return "Read, Grep, Glob, Bash"
-    return "Read, Grep, Glob, Edit, Write, Bash"
+        return f"Read, Grep, Glob, Bash{web}"
+    return f"Read, Grep, Glob, Edit, Write, Bash{web}"
 
 
 def pi_tools(capability, role=None):

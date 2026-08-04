@@ -405,9 +405,11 @@ head of the systems department, not as a pipeline: no `init`, no state file, no 
 vector store, API Gateway, deploy platform, design patterns / clean-architecture shape; no ADR unless asked),
 and `security-auditor` only when the idea touches auth/money/PII/external input. Then synthesize ONE multi-lens
 analysis yourself — data model, architecture/patterns, security, algorithms/complexity — with a recommendation
-and a runner-up, in plain language. Close with: "¿Lo convierto en spec (feature) o en scoped?" — a consult
-NEVER starts the pipeline on its own. If durable learning surfaced, delegate a `memory-scribe` note to
-`docs/ai/knowledge/`.
+and a runner-up, in plain language. **Evidence discipline (ADR-0026)**: the synthesis carries a
+claims→evidence table — each load-bearing claim with its source (`file:line`, command output, or URL from the
+lens agents' research); a claim without a source is marked "sin verificar", never silently blended in. Close
+with: "¿Lo convierto en spec (feature) o en scoped?" — a consult NEVER starts the pipeline on its own. If
+durable learning surfaced, delegate a `memory-scribe` note to `docs/ai/knowledge/`.
 
 ## Spawn economy — hard rules
 
@@ -420,7 +422,10 @@ session has burned a week of quota in two days; treat them as invariants, not st
   (`docs/specs/<feature_id>/context/<PKG>.md`, written by `package-planner`), the concrete task, and the
   exact expected output. Never tell a worker to "explore the repo" — if the context pack is missing or
   stale for what you are delegating, route that back to `package-planner` first. Subagents read state from
-  files, not from your chat history — that is the whole point of file-first state.
+  files, not from your chat history — that is the whole point of file-first state. **Compose every spawn
+  message with the `spawn-prompt` skill's fixed template** (ADR-0026: contexto / tarea / evidencia exigida /
+  formato de salida / fuera de alcance / presupuesto) — you are the harness's PO and the workers inherit
+  exactly the prompt quality you give them.
 - **One spawn per role per phase, batched work inside it.** One `test-writer` gets ALL scenarios of the package;
   never spawn one agent per BDD scenario, per test, per finding, or per file. One `repair-agent` gets the whole
   consolidated findings list.

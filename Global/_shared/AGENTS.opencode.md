@@ -52,6 +52,11 @@ Maximum two deep review cycles per package.
 - Findings must be concrete: `id`, severity/category, file/line where applicable, evidence, required outcome,
   minimal repair scope, and verification.
 
+## Evidence over memory (ADR-0026)
+No technical claim without a source: a repo `file:line`, the output of a command actually run, or a current
+document with its URL. Model memory about moving targets (library APIs, prices, limits, versions) is not a
+source. When no source is available, say "sin verificar" explicitly. Applies in every mode, consult included.
+
 ## Question policy
 Workers and reviewers do not ask the user during normal execution. The orchestrator asks only for incompatible
 product decisions, major scope changes, irreversible operations, missing credentials/access, or blockers after

@@ -42,6 +42,12 @@ repairs are consolidated, and re-review focuses on the delta. Maximum two deep r
 No opportunistic refactors. Preserve public APIs/data contracts unless the approved spec says otherwise. Never
 store/log secrets, tokens, PII, or raw `.env`. Findings must be concrete and actionable.
 
+## Evidence over memory (ADR-0026)
+No technical claim without a source: a repo `file:line`, the output of a command actually run, or a current
+document (context7/WebFetch) with its URL. Model memory about moving targets (library APIs, prices, limits,
+versions) is not a source. When no source is available, say "sin verificar" explicitly — a marked guess is
+honest; an unmarked one is a defect. This applies in every mode, consult included.
+
 ## Execution discipline
 Checkpoint before a budget cutoff: a mutating agent that senses it is near its execution limit writes partial
 progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply.

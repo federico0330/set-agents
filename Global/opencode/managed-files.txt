@@ -124,6 +124,7 @@ skills/solution-baselines/references/api-b2b-integraciones.md
 skills/solution-baselines/references/ecommerce-landing.md
 skills/solution-baselines/references/gestion-dashboard.md
 skills/solution-baselines/references/scraping-datos-ml.md
+skills/spawn-prompt/SKILL.md
 skills/spec-challenge/SKILL.md
 skills/strict-tdd-verify/SKILL.md
 skills/strict-tdd/SKILL.md

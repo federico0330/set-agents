@@ -1,7 +1,7 @@
 ---
 name: architect
 description: "Architect \u2014 design, ADRs, Clean/Hexagonal/SOLID before implementation"
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
 model: opus
 
 ---

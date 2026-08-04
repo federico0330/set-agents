@@ -1,7 +1,7 @@
 ---
 name: product-analyst
 description: "Product-Analyst \u2014 turns intent into specs and acceptance criteria"
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
 model: sonnet
 
 ---

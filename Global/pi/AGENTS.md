@@ -48,6 +48,11 @@ cycles per package.
 No opportunistic refactors. Preserve public APIs/data contracts unless the spec says otherwise. Never store/log
 secrets, tokens, PII, or raw `.env`. Findings must be concrete and actionable.
 
+## Evidence over memory (ADR-0026)
+No technical claim without a source: a repo `file:line`, the output of a command actually run, or a current
+document with its URL. Model memory about moving targets is not a source. When no source is available, say
+"sin verificar" explicitly. Applies in every mode, consult included.
+
 ## Execution discipline
 Checkpoint before a budget cutoff: a mutating agent that senses it is near its execution limit writes partial
 progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply.

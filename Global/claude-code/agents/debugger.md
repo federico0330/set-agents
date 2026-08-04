@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: "Debugger \u2014 root-cause a failing gate and apply the minimal fix"
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
 model: sonnet
 
 ---
