@@ -106,7 +106,8 @@ def next_transition(data: dict[str, Any]) -> dict[str, Any]:
             return {"phase": phase, "next": "PACKAGE_ACCEPTED" if status == "pass" else "PACKAGE_REPAIR", "reason": f"latest runtime QA status={status}"}
         return {"phase": phase, "next": "PACKAGE_RUNTIME_QA", "reason": "run app/browser QA"}
     if phase == "PACKAGE_ACCEPTED":
-        if any(package.get("status") != "accepted" for package in data.get("packages", [])):
+        # ADR-0028: superseded counts as closed here too, matching done_ready.
+        if any(package.get("status") not in ("accepted", "superseded") for package in data.get("packages", [])):
             return {"phase": phase, "next": "PACKAGE_PLANNING", "reason": "remaining packages exist"}
         return {"phase": phase, "next": "INTEGRATION", "reason": "all packages accepted"}
     if phase == "INTEGRATION":

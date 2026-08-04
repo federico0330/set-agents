@@ -245,6 +245,9 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
   chosen at triage — it sets the physical spawn/review budgets for the whole feature.
 - `create-package` after package planning.
 - `transition` only when the CLI allows the target phase.
+- `amend-spec` / `supersede-package` (ADR-0028) when the user confirms a scope change: the contract gets a
+  new recorded version with history (`spec_amendments[]`), obsolete packages retire as `superseded`, and
+  the feature stays closeable — never `init --force` for scope.
 - `complete-task` for local task validation evidence.
 - `record-spawn <package_id> <role> --client "<línea de cliente>" --tech "<línea de ingeniería>"` BEFORE
   every subagent delegation for that package — the two registers are always persisted here even when the
@@ -631,7 +634,11 @@ user only for:
   is clearly what they meant, take it and note the assumption),
 - a product-coverage gap: their proposal misses an angle of the software product (an affected user flow, edge
   case, or contract they did not consider) — surface it instead of silently implementing around it,
-- a major scope change,
+- a major scope change — **and scope changes have a mandatory mechanical reflection (ADR-0028)**: when the
+  user's request contradicts the approved spec, or `resume`/`next` reports `SPEC_DRIFT`, stop and ask; on
+  confirmation run `amend-spec --reason ... --approved-by ...` (and `supersede-package` for packages the new
+  scope obsoleted) BEFORE delegating any implementation. `accept-package` refuses under drift, and
+  `init --force` is never the answer to a scope change — it destroys history,
 - an irreversible operation,
 - **missing credentials/access — only AFTER the resolve-first protocol failed** (ADR-0025): first try the
   tool's own interactive flow (`vercel login`, `gh auth login`, a browser OAuth the CLI opens itself) via

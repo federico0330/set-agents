@@ -60,6 +60,92 @@ def verify_spec_hash(spec_path: str, spec_hash: str) -> None:
         )
 
 
+def spec_drift(data: dict[str, Any]) -> str | None:
+    """017/AC-11 (ADR-0028): re-hash the approved spec against the record.
+
+    `verify_spec_hash` runs at init only; this is the mid-flight counterpart.
+    Returns a human-actionable message (never raises) so callers choose their
+    own severity: `resume`/`next` warn, `accept-package` refuses.
+    """
+    spec = data.get("approved_spec") or {}
+    path, recorded = spec.get("path"), spec.get("hash")
+    if not path or not recorded:
+        return None
+    spec_file = Path(path)
+    if not spec_file.is_file():
+        return f"SPEC_NOT_FOUND: {path} — el contrato aprobado ya no está en disco"
+    digest = hashlib.sha256(spec_file.read_bytes()).hexdigest()
+    if digest != recorded:
+        return (
+            f"SPEC_DRIFT: recorded={recorded[:12]} disk={digest[:12]} path={path} — "
+            "el spec cambió después de la aprobación; registrá el cambio con `amend-spec` "
+            "(y consultá al usuario) antes de aceptar más paquetes. Nunca `init --force`."
+        )
+    return None
+
+
+def cmd_amend_spec(args: argparse.Namespace) -> int:
+    """ADR-0028: record a new approved version of the contract WITHOUT destroying
+    history. The user's confirmation is a precondition the orchestrator's own
+    Question policy already authorizes — this command only persists it."""
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        spec = data.get("approved_spec") or {}
+        new_path = args.spec_path or spec.get("path")
+        spec_file = Path(new_path)
+        if not spec_file.is_file():
+            raise StateError(f"SPEC_NOT_FOUND: {new_path}")
+        new_hash = hashlib.sha256(spec_file.read_bytes()).hexdigest()
+        if new_hash == spec.get("hash") and new_path == spec.get("path"):
+            raise StateError("amend-spec: el spec en disco es idéntico al ya aprobado — nada que enmendar")
+        amendment = {
+            "at": now(),
+            "old_path": spec.get("path"),
+            "old_hash": spec.get("hash"),
+            "path": new_path,
+            "hash": new_hash,
+            "reason": args.reason,
+            "approved_by": args.approved_by,
+            "actor": args.actor,
+        }
+        data.setdefault("spec_amendments", []).append(amendment)
+        data["approved_spec"] = {"path": new_path, "hash": new_hash, "approved_at": amendment["at"]}
+        if args.ac is not None:
+            data["acceptance_criteria"] = args.ac
+        model.record_event(data, "amend-spec", data["phase"], data["phase"], args.actor,
+                           metadata={"reason": args.reason, "approved_by": args.approved_by,
+                                     "new_hash": new_hash}, event_id=args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "amend-spec", update)
+    return output_state(data, changed, path)
+
+
+def cmd_supersede_package(args: argparse.Namespace) -> int:
+    """ADR-0028: retire a package the amended scope obsoleted, keeping its history.
+    A superseded package no longer blocks `done_ready` and its acceptance criteria
+    no longer count as covered — the amendment must have re-homed or removed them."""
+    path = state_file_arg(args)
+
+    def update(data: dict[str, Any]) -> bool:
+        package = model.package_by_id(data, args.package_id)
+        if package.get("status") == "accepted":
+            raise StateError("supersede-package: un paquete aceptado no se retira — el alcance nuevo "
+                             "se implementa en un paquete nuevo")
+        if package.get("status") == "superseded":
+            return False
+        package["status"] = "superseded"
+        package["superseded"] = {"at": now(), "reason": args.reason,
+                                 "amendment_hash": args.amendment_hash or ""}
+        model.record_event(data, "supersede-package", data["phase"], data["phase"], args.actor,
+                           args.package_id, {"reason": args.reason}, args.event_id)
+        return True
+
+    data, changed = model.mutate(path, args, "supersede-package", update)
+    return output_state(data, changed, path)
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     path = Path(args.state_file) if args.state_file else state_path(args.feature_id)
     if path.exists() and not args.force:
@@ -110,7 +196,13 @@ def cmd_next(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
     data = load_state(path)
     fail_if_invalid(data)
-    print_json({"ok": True, "state_file": str(path), "next": next_transition(data)})
+    payload = {"ok": True, "state_file": str(path), "next": next_transition(data)}
+    # ADR-0028: warn (never fail) on contract drift — the key is absent when clean,
+    # so pre-017 consumers of this output see exactly what they always saw.
+    drift = spec_drift(data)
+    if drift:
+        payload["spec_drift"] = drift
+    print_json(payload)
     return 0
 
 

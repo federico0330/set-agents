@@ -56,6 +56,7 @@ from feature_state_lib.cli_lifecycle import (
     output_state, state_file_arg, verify_spec_hash, cmd_init, cmd_validate, cmd_status, cmd_next,
     cmd_transition, cmd_create_package, cmd_update_package, cmd_start_task, cmd_complete_task,
     cmd_fail_task, cmd_resume, cmd_reopen, cmd_block, block_with_reason,
+    cmd_amend_spec, cmd_supersede_package,
 )
 from feature_state_lib.cli_review import (
     cmd_record_review, panel_roles, cmd_record_subreview, cmd_finalize_review_panel,
@@ -810,6 +811,23 @@ def build_parser() -> argparse.ArgumentParser:
     transition.add_argument("--package-id")
     transition.add_argument("--reason", default="")
     transition.set_defaults(func=cmd_transition)
+
+    amend = sub.add_parser("amend-spec")
+    add_common_state_args(amend)
+    amend.add_argument("--feature-id")
+    amend.add_argument("--spec-path", help="path nuevo; default: el ya aprobado")
+    amend.add_argument("--reason", required=True)
+    amend.add_argument("--approved-by", required=True)
+    amend.add_argument("--ac", action="append", help="reemplaza acceptance_criteria si se pasa")
+    amend.set_defaults(func=cmd_amend_spec)
+
+    supersede = sub.add_parser("supersede-package")
+    add_common_state_args(supersede)
+    supersede.add_argument("package_id")
+    supersede.add_argument("--feature-id")
+    supersede.add_argument("--reason", required=True)
+    supersede.add_argument("--amendment-hash", help="hash del amend-spec que lo obsoletó")
+    supersede.set_defaults(func=cmd_supersede_package)
 
     create = sub.add_parser("create-package")
     add_common_state_args(create)

@@ -16,7 +16,7 @@ from feature_state_lib import model
 from feature_state_lib.model import (
     StateError, now, parse_json_object, package_by_id, has_open_findings, package_accept_ready,
 )
-from feature_state_lib.cli_lifecycle import state_file_arg, output_state, block_with_reason
+from feature_state_lib.cli_lifecycle import state_file_arg, output_state, block_with_reason, spec_drift
 
 
 def cmd_record_gate(args: argparse.Namespace) -> int:
@@ -409,6 +409,11 @@ def cmd_accept_package(args: argparse.Namespace) -> int:
     def update(data: dict[str, Any]) -> bool:
         if data["phase"] != "PACKAGE_RUNTIME_QA":
             raise StateError(f"cannot accept package from phase {data['phase']}")
+        # ADR-0028: accepting work against a silently-changed contract is the exact
+        # waste this check exists to stop. resume/next only warn; HERE it blocks.
+        drift = spec_drift(data)
+        if drift:
+            raise StateError(f"cannot accept package: {drift}")
         package = package_by_id(data, args.package_id)
         errors = package_accept_ready(data, package, args.actor)
         if errors:

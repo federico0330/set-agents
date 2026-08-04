@@ -75,6 +75,8 @@ MUTATING_COMMANDS = {
     "reopen",
     "freeze-candidate",
     "record-receipt",
+    "amend-spec",
+    "supersede-package",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
 # Refuting retires a blocking finding with no code change: it is an authorization verb,
@@ -446,7 +448,9 @@ def package_accept_ready(data: dict[str, Any], package: dict[str, Any], actor: s
 
 def done_ready(data: dict[str, Any]) -> list[str]:
     errors = []
-    if any(package.get("status") != "accepted" for package in data.get("packages", [])):
+    # ADR-0028: `superseded` is the second terminal package state — a package the
+    # amended scope retired keeps its history and stops blocking the feature.
+    if any(package.get("status") not in ("accepted", "superseded") for package in data.get("packages", [])):
         errors.append("all packages must be accepted")
     required = [gate for gate in data.get("global_gates", []) if gate.get("required", True)]
     if not required:
@@ -459,7 +463,9 @@ def done_ready(data: dict[str, Any]) -> list[str]:
     # unresolved (a falsy check, not "key absent"), so it keeps blocking too.
     if any(not blocker.get("resolved_at") for blocker in data.get("blockers", [])):
         errors.append("open blocker exists")
-    covered = {ac for package in data.get("packages", []) for ac in package.get("acceptance_criteria", [])}
+    covered = {ac for package in data.get("packages", [])
+               if package.get("status") != "superseded"
+               for ac in package.get("acceptance_criteria", [])}
     required_criteria = set(data.get("acceptance_criteria") or [])
     if required_criteria and not required_criteria.issubset(covered):
         errors.append("not all acceptance criteria are covered by accepted packages")
