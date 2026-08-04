@@ -5,6 +5,18 @@ set per **area** (the `duty` column of `roles.tsv`), and per-role overrides. `ro
 structure only (role, mode, temperature, capability, duty). `active-profile` still selects the
 opencode lane (`go-zen`/`zen`/`local`) without rewriting anything.
 
+## Suscripciones: tri-estado (ADR-0029)
+
+Cada clave de `[subscriptions]` acepta tres estados:
+
+- `true` — pin curado: confiás en que está activa (comportamiento histórico).
+- `false` — exclusión dura: el build **muere** si algún modelo la referencia (histórico).
+- **ausente** — automático: el harness la detecta con el probe de credenciales. Si diste de baja
+  una suscripción, **borrá la línea y listo** — el build sigue verde con un `WARN degraded` y el
+  routing en vivo excluye ese proveedor solo (`PROVIDER_UNAUTHENTICATED`). Nada más que tocar.
+
+`SET_AGENTS_STRICT_MODELS=1` (CI) desactiva la tolerancia del estado ausente.
+
 ## The fast path: `./setup-models.sh`
 
 ```bash

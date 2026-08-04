@@ -2,7 +2,6 @@
 name: adversarial-judge
 description: "Adversarial judge \u2014 mandatory final read-only gate"
 tools: Read, Grep, Glob, Bash
-model: fable
 hooks:
   PreToolUse:
     - matcher: "Bash"

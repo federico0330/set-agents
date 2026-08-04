@@ -2,7 +2,6 @@
 name: delta-reviewer
 description: "Delta-Reviewer \u2014 focused review after package repair"
 tools: Read, Grep, Glob, Bash
-model: fable
 hooks:
   PreToolUse:
     - matcher: "Bash"

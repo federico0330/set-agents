@@ -10,6 +10,7 @@ profiles survive as lanes of the opencode dimension.
 import csv
 import json
 import re
+import sys
 import tomllib
 import os
 import tempfile
@@ -216,6 +217,34 @@ def permission_profile(models_path=None):
     return load_config(models_path)["permissions"].get("profile", "guarded")
 
 
+# ADR-0029 (017 PKG-A1): provider→subscription map for probe-backed detection.
+_PROVIDER_SUBSCRIPTION = {
+    "openai-codex": "openai",
+    "anthropic": "anthropic",
+    "opencode-zen": "zen",
+    "opencode-go": "zen",
+}
+
+
+def detect_subscriptions(config):
+    """Probe-backed subscription detection (ADR-0029): which subscriptions this
+    machine can actually use, derived from authenticated pairs. Lazy import (no
+    routing_core dependency at module load), shared probe cache, and `None` on
+    any failure — the caller treats that as "no probe info", never as "nothing".
+    Never reads or returns credential material."""
+    try:
+        from routing_core.catalog import probe_inventory
+        state = Path.home() / ".local/state/set-agentes"
+        inventory = probe_inventory(config, cache_root=state)
+    except Exception:
+        return None
+    return {
+        _PROVIDER_SUBSCRIPTION[provider]
+        for (_, provider), models in inventory.items()
+        if models and provider in _PROVIDER_SUBSCRIPTION
+    }
+
+
 def subscription_of(model, config):
     prefix = model.split("/", 1)[0]
     providers = {**SUBSCRIPTION_BY_PREFIX, **config["providers"]}
@@ -276,6 +305,7 @@ def load_roles(profile, roles_path=None, models_path=None):
             die(f"models.toml: [roles.{name}] does not match any role in roles.tsv")
     subscriptions = config["subscriptions"]
     catalog = config["catalog"]
+    detected_subscriptions = None  # ADR-0029: lazily probed, only when an absent key is hit
     for row in roles:
         row.update(resolve_role(row, config, profile))
         if row["claude_model"] not in catalog["claude"]:
@@ -288,10 +318,27 @@ def load_roles(profile, roles_path=None, models_path=None):
             die(f"{row['role']}: invalid OpenCode model id")
         subscription = subscription_of(row["opencode_model"], config)
         if not subscriptions.get(subscription):
-            die(
-                f"{row['role']}: {row['opencode_model']} needs the '{subscription}' subscription, "
-                "which is inactive in models.toml — reassign it (./setup-models.sh) or re-enable the subscription"
-            )
+            # ADR-0029 tri-state (017 PKG-A1): an EXPLICIT `false` is curated intent and
+            # still dies (the immutable contract). An ABSENT key means "auto": the probe
+            # decides. Undetected (or probe unavailable) degrades to a WARN that keeps
+            # the pin — the build never dies for a subscription nobody explicitly
+            # disabled; live routing already excludes it as PROVIDER_UNAUTHENTICATED.
+            # SET_AGENTS_STRICT_MODELS=1 restores the historical die for CI.
+            if subscription in subscriptions or os.environ.get("SET_AGENTS_STRICT_MODELS") == "1":
+                die(
+                    f"{row['role']}: {row['opencode_model']} needs the '{subscription}' subscription, "
+                    "which is inactive in models.toml — reassign it (./setup-models.sh) or re-enable the subscription"
+                )
+            if detected_subscriptions is None:
+                detected_subscriptions = detect_subscriptions(config)
+            if detected_subscriptions is None or subscription not in detected_subscriptions:
+                print(
+                    f"WARN degraded {row['role']}: {row['opencode_model']} necesita la suscripción "
+                    f"'{subscription}' y el probe no la detectó en esta máquina — se mantiene el pin "
+                    "(el routing en vivo la excluye como PROVIDER_UNAUTHENTICATED); si la diste de "
+                    "baja a propósito, declarala false en models.toml o remapeá con ./setup-models.sh",
+                    file=sys.stderr,
+                )
 
     implementers = [r for r in roles if r["duty"] in IMPLEMENT_DUTIES]
     reviewers = [r for r in roles if r["duty"] in REVIEW_DUTIES]

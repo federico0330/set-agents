@@ -2,7 +2,6 @@
 name: finding-verifier
 description: "Finding-Verifier \u2014 adversarial refutation of review findings before repair"
 tools: Read, Grep, Glob, Bash
-model: fable
 hooks:
   PreToolUse:
     - matcher: "Bash"

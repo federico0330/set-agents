@@ -2,7 +2,6 @@
 name: spec-challenger
 description: "Spec-Challenger \u2014 pre-approval read-only challenge of the Feature Contract"
 tools: Read, Grep, Glob, Bash
-model: fable
 hooks:
   PreToolUse:
     - matcher: "Bash"

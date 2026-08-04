@@ -2,7 +2,6 @@
 name: package-reviewer
 description: "Package-Reviewer \u2014 independent deep review of a complete implementation package (correctness, data, performance)"
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-model: fable
 hooks:
   PreToolUse:
     - matcher: "Bash"

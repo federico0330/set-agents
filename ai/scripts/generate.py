@@ -114,6 +114,10 @@ def oc_hidden(role):
     }
 
 
+# ADR-0029 (017 PKG-A2): the only model aliases guaranteed to resolve on ANY
+# Claude account tier. Anything else is omitted from claude-code frontmatter.
+CLAUDE_UNIVERSAL_ALIASES = {"sonnet", "opus", "haiku"}
+
 # ADR-0026: analysis roles whose claims need CURRENT sources (docs, prices, CVEs,
 # library APIs) get the web tools; mechanical/gate roles never do (least privilege).
 WEB_ANALYSIS_ROLES = {
@@ -449,9 +453,15 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(oc)
 
+        # ADR-0029 (017 PKG-A2): the frontmatter only ever pins a UNIVERSAL alias —
+        # one that resolves on any Claude account. A curated non-universal id (e.g.
+        # `fable`) is omitted instead: the agent inherits the session model, and the
+        # routed spawn path already overrides with --model regardless (spec 015).
+        model_line = ([f"model: {row['claude_model']}"]
+                      if row["claude_model"] in CLAUDE_UNIVERSAL_ALIASES else [])
         claude = "\n".join([
             "---", f"name: {row['role']}", f"description: {json.dumps(desc)}",
-            f"tools: {claude_tools(row['capability'], roles, row['role'])}", f"model: {row['claude_model']}",
+            f"tools: {claude_tools(row['capability'], roles, row['role'])}", *model_line,
             frontmatter_hook(row["capability"], row["role"]).rstrip(), "---", "", body,
         ])
         path = out / "claude-code/agents" / f"{row['role']}.md"

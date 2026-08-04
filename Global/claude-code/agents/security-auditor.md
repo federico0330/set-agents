@@ -2,7 +2,6 @@
 name: security-auditor
 description: "Security-Auditor \u2014 offensive + defensive read-only security review"
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-model: fable
 hooks:
   PreToolUse:
     - matcher: "Bash"
