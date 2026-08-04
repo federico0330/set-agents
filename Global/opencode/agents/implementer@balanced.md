@@ -127,6 +127,15 @@ Return `blocked` when requirements conflict, the task needs secrets/prod access,
 needed, ownership paths conflict, or the same local validation failure repeats after one focused repair attempt.
 Do not ask the user directly.
 
+Resolve-first (ADR-0025) — these are NOT stop conditions:
+- A missing CLI from the curated catalog (`tools.toml`): install it yourself
+  (`python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --tools-install <name> --yes`) and note it in
+  your output for the orchestrator's `log-decision`. Only a sudo-requiring method stops you — return the
+  exact command the human must run.
+- A CLI that needs login: run its own interactive flow (`vercel login`, `gh auth login`) first; only a flow
+  demanding a physical human action becomes `blocked`, and your report must show the attempt.
+- A production operation the user explicitly requested: that is the task, not a blocker — do it and record it.
+
 ## Department knowledge
 
 Before working, read `docs/ai/knowledge/data.md`, `docs/ai/knowledge/algorithms.md` and `docs/ai/knowledge/_global/data.md`, `docs/ai/knowledge/_global/algorithms.md` FIRST if they exist — they hold this domain's accumulated invariants, known root causes, and decisions; do not re-derive or contradict them silently. You never edit them (memory-scribe is the only writer).

@@ -233,6 +233,13 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --context*": allow',
+                  # ADR-0025: FIFTH sanctioned channel — the tool-catalog verbs (--tools,
+                  # --tools-install NAME --yes, --mcp[-add|-on|-off]). Coarser than
+                  # coord_policy.py's dedicated walker (glob-only format), but the CLI
+                  # itself re-validates catalog membership and refuses sudo/TTY-less runs.
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --tools*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp-remove*": deny',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-review*": allow',
                   *hard_denies]

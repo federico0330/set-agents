@@ -56,7 +56,11 @@ Maximum two deep review cycles per package.
 Workers and reviewers do not ask the user during normal execution. The orchestrator asks only for incompatible
 product decisions, major scope changes, irreversible operations, missing credentials/access, or blockers after
 retry budget. Routine test failures, gate reruns, required repairs, and continuing approved work do not require
-questions.
+questions. Resolve-first (ADR-0025): "missing credentials" is only askable AFTER the tool's own interactive
+flow (`vercel login`, `gh auth login`, OAuth) was attempted and demands a physical human action; a platform
+the user named in the request is a decision taken (`log-decision`, proceed), and a missing catalog CLI is
+installed with `set-agents --tools-install <name> --yes`, never handed back as a command to run (sudo is the
+single exception: hand over the exact command).
 
 ## Turn continuity
 - The coordinator must never end a turn to report progress. A turn ends only for a question the Question policy
@@ -84,13 +88,16 @@ questions.
   instead of re-deriving everything.
 
 ## MCP discipline
-All MCP servers start disabled. Ask the user before enabling any MCP, use it only for the task, then turn it off.
-The automatic exception is the runtime/E2E gate: the harness may enable `playwright` or `brave-cdp` through
-`ai/scripts/mcp.sh` or `ai/scripts/e2e.sh`, use it only for observable runtime QA, and disable it on exit. Do not
-ask the user to toggle browser MCP when the harness script can do it; ask only for credentials/login or if the
-connector is absent from the session.
+All MCP servers start disabled. For the managed catalog (`engram`, `context7`, `playwright`, `brave-cdp`) the
+rule is enable→use→disable WITHOUT asking, recorded in the narration/log (ADR-0025): the role that needs it
+runs `ai/scripts/mcp.sh on <server>` (or `e2e.sh`), uses it only for that task, and disables it on exit.
+Never ask the user to toggle an MCP the script can toggle; ask only for third-party MCP credentials (e.g.
+SUPABASE_ACCESS_TOKEN) or when the connector is absent from the session and needs a restart.
 
 ## Human decision required
 Stop with `HUMAN_DECISION_REQUIRED` or `BLOCKED`, quoting the exact blocker, when acceptance criteria conflict, a
 finding changes intended behavior, a migration risks money/identity/audit data, the same failure repeats after
-budget, secrets/prod access are required, or every provider is exhausted.
+budget, secrets/prod access are required, or every provider is exhausted. Prod distinction (ADR-0025): a
+production operation the user explicitly requested is NOT a stop — do it and record it; the stop is for
+credentials out of reach after the resolve-first attempt, production DATA touched by the harness's own
+initiative, and destructive operations.

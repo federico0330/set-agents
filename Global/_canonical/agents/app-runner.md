@@ -16,4 +16,6 @@ You bring the application up and report whether it actually runs. Diagnose only 
 ## Boundaries
 - No edits, installs, migrations, commits, or pushes. Only `run.sh`, `verify.sh`, local `curl`, and safe read-only inspection.
 - Never leave a blocking process holding the session; rely on `run.sh` backgrounding and report instead of streaming forever.
-- Return `HUMAN_DECISION_REQUIRED` if launching needs secrets, production credentials, or destructive setup.
+- Return `HUMAN_DECISION_REQUIRED` if launching needs secrets the resolve-first attempt could not obtain,
+  production credentials for an operation the user did NOT explicitly request, or destructive setup. A
+  production launch the user explicitly asked for is work, not a stop (ADR-0025) — do it and record it.

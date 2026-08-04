@@ -139,6 +139,43 @@ def _transition_blocks_integration(argv: list[str]) -> bool:
     return False
 
 
+# ADR-0025: names accepted by the tool-catalog channel below. Tight on purpose:
+# a catalog key or harness id, never a path, never an option, never empty.
+_CATALOG_NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
+
+
+def _tools_channel_allowed(argv: list[str]) -> bool:
+    """ADR-0025 sanctioned tool-catalog channel: `--tools`, `--tools-install NAME
+    [--yes|--dry-run]`, `--mcp[-add|-on|-off] [NAME] [--harness H]` -- and nothing
+    else. A dedicated positional-aware walker (the `_transition_blocks_integration`
+    pattern), never a trailing-wildcard regex: `--tools-install` takes a bare NAME
+    value, which `SAFE_ARGV`'s flag-only `modifiers` grammar cannot express, and
+    the historical `--context --scaffold X` escape (see SAFE_ARGV's SEC-001 note)
+    shows exactly what a lax rest-of-argv check costs. `set_agents_app.py` itself
+    still re-checks everything (catalog membership, sudo refusal, TTY/--yes); this
+    walker only narrows which Bash surface can reach it."""
+    if len(argv) < 3 or argv[0] not in {"python3", "python"} or argv[1] != APP_CLI:
+        return False
+    head, rest = argv[2], argv[3:]
+    if head == "--tools":
+        return not rest
+    if head == "--tools-install":
+        if not rest or not _CATALOG_NAME.fullmatch(rest[0]):
+            return False
+        extras = rest[1:]
+        return all(item in {"--yes", "--dry-run"} for item in extras) and len(set(extras)) == len(extras)
+    if head == "--mcp":
+        return not rest or (len(rest) == 2 and rest[0] == "--harness" and bool(_CATALOG_NAME.fullmatch(rest[1])))
+    if head in {"--mcp-add", "--mcp-on", "--mcp-off"}:
+        if not rest or not _CATALOG_NAME.fullmatch(rest[0]):
+            return False
+        extras = rest[1:]
+        if not extras:
+            return True
+        return len(extras) == 2 and extras[0] == "--harness" and bool(_CATALOG_NAME.fullmatch(extras[1]))
+    return False
+
+
 def _argv_allowed(argv: list[str]) -> bool:
     if len(argv) < 3:
         return False
@@ -163,6 +200,8 @@ def allowed(command: str) -> bool:
     if _transition_blocks_integration(argv):
         return False
     if _argv_allowed(argv):
+        return True
+    if _tools_channel_allowed(argv):
         return True
     return any(re.fullmatch(pattern + r".*", command) for pattern in SAFE)
 

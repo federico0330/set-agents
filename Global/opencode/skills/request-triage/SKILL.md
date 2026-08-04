@@ -132,6 +132,10 @@ quick-fix on its surface ("add semantic search to the docs page" is a one-line a
 decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
 ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
 hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+**Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+Vercel", "store it in Supabase"), that axis is DECIDED — record it with `log-decision` and proceed without
+asking; `architect` writes the formal ADR afterwards. The red-flag question is only for an axis the user
+left genuinely open.
 
 ## Waking the dormant agents (concrete triggers, not "by risk")
 These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in

@@ -1,9 +1,11 @@
 # MCP — política y cómo encender/apagar por harness
 
 Servidores definidos en los 3 harnesses: **engram**, **context7**, **playwright**, **brave-cdp**.
-Regla general: **arrancan APAGADOS** y la IA debe **pedirte permiso** antes de encender o usar cualquiera.
-Excepción operativa: durante un runtime/E2E gate aprobado, el agente puede encender `playwright` o `brave-cdp`
-mediante `ai/scripts/mcp.sh` / `ai/scripts/e2e.sh`, usarlo sólo para esa prueba observable, y apagarlo al salir.
+Regla general (ADR-0025): **arrancan APAGADOS**, y para el catálogo gestionado el agente los
+**enciende→usa→apaga solo, sin pedir permiso**, registrándolo en la narración/log — la vieja excepción del
+browser-gate ahora es la regla para todo el catálogo. Lo único que sigue requiriendo pedirte algo son las
+credenciales de MCPs de terceros (p.ej. `SUPABASE_ACCESS_TOKEN`) o un conector ausente de la sesión que
+exija reiniciarla.
 
 ## Quién puede llamar a cada uno (los demás agentes NO)
 | MCP | Agentes habilitados | Para qué |
@@ -17,11 +19,12 @@ mediante `ai/scripts/mcp.sh` / `ai/scripts/e2e.sh`, usarlo sólo para esa prueba
 > docs/specs/Obsidian. engram es para memoria durable de alto valor, no un log.
 
 ## Encender
-- **Runtime/E2E gate aprobado** — el agente ejecuta `./ai/scripts/mcp.sh browser-gate auto` o
+- **Runtime/E2E gate** — el agente ejecuta `./ai/scripts/mcp.sh browser-gate auto` o
   `./ai/scripts/e2e.sh <TASK_ID> auto`. No debe pedirte que manipules toggles.
-- **Otros usos** — el agente pide permiso primero. En OpenCode puede ejecutar `./ai/scripts/mcp.sh on <server>`
-  cuando el proyecto tiene el script. En Codex/Claude, si la sesión no expone el conector dinámicamente, puede
-  quedar requerido reiniciar la sesión con el server habilitado.
+- **Cualquier otro uso del catálogo** — el agente habilitado ejecuta `./ai/scripts/mcp.sh on <server>`
+  (OpenCode o Claude Code; el script detecta el harness), lo usa para esa tarea y lo apaga al salir,
+  registrándolo. En Codex, si la sesión no expone el conector dinámicamente, puede quedar requerido
+  reiniciar la sesión con el server habilitado.
 
 ## Apagar
 El agente ejecuta `./ai/scripts/mcp.sh off playwright` y/o `./ai/scripts/mcp.sh off brave-cdp`. El wrapper

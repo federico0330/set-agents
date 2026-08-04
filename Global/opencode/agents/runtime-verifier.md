@@ -132,5 +132,7 @@ A problem IS a blocking defect; do not grade severity, and do not raise cosmetic
   browser MCP.
 - Always leave the system in a known state: stop what you started (`run.sh down`) unless asked to keep it running,
   and say which you did. Never leave a blocking process holding the session.
-- Return `HUMAN_DECISION_REQUIRED` if verification needs secrets, production credentials, or destructive setup.
+- Return `HUMAN_DECISION_REQUIRED` if verification needs secrets the resolve-first attempt could not obtain,
+  production credentials for an operation the user did NOT explicitly request, or destructive setup
+  (ADR-0025: a prod verification the user asked for is work, not a stop).
 - One focused pass: exercise the flows the task names, report, and stop. Do not explore the whole app.

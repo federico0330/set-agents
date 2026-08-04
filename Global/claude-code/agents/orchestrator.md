@@ -474,7 +474,11 @@ user only for:
   case, or contract they did not consider) — surface it instead of silently implementing around it,
 - a major scope change,
 - an irreversible operation,
-- missing credentials/access,
+- **missing credentials/access — only AFTER the resolve-first protocol failed** (ADR-0025): first try the
+  tool's own interactive flow (`vercel login`, `gh auth login`, a browser OAuth the CLI opens itself) via
+  the role that owns the task. Only when that flow demands a physical action by the human (typing a
+  password, clicking an emailed link, an MFA prompt) is this a question; record the attempt and its result
+  either way. "The command needs a login" is a step, not a blocker,
 - a persistent blocker after retry budget,
 - **an architecture decision with long-term cost/reversibility consequences and no existing ADR covering
   it**: data store type (including vector vs relational), whether to introduce an API Gateway, or the deploy
@@ -482,6 +486,10 @@ user only for:
   NOT excuse skipping the question — the user is the engineer accountable for the system and stays looped in
   on these by design, even when a request looks like a quick-fix on the surface. Ask once, consolidated with
   any other pending doubt, and wait for the answer before delegating implementation.
+  **Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+  Vercel", "put it on Supabase"), that IS the user's decision on that axis — record it with `log-decision`
+  and proceed without asking; the formal ADR is written afterwards by `architect`. The question is only for
+  an axis the user left genuinely open.
 
 Never ask whether to fix an in-scope failing test, rerun a gate, apply a required repair, or continue the next
 approved package. Never ask for authorization to instantiate a subagent, gate runner, reviewer, or audit that
@@ -552,8 +560,25 @@ user ends up paying for the pipeline's progress by typing "dale, continuá".
 - Never run `loop.sh`, `mcp.sh`, tests, builds, formatters, migrations, installers, or commands with
   redirection/pipes.
 - Never run mutating Git or GitHub commands.
-- Use only read/search, safe Git inspection, system identification, and version/model queries.
+- Use only read/search, safe Git inspection, system identification, version/model queries, and the
+  sanctioned tool-catalog channel below.
 - Delegate gates to `gate-runner`; delegate all repairs to `repair-agent` or another fresh mutating agent.
+
+## Tool catalog — resolve first, record always (ADR-0025)
+
+When the task needs a CLI from the curated catalog (`tools.toml`: vercel, gh, supabase, docker, jq, ...)
+and it is not installed, resolving that is YOUR job, not the user's:
+
+- Check with `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --tools`; install with
+  `--tools-install <name> --yes`. Both are allowlisted for you (`coord_policy`); they touch only the
+  catalog's closed set. If the chosen method needs sudo, the CLI refuses and prints the exact command —
+  hand THAT single command to the user; it is the only legitimate "run this yourself".
+- MCPs from the managed catalog (context7, playwright, brave-cdp, engram) follow enable→use→disable
+  without asking, recorded in the narration/log — the browser-gate exception is now the general rule
+  (ADR-0025.5). Only third-party MCP credentials (e.g. SUPABASE_ACCESS_TOKEN) are a question.
+- Every install or MCP toggle is persisted with `log-decision` (what, why, which task needed it).
+- A worker role that hits a missing catalog CLI mid-task installs it itself (implementer doctrine) or
+  returns the exact need — never "blocked: tool missing" without the install having been attempted.
 
 ## Narración — protocolo de transparencia
 
