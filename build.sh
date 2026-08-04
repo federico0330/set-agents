@@ -3,13 +3,36 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="generate"
-PROFILE=""
+# Env override honored (PROFILE=zen ./build.sh); --profile flag wins below.
+PROFILE="${PROFILE:-}"
 OUTPUT=""
 YES=0
 TARGETS=()
 
 usage() {
   echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|local] [--output DIR] [--target opencode|claude-code|codex|pi] [--yes]"
+}
+
+ensure_active_profile() {
+  # The lane is auto-derived from the probe (models_config.auto_profile); the old
+  # use-go-zen.sh/use-zen.sh/use-local.sh scripts are gone. Only a MISSING
+  # active-profile is written here — an existing one (earlier auto run, or a
+  # deliberate hand edit / --profile override) is never flipped silently, so
+  # tracked artifacts can't churn because a probe changed its mind.
+  [ -n "$PROFILE" ] && return 0
+  [ -f "$ROOT/active-profile" ] && return 0
+  local lane
+  lane="$(python3 - "$ROOT" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1] + "/ai/scripts")
+import models_config
+print(models_config.auto_profile() or "")
+PY
+)" || lane=""
+  if [ -n "$lane" ]; then
+    printf '%s\n' "$lane" > "$ROOT/active-profile"
+    echo "PROFILE_AUTO $lane"
+  fi
 }
 
 while [ "$#" -gt 0 ]; do
@@ -26,6 +49,8 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+ensure_active_profile
 
 if [ -n "$OUTPUT" ]; then
   args=(python3 "$ROOT/ai/scripts/generate.py" --output "$OUTPUT")

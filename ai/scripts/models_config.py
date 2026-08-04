@@ -258,6 +258,26 @@ def detect_subscriptions(config):
     }
 
 
+def auto_profile(config=None):
+    """The lane is derived from the probe, never hand-picked (the old use-*.sh
+    scripts are gone). Both opencode pairs live → go-zen; only opencode-zen →
+    zen; probe fine but no opencode pair → local. None on probe failure — the
+    caller keeps whatever active-profile already says and never dies."""
+    try:
+        from routing_core.catalog import probe_inventory
+        cfg = config if config is not None else load_config()
+        state = Path.home() / ".local/state/set-agentes"
+        inventory = probe_inventory(cfg, cache_root=state)
+    except Exception:
+        return None
+    live = {provider for (_, provider), models in inventory.items() if models}
+    if "opencode-go" in live:
+        return "go-zen"
+    if "opencode-zen" in live:
+        return "zen"
+    return "local"
+
+
 def subscription_of(model, config):
     prefix = model.split("/", 1)[0]
     providers = {**SUBSCRIPTION_BY_PREFIX, **config["providers"]}

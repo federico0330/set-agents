@@ -59,14 +59,11 @@ role prompts, and rolls back managed paths if smoke checks fail. Backups live un
 `~/.local/state/set-agentes/backups/` (the state dir keeps its historical `set-agentes` spelling on
 purpose: migrating it would orphan every machine's manifest and backups).
 
-Profile wrappers change only `active-profile` (per-machine, untracked; fresh clones default to go-zen)
-and use the same confirmation flow:
-
-```bash
-./use-go-zen.sh
-./use-zen.sh
-./use-local.sh
-```
+The opencode lane (`active-profile`, per-machine, untracked) is auto-derived from the probe on the
+first `./build.sh` run: both opencode pairs authenticated → `go-zen`, only zen → `zen`, no opencode →
+`local`. The old `use-go-zen.sh`/`use-zen.sh`/`use-local.sh` wrappers are gone. To override, run
+`PROFILE=zen ./build.sh --install` (one-off) or edit/delete `active-profile` and rebuild (delete →
+re-derive).
 
 Runtime gate timeout: `e2e.sh` cuts the runtime-verifier at `E2E_TIMEOUT` seconds (default 600).
 If a project's E2E legitimately needs longer, export a bigger `E2E_TIMEOUT` instead of authorizing reruns.

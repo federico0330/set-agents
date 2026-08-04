@@ -2,8 +2,10 @@
 
 Model routing lives in **`models.toml`**: active subscriptions, the model catalog, one model
 set per **area** (the `duty` column of `roles.tsv`), and per-role overrides. `roles.tsv` holds
-structure only (role, mode, temperature, capability, duty). `active-profile` still selects the
-opencode lane (`go-zen`/`zen`/`local`) without rewriting anything.
+structure only (role, mode, temperature, capability, duty). `active-profile` selects the opencode
+lane (`go-zen`/`zen`/`local`) and is **auto-derived from the credentials probe** on the first
+`./build.sh` (both opencode pairs live → go-zen, only zen → zen, none → local). Override with
+`PROFILE=<lane> ./build.sh --install`, or delete `active-profile` to re-derive.
 
 ## Suscripciones: tri-estado (ADR-0029)
 
