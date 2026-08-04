@@ -23,8 +23,10 @@ class DoctorAllTests(unittest.TestCase):
             cwd=ROOT, text=True, capture_output=True, timeout=300,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        for harness in ("claude-code", "opencode", "codex", "pi"):
+        for harness in ("claude-code", "opencode", "codex"):
             self.assertRegex(result.stdout, rf"(?m)^HARNESS {harness} installed=(yes|no)$")
+        # pi resolves via pnpm dlx (no global binary expected): a third honest state.
+        self.assertRegex(result.stdout, r"(?m)^HARNESS pi installed=(yes|no|via-pnpm-dlx)$")
         self.assertRegex(result.stdout, r"(?m)^INSTALL_SCOPE ")
         self.assertRegex(result.stdout, r"(?m)^TOOL \S+ installed=(yes|no)$")
         # Same redaction contract as the pi doctor: never credential material.

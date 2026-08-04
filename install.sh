@@ -15,7 +15,7 @@ NO_INSTALL=0
 HARNESS="all"
 
 usage() {
-  echo "usage: ./install.sh [--yes] [--update] [--dry-run] [--skip-auth] [--skip-deps] [--no-install] [--harness claude|opencode|codex|all]"
+  echo "usage: ./install.sh [--yes] [--update] [--dry-run] [--skip-auth] [--skip-deps] [--no-install] [--harness claude|opencode|codex|pi|all]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -29,8 +29,8 @@ while [ "$#" -gt 0 ]; do
     --harness)
       shift
       case "${1:-}" in
-        claude|opencode|codex|all) HARNESS="$1" ;;
-        *) echo "harness inválido: '${1:-}' (claude|opencode|codex|all)" >&2; exit 2 ;;
+        claude|opencode|codex|pi|all) HARNESS="$1" ;;
+        *) echo "harness inválido: '${1:-}' (claude|opencode|codex|pi|all)" >&2; exit 2 ;;
       esac
       ;;
     -h|--help) usage; exit 0 ;;
@@ -42,6 +42,11 @@ done
 harness_wanted() {
   # $1 cli name (opencode|claude|codex). With --harness all, everything is wanted.
   [ "$HARNESS" = "all" ] || [ "$HARNESS" = "$1" ]
+}
+
+pi_wanted() {
+  # The pi lane rides on the claude harness (same Anthropic auth; see repo_config).
+  [ "$HARNESS" = "all" ] || [ "$HARNESS" = "pi" ] || [ "$HARNESS" = "claude" ]
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -215,6 +220,57 @@ path_hint() {
   esac
 }
 
+pi_package_spec() {
+  # Single source of truth for the pi pin lives in routing_core/catalog.py.
+  python3 - "$ROOT" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1] + "/ai/scripts")
+from routing_core.catalog import PI_PACKAGE, PI_PINNED_VERSION
+print(f"{PI_PACKAGE}@{PI_PINNED_VERSION}")
+PY
+}
+
+install_pnpm() {
+  if have npm; then
+    npm install -g pnpm
+  elif have corepack; then
+    corepack enable pnpm
+  else
+    return 1
+  fi
+}
+
+ensure_pi_lane() {
+  # pi never installs as a global binary: it resolves at runtime via
+  # `pnpm dlx` against the pinned package. Installing the lane means making
+  # sure pnpm exists and warming that pin into pnpm's store.
+  if [ "$DRY" -eq 1 ]; then
+    have pnpm || echo "BOOTSTRAP_PLAN pnpm"
+    echo "BOOTSTRAP_PLAN pi"
+    return 0
+  fi
+  if have pnpm; then
+    echo "BOOTSTRAP_SKIP pnpm ($(version_of pnpm))"
+  elif have npm || have corepack; then
+    if confirm "¿Instalar pnpm (necesario para el lane pi)?"; then
+      install_pnpm && echo "BOOTSTRAP_OK pnpm"
+    fi
+  else
+    echo "AVISO: sin npm/corepack no se puede instalar pnpm; el lane pi queda sin runtime."
+  fi
+  have pnpm || return 0
+  local spec
+  if ! spec="$(pi_package_spec)"; then
+    echo "AVISO: no pude leer el pin de pi desde routing_core/catalog.py; salto el warm-up."
+    return 0
+  fi
+  if pnpm dlx --package "$spec" pi --version >/dev/null 2>&1; then
+    echo "BOOTSTRAP_OK pi ($spec)"
+  else
+    echo "AVISO: el warm-up de pi ($spec) falló; el lane pi puede no estar operativo todavía."
+  fi
+}
+
 ensure_agent_clis() {
   harness_wanted opencode && ensure_cli opencode install_opencode
   harness_wanted claude && ensure_cli claude install_claude
@@ -225,6 +281,7 @@ ensure_agent_clis() {
       echo "AVISO: sin npm/pnpm no se puede instalar codex; resolvé node/npm primero."
     fi
   fi
+  if pi_wanted; then ensure_pi_lane; fi
   [ "$DRY" -eq 1 ] && return 0
   path_hint "$HOME/.local/bin"
   path_hint "$HOME/.opencode/bin"
@@ -324,6 +381,7 @@ repo_config() {
     claude) build_args+=(--target claude-code --target pi) ;;
     opencode) build_args+=(--target opencode) ;;
     codex) build_args+=(--target codex) ;;
+    pi) build_args+=(--target pi) ;;
   esac
   [ "$YES" -eq 1 ] && build_args+=(--yes)
   "$ROOT/build.sh" "${build_args[@]}"
@@ -337,13 +395,21 @@ verify_final() {
   echo
   echo "Componente   Versión"
   local tool
-  for tool in git python3 node opencode claude codex; do
+  for tool in git python3 node pnpm opencode claude codex; do
     if have "$tool"; then
       printf '%-12s %s\n' "$tool" "$(version_of "$tool")"
     else
       printf '%-12s %s\n' "$tool" "FALTA"
     fi
   done
+  # pi resolves via pnpm dlx (no global binary expected); report the lane honestly.
+  if have pi; then
+    printf '%-12s %s\n' "pi" "$(version_of pi)"
+  elif have pnpm; then
+    printf '%-12s %s\n' "pi" "vía pnpm dlx ($(pi_package_spec 2>/dev/null || echo 'pin ilegible'))"
+  else
+    printf '%-12s %s\n' "pi" "FALTA (sin pnpm)"
+  fi
 }
 
 echo "Detalle de todo lo que vas a ver paso a paso: README.md"

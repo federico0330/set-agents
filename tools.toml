@@ -79,6 +79,13 @@ apt = "sudo apt-get install -y syncthing"
 brew = "brew install syncthing"
 doc = "https://syncthing.net"
 
+[cli.pnpm]
+detect = "pnpm"
+note = "runtime del lane pi: pi corre vía `pnpm dlx` contra el paquete pinneado en routing_core/catalog.py (no hay binario pi global)"
+[cli.pnpm.install]
+npm = "npm install -g pnpm"
+doc = "https://pnpm.io/installation"
+
 [mcp.supabase]
 type = "local"
 command = ["npx", "-y", "@supabase/mcp-server-supabase@latest"]

@@ -543,8 +543,17 @@ def cmd_doctor_all():
     instalados, scope de instalación, CLIs del catálogo, y proveedores/modelos
     realmente autenticados (probe con cache; nunca imprime credenciales)."""
     from routing_core.catalog import probe_inventory
-    for harness, cli in (("claude-code", "claude"), ("opencode", "opencode"), ("codex", "codex"), ("pi", "pi")):
+    for harness, cli in (("claude-code", "claude"), ("opencode", "opencode"), ("codex", "codex")):
         print(f"HARNESS {harness} installed={'yes' if shutil.which(cli) else 'no'}")
+    # pi has no global binary by design: it resolves via `pnpm dlx` against the
+    # pin in routing_core/catalog.py, so pnpm present == lane installable. A bare
+    # which("pi") here was a structural false negative on every fresh machine.
+    if shutil.which("pi"):
+        print("HARNESS pi installed=yes")
+    elif shutil.which("pnpm"):
+        print("HARNESS pi installed=via-pnpm-dlx")
+    else:
+        print("HARNESS pi installed=no")
     scope_path = STATE_DIR / "install-targets.json"
     if scope_path.exists():
         try:
