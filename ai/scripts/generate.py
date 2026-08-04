@@ -254,7 +254,16 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp-remove*": deny',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-review*": allow',
-                  *hard_denies]
+                  *hard_denies,
+                  # ADR-0025: read-only gh inspection, placed AFTER hard_denies' blanket
+                  # `"gh *": deny` so it overrides per this list's last-match-wins
+                  # convention. Enumerated verbs only — mirrors coord_policy.SAFE.
+                  '    "gh run list*": allow', '    "gh run view*": allow', '    "gh run watch*": allow',
+                  '    "gh pr list*": allow', '    "gh pr view*": allow', '    "gh pr checks*": allow',
+                  '    "gh pr status*": allow', '    "gh pr diff*": allow',
+                  '    "gh workflow list*": allow', '    "gh workflow view*": allow',
+                  '    "gh issue list*": allow', '    "gh issue view*": allow',
+                  '    "gh auth status*": allow', '    "gh repo view*": allow']
     elif capability == "review-ro":
         lines += ["  edit: deny", "  question: deny", "  doom_loop: deny", "  task: deny", "  bash:", bash_default, *safe, *always_deny]
     elif capability == "gate-ro":

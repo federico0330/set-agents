@@ -54,6 +54,28 @@ class ToolsChannelPolicyTests(unittest.TestCase):
         self.assertFalse(coord_policy.allowed(f"python3 {APP} --tools-install vercel --yes | tee /tmp/x"))
 
 
+class GhReadOnlyChannelTests(unittest.TestCase):
+    def test_read_only_gh_inspection_is_allowed(self):
+        for command in ("gh run view 12345 --log", "gh run list --limit 5", "gh pr checks 42",
+                        "gh pr view 42", "gh workflow list", "gh auth status", "gh repo view"):
+            self.assertTrue(coord_policy.allowed(command), command)
+
+    def test_mutating_or_arbitrary_gh_stays_denied(self):
+        for command in ("gh api repos/o/r/dispatches", "gh pr merge 42", "gh release create v1",
+                        "gh repo delete o/r", "gh run cancel 9", "gh run rerun 9",
+                        "gh secret set X", "gh run view 1 | tee /tmp/x"):
+            self.assertFalse(coord_policy.allowed(command), command)
+
+    def test_opencode_orchestrator_gh_allows_come_after_the_blanket_deny(self):
+        text = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
+        deny = '    "gh *": deny'
+        allow = '    "gh run view*": allow'
+        self.assertIn(deny, text)
+        self.assertIn(allow, text)
+        # Last-match-wins: the specific allow must come after the blanket deny.
+        self.assertLess(text.index(deny), text.index(allow))
+
+
 class GeneratedPermissionTests(unittest.TestCase):
     def test_opencode_orchestrator_gains_the_tools_channel(self):
         text = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()

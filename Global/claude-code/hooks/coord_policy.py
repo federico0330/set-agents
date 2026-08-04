@@ -29,6 +29,11 @@ SAFE = [
     r"rustup (toolchain list|show)(\s|$)",
     r"(cargo|rustc) (--version|-V)(\s|$)",
     r"(claude|codex|opencode) (--version|-V)(\s|$)",
+    # ADR-0025 resolve-first: READ-ONLY GitHub inspection for the coordinator — CI runs,
+    # PR state, workflow listings, auth status. Enumerated subcommands only: `gh api`,
+    # `gh pr merge`, `gh release`, etc. stay denied (mutating or arbitrary-request
+    # surfaces), and ALWAYS_DENY keeps `gh repo delete` hard-blocked for every role.
+    r"gh (run (list|view|watch)|pr (list|view|checks|status|diff)|workflow (list|view)|issue (list|view)|auth status|repo view)(\s|$)",
     r"(cat|ls|find|grep|head|tail|wc|tree|file|stat|diff|du|df|ps|pwd|which)(\s|$)",
     r"curl (?:-[A-Za-z]+\s+)*(?:http://)?(?:localhost|127\.0\.0\.1)(?::\d+)?(?:/|\s|$)",
     # Sanctioned mutation channel: the state CLI validates every transition and

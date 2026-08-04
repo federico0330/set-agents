@@ -157,6 +157,20 @@ permission:
     "node * -e *": deny
     "* -exec *": deny
     "*-toolexec*": deny
+    "gh run list*": allow
+    "gh run view*": allow
+    "gh run watch*": allow
+    "gh pr list*": allow
+    "gh pr view*": allow
+    "gh pr checks*": allow
+    "gh pr status*": allow
+    "gh pr diff*": allow
+    "gh workflow list*": allow
+    "gh workflow view*": allow
+    "gh issue list*": allow
+    "gh issue view*": allow
+    "gh auth status*": allow
+    "gh repo view*": allow
 ---
 
 # Orchestrator — read-only coordinator of the package-based delivery lifecycle
