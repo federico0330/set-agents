@@ -54,7 +54,7 @@
 
 - spawns: 16 (máx 16/paquete) · deep review máx 3 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/003-trusted-routing-pi-runtime/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/003-trusted-routing-pi-runtime/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/003-trusted-routing-pi-runtime/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/003-trusted-routing-pi-runtime/bitacora.md`
 
 _Actualizado: 2026-07-29T17:13:45+00:00_
 <!-- /notas:auto -->

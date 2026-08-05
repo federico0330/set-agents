@@ -43,7 +43,7 @@
 
 - spawns: 8 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/012-discovered-inventory/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/012-discovered-inventory/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/012-discovered-inventory/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/012-discovered-inventory/bitacora.md`
 
 _Actualizado: 2026-08-02T15:00:53+00:00_
 <!-- /notas:auto -->

@@ -48,7 +48,7 @@
 
 - spawns: 9 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/013-pi-interactive-target/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/013-pi-interactive-target/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/013-pi-interactive-target/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/013-pi-interactive-target/bitacora.md`
 
 _Actualizado: 2026-08-02T22:40:39+00:00_
 <!-- /notas:auto -->

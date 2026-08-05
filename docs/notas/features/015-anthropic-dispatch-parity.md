@@ -40,7 +40,7 @@
 
 - spawns: 0 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/015-anthropic-dispatch-parity/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/015-anthropic-dispatch-parity/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/015-anthropic-dispatch-parity/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/015-anthropic-dispatch-parity/bitacora.md`
 
 _Actualizado: 2026-08-01T22:46:55+00:00_
 <!-- /notas:auto -->

@@ -122,6 +122,12 @@ permission:
     "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp-remove*": deny
     "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow
     "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-review*": allow
+    "python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py --dispatch-writer*": allow
+    "python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py --dispatch-review*": allow
+    "python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py --dispatch-simulate*": allow
+    "python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py --dispatch-writer*": allow
+    "python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py --dispatch-review*": allow
+    "python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py --dispatch-simulate*": allow
     "* > *": deny
     "*>*": deny
     "* >> *": deny
@@ -498,18 +504,45 @@ FALLBACK layer, not the ceiling. So, additionally:
    release included), run the same `--route-decide` with the role's real `role`/`task_class`/`risk`. For
    non-writer, non-verified-review roles the envelope comes back `simulate` — that is expected and still a
    decision: it names the provider/model/tier the brain would pick for this task, with reason codes.
-2. **Materialize by lane capability** (the exact same lane-branching vocabulary as step 2 above):
+   Then pass the decision into the spawn record STRUCTURED, never only as prose: `record-spawn <PKG> <role>
+   --model <data.model> --provider <data.provider> --effort <data.effort> --route-id <data.run_id, or
+   data.decision_id when there is no durable run>` (ADR-0031) — that is what makes "which model ran
+   SPAWN-NNN" answerable from state instead of from chat.
+2. **Materialize by lane capability** (the exact same lane-branching vocabulary as step 2 above;
+   ADR-0032 closes ADR-0030's stated gap — EVERY lane now applies the decided model AT SPAWN TIME):
    - `data.provider == "anthropic"` → the Claude-Code lane serves ANY roster role at the decided model:
      `claude_code_spawn.py` with `--model data.model` (base `<role>.md`, no variant needed).
-   - `data.provider == "openai-codex"` and the role is one of the six tiered → the `<role>@<tier>` variant,
-     exactly per the protocol above (unchanged).
-   - `data.provider == "openai-codex"` and the role is NOT tiered → no lane you can reach applies that
-     model at spawn time (no variant exists, and the tiered roster is a closed contract): spawn the BASE
-     agent (its curated `models.toml` default) and record `MODEL_STATIC_FALLBACK` plus the decision's
-     provider/model in the spawn record (`record-spawn --tech`) — a visible degrade, never silent.
+   - Host harness OpenCode, `data.provider == "openai-codex"`, and the role is one of the six tiered →
+     the `<role>@<tier>` variant, exactly per the protocol above (unchanged — the variants stay; this
+     addition is a dynamic road beside them, never their replacement).
+   - EVERY OTHER roster role on an OpenCode host → the OpenCode-lane spawn CLI,
+     `python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py`, with the mode matching the decision's
+     `role_class`: `--dispatch-writer --run-id <data.run_id>` (writer-class, consumes the SAME run this
+     decide already authorized — never re-decide), `--dispatch-review` (verified review-class, diff via
+     `--supplementary <FILE|->` exactly like `claude_code_spawn.py`), or `--dispatch-simulate` (every
+     `role_class == "other"` role — the simulate universe). Always with `--provider data.provider
+     --model data.model --effort data.effort --task <FILE|->`. Same enumerated-grammar rule as the
+     Claude-Code CLI: invoke it exactly as narrowly as `coord_policy.SAFE_ARGV` allowlists it.
+   - Host harness Codex → identical protocol through `python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py`
+     (same three modes, same flags; the role prompt rides `developer_instructions`, the decided effort
+     rides `model_reasoning_effort` — both live-verified per-invocation overrides of codex-cli).
+   - A decision whose `reason_codes` carry `MODEL_PINNED` (envelope `selection_path: "pin"`) is the
+     user's explicit pin (ADR-0032, `set-agents --model-pin-set`) — materialize it exactly like a
+     dynamic pick; `MODEL_PIN_UNAVAILABLE` means the pin exists but was not eligible and the dynamic
+     pick prevailed: narrate that, never silently drop it.
+   - `MODEL_STATIC_FALLBACK` is now a RESIDUAL degrade, never the normal path: only when the lane's
+     spawn CLI is unavailable/crashed or the decided model is outside the lane's probed inventory do
+     you spawn the BASE agent (its curated `models.toml` default) and record `MODEL_STATIC_FALLBACK`
+     plus the decision's provider/model in the spawn record (`record-spawn --tech`) — a visible
+     degrade, never silent.
 3. **Never fabricate enforcement.** A `simulate` decision authorizes nothing durable: do not call
    `--route-dispatched`/`--route-terminal` for it, and do not present it as an authorized run — it is
-   recorded advice that keeps model selection observable for all 28 roles instead of six.
+   recorded advice that keeps model selection observable for all 28 roles instead of six. Materializing
+   a simulate decision through `--dispatch-simulate` keeps that true by construction: the mode does
+   ZERO routing-store bookkeeping and refuses writer/review roles outright. The advice IS
+   durable now (ADR-0031): every `--route-decide`, simulate included, appends one line to the decisions
+   log — `set-agents --routing-decisions` reads it, and `feature-state.py spawns` joins it to the spawn
+   records through `--route-id`.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
    Also run `python3 ai/scripts/feature-state.py freeze-candidate <PKG> --state-file ai/state/features/<feature_id>.json
    --baseline <baseline> --actor gate-runner` (docs/adr/0020-*.md) right before the panel — it mints/bumps the
@@ -807,10 +840,14 @@ from those logs, which is what the user reads with the morning coffee.
 **a) At a narrated milestone that opens work:**
 
 ```
-▸ Instancio <role> — <qué va a hacer, una frase>
+▸ Instancio <role> [<provider>/<model> · effort <effort>] — <qué va a hacer, una frase>
   Cliente: <qué se agrega o arregla y cómo lo afecta, sin jerga>
   Ingeniería: <por qué hace falta ESTA instancia: qué invariante, fase o presupuesto la exige, y qué produce>
 ```
+
+The bracket is the decision's identity (`data.provider`/`data.model`/`data.effort` from the
+`--route-decide` this spawn consumed — ADR-0031/0032); on a static fallback it names the curated
+default plus `MODEL_STATIC_FALLBACK`. Effort omitted only when the decision carries none.
 
 **b) At a narrated milestone that closes work:**
 
@@ -835,6 +872,14 @@ When a `HUMAN_DECISION_REQUIRED` blocker exists, its exact text goes in `Necesit
 
 Rules that keep this from degenerating into filler:
 
+- **Every instantiated subagent shows its model and effort ON SCREEN** (ADR-0032). For narrated
+  milestones, the `▸ Instancio` bracket above carries it. For every OTHER spawn (persisted, not
+  narrated), the spawn mechanism itself must make it visible: the spawn CLIs
+  (`claude_code_spawn.py`/`opencode_spawn.py`/`codex_spawn.py`) show `--model`/`--effort` in the
+  invocation and echo them in the result JSON — never hide that invocation; when delegating
+  through the host harness's OWN in-process task tool (e.g. an OpenCode `@tier` variant), print
+  ONE plain provenance line immediately before the call: `↳ <role>[@tier] · <provider>/<model> ·
+  effort <effort>`. One line, not a narration block — ADR-0027's milestone rule is untouched.
 - **Never an opening block without its closing block.** A milestone narrated open in chat is narrated closed
   in chat. If the instance failed, timed out, or returned unusable output, the closing block says so and
   names the focused retry or the `BLOCKED` you are recording — a failure is ALWAYS a narrated milestone.

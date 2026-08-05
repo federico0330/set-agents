@@ -2651,6 +2651,89 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("SPAWN-002", result.stdout)
         self.assertEqual(before, after)  # fail-closed: nothing written on rejection
 
+    # ------------------------------------------------- ADR-0031 per-spawn observability
+
+    def test_record_spawn_persists_the_structured_routing_decision(self):
+        # ADR-0031: --model/--provider/--effort/--route-id land on BOTH the spawn entry
+        # and the event metadata when provided; a spawn recorded without them keeps the
+        # keys absent (legacy shape), and the bitacora header carries the decision.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "docs/specs/feat-r").mkdir(parents=True)
+            state = root / "ai/state/features/feat-r.json"
+            init_state(state, "--mode", "scoped", feature_id="feat-r")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            self.run_state(state, "record-spawn", "PKG-01", "architect",
+                           "--model", "gpt-5.6-sol", "--provider", "openai-codex",
+                           "--effort", "high", "--route-id", "dec1_" + "a" * 32,
+                           "--client", "se eligió el motor adecuado para el diseño",
+                           "--tech", "decisión ADR-0030 materializada")
+            self.run_state(state, "record-spawn", "PKG-01", "gate-runner", "--purpose", "legacy")
+            data = json.loads(state.read_text())
+            routed, legacy = data["packages"][0]["spawns"]
+            event = [e for e in data["history"] if e["event"] == "record-spawn"][0]
+            bitacora = (root / "docs/specs/feat-r/bitacora.md").read_text(encoding="utf-8")
+        self.assertEqual(routed["model"], "gpt-5.6-sol")
+        self.assertEqual(routed["provider"], "openai-codex")
+        self.assertEqual(routed["effort"], "high")
+        self.assertEqual(routed["route_id"], "dec1_" + "a" * 32)
+        self.assertEqual(event["metadata"]["model"], "gpt-5.6-sol")
+        self.assertEqual(event["metadata"]["route_id"], "dec1_" + "a" * 32)
+        for key in ("model", "provider", "effort", "route_id"):
+            self.assertNotIn(key, legacy)
+        self.assertIn("modelo openai-codex/gpt-5.6-sol", bitacora)
+        self.assertIn("effort high", bitacora)
+
+    def test_spawns_subcommand_lists_decisions_and_never_mutates(self):
+        # ADR-0031: `spawns` is the read-only join surface -- every spawn appears, the
+        # structured fields only where the record carries them, and the state file's
+        # bytes are identical after the run.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            self.run_state(state, "record-spawn", "PKG-01", "architect",
+                           "--model", "gpt-5.6-sol", "--provider", "openai-codex",
+                           "--effort", "high", "--route-id", "run1_" + "b" * 32)
+            self.run_state(state, "record-spawn", "PKG-01", "gate-runner", "--purpose", "legacy")
+            before = state.read_bytes()
+            result = run("python3", str(FEATURE_STATE), "spawns", "--state-file", str(state))
+            after = state.read_bytes()
+            payload = json.loads(result.stdout)
+        self.assertEqual(before, after)
+        self.assertTrue(payload["ok"])
+        rows = payload["spawns"]
+        self.assertEqual([row["spawn_id"] for row in rows], ["SPAWN-001", "SPAWN-002"])
+        self.assertEqual(rows[0]["model"], "gpt-5.6-sol")
+        self.assertEqual(rows[0]["route_id"], "run1_" + "b" * 32)
+        self.assertNotIn("model", rows[1])
+
+    def test_package_note_lists_only_spawns_that_carry_a_decision(self):
+        # ADR-0031: the living package note gains a `## Spawns` section only when at
+        # least one spawn carries a structured decision; a package whose spawns are all
+        # legacy renders without the section (byte-compatible with pre-0031 notes).
+        with tempfile.TemporaryDirectory() as td:
+            root, state = self._notes_project(td)
+            self.run_state(state, "record-spawn", "PKG-01", "gate-runner", "--purpose", "legacy")
+            note = (root / "docs/notas/features/feat-x/PKG-01.md").read_text()
+            self.assertNotIn("## Spawns", note)
+            self.run_state(state, "record-spawn", "PKG-01", "architect",
+                           "--model", "gpt-5.6-sol", "--provider", "openai-codex",
+                           "--effort", "high", "--route-id", "dec1_" + "c" * 32)
+            note = (root / "docs/notas/features/feat-x/PKG-01.md").read_text()
+        self.assertIn("## Spawns", note)
+        self.assertIn("SPAWN-002 architect · modelo openai-codex/gpt-5.6-sol · effort high", note)
+        self.assertIn("route dec1_" + "c" * 32, note)
+        self.assertNotIn("SPAWN-001 gate-runner ·", note)
+
     def test_orchestrator_narration_reaches_all_three_harnesses(self):
         # The user reads the harness through OpenCode, Claude Code and Codex.
         # generate.py copies the canonical body verbatim into all three, so this

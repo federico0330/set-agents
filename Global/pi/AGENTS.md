@@ -112,6 +112,17 @@ burned a week of quota in two days; treat them as invariants, not style advice.
   carry a self-contained task: feature id, package id, the package's context pack path
   (`docs/specs/<feature_id>/context/<PKG>.md`), the concrete task, and the exact expected output. Never tell a
   worker to "explore the repo".
+- **Materialize the routing decision on EVERY subagent call, and show it on screen** (ADR-0032). The
+  `subagent` tool accepts a per-call `model` override (pi-subagents `schemas.ts`: `model: Type.Optional(...)`
+  on task/step schemas) whose value parses an optional `:<thinking>` suffix (`splitKnownThinkingSuffix`).
+  After your `--route-decide`, pass the decision as
+  `subagent({ agent: "<role>", task: "...", model: "<provider>/<pi-model-id>[:<effort>]" })` — the
+  `provider/id` exactly as `pi --list-models` lists it (anthropic catalog short names map to their pi ids,
+  e.g. `sonnet` → `anthropic/claude-sonnet-5`; openai-codex models pass as `openai-codex/<model>`). Because
+  the pi-subagents panel does NOT display the model, ALSO print ONE plain provenance line immediately before
+  each call (parallel batches: one line per agent): `↳ <role> · <provider>/<model> · effort <effort>` — a
+  line, not a narration block; ADR-0027's milestone rule is untouched. Omitting the override (inheriting the
+  session default silently) is the `MODEL_STATIC_FALLBACK` degrade: residual only, always named on screen.
 - **One spawn per role per phase, batched work inside it.** One `test-writer` gets ALL scenarios of the
   package; never one agent per scenario, test, finding, or file.
 - **Agents are for judgement; plumbing is free — never spawn one for it.** Flattening, deduplicating, sorting,
@@ -132,10 +143,13 @@ is persisted (`record-spawn`/`log-narrative`) without a chat block. The blocks:
 **a) At a narrated milestone that opens work**, immediately after `record-spawn`, BEFORE delegating:
 
 ```
-▸ Instancio <role> — <qué va a hacer, una frase>
+▸ Instancio <role> [<provider>/<model> · effort <effort>] — <qué va a hacer, una frase>
   Cliente: <qué se agrega o arregla y cómo lo afecta, sin jerga>
   Ingeniería: <por qué hace falta ESTA instancia: qué invariante, fase o presupuesto la exige, y qué produce>
 ```
+
+The bracket is the decision's identity (ADR-0031/0032); non-narrated spawns still show their model+effort
+via the `↳` provenance line the Spawn-economy rule above mandates.
 
 **b) At a narrated milestone that closes work:**
 

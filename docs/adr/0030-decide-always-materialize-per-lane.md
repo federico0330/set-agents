@@ -27,7 +27,9 @@ Two immutable contracts bound the solution space:
 
 1. **Every spawn gets a decision.** The orchestrator runs `--route-decide` with real
    `role`/`task_class`/`risk` before delegating ANY role, not only the six tiered ones. For roles
-   outside writer/verified-review the envelope is `simulate` — still a decision, still recorded.
+   outside writer/verified-review the envelope is `simulate` — still a decision, still recorded
+   (the durable mechanism behind "still recorded" — the decisions log and the structured
+   `record-spawn` fields — is ADR-0031's).
 2. **Materialization is a lane-capability question, not a doctrine table.**
    - `provider == "anthropic"` → Claude-Code lane serves ANY roster role at the decided model
      (`claude_code_spawn.py --model <model>` over the base `<role>.md`; the lane always passed

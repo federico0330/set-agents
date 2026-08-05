@@ -40,7 +40,7 @@
 
 - spawns: 3 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/011-quota-failover/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/011-quota-failover/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/011-quota-failover/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/011-quota-failover/bitacora.md`
 
 _Actualizado: 2026-07-30T17:04:39+00:00_
 <!-- /notas:auto -->

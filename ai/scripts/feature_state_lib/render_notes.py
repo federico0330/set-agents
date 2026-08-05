@@ -239,6 +239,24 @@ def _package_body(fid: str, package: dict[str, Any]) -> str:
         trail.append(f"- gate `{gate.get('name')}`: {gate.get('status')}")
     if trail:
         lines += ["", "## Recorrido", ""] + trail
+    # ADR-0031: only spawns that carry a structured routing decision are listed —
+    # packages written before the fields existed render byte-identical.
+    routed = [
+        s for s in package.get("spawns", []) or []
+        if isinstance(s, dict) and any(s.get(k) for k in ("model", "provider", "effort", "route_id"))
+    ]
+    if routed:
+        lines += ["", "## Spawns", ""]
+        for spawn in routed:
+            bits = [f"- {spawn.get('spawn_id', '?')} {_short(spawn.get('role', '?'), 40)}"]
+            if spawn.get("model"):
+                model_txt = f"{spawn['provider']}/{spawn['model']}" if spawn.get("provider") else spawn["model"]
+                bits.append("modelo " + _short(model_txt, 80))
+            if spawn.get("effort"):
+                bits.append("effort " + _short(spawn["effort"], 20))
+            if spawn.get("route_id"):
+                bits.append("route " + _short(spawn["route_id"], 60))
+            lines.append(" · ".join(bits))
     if package.get("context_pack"):
         lines += ["", f"context pack: `{package['context_pack']}`"]
     lines += ["", f"↩ [[features/{fid}|{fid}]]"]

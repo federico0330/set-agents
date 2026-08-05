@@ -14,6 +14,11 @@ APP_CLI = "__SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py"
 # execution surface AC-03/AC-04's doctrine has for actually invoking this module, since
 # the orchestrator's Bash is deny-by-default and nothing allowlisted it before this fix.
 CLAUDE_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py"
+# ADR-0032: the OpenCode/Codex-lane cross-process spawn CLIs -- the mechanism that
+# applies a --route-decide model AT SPAWN TIME for any roster role on those lanes
+# (retiring MODEL_STATIC_FALLBACK as the normal path, ADR-0030's stated gap).
+OPENCODE_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py"
+CODEX_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py"
 
 SAFE = [
     r"git (status|diff|log|show)(\s|$)",
@@ -87,6 +92,24 @@ SAFE_ARGV = [
     ({"python3", "python"}, CLAUDE_SPAWN_CLI, re.compile(r"--dispatch-(writer|review)"), {
         "--role": 1, "--provider": 1, "--model": 1, "--task": 1, "--run-id": 1,
         "--supplementary": 1, "--spawn-cwd": 1, "--cwd": 1,
+        "--timeout": 1,
+    }),
+    # ADR-0032: FIFTH and SIXTH sanctioned spawn channels -- one per lane CLI, same
+    # exhaustively-enumerated `modifiers` discipline as the claude_code_spawn entry
+    # above (never `modifiers=None`, never a trailing-wildcard regex). The flag maps
+    # must keep matching each module's real `main()` flag set exactly -- no more, no
+    # less (`--effort` exists here and NOT on claude_code_spawn, whose main() never
+    # defines it; the catalog pins anthropic routes to effort=medium by construction).
+    # `--dispatch-simulate` is the ADR-0030 simulate universe: role_class `other` only,
+    # zero routing-store bookkeeping, refused for writer/review roles by the module.
+    ({"python3", "python"}, OPENCODE_SPAWN_CLI, re.compile(r"--dispatch-(writer|review|simulate)"), {
+        "--role": 1, "--provider": 1, "--model": 1, "--effort": 1, "--task": 1,
+        "--run-id": 1, "--supplementary": 1, "--spawn-cwd": 1, "--cwd": 1,
+        "--timeout": 1,
+    }),
+    ({"python3", "python"}, CODEX_SPAWN_CLI, re.compile(r"--dispatch-(writer|review|simulate)"), {
+        "--role": 1, "--provider": 1, "--model": 1, "--effort": 1, "--task": 1,
+        "--run-id": 1, "--supplementary": 1, "--spawn-cwd": 1, "--cwd": 1,
         "--timeout": 1,
     }),
 ]

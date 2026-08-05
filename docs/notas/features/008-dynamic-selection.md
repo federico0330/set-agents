@@ -45,7 +45,7 @@
 
 - spawns: 6 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/008-dynamic-selection/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/008-dynamic-selection/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/008-dynamic-selection/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/008-dynamic-selection/bitacora.md`
 
 _Actualizado: 2026-08-02T14:53:39+00:00_
 <!-- /notas:auto -->

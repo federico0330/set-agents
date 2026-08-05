@@ -327,6 +327,11 @@ def _add_package_spawns(state: _GraphState, fid: str, pid: str, package: dict[st
         purpose = spawn.get("purpose")
         if purpose:
             label += f" {purpose}"
+        # ADR-0031: the routed model, when the spawn record carries one — same
+        # non-empty-only posture as purpose above.
+        model = spawn.get("model")
+        if model:
+            label += f" [{model}]"
         state.add_node("spawn", fid, pid, label)
 
 

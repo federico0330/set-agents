@@ -254,6 +254,16 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp-remove*": deny',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-review*": allow',
+                  # ADR-0032: the OpenCode/Codex-lane spawn CLIs -- the paired OpenCode-lane
+                  # half of coord_policy.SAFE_ARGV's two new enumerated entries (DR-01
+                  # discipline: both sides must keep matching each module's main() modes
+                  # exactly, one entry per sanctioned shape, never a bare catch-all).
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py --dispatch-writer*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py --dispatch-review*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py --dispatch-simulate*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py --dispatch-writer*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py --dispatch-review*": allow',
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py --dispatch-simulate*": allow',
                   *hard_denies,
                   # ADR-0025: read-only gh inspection, placed AFTER hard_denies' blanket
                   # `"gh *": deny` so it overrides per this list's last-match-wins

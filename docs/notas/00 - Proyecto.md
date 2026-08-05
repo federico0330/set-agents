@@ -21,13 +21,8 @@
 
 ## Qué falta
 
-- **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
-- **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **006-execution-graph** → `INTEGRATION` — all packages accepted
 - **010-spawn-provenance** → `INTEGRATION` — all packages accepted
-- **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
-- **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
-- **016-audit-debt-repayment** 1 hallazgos abiertos
 
 ## Quick-fixes recientes
 
@@ -37,14 +32,14 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-05 adr-0032-materializacion-spawn-y-pins|ADR-0032: materialización en el spawn para opencode/codex y pins de modelo]]
+- [[decisiones/2026-08-05 adr-0031-observabilidad-por-spawn|Observabilidad por spawn (ADR-0031): log de decisiones + campos estructurados en record-spawn]]
 - [[decisiones/2026-08-03 ac-01i-grunt-no-flip-en-verified-review-2-proveedores|AC-01(i): grunt no puede flippear provider en verified review con catalogo de 2 proveedores]]
 - [[decisiones/2026-08-03 audit-debt-006-p2-cierre-parcial-016|Cierre parcial de audit-debt-006-p2: PR-07/08/09 saldadas por 016; PR-06/10/11 siguen diferidas]]
 - [[decisiones/2026-08-02 p1f-01-repair-entry-pop-package-id-opcional|P1F-01 aceptado como deuda low: el pop de repair_entry depende del --package-id opcional]]
 - [[decisiones/2026-08-02 build-staging-no-concurrent-full-gates|Los gates de suite completa no se corren en paralelo: build.sh colisiona en staging compartido]]
 - [[decisiones/2026-08-02 ac-13-roster-half-environment-gated|AC-13: la mitad de discoverability viva del roster queda environment-gated, no BLOCKED de feature]]
 - [[decisiones/2026-08-02 ac09-ac10-pi-minimal-target-superseded-by-013|AC-08/AC-14 supersedes ac09-ac10-pi-minimal-target-accepted: pi gains a real install.py target and generated agent tree]]
-- [[decisiones/2026-08-02 pasada-integracion-2026-08-02|Pasada de integración 2026-08-02: 008 y 012 a DONE; 006 y 010 quedan PACKAGE_ACCEPTED por diseño]]
-- [[decisiones/2026-08-01 areas-ops-opencode-go-zen-colision-cerrada-f-03-ac-06a-queda-genericamente-cerrado|areas.ops.opencode.go-zen colision CERRADA (F-03); AC-06(a) queda genericamente cerrado, sin residuo]]
 
 ## Referencias
 

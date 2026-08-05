@@ -47,7 +47,7 @@
 
 - spawns: 10 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/016-audit-debt-repayment/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/016-audit-debt-repayment/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/016-audit-debt-repayment/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/016-audit-debt-repayment/bitacora.md`
 
 _Actualizado: 2026-08-03T00:02:59+00:00_
 <!-- /notas:auto -->

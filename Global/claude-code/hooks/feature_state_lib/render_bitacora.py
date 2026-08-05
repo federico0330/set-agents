@@ -63,6 +63,10 @@ def collect_narrative(features_dir: Path, out_dir: Path) -> list[dict[str, Any]]
                 "client": meta.get("client", ""),
                 "tech": meta.get("tech", ""),
                 "actor": event.get("actor", "-"),
+                # ADR-0031: the structured routing decision record-spawn now carries.
+                "model": meta.get("model", ""),
+                "provider": meta.get("provider", ""),
+                "effort": meta.get("effort", ""),
             })
     # Timestamps have second resolution, so an opening and its closing block can
     # tie. Break the tie on result so a delegation never reads as having finished
@@ -78,10 +82,19 @@ def collect_narrative(features_dir: Path, out_dir: Path) -> list[dict[str, Any]]
 def format_narrative(entry: dict[str, Any]) -> list[str]:
     """One narration block: a header line plus the two labelled registers."""
     from feature_state_lib.render_notes import _short  # deferred: see module docstring
-    tail = " · ".join(
+    parts = [
         part for part in (entry.get("package_id"), entry.get("role"), entry.get("result"))
         if part and part != "-"
-    )
+    ]
+    # ADR-0031: agent-authored fields headed for a generated file go through _short,
+    # like every register below — never raw into the notas:auto surface.
+    model = entry.get("model")
+    if model:
+        provider = entry.get("provider")
+        parts.append("modelo " + _short(f"{provider}/{model}" if provider else model, 80))
+    if entry.get("effort"):
+        parts.append("effort " + _short(entry["effort"], 20))
+    tail = " · ".join(parts)
     return [
         f"[{entry.get('at', '?')}] {tail}".rstrip(),
         f"Cliente: {_short(entry.get('client'), 400) or '-'}",

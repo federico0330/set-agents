@@ -71,7 +71,7 @@ from feature_state_lib.cli_repair import (
 )
 from feature_state_lib.cli_reporting import (
     cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_sync_notes, cmd_digest,
-    run_dry_workflow, cmd_dry_run,
+    run_dry_workflow, cmd_dry_run, cmd_spawns,
 )
 from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
 from feature_state_lib.parser import add_common_state_args
@@ -404,14 +404,14 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             # hand-corrupted fixture -- no real caller ever provides spawn_id, only
             # this command mints it.
             raise StateError(f"spawn {spawn_id} already exists on {args.package_id}: counter out of sync")
-        spawns.append({
+        entry = {
             "spawn_id": spawn_id,
             "role": args.role,
             "purpose": args.purpose,
             "client": args.client,
             "tech": args.tech,
             "at": now(),
-        })
+        }
         metadata = {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"], "spawn_id": spawn_id}
         # The two registers of the opening narration block. Optional so older
         # callers keep working, but the orchestrator doctrine requires them:
@@ -420,6 +420,15 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             metadata["client"] = args.client
         if args.tech:
             metadata["tech"] = args.tech
+        # ADR-0031: the routing decision, when the caller passes it, lands on the spawn
+        # entry AND the event metadata so both the state record and the bitacora carry it.
+        # Absent flags leave the keys absent — old state files and old callers are identical.
+        for key in ("model", "provider", "effort", "route_id"):
+            value = getattr(args, key)
+            if value:
+                entry[key] = value
+                metadata[key] = value
+        spawns.append(entry)
         record_event(
             data,
             "record-spawn",
@@ -897,6 +906,11 @@ def build_parser() -> argparse.ArgumentParser:
     spawn.add_argument("--purpose", default="")
     spawn.add_argument("--client", default="")
     spawn.add_argument("--tech", default="")
+    # ADR-0031: the routing decision travels structured, not as prose inside --tech.
+    spawn.add_argument("--model")
+    spawn.add_argument("--provider")
+    spawn.add_argument("--effort")
+    spawn.add_argument("--route-id", help="run_id (writer/verified-review) o decision_id (resto) del --route-decide")
     spawn.set_defaults(func=cmd_record_spawn)
 
     review = sub.add_parser("record-review")
@@ -1102,6 +1116,12 @@ def build_parser() -> argparse.ArgumentParser:
     dry = sub.add_parser("dry-run")
     dry.add_argument("feature_id")
     dry.set_defaults(func=cmd_dry_run)
+
+    spawn_list = sub.add_parser("spawns", help="lista solo-lectura de spawns con su decisión de ruteo (ADR-0031)")
+    spawn_list.add_argument("feature_id", nargs="?")
+    spawn_list.add_argument("--state-file")
+    spawn_list.add_argument("--package-id")
+    spawn_list.set_defaults(func=cmd_spawns)
 
     graph = sub.add_parser("graph")
     graph.add_argument("--feature-id", action="append")

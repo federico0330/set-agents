@@ -24,6 +24,27 @@ from models_config import LANES, ModelsError, die
 ROOT = Path(__file__).resolve().parents[2]
 AREA_SIMPLE_FIELDS = ("claude", "codex", "codex_effort")
 
+# ADR-0032: which catalog list suggests models for a pinned provider.
+PIN_PROVIDER_CATALOGS = {"openai-codex": "codex", "anthropic": "claude",
+                         "opencode-zen": "opencode_zen", "opencode-go": "opencode_go"}
+
+
+def _load_pins():
+    """ADR-0032: the user's [model_pin] table from model-preference.toml, via the same
+    loader the routing CLI uses. Degrades to None (panel shows 'no legible') on any
+    error — the wizard must never crash because a sibling config is malformed."""
+    try:
+        import set_agents_app
+        return set_agents_app.load_model_pin()
+    except Exception:
+        return None
+
+
+def _pin_cli(*args):
+    """Write path for pins: the sanctioned CLI, never a hand-rolled TOML writer here."""
+    return subprocess.run([sys.executable, str(ROOT / "ai/scripts/set_agents_app.py"), *args],
+                          check=False).returncode
+
 
 def parse_address(config, roster, address):
     """<duty>.<field> | <duty>.opencode.<lane> | role:<role>... | session.opencode_small_model.<lane>"""
@@ -139,6 +160,18 @@ def _panel_lines(config, roster, profile, detected=None):
         "routing dinámico: el router decide por spawn para TODOS los roles (ADR-0030; --route-explain)"
         + (f" · variantes @tier: {tiered} roles" if tiered else ""),
     ]
+    # ADR-0032: la política vigente, por rol o global — Automático (el router decide) o
+    # pin explícito del usuario. El origen de cada valor por spawn queda registrado en
+    # decisions-v1.jsonl (selection_path: pin|dynamic; el fallback curado se registra en
+    # el spawn como MODEL_STATIC_FALLBACK).
+    pins = _load_pins()
+    if pins is None:
+        lines.append("política: Automático — pins no legibles (model-preference.toml inválido; ver --model-preference-show)")
+    elif not pins:
+        lines.append("política: Automático (recomendado) — sin pins; fijá un modelo con 'Routing: fijar modelo'")
+    else:
+        rendered = ", ".join(f"{role}={p}/{m}" for role, (p, m) in sorted(pins.items()))
+        lines.append(f"política: Automático + {len(pins)} pin(s) — {rendered}")
     if discovered:
         lines.append(f"proveedores descubiertos rutables: {', '.join(discovered)}")
     lines.append("DEFAULTS CURADOS (fallback cuando el lane no aplica la decisión):")
@@ -219,7 +252,8 @@ def wizard(config, roster, profile, roles_path, models_out):
     # Indexes 0-4 are a pinned contract (immutable suite drives the wizard by
     # Selected(N)); new actions append AFTER them, never reorder.
     WIZARD_ITEMS = ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar",
-                    "Ver detalle completo", "Proveedores descubiertos (routing)")
+                    "Ver detalle completo", "Proveedores descubiertos (routing)",
+                    "Routing: fijar modelo / automático")
     # Probe once per wizard run (shared cache): live subscription state for the
     # header's tri-state origins. None on any failure — panel degrades to pins.
     try:
@@ -344,6 +378,42 @@ def wizard(config, roster, profile, roles_path, models_out):
             dirty = True
             print(f"OK: discovered_providers = {routing['discovered_providers']} (ADR-0029: la curada gana; "
                   "lo inferido lleva MODEL_METADATA_INFERRED)")
+        elif option == "8":
+            # ADR-0032: política por rol (o global '*') — Automático (el router decide por
+            # spawn) o pin explícito. Escribe model-preference.toml vía el CLI sancionado,
+            # INMEDIATO (archivo hermano, independiente de 'Guardar'/models.toml).
+            subject = choose("Rol ('*' = global)", ["*"] + sorted(row["role"] for row in roster))
+            if not subject:
+                continue
+            policy = tui.run_picker(
+                ("Automático (recomendado) — el router decide por spawn", "Fijar modelo — pin explícito"),
+                prompt=f"{subject}:")
+            if not isinstance(policy, tui.Selected):
+                continue
+            if policy.index == 0:
+                _pin_cli("--model-pin-clear", subject)
+                # F-04 (ADR-0032 review repair): "automático" mentiría si el pin global
+                # `*` sigue aplicando a este rol (el router cae al `*` sin pin propio).
+                remaining = _load_pins() or {}
+                if subject != "*" and "*" in remaining:
+                    star = "/".join(remaining["*"])
+                    print(f"OK: {subject} sin pin propio — PERO el pin global '*' = {star} sigue aplicando; "
+                          "para automático real, poné '*' en Automático también")
+                else:
+                    print(f"OK: {subject} = automático (sin pin; efectivo ya — no requiere 'Guardar')")
+                continue
+            provider = choose("Proveedor", sorted(PIN_PROVIDER_CATALOGS))
+            if not provider:
+                continue
+            suggestions = sorted(config.get("catalog", {}).get(PIN_PROVIDER_CATALOGS[provider], []))
+            model = choose("Modelo (identidad del catálogo de routing)", suggestions)
+            if not model:
+                continue
+            if _pin_cli("--model-pin-set", subject, f"{provider}/{model}") == 0:
+                print(f"OK: {subject} = pin {provider}/{model} (efectivo ya — no requiere 'Guardar'; "
+                      "el router lo respeta como override y lo registra como MODEL_PINNED)")
+            else:
+                print("RECHAZADO: ver el error de arriba (--model-pin-set)")
 
 
 def main():

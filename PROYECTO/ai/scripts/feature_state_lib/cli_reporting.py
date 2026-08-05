@@ -349,6 +349,31 @@ def run_dry_workflow(feature_id: str) -> dict[str, Any]:
     return data
 
 
+def cmd_spawns(args: argparse.Namespace) -> int:
+    """ADR-0031: read-only listing of a feature's spawns with their routing decision
+    (model/provider/effort/route_id) when the record carries one. Never mutates state;
+    legacy spawns without the structured fields list with those keys absent."""
+    from feature_state_lib.cli_lifecycle import state_file_arg  # deferred: see module docstring
+    from feature_state_lib.model import load_state
+    from feature_state_lib.render_notes import _note_packages
+    path = state_file_arg(args)
+    data = load_state(path)
+    spawns = []
+    for package in _note_packages(data):
+        if args.package_id and package.get("package_id") != args.package_id:
+            continue
+        for spawn in package.get("spawns", []) or []:
+            if not isinstance(spawn, dict):
+                continue
+            row = {"package_id": package.get("package_id")}
+            for key in ("spawn_id", "role", "purpose", "model", "provider", "effort", "route_id", "at"):
+                if spawn.get(key):
+                    row[key] = spawn[key]
+            spawns.append(row)
+    print_json({"ok": True, "feature_id": data.get("feature_id"), "spawns": spawns})
+    return 0
+
+
 def cmd_dry_run(args: argparse.Namespace) -> int:
     data = run_dry_workflow(args.feature_id)
     evidence = {

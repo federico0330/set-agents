@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import pwd
 import re
 import secrets
 import shutil
@@ -144,7 +145,7 @@ def _read_model_preference_raw():
         doc = tomllib.loads(raw)
     except tomllib.TOMLDecodeError as exc:
         _model_preference_die(f"model-preference.toml: {exc}")
-    if not isinstance(doc, dict) or set(doc) - {"preference", "role_override"}:
+    if not isinstance(doc, dict) or set(doc) - {"preference", "role_override", "model_pin"}:
         _model_preference_die("model-preference.toml: unknown top-level key")
     return doc
 
@@ -174,6 +175,45 @@ def load_model_preference(roster_roles=None):
     return {"preference": preference, "role_override": role_override}
 
 
+# ---------------------------------------------------------------- ADR-0032: model pin
+#
+# `[model_pin]` is the third table in the SAME sibling file (never a new mechanism —
+# ADR-0018's infra reused per ADR-0032): `role = "provider/model"`, plus the literal
+# key `"*"` as the global pin every role without its own entry inherits. The pin is a
+# USER OVERRIDE the router respects as a soft, sort-level preference: it never bypasses
+# a hard exclusion (auth, independence, tier floor) — when the pinned identity is not
+# eligible the decision degrades to dynamic with an additive MODEL_PIN_UNAVAILABLE code,
+# never a fabricated authorization. `load_model_preference`'s public two-key return
+# shape is a frozen contract (tests/test_routing.py:4004) — pins load through this
+# SEPARATE sibling loader, same file, same fail-closed discipline.
+_MODEL_PIN_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+def _validate_model_pin_entry(role, value, roster_roles):
+    if role != "*" and role not in roster_roles:
+        _model_preference_die(f"model-preference.toml: [model_pin].{role} does not match any role in roles.tsv")
+    if not isinstance(value, str) or value.count("/") != 1:
+        _model_preference_die(f"model-preference.toml: [model_pin].{role} must be \"provider/model\"")
+    provider, model = value.split("/", 1)
+    if provider not in _MODEL_PREFERENCE_PROVIDERS:
+        _model_preference_die(f"model-preference.toml: [model_pin].{role} names unknown provider {provider!r}")
+    if not _MODEL_PIN_MODEL_RE.fullmatch(model):
+        _model_preference_die(f"model-preference.toml: [model_pin].{role} has an invalid model token")
+    return provider, model
+
+
+def load_model_pin(roster_roles=None):
+    """ADR-0032: `{role_or_star: (provider, model)}` — absent file/table is the unpinned
+    default (empty dict), never a crash; a malformed entry fails closed like every other
+    table in this file."""
+    doc = _read_model_preference_raw()
+    pin_table = doc.get("model_pin", {})
+    if not isinstance(pin_table, dict):
+        _model_preference_die("model-preference.toml: [model_pin] must be a table")
+    roles = roster_roles if roster_roles is not None else {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
+    return {role: _validate_model_pin_entry(role, value, roles) for role, value in pin_table.items()}
+
+
 def _config_with_model_preference(config, roster):
     """AC-04: the one channel available to feed AC-02's resolved preference tables into
     `RoutingService` without touching `routing.py`'s read-only `compose()` signature --
@@ -183,7 +223,11 @@ def _config_with_model_preference(config, roster):
     sibling file fails closed exactly like a malformed `models.toml` already does --
     `ModelPreferenceError` bubbles to the caller's own existing except clause."""
     roster_roles = {row["role"] for row in roster}
-    config["_model_preference"] = load_model_preference(roster_roles)
+    preference = dict(load_model_preference(roster_roles))
+    # ADR-0032: pins ride the same internal-marker channel; the service treats an
+    # absent/empty table as the unpinned default.
+    preference["model_pin"] = load_model_pin(roster_roles)
+    config["_model_preference"] = preference
     return config
 
 
@@ -206,7 +250,13 @@ def _serialize_model_preference(doc):
         for role in sorted(role_override):
             lines.append(f"{role} = {json.dumps(role_override[role])}")
         lines.append("")
-    return ("\n".join(lines).rstrip("\n") + "\n") if (preference or role_override) else ""
+    model_pin = doc.get("model_pin") or {}
+    if model_pin:
+        lines.append("[model_pin]")
+        for role in sorted(model_pin):
+            lines.append(f'"{role}" = {json.dumps(model_pin[role])}' if role == "*" else f"{role} = {json.dumps(model_pin[role])}")
+        lines.append("")
+    return ("\n".join(lines).rstrip("\n") + "\n") if (preference or role_override or model_pin) else ""
 
 
 def _model_preference_class_inert(class_name):
@@ -237,6 +287,7 @@ def cmd_model_preference_set(class_name, providers):
     # `", ".join(... for token in preference[class_name])` would silently iterate a
     # string value character by character and corrupt the file.
     load_model_preference()
+    load_model_pin()  # ADR-0032: [model_pin] is part of the same whole-document check
     doc = _read_model_preference_raw()
     preference = dict(doc.get("preference") or {})
     preference[class_name] = list(validated)
@@ -256,6 +307,7 @@ def cmd_model_preference_role_override(role, class_name):
     validated_class = _validate_role_override_entry(role, class_name, roster_roles)
     # RF14-06: same fail-closed whole-document validation as cmd_model_preference_set above.
     load_model_preference(roster_roles)
+    load_model_pin(roster_roles)  # ADR-0032
     doc = _read_model_preference_raw()
     role_override = dict(doc.get("role_override") or {})
     role_override[role] = validated_class
@@ -269,15 +321,57 @@ def cmd_model_preference_role_override(role, class_name):
 
 def cmd_model_preference_show():
     """AC-02 resolution state (e): read-only, prints the sibling file's current, fully-
-    resolved `[preference]`/`[role_override]` contents, or a clear no-preferences line."""
+    resolved `[preference]`/`[role_override]`/`[model_pin]` contents, or a clear
+    no-preferences line."""
     data = load_model_preference()
-    if not data["preference"] and not data["role_override"]:
+    pins = load_model_pin()
+    if not data["preference"] and not data["role_override"] and not pins:
         print("MODEL_PREFERENCE_NONE")
         return 0
     for class_name in sorted(data["preference"]):
         print(f"MODEL_PREFERENCE preference.{class_name}=" + ",".join(data["preference"][class_name]))
     for role in sorted(data["role_override"]):
         print(f"MODEL_PREFERENCE role_override.{role}=" + data["role_override"][role])
+    for role in sorted(pins):
+        provider, model = pins[role]
+        print(f"MODEL_PREFERENCE model_pin.{role}={provider}/{model}")
+    return 0
+
+
+def cmd_model_pin_set(role, target):
+    """ADR-0032: `--model-pin-set ROLE PROVIDER/MODEL` — pins ROLE (or the literal `*`
+    for the global default) to one catalog identity; the router honors it as a soft
+    override (pin > dynamic > curated fallback) and reports MODEL_PINNED /
+    MODEL_PIN_UNAVAILABLE in the decision's reason codes."""
+    roster_roles = {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
+    provider, model = _validate_model_pin_entry(role, target, roster_roles)
+    # RF14-06: whole-document validation before any merge/re-serialize.
+    load_model_preference(roster_roles)
+    load_model_pin(roster_roles)
+    doc = _read_model_preference_raw()
+    model_pin = dict(doc.get("model_pin") or {})
+    model_pin[role] = f"{provider}/{model}"
+    doc = {**doc, "model_pin": model_pin}
+    atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    print(f"MODEL_PIN_SET role={role} model={provider}/{model}")
+    return 0
+
+
+def cmd_model_pin_clear(role):
+    """ADR-0032: `--model-pin-clear ROLE` — removes ROLE's pin (or `*`'s); an absent pin
+    is reported, never an error."""
+    roster_roles = {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
+    load_model_preference(roster_roles)
+    load_model_pin(roster_roles)
+    doc = _read_model_preference_raw()
+    model_pin = dict(doc.get("model_pin") or {})
+    if role not in model_pin:
+        print(f"MODEL_PIN_ABSENT role={role}")
+        return 0
+    del model_pin[role]
+    doc = {**doc, "model_pin": model_pin}
+    atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    print(f"MODEL_PIN_CLEARED role={role}")
     return 0
 
 
@@ -350,6 +444,48 @@ from routing_cli import (  # noqa: E402
     _MAX_USAGE_TEXT_LEN, parse_usage,
 )
 
+# --------------------------------------------------------------- ADR-0031: decisions log
+#
+# Every --route-decide (simulate included) appends one JSONL line here, so the 22
+# non-writer roles' decisions stop evaporating with the CLI envelope. This is CLI-layer
+# observability, NOT the store: it authorizes nothing, the store never touches it, and
+# routing.db's frozen schema stays at its pinned version. Best-effort by contract — a
+# logging failure can never break the one-JSON-line envelope or the exit code.
+# The name deliberately avoids `routing-decisions.json` (legacy set in routing.py).
+DECISION_LOG_NAME = "decisions-v1.jsonl"
+DECISION_LOG_CAP = 1_000_000  # bytes; single-generation rotation past this
+
+
+def _decision_log_path() -> Path:
+    if ROUTING_TEST_ROOT:
+        return Path(ROUTING_TEST_ROOT) / DECISION_LOG_NAME
+    # Same fixed production root as RoutingStore (account database, not $HOME), so the
+    # sidecar always sits next to routing.db regardless of environment overrides.
+    home = Path(pwd.getpwuid(os.getuid()).pw_dir) if os.name == "posix" else Path.home()
+    return home / ".local/state/set-agentes/routing-v2" / DECISION_LOG_NAME
+
+
+def _append_decision_log(entry: dict) -> None:
+    try:
+        path = _decision_log_path()
+        if ROUTING_TEST_ROOT:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # F-02 (ADR-0032 review repair): NEVER a raw mkdir on the store's root — the
+            # store's `_safe_dir` validates leaf 0700 and refuses to adopt a foreign
+            # directory, so a umask-permissioned mkdir here would permanently poison
+            # every later store open with ROUTING_UNAVAILABLE. `ensure_cache_root()` is
+            # the one sanctioned creator (same discipline as the spawn CLIs'
+            # `_persist_audit_binding`); best-effort stays best-effort via the except.
+            routing.RoutingStore().ensure_cache_root()
+        if path.exists() and path.stat().st_size > DECISION_LOG_CAP:
+            path.replace(path.with_name(path.name + ".1"))
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, sort_keys=True) + "\n")
+        os.chmod(path, 0o600)  # F-02: same explicit 0600 the store's own files carry
+    except (OSError, routing.RoutingError):
+        pass
+
 
 def cmd_route_decide(source, human=False, fresh=False):
     allowed = {"role", "task_class", "risk", "review_of_run_id", "selected_runtime", "feature_id", "package_id"}
@@ -411,7 +547,34 @@ def cmd_route_decide(source, human=False, fresh=False):
         # F03: the effective (feature_id, package_id, context_ok) is always in the envelope,
         # even when context wasn't needed, for audit.
         data["feature_id"] = resolved_feature; data["package_id"] = resolved_package; data["context_ok"] = context_flag
+        # ADR-0031: mint a per-decision id (parallel to run1_/proj1_) and append the whole
+        # decision to the sidecar log — simulate included, which is exactly the class of
+        # decision that previously left no durable trace (store=None above stays as-is).
+        decision_id = "dec1_" + secrets.token_hex(16)
+        data["decision_id"] = decision_id
+        # ADR-0032: which of the selection paths produced this identity — "pin" (a user
+        # [model_pin] override was selected) or "dynamic" (the router's own pick; a
+        # configured-but-ineligible pin shows up as MODEL_PIN_UNAVAILABLE in
+        # reason_codes and still counts as dynamic). The THIRD path, the curated static
+        # fallback, only exists at materialization time and is recorded on the spawn
+        # record as MODEL_STATIC_FALLBACK (ADR-0030), never here.
+        selection_path = ("pin" if any(code.startswith("MODEL_PINNED") for code in decision.reason_codes)
+                          else "dynamic")
+        data["selection_path"] = selection_path
         ok, exit_code = _decide_status(decision)
+        _append_decision_log({
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "decision_id": decision_id, "run_id": data.get("run_id"),
+            "project_key": PROJECT_KEY, "role": role, "task_class": task_class,
+            "risk": req_risk, "role_class": role_class, "simulate": simulate,
+            "route_id": data.get("route_id"), "runtime": data.get("runtime"),
+            "provider": data.get("provider"), "model": data.get("model"),
+            "family": data.get("family"), "effort": data.get("effort"), "tier": tier,
+            "feature_id": resolved_feature, "package_id": resolved_package,
+            "reason_codes": list(decision.reason_codes),
+            "execution_enabled": bool(data.get("execution_enabled")),
+            "selection_path": selection_path,
+        })
         _routing_output(routing.cli_envelope(ok, "route-decide", data, (), decision.reason_codes), human)
         return exit_code
     except models_config.ModelsError:
@@ -523,6 +686,32 @@ def cmd_routing_recent_writers(human=False):
         _routing_output(routing.cli_envelope(True, "routing-recent-writers", data, (), ()), human); return 0
     except (routing.RoutingError, OSError):
         _routing_output(routing.cli_envelope(False, "routing-recent-writers", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
+
+
+def cmd_routing_decisions(limit=50, human=False):
+    """ADR-0031: read-only tail of the per-decision sidecar log, filtered to this
+    project. Missing/empty log is a legitimate zero, never an error; malformed lines
+    (a torn write in a best-effort append-only file) are skipped, not fatal."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        _routing_output(routing.cli_envelope(False, "routing-decisions", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    try:
+        decisions = []
+        path = _decision_log_path()
+        if path.exists():
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(entry, dict) and entry.get("project_key") == PROJECT_KEY:
+                    decisions.append(entry)
+        data = {"decisions": decisions[-limit:]}
+        _routing_output(routing.cli_envelope(True, "routing-decisions", data, (), ()), human); return 0
+    except OSError:
+        _routing_output(routing.cli_envelope(False, "routing-decisions", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
 
 
 def cmd_doctor(harness, human=False):
@@ -2268,6 +2457,8 @@ def main():
     parser.add_argument("--quota-error", metavar="JSON")
     parser.add_argument("--routing-open-runs", action="store_true")
     parser.add_argument("--routing-recent-writers", action="store_true")
+    parser.add_argument("--routing-decisions", action="store_true", help="tail del log de decisiones por spawn (ADR-0031, solo lectura)")
+    parser.add_argument("--limit", type=int, default=None, help="con --routing-decisions: máximo de entradas (default 50)")
     parser.add_argument("--routing-migrate", action="store_true", help="migra explícitamente la DB de routing al schema actual")
     parser.add_argument("--project", metavar="DIR", help="ancla explícita del proyecto para ruteo")
     parser.add_argument("--scaffold", nargs="?", metavar="DIR", const="", help="crea el estado portable mínimo del proyecto")
@@ -2320,6 +2511,12 @@ def main():
     parser.add_argument("--model-preference-role-override", nargs=2, metavar=("ROLE", "CLASS"),
                         help="escribe [role_override].ROLE = CLASS en model-preference.toml")
     parser.add_argument("--model-preference-show", action="store_true", help="lee model-preference.toml (solo lectura)")
+    # ADR-0032: pin de modelo por rol (o global con el literal '*') — el router lo
+    # respeta como override blando: pin > decisión dinámica > fallback curado.
+    parser.add_argument("--model-pin-set", nargs=2, metavar=("ROLE", "PROVIDER/MODEL"),
+                        help="escribe [model_pin].ROLE en model-preference.toml (ROLE puede ser '*')")
+    parser.add_argument("--model-pin-clear", metavar="ROLE",
+                        help="borra [model_pin].ROLE de model-preference.toml")
     args = parser.parse_args()
 
     # This gate is intentionally outside the ordinary routing modes.  It has no
@@ -2337,18 +2534,19 @@ def main():
     # straight through every mode check into the interactive menu/help instead of failing closed.
     _mode_flags = (args.route_explain is not None, args.routing_report, args.route_decide is not None,
                    args.route_dispatched is not None, args.route_terminal is not None, args.route_quota_exhausted is not None,
-                   args.routing_open_runs, args.routing_recent_writers, args.routing_migrate)
+                   args.routing_open_runs, args.routing_recent_writers, args.routing_decisions, args.routing_migrate)
     routing_mode = any(_mode_flags)
     _routing_args = {"json", "route_explain", "routing_report", "route_decide", "route_dispatched",
                      "route_terminal", "route_quota_exhausted", "quota_error", "routing_open_runs", "routing_recent_writers",
-                     "routing_migrate", "fresh_probes", "latency_ms", "usage", "project"}
+                     "routing_decisions", "limit", "routing_migrate", "fresh_probes", "latency_ms", "usage", "project"}
     other_mode = any(value != parser.get_default(name)
                      for name, value in vars(args).items() if name not in _routing_args)
     modifier_misuse = (args.fresh_probes and args.route_decide is None) or \
                       (args.latency_ms is not None and args.route_terminal is None and args.route_quota_exhausted is None) or \
                       (args.usage is not None and args.route_terminal is None and args.route_quota_exhausted is None) or \
                       (args.quota_error is not None and args.route_quota_exhausted is None) or \
-                      (args.route_quota_exhausted is not None and args.quota_error is None)
+                      (args.route_quota_exhausted is not None and args.quota_error is None) or \
+                      (args.limit is not None and not args.routing_decisions)
     if (sum(_mode_flags) > 1) or (routing_mode and other_mode) or modifier_misuse:
         _routing_output(routing.cli_envelope(False, "routing", {}, (), ("ROUTING_INPUT_INVALID",)), routing_human)
         return 2
@@ -2405,6 +2603,8 @@ def main():
         return cmd_routing_open_runs(human=routing_human)
     if args.routing_recent_writers:
         return cmd_routing_recent_writers(human=routing_human)
+    if args.routing_decisions:
+        return cmd_routing_decisions(limit=50 if args.limit is None else args.limit, human=routing_human)
     if args.routing_migrate:
         return cmd_routing_migrate()
     if args.doctor:
@@ -2448,6 +2648,18 @@ def main():
     if args.model_preference_role_override:
         try:
             return cmd_model_preference_role_override(*args.model_preference_role_override)
+        except ModelPreferenceError as exc:
+            print(f"model-preference: {exc}", file=sys.stderr)
+            return 2
+    if args.model_pin_set:
+        try:
+            return cmd_model_pin_set(*args.model_pin_set)
+        except ModelPreferenceError as exc:
+            print(f"model-preference: {exc}", file=sys.stderr)
+            return 2
+    if args.model_pin_clear:
+        try:
+            return cmd_model_pin_clear(args.model_pin_clear)
         except ModelPreferenceError as exc:
             print(f"model-preference: {exc}", file=sys.stderr)
             return 2

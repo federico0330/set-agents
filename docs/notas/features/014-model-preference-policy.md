@@ -42,7 +42,7 @@
 
 - spawns: 7 (máx 12/paquete) · deep review máx 2 ciclos
 
-[[00 - Proyecto|⌂ Proyecto]] · [[features/014-model-preference-policy/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTS/docs/specs/014-model-preference-policy/bitacora.md`
+[[00 - Proyecto|⌂ Proyecto]] · [[features/014-model-preference-policy/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/014-model-preference-policy/bitacora.md`
 
 _Actualizado: 2026-08-03T00:38:12+00:00_
 <!-- /notas:auto -->

@@ -35,3 +35,5 @@
 | [0028](0028-living-scope.md) | Alcance vivo: re-verificación de spec hash, amend-spec, supersede-package | Accepted | 2026-08-04 | — | — |
 | [0029](0029-probe-driven-model-selection.md) | "El probe manda": inventario descubierto como fuente de verdad de modelos | Accepted | 2026-08-04 | — | — |
 | [0030](0030-decide-always-materialize-per-lane.md) | Decide siempre: una decisión de routing por spawn (28/28 roles), materializada según el lane | Accepted | 2026-08-04 | — | — |
+| [0031](0031-per-spawn-routing-observability.md) | Observabilidad por spawn: log de decisiones (simulate incluido), campos estructurados en record-spawn, join route_id | Accepted | 2026-08-05 | — | — |
+| [0032](0032-spawn-time-model-materialization-and-pins.md) | Materialización en el spawn para opencode/codex (CLIs de dispatch) y pins de modelo: pin > dinámico > fallback | Accepted | 2026-08-05 | — | — |

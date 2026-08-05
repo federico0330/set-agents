@@ -124,6 +124,12 @@ class RoutingService:
         model_preference = config.pop("_model_preference", None) if isinstance(config, dict) else None
         preference = dict((model_preference or {}).get("preference") or {})
         role_override = dict((model_preference or {}).get("role_override") or {})
+        # ADR-0032: user model pins ride the same injected channel. `{role_or_star:
+        # (provider, model)}` — a SOFT sort-level override only: pins never bypass the
+        # hard-exclusion loop in route() (auth/independence/tier floor), so a pinned
+        # identity that is not eligible degrades to the dynamic pick with an additive
+        # MODEL_PIN_UNAVAILABLE reason code, never a fabricated authorization.
+        model_pin = dict((model_preference or {}).get("model_pin") or {})
         inventory = probe_inventory(config, cache_root=cache_root, fresh=fresh_probes, cache_write=not simulate)
         # ADR-0029 (017 PKG-B2): the OPT-IN discovered-routes path. With
         # [routing].discovered_providers empty (the default), this branch is dead and
@@ -147,11 +153,12 @@ class RoutingService:
                    store, simulate, clock,
                    recheck=recheck,
                    reprobe=None if simulate else (lambda pairs: probe_inventory(config, pairs=pairs)),
-                   preference=preference, role_override=role_override, inferred_ids=inferred_ids)
+                   preference=preference, role_override=role_override, inferred_ids=inferred_ids,
+                   model_pin=model_pin)
 
     @classmethod
     def _for_tests(cls, snapshot, roster, inventory, store=None, simulate=False, clock=time.time, reprobe=None,
-                    preference=None, role_override=None):
+                    preference=None, role_override=None, model_pin=None):
         """Private hermetic seam; production callers never reach it.
 
         `preference`/`role_override` (AC-04): the resolved sibling-config tables a
@@ -164,10 +171,10 @@ class RoutingService:
         if reprobe is None:
             reprobe = lambda pairs: {pair: set(inventory.get(pair, set())) for pair in pairs}
         service._seal(snapshot, roster, inventory, store, simulate, clock, recheck=lambda: snapshot, reprobe=reprobe,
-                       preference=preference, role_override=role_override)
+                       preference=preference, role_override=role_override, model_pin=model_pin)
         return service
 
-    def _seal(self, snapshot, roster, inventory, store, simulate, clock, recheck, reprobe, preference=None, role_override=None, inferred_ids=frozenset()):
+    def _seal(self, snapshot, roster, inventory, store, simulate, clock, recheck, reprobe, preference=None, role_override=None, inferred_ids=frozenset(), model_pin=None):
         self.snapshot = snapshot
         self.roster = {item["role"]: item for item in roster}
         self.inventory = {key: frozenset(values) for key, values in inventory.items()}
@@ -185,6 +192,8 @@ class RoutingService:
         # discipline every other collection on this instance already follows.
         self._bias_preference = {key: tuple(value) for key, value in (preference or {}).items()}
         self._bias_role_override = dict(role_override or {})
+        # ADR-0032: normalized to (provider, model) tuples; role entry beats the `*` global.
+        self._model_pin = {key: tuple(value) for key, value in (model_pin or {}).items()}
         if store is not None: store._bind_issuer(self._issuer)
 
     # Explicitly private composition seam. Production callers receive facts from harness composition.
@@ -244,6 +253,9 @@ class RoutingService:
         bias_class = resolve_bias_class(facts.role, self.roster[facts.role], self._bias_role_override)
         bias_preference = self._bias_preference.get(bias_class, ())
         preference_configured = bool(bias_preference)
+        # ADR-0032: role pin beats the `*` global; None means unpinned (every candidate
+        # ranks equal at the pin position, ordering falls through unchanged).
+        pin = self._model_pin.get(facts.role) or self._model_pin.get("*")
         unverified = False
         if role_class == "review":
             # P1R persists only writers; a review decision is selected but never becomes a writer authorization.
@@ -330,7 +342,12 @@ class RoutingService:
         # position 3, strictly between tier (position 2) and `curated_priority` (today's
         # position 3, shifted to 4) -- never before the independence/tier boundary, never a
         # change to which candidates reach this sort (the exclusion loop above, untouched).
-        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, TIER_ORDER[x[0].tier], _bias_rank(x[0].provider, bias_preference), x[0].curated_priority, x[0].route_id))
+        # ADR-0032: the pin rank sits BETWEEN the reviewer different-provider preference
+        # and tier — a pinned identity that survived every hard exclusion above wins even
+        # across tiers (the tier FLOOR was already enforced as TIER_INSUFFICIENT), but a
+        # pin never outranks reviewer independence. Unpinned decisions rank every
+        # candidate equal here, leaving the pre-ADR-0032 ordering byte-identical.
+        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], _bias_rank(x[0].provider, bias_preference), x[0].curated_priority, x[0].route_id))
         if not candidates:
             return RouteDecision(None,None,None,None,None,None,False,("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",),tuple(exclusions),bias_class=bias_class,preference_configured=preference_configured)
         selected, identity = candidates[0]; fallback = candidates[1][1] if len(candidates) > 1 else None
@@ -352,6 +369,13 @@ class RoutingService:
         if selected.route_id in self._inferred_ids:
             redirect_reason = redirect_reason + (
                 f"MODEL_METADATA_INFERRED tier={selected.tier} family={selected.family}",)
+        # ADR-0032: a pinned decision always says so — MODEL_PINNED when the user's pin
+        # is what actually got selected, MODEL_PIN_UNAVAILABLE when a pin exists but the
+        # pinned identity was excluded/absent and the dynamic pick prevailed. Purely
+        # additive to reason_codes, same discipline as RUNTIME_REDIRECTED above.
+        if pin:
+            marker = "MODEL_PINNED" if (selected.provider, selected.model) == pin else "MODEL_PIN_UNAVAILABLE"
+            redirect_reason = redirect_reason + (f"{marker} {pin[0]}/{pin[1]}",)
         if self.simulate or role_class != "writer":
             # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
             # reason code — true only for a review decision that matched a real terminal writer and
