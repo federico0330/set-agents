@@ -116,6 +116,43 @@ def status(config, roster, profile):
         print(line)
 
 
+def _panel_lines(config, roster, profile, detected=None):
+    """The wizard's COMPACT header — replaces the old full `_status_lines` dump
+    (10 wide area rows + one line per role override, printed to the normal screen
+    AND repeated as header) that the owner reported as "una lista interminable".
+    Area table stays (it's the useful core), overrides collapse to a count, and
+    each subscription shows its tri-state origin (ADR-0029): ✓pin (true), ✗off
+    (false), auto (absent — the probe decides; live state when `detected` came
+    from a successful probe). `--status` keeps the full machine dump."""
+    subs = []
+    subscriptions = config.get("subscriptions", {})
+    for key in sorted(set(subscriptions) | (detected or set())):
+        if key not in subscriptions:
+            live = detected is not None and key in detected
+            subs.append(f"{key}=auto{'✓' if live else ''}")
+        else:
+            subs.append(f"{key}={'✓pin' if subscriptions[key] else '✗off'}")
+    discovered = config.get("routing", {}).get("discovered_providers", [])
+    lines = [
+        f"lane: {profile} (auto)    suscripciones: {' '.join(subs) or '-'}",
+    ]
+    if discovered:
+        lines.append(f"proveedores descubiertos rutables: {', '.join(discovered)}")
+    lines.append(f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]")
+    duties = [d for d in models_config.DUTY_ORDER if d in config.get("areas", {})]
+    duties += sorted(set(config.get("areas", {})) - set(duties))
+    for duty in duties:
+        area = config["areas"][duty]
+        lines.append(
+            f"{duty:<10} {area.get('claude', '-'):<8} {area.get('codex', '-'):<14} "
+            f"{area.get('codex_effort', '-'):<7} {area.get('opencode', {}).get(profile, '-')}"
+        )
+    overrides = config.get("roles", {})
+    if overrides:
+        lines.append(f"overrides de rol: {len(overrides)} — detalle: 'Ver detalle completo' o --status")
+    return lines
+
+
 def atomic_write(path, content):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -175,18 +212,23 @@ def wizard(config, roster, profile, roles_path, models_out):
         print("Sin cambios pedidos y sin TTY: usá --status/--check/--set (ver --help).", file=sys.stderr)
         return 2
     dirty = False
-    WIZARD_ITEMS = ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar")
+    # Indexes 0-4 are a pinned contract (immutable suite drives the wizard by
+    # Selected(N)); new actions append AFTER them, never reorder.
+    WIZARD_ITEMS = ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar",
+                    "Ver detalle completo", "Proveedores descubiertos (routing)")
+    # Probe once per wizard run (shared cache): live subscription state for the
+    # header's tri-state origins. None on any failure — panel degrades to pins.
+    try:
+        detected = models_config.detect_subscriptions(config)
+    except Exception:
+        detected = None
     while True:
-        print()
-        status_lines = _status_lines(config, roster, profile)
-        for line in status_lines:
-            print(line)
-        print()
         # AC-24/AC-29: Esc/Ctrl-C/EOF resolve to `None` inside run_picker itself -- treated
         # the same as "salir sin guardar", never a raised EOFError/KeyboardInterrupt here.
-        # F-03: `header=` carries the same table into the picker's own frame so it survives
-        # the alternate-screen switch instead of being erased right when deciding.
-        choice = tui.run_picker(WIZARD_ITEMS, header="\n".join(status_lines))
+        # F-03/UI refresh: the state travels ONLY as the picker's `header=` (compact panel);
+        # the old duplicate print() to the normal screen is gone with the avalanche.
+        panel = _panel_lines(config, roster, profile, detected)
+        choice = tui.run_picker(WIZARD_ITEMS, header="\n".join(panel))
         option = str(choice.index + 1) if isinstance(choice, tui.Selected) else "5"
         if option == "1" or option == "2":
             if option == "1":
@@ -221,11 +263,12 @@ def wizard(config, roster, profile, roles_path, models_out):
                 config.update(snapshot)
                 print(f"RECHAZADO: {exc}")
         elif option == "3":
-            subscription = choose("Suscripción a activar/desactivar", sorted(config["subscriptions"]))
+            subscription = choose("Suscripción a cambiar", sorted(config["subscriptions"]))
             if not subscription:
                 continue
             enabled = config["subscriptions"].get(subscription, False)
             if enabled:
+                # Pinned contract: this guard fires BEFORE any further picker.
                 affected = dropped_cells(config, roster, subscription)
                 if affected:
                     print(f"AFFECTED={len(affected)} — celdas que usan '{subscription}':")
@@ -237,9 +280,19 @@ def wizard(config, roster, profile, roles_path, models_out):
                     # can't go stale again if their order/wording ever changes.
                     print(f"Reasignalas primero ({WIZARD_ITEMS[0]!r} / {WIZARD_ITEMS[1]!r}) y después dala de baja.")
                     continue
-            config["subscriptions"][subscription] = not enabled
+            # Tri-state (ADR-0029): pin true / exclusión false / auto (clave ausente).
+            state = tui.run_picker(
+                ("Pin activada (true)", "Exclusión dura (false)", "Auto — el probe decide (borrar la línea)"),
+                prompt=f"{subscription}:")
+            if not isinstance(state, tui.Selected):
+                continue
+            if state.index == 2:
+                config["subscriptions"].pop(subscription, None)
+                print(f"OK: {subscription} = auto (el probe decide)")
+            else:
+                config["subscriptions"][subscription] = state.index == 0
+                print(f"OK: {subscription} = {'on' if state.index == 0 else 'off'}")
             dirty = True
-            print(f"OK: {subscription} = {'on' if not enabled else 'off'}")
         elif option == "4":
             if not dirty:
                 print("Sin cambios.")
@@ -260,6 +313,33 @@ def wizard(config, roster, profile, roles_path, models_out):
             return 0
         elif option == "5":
             return 0
+        elif option == "6":
+            # On demand, on the NORMAL screen (survives after the wizard exits);
+            # the picker's header clamps long content, a pause here doesn't.
+            print()
+            for line in _status_lines(config, roster, profile):
+                print(line)
+            _safe_input("Enter para volver… ")
+        elif option == "7":
+            # ADR-0029 opt-in: which discovered opencode providers become routable.
+            routing = config.setdefault("routing", {})
+            current = list(routing.get("discovered_providers", []))
+            options = []
+            for provider in ("opencode-zen", "opencode-go"):
+                mark = "rutable" if provider in current else "solo probeable"
+                options.append(f"{provider} — hoy: {mark}")
+            picked = tui.run_picker(options, prompt="Togglear proveedor descubierto:")
+            if not isinstance(picked, tui.Selected):
+                continue
+            provider = ("opencode-zen", "opencode-go")[picked.index]
+            if provider in current:
+                current.remove(provider)
+            else:
+                current.append(provider)
+            routing["discovered_providers"] = sorted(current)
+            dirty = True
+            print(f"OK: discovered_providers = {routing['discovered_providers']} (ADR-0029: la curada gana; "
+                  "lo inferido lleva MODEL_METADATA_INFERRED)")
 
 
 def main():
