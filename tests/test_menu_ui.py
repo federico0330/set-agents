@@ -103,3 +103,27 @@ class MenuDispatchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ToolsHeaderTests(unittest.TestCase):
+    def test_header_lists_method_and_note_per_tool(self):
+        catalog = {"cli": {"vercel": {"detect": "vercel", "note": "cli de vercel",
+                                      "install": {"npm": "npm install -g vercel"}}}}
+        with mock.patch.object(app, "load_catalog", return_value=catalog), \
+             mock.patch.object(app.shutil, "which", return_value=None), \
+             mock.patch.object(app, "pick_method", return_value="npm"):
+            header = app._tools_header()
+        self.assertIn("vercel", header)
+        self.assertIn("npm", header)
+        self.assertIn("cli de vercel", header)
+
+    def test_tools_menu_still_installs_on_enter_with_the_pinned_rows(self):
+        # The immutable suite pins this too; asserted here so THIS package's header
+        # addition can't have changed the picker items or the install dispatch.
+        with mock.patch.object(app, "_tools_data", return_value=[("jq", True), ("vercel", False)]), \
+             mock.patch.object(app, "_tools_header", return_value="x"), \
+             mock.patch.object(app.tui, "run_picker", return_value=app.tui.Selected(1)) as picker, \
+             mock.patch.object(app, "cmd_tools_install") as install:
+            app.tools_menu()
+        install.assert_called_once_with("vercel")
+        self.assertEqual(picker.call_args.kwargs["header"], "x")

@@ -1016,6 +1016,23 @@ def cmd_tools_install(name, dry=False, yes=False):
     return 1
 
 
+def _tools_header():
+    """Herramientas panel: per-tool install method + short note, rendered with
+    the shared width-aware table (no hardcoded widths). Header-only on purpose:
+    the row format and Enter→install behavior of the picker items below are a
+    pinned contract of the immutable suite."""
+    catalog = load_catalog().get("cli", {})
+    rows = []
+    for name, entry in catalog.items():
+        installed = bool(shutil.which(entry.get("detect", name)))
+        method = pick_method(entry.get("install", {})) or "manual (ver doc)"
+        note = str(entry.get("note", ""))
+        rows.append((name, "✓" if installed else "·", method, note))
+    lines = ["Herramientas del catálogo (Enter instala la elegida; sudo siempre pregunta)"]
+    lines += table_lines(rows)
+    return "\n".join(lines)
+
+
 def tools_menu():
     data = _tools_data()
     if not data:
@@ -1025,7 +1042,8 @@ def tools_menu():
         f"{name:<10} {color('instalado', '32') if installed else 'falta'}"
         for name, installed in data
     ]
-    choice = tui.run_picker(items, style={"color": color, "bold": bold, "dim": dim})
+    choice = tui.run_picker(items, style={"color": color, "bold": bold, "dim": dim},
+                            header=_tools_header())
     if isinstance(choice, tui.Selected):
         cmd_tools_install(data[choice.index][0])
 
