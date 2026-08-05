@@ -133,11 +133,15 @@ def _panel_lines(config, roster, profile, detected=None):
         else:
             subs.append(f"{key}={'✓pin' if subscriptions[key] else '✗off'}")
     discovered = config.get("routing", {}).get("discovered_providers", [])
+    tiered = len({key for key, value in config.get("roles", {}).items() if "tiers" in value})
     lines = [
         f"lane: {profile} (auto)    suscripciones: {' '.join(subs) or '-'}",
+        "routing dinámico: el router decide por spawn para TODOS los roles (ADR-0030; --route-explain)"
+        + (f" · variantes @tier: {tiered} roles" if tiered else ""),
     ]
     if discovered:
         lines.append(f"proveedores descubiertos rutables: {', '.join(discovered)}")
+    lines.append("DEFAULTS CURADOS (fallback cuando el lane no aplica la decisión):")
     lines.append(f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]")
     duties = [d for d in models_config.DUTY_ORDER if d in config.get("areas", {})]
     duties += sorted(set(config.get("areas", {})) - set(duties))

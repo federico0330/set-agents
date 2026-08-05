@@ -113,7 +113,9 @@ de modelos), Esc o Ctrl-C para volver/cancelar sin dejar rastro de error. Las op
   (Todos / Claude Code+pi / OpenCode / Codex / Pi)
 - 🔄 Actualizar
 - 🧠 Modelos — panel compacto + fijar modelo por área/rol, suscripciones tri-estado
-  (pin/off/auto por probe) y proveedores descubiertos (ADR-0029)
+  (pin/off/auto por probe) y proveedores descubiertos (ADR-0029). La tabla que muestra son
+  los **defaults curados (fallback)**: el router decide en vivo por spawn para los 28 roles
+  y la pisa donde el lane lo permite (ADR-0030)
 - 🧰 Herramientas (CLIs) — con método de instalación y nota por herramienta
 - 🔌 MCPs
 - 🧩 Plugins Claude Code

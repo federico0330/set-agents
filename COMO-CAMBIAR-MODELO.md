@@ -1,5 +1,13 @@
 # Changing agent models
 
+**Cómo conviven la tabla y el router (ADR-0030):** la tabla por área de `models.toml` son los
+**defaults curados** que se hornean en el frontmatter de cada agente al buildear — el fallback.
+La selección viva la hace el router en cada spawn (`set-agents --route-decide`, para los 28
+roles): en los lanes claude-code y pi la decisión pisa el frontmatter vía `--model`; en opencode
+se materializa con las variantes `@tier` (6 roles tiered) y, para el resto, corre el default
+curado registrando `MODEL_STATIC_FALLBACK` — visible, nunca silencioso. Fijar algo acá NO apaga
+el router: es curar el fallback y las preferencias que el router respeta.
+
 Model routing lives in **`models.toml`**: active subscriptions, the model catalog, one model
 set per **area** (the `duty` column of `roles.tsv`), and per-role overrides. `roles.tsv` holds
 structure only (role, mode, temperature, capability, duty). `active-profile` selects the opencode
