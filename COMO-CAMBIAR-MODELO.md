@@ -23,6 +23,8 @@ Cada clave de `[subscriptions]` acepta tres estados:
 
 ```bash
 ./setup-models.sh                 # interactive wizard: pick area/role -> field -> model
+                                  # (también: suscripciones tri-estado, detalle completo a
+                                  #  demanda, y toggle de proveedores descubiertos ADR-0029)
 ./setup-models.sh --status        # current assignment per area + overrides + subscriptions
 ./setup-models.sh --check         # validate all three lanes without changing anything
 ```

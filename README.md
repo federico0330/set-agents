@@ -30,7 +30,7 @@ el acceso, la próxima actualización de esa persona falla — así de simple.
 # si no tenés gh: pacman -S github-cli / apt install gh / brew install gh
 gh auth login                                        # una vez
 gh repo clone federico0330/SET-AGENTS ~/SET-AGENTS
-cd ~/SET-AGENTS && ./set-agents                      # menú → [1] Instalar
+cd ~/SET-AGENTS && ./set-agents                      # menú → "Instalar / Reparar"
 ```
 
 ### Windows 10/11
@@ -107,13 +107,16 @@ corré `./build.sh --install`.
 moverte, Enter para elegir, `/` para buscar (con texto libre donde tiene sentido, ej. el picker
 de modelos), Esc o Ctrl-C para volver/cancelar sin dejar rastro de error. Las opciones, en orden:
 
-- 📦 Instalar / Reparar
+- 🩺 Estado general — el doctor completo, formateado: harnesses con versión y auth, lane pi,
+  alcance de instalación, catálogo de CLIs y proveedores autenticados (probe)
+- 📦 Instalar / Reparar — primero elegís qué CLI de IA instalar o aplicarle el harness
+  (Todos / Claude Code+pi / OpenCode / Codex / Pi)
 - 🔄 Actualizar
-- 🧠 Modelos
-- 🧰 Herramientas (CLIs)
+- 🧠 Modelos — panel compacto + fijar modelo por área/rol, suscripciones tri-estado
+  (pin/off/auto por probe) y proveedores descubiertos (ADR-0029)
+- 🧰 Herramientas (CLIs) — con método de instalación y nota por herramienta
 - 🔌 MCPs
 - 🧩 Plugins Claude Code
-- 📊 Estado
 - 🗒 Vault Obsidian
 - ⏻ Salir
 

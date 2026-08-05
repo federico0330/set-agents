@@ -29,7 +29,7 @@ cd ~/SET-AGENTS
 ¿Usás una sola herramienta? Instalá solo esa (no te pide login de las otras):
 
 ```bash
-./install.sh --harness claude     # solo Claude Code (también: opencode | codex | all)
+./install.sh --harness claude     # solo Claude Code + lane pi (también: opencode | codex | pi | all)
 set-agents --doctor-all           # qué detectó: harnesses, CLIs y proveedores autenticados
 ```
 
@@ -55,13 +55,13 @@ escribís `set-agents` en cualquier terminal de Windows y listo. Los CLIs
 puro, sin librerías de terceros: ↑↓ mover, Enter elegir, `/` buscar/texto libre donde aplica,
 Esc/Ctrl-C volver) con estas opciones, en orden:
 
-- Instalar / Reparar
+- Estado general (doctor formateado: harnesses, lane pi, alcance, CLIs, proveedores)
+- Instalar / Reparar (elegís qué CLI de IA instalar o aplicarle el harness)
 - Actualizar
-- Modelos
+- Modelos (panel compacto; fijar por área/rol; suscripciones tri-estado; descubiertos)
 - Herramientas (CLIs)
 - MCPs
 - Plugins Claude Code
-- Estado
 - Vault Obsidian
 - Salir
 
