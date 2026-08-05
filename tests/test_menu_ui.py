@@ -1,0 +1,105 @@
+"""UI refresh — main menu personalized to the harness.
+
+New tests only: the shared width-aware panel renderer (`table_lines`), the
+'Estado general' panel content, and the Instalar/Reparar harness selector
+(gentle-ai-style onboarding). The immutable suite keeps pinning Vault-before-
+Salir, the Esc contract, and the tools_menu row format — nothing here may
+contradict those.
+"""
+
+import io
+import sys
+import unittest
+from pathlib import Path
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "ai/scripts"))
+
+import set_agents_app as app  # noqa: E402
+
+
+class TableLinesTests(unittest.TestCase):
+    def test_columns_align_to_the_widest_cell(self):
+        with mock.patch.object(app.shutil, "get_terminal_size", return_value=__import__("os").terminal_size((120, 24))):
+            lines = app.table_lines([("gh", "instalado"), ("supabase", "falta")])
+        self.assertEqual(lines, ["  gh        instalado", "  supabase  falta"])
+
+    def test_lines_clip_to_the_live_terminal_width(self):
+        with mock.patch.object(app.shutil, "get_terminal_size", return_value=__import__("os").terminal_size((46, 24))):
+            lines = app.table_lines([("x" * 60,)])
+        self.assertEqual(len(lines[0]), 46)
+        self.assertTrue(lines[0].endswith("…"))
+
+    def test_empty_rows_render_nothing(self):
+        self.assertEqual(app.table_lines([]), [])
+
+
+class EstadoGeneralTests(unittest.TestCase):
+    def test_panel_carries_harnesses_scope_tools_and_providers(self):
+        data = {"rows": [("claude", "1.0", "ok")], "drift": "ok"}
+        with mock.patch.object(app, "_pi_lane_state", return_value="via-pnpm-dlx"), \
+             mock.patch.object(app, "_install_scope", return_value=["claude-code", "pi"]), \
+             mock.patch.object(app, "_tools_data", return_value=[("gh", True)]), \
+             mock.patch.object(app.models_config, "load_config", side_effect=OSError("hermetic")):
+            lines = app._estado_general_lines(data)
+        text = "\n".join(lines)
+        self.assertIn("Harnesses", text)
+        self.assertIn("vía pnpm dlx", text)
+        self.assertIn("claude-code, pi", text)
+        self.assertIn("gh", text)
+        self.assertIn("probe no disponible", text)
+        self.assertNotIn("drift:", text)
+
+    def test_stale_drift_adds_the_repair_hint(self):
+        data = {"rows": [], "drift": "stale"}
+        with mock.patch.object(app, "_pi_lane_state", return_value="no"), \
+             mock.patch.object(app, "_install_scope", return_value=None), \
+             mock.patch.object(app, "_tools_data", return_value=[]), \
+             mock.patch.object(app.models_config, "load_config", side_effect=OSError("hermetic")):
+            text = "\n".join(app._estado_general_lines(data))
+        self.assertIn("Instalar / Reparar", text)
+
+
+class MenuDispatchTests(unittest.TestCase):
+    def _menu(self, picks):
+        with mock.patch.object(app, "first_run", return_value=False), \
+             mock.patch.object(app, "launch_update_check", return_value="al día"), \
+             mock.patch.object(app, "drift_state", return_value="ok"), \
+             mock.patch.object(app, "banner"), \
+             mock.patch.object(app, "short_sha", return_value="abc"), \
+             mock.patch.object(app, "auto_update_enabled", return_value=True), \
+             mock.patch.object(app.tui, "run_picker", side_effect=picks) as picker, \
+             mock.patch.object(app, "run_tty", return_value=0) as tty, \
+             mock.patch("sys.stdout", io.StringIO()):
+            rc = app.menu()
+        return rc, picker, tty
+
+    def test_estado_general_is_first_and_renders_inside_the_picker_frame(self):
+        with mock.patch.object(app, "_status_data", return_value={"rows": [], "drift": "ok",
+                                                                  "sha": "abc", "behind": 0,
+                                                                  "auto_update": True}), \
+             mock.patch.object(app, "_estado_general_lines", return_value=["Harnesses"]):
+            rc, picker, _ = self._menu([app.tui.Selected(0), None, None])
+        self.assertEqual(rc, 0)
+        estado_call = picker.call_args_list[1]
+        self.assertIn("Harnesses", estado_call.kwargs["header"])
+
+    def test_instalar_picks_a_harness_and_passes_it_to_install_sh(self):
+        rc, _, tty = self._menu([app.tui.Selected(1), app.tui.Selected(2), None])
+        self.assertEqual(rc, 0)
+        command = tty.call_args.args[0]
+        self.assertTrue(command[0].endswith("install.sh"))
+        self.assertEqual(command[1:], ["--harness", "opencode"])
+
+    def test_cancelling_the_harness_picker_runs_nothing(self):
+        rc, _, tty = self._menu([app.tui.Selected(1), None, None])
+        self.assertEqual(rc, 0)
+        tty.assert_not_called()
+
+    def test_menu_items_start_with_estado_general(self):
+        self.assertIn("Estado general", app.MENU_ITEMS[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -538,6 +538,27 @@ def cmd_doctor(harness, human=False):
     return 0 if ok else 1
 
 
+def _pi_lane_state():
+    """pi has no global binary by design: it resolves via `pnpm dlx` against the
+    pin in routing_core/catalog.py, so pnpm present == lane installable. A bare
+    which("pi") was a structural false negative on every fresh machine."""
+    if shutil.which("pi"):
+        return "yes"
+    if shutil.which("pnpm"):
+        return "via-pnpm-dlx"
+    return "no"
+
+
+def _install_scope():
+    scope_path = STATE_DIR / "install-targets.json"
+    if not scope_path.exists():
+        return None
+    try:
+        return sorted(t for t in json.loads(scope_path.read_text()) if isinstance(t, str))
+    except (OSError, json.JSONDecodeError):
+        return "unreadable"
+
+
 def cmd_doctor_all():
     """017/AC-02: qué tiene esta máquina y qué va a usar el harness — harnesses
     instalados, scope de instalación, CLIs del catálogo, y proveedores/modelos
@@ -545,24 +566,14 @@ def cmd_doctor_all():
     from routing_core.catalog import probe_inventory
     for harness, cli in (("claude-code", "claude"), ("opencode", "opencode"), ("codex", "codex")):
         print(f"HARNESS {harness} installed={'yes' if shutil.which(cli) else 'no'}")
-    # pi has no global binary by design: it resolves via `pnpm dlx` against the
-    # pin in routing_core/catalog.py, so pnpm present == lane installable. A bare
-    # which("pi") here was a structural false negative on every fresh machine.
-    if shutil.which("pi"):
-        print("HARNESS pi installed=yes")
-    elif shutil.which("pnpm"):
-        print("HARNESS pi installed=via-pnpm-dlx")
-    else:
-        print("HARNESS pi installed=no")
-    scope_path = STATE_DIR / "install-targets.json"
-    if scope_path.exists():
-        try:
-            scope = [t for t in json.loads(scope_path.read_text()) if isinstance(t, str)]
-            print("INSTALL_SCOPE " + (",".join(sorted(scope)) or "none"))
-        except (OSError, json.JSONDecodeError):
-            print("INSTALL_SCOPE unreadable")
-    else:
+    print(f"HARNESS pi installed={_pi_lane_state()}")
+    scope = _install_scope()
+    if scope is None:
         print("INSTALL_SCOPE all (sin registro: instalación previa a 017 o nunca instalado)")
+    elif scope == "unreadable":
+        print("INSTALL_SCOPE unreadable")
+    else:
+        print("INSTALL_SCOPE " + (",".join(scope) or "none"))
     for name, installed in _tools_data():
         print(f"TOOL {name} installed={'yes' if installed else 'no'}")
     try:
@@ -2055,19 +2066,91 @@ DRIFT_BADGE = {
 }
 
 
+# ------------------------------------------------------------ menu panels
+def _term_width():
+    try:
+        return max(40, shutil.get_terminal_size().columns)
+    except (ValueError, OSError):
+        return 80
+
+
+def _clip(line, width):
+    """Truncate a plain (no-ANSI) line to the real terminal width."""
+    return line if len(line) <= width else line[: width - 1] + "…"
+
+
+def table_lines(rows, indent="  "):
+    """Aligned plain-text columns clamped to the live terminal width — the shared
+    renderer for every menu panel (Estado, Modelos header, Herramientas). Pure on
+    its inputs except for the width read; no hardcoded widths, no ANSI inside
+    (escape codes break the length math), colors get applied by callers on whole lines."""
+    rows = [tuple(str(cell) for cell in row) for row in rows]
+    if not rows:
+        return []
+    columns = max(len(row) for row in rows)
+    widths = [max((len(row[i]) for row in rows if len(row) > i), default=0) for i in range(columns)]
+    width = _term_width()
+    lines = []
+    for row in rows:
+        cells = [row[i].ljust(widths[i]) for i in range(len(row))]
+        lines.append(_clip((indent + "  ".join(cells)).rstrip(), width))
+    return lines
+
+
+def _estado_general_lines(data):
+    """The '🩺 Estado general' panel: everything --doctor-all knows, formatted for
+    humans — harnesses with version+auth, install scope, catalog CLIs, live
+    providers. Reuses _status_data's rows (already probed) and the shared probe
+    cache; never prints credential material."""
+    lines = ["Harnesses"]
+    lines += table_lines([(cli, version, auth) for cli, version, auth in data["rows"]])
+    lines += table_lines([("pi", {"yes": "instalado", "via-pnpm-dlx": "vía pnpm dlx",
+                                  "no": "FALTA (sin pnpm)"}[_pi_lane_state()], "-")])
+    scope = _install_scope()
+    if isinstance(scope, list):
+        lines += ["", "Alcance de instalación", *table_lines([(", ".join(scope) or "none",)])]
+    lines.append("")
+    lines.append("Herramientas (catálogo)")
+    lines += table_lines([(name, "instalado" if installed else "falta") for name, installed in _tools_data()])
+    lines.append("")
+    lines.append("Proveedores autenticados (probe)")
+    try:
+        from routing_core.catalog import probe_inventory
+        inventory = probe_inventory(models_config.load_config(), cache_root=STATE_DIR)
+        pairs = [(provider, runtime, f"{len(models)} modelos")
+                 for (runtime, provider), models in sorted(inventory.items()) if models]
+        lines += table_lines(pairs) if pairs else ["  (ninguno — logueate en al menos una herramienta)"]
+    except Exception:
+        lines.append("  probe no disponible ahora (corré set-agents --doctor-all)")
+    if data["drift"] == "stale":
+        lines += ["", "drift: la instalación quedó atrás del repo → Instalar / Reparar o ./build.sh --install"]
+    return lines
+
+
+# Instalar / Reparar wizard: which AI CLI to install or apply the harness to
+# (gentle-ai-style onboarding); values feed install.sh --harness verbatim.
+HARNESS_CHOICES = (
+    ("Todos (recomendado)", "all"),
+    ("Claude Code (incluye el lane pi)", "claude"),
+    ("OpenCode", "opencode"),
+    ("Codex", "codex"),
+    ("Solo Pi", "pi"),
+)
+
+
 # AC-24/AC-29: the single source of truth for the main menu's order -- Vault sits right
 # before Salir (closing the menu-debt finding: the old numbered grid had it AFTER Salir, at
 # index 9 while Salir was 8). Arrow-key navigation makes the bracketed numbers themselves
 # cosmetic history, not a contract -- README.md/INSTALACION.md (AC-30) describe the selector,
 # not literal [N] numbers.
 MENU_ITEMS = (
+    "🩺 Estado general",
     "📦 Instalar / Reparar",
     "🔄 Actualizar",
     "🧠 Modelos",
     "🧰 Herramientas (CLIs)",
     "🔌 MCPs",
     "🧩 Plugins Claude Code",
-    "📊 Estado",
     "🗒  Vault Obsidian",
     "⏻  Salir",
 )
@@ -2106,37 +2189,43 @@ def menu():
             return 0
         index = choice.index
         if index == 0:
-            if run_tty([str(ROOT / "install.sh")]) != 0:
-                print(color("El instalador terminó con error — revisá la salida de arriba.", "31"))
+            # Estado general: the doctor-all panel, formatted, as the toggle
+            # picker's header (F-03's lesson: print()s die with the alt-screen).
             drift = drift_state()
+            print(dim("· relevando estado…"))
+            status_data = _status_data(rows=True)
+            estado_lines = _estado_general_lines(status_data)
+            estado_header = "\n".join([_status_machine_line(status_data), ""] + estado_lines)
+            toggle = tui.run_picker(
+                (f"Togglear auto-update (hoy: {'on' if auto_update_enabled() else 'off'})", "Volver"),
+                style=style, header=estado_header)
+            if isinstance(toggle, tui.Selected) and toggle.index == 0:
+                set_auto_update(not auto_update_enabled())
         elif index == 1:
+            # gentle-ai-style onboarding: pick which AI CLI to install or apply
+            # the harness to; Esc backs out without running anything.
+            picked = tui.run_picker(
+                [label for label, _ in HARNESS_CHOICES], style=style,
+                header="¿Qué CLI de IA querés instalar o aplicarle el harness?")
+            if isinstance(picked, tui.Selected):
+                harness = HARNESS_CHOICES[picked.index][1]
+                if run_tty([str(ROOT / "install.sh"), "--harness", harness]) != 0:
+                    print(color("El instalador terminó con error — revisá la salida de arriba.", "31"))
+                drift = drift_state()
+        elif index == 2:
             if cmd_update() == 0:
                 update_badge = "al día"
             drift = drift_state()
-        elif index == 2:
+        elif index == 3:
             if run_tty([str(ROOT / "setup-models.sh")]) != 0:
                 print(color("El wizard terminó con error — revisá la salida de arriba.", "31"))
             drift = drift_state()
-        elif index == 3:
-            tools_menu()
         elif index == 4:
-            mcp_menu()
+            tools_menu()
         elif index == 5:
-            plugins_menu()
+            mcp_menu()
         elif index == 6:
-            drift = drift_state()
-            status_data = _status_data(rows=True)
-            print(_status_machine_line(status_data))
-            print()
-            status_lines = _status_table_lines(status_data)
-            for line in status_lines:
-                print(line)
-            # F-03: same table, as the toggle picker's header -- visible while deciding, not
-            # only before the alternate screen clears it.
-            status_header = "\n".join([_status_machine_line(status_data), ""] + status_lines)
-            toggle = tui.run_picker(("Togglear auto-update", "Volver"), style=style, header=status_header)
-            if isinstance(toggle, tui.Selected) and toggle.index == 0:
-                set_auto_update(not auto_update_enabled())
+            plugins_menu()
         elif index == 7:
             vault_menu()
         elif index == 8:
