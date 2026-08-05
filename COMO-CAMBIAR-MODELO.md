@@ -6,7 +6,10 @@ La selección viva la hace el router en cada spawn (`set-agents --route-decide`,
 roles): en los lanes claude-code y pi la decisión pisa el frontmatter vía `--model`; en opencode
 se materializa con las variantes `@tier` (6 roles tiered) y, para el resto, corre el default
 curado registrando `MODEL_STATIC_FALLBACK` — visible, nunca silencioso. Fijar algo acá NO apaga
-el router: es curar el fallback y las preferencias que el router respeta.
+el router: es curar el fallback y las preferencias que el router respeta. El **effort** de la
+decisión también viaja donde el runtime tiene la perilla: en el lane pi va como `--thinking`;
+en claude-code no existe la perilla (y el catálogo clava anthropic en medium); en opencode/codex
+el effort vive en la propia escalera de modelos y en la columna EFFORT estática.
 
 Model routing lives in **`models.toml`**: active subscriptions, the model catalog, one model
 set per **area** (the `duty` column of `roles.tsv`), and per-role overrides. `roles.tsv` holds

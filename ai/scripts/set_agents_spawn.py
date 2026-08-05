@@ -201,8 +201,16 @@ def _model_fallback_marker(stderr_text: str) -> str | None:
     return None
 
 
+# ADR-0030 (effort extension): the route decision's effort maps 1:1 onto pi's own
+# `--thinking` levels. Closed set on purpose — anything outside it (None included)
+# simply omits the flag: an advisory knob must never fail a spawn or reach argv
+# unvalidated.
+_PI_THINKING_LEVELS = frozenset({"off", "minimal", "low", "medium", "high", "xhigh", "max"})
+
+
 def spawn(role: str, task: str, provider: str, model: str, prompt_path,
-          guard_tools=GUARD_TOOLS_READONLY, cwd=None, timeout: float = PI_TIMEOUT_SECONDS):
+          guard_tools=GUARD_TOOLS_READONLY, cwd=None, timeout: float = PI_TIMEOUT_SECONDS,
+          effort=None):
     """One guarded pi child (T-303/T-304). Returns `(outcome, detail)`:
 
     - `("success", {"model": ..., "usage": ...})` — agent_settled reached, exit 0, the
@@ -247,8 +255,9 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     # and prompt library too — added context weight the dispatch lane's original,
     # minimal-and-auditable design never accounted for (see docs/adr/0007-pi-lane.md,
     # amended by docs/adr/0017-pi-interactive-target.md).
+    thinking = ("--thinking", effort) if effort in _PI_THINKING_LEVELS else ()
     argv = catalog.pi_pinned_argv(
-        "--model", target_id, "--print", "--mode", "json", "--no-session", "--no-extensions",
+        "--model", target_id, *thinking, "--print", "--mode", "json", "--no-session", "--no-extensions",
         "--no-context-files", "--no-skills", "--no-prompt-templates", "--tools", ",".join(guard_tools),
         "--append-system-prompt", str(prompt_path), task,
     )
@@ -390,8 +399,11 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         started = time.time()
         role_prompt = (Path(prompt_root) if prompt_root else CANON_AGENTS) / f"{role}.md"
         # SEC-A02: always the read-only tier; this routed path never accepts an override.
+        # ADR-0030: the decision's effort rides along as pi's --thinking level (validated
+        # against the closed set inside spawn(); absent/unknown just omits the flag).
         outcome, detail = spawn(role, task, provider, model, role_prompt,
-                                guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd)
+                                guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd,
+                                effort=data.get("effort"))
         latency_ms = max(0, int((time.time() - started) * 1000))
         terminal_outcome = "success" if outcome == "success" else "failure"
         terminal_args = ["--route-terminal", run_id, terminal_outcome, "--latency-ms", str(latency_ms), "--json"]

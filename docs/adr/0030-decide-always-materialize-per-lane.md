@@ -51,8 +51,19 @@ Two immutable contracts bound the solution space:
 - The tiered roster stays six; full coverage arrives through lanes that apply `--model` at spawn
   time (claude-code today; pi's spawn CLI shares the property). A future widening of the OpenCode
   variant roster remains possible but is NOT required for coverage.
-- Decision `effort` still does not propagate to any child process (Claude Code has no such flag;
-  codex effort remains the static `codex_effort` column). Explicitly deferred as a future extension.
+- Decision `effort` propagates **where the runtime has the knob** (2026-08-05 extension):
+  - **pi lane**: `set_agents_spawn.spawn()` maps the decision's effort onto pi's own
+    `--thinking <level>` flag (closed level set validated in code; absent/unknown omits the
+    flag — an advisory knob never fails a spawn). `route_and_spawn` threads `data.effort`
+    through; the quota-failover replacement spawn stays effort-less (its envelope carries none).
+  - **Claude Code lane**: no effort flag exists on the CLI, and the catalog itself pins every
+    anthropic route row to `effort = "medium"` (`routing_core/catalog.py` validation) — there is
+    nothing to propagate by construction.
+  - **OpenCode `@tier` variants**: per-tier `reasoningEffort` frontmatter is blocked by the
+    immutable pin that a variant differs from its base agent ONLY in the `model:` line
+    (`tests/test_harness.py:2892`). Effort stays embodied in the model ladder itself
+    (luna/sol/terra are effort-differentiated models); codex agents keep the static
+    `model_reasoning_effort` column.
 - Cost: one extra `--route-decide` per non-tiered spawn (envelope, no durable run). Cached probe;
   no new subprocesses beyond the CLI call itself.
 
