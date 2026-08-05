@@ -34,3 +34,4 @@
 | [0027](0027-milestone-narration-digest.md) | Narración por hito, digest matinal generado, notas como entrada | Accepted | 2026-08-04 | — | — |
 | [0028](0028-living-scope.md) | Alcance vivo: re-verificación de spec hash, amend-spec, supersede-package | Accepted | 2026-08-04 | — | — |
 | [0029](0029-probe-driven-model-selection.md) | "El probe manda": inventario descubierto como fuente de verdad de modelos | Accepted | 2026-08-04 | — | — |
+| [0030](0030-decide-always-materialize-per-lane.md) | Decide siempre: una decisión de routing por spawn (28/28 roles), materializada según el lane | Accepted | 2026-08-04 | — | — |

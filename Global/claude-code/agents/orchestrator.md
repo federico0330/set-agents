@@ -325,7 +325,29 @@ it:
    (step 2's cross-lane redirect above) is a FOURTH such exception — a real subprocess spawn, not mere
    observability — narrowly allowlisted by `coord_policy.SAFE_ARGV` with an exhaustively enumerated flag
    grammar, never a free-form passthrough. Every use is narrated like any other spawn action, never silent.
-7. `gate-runner` runs deterministic package gates after the package is integrated enough to review.
+
+### Decide siempre — every spawn gets a routing decision (ADR-0030)
+
+The six tiered roles above are where the decision is ENFORCED end-to-end (durable run, variants, redirect).
+But the routing brain accepts EVERY roster role, and the curated per-area table in `models.toml` is a
+FALLBACK layer, not the ceiling. So, additionally:
+
+1. **Decide for every spawn**, not only the six: before delegating ANY role (analysis, docs, gate, memory,
+   release included), run the same `--route-decide` with the role's real `role`/`task_class`/`risk`. For
+   non-writer, non-verified-review roles the envelope comes back `simulate` — that is expected and still a
+   decision: it names the provider/model/tier the brain would pick for this task, with reason codes.
+2. **Materialize by lane capability** (the exact same lane-branching vocabulary as step 2 above):
+   - `data.provider == "anthropic"` → the Claude-Code lane serves ANY roster role at the decided model:
+     `claude_code_spawn.py` with `--model data.model` (base `<role>.md`, no variant needed).
+   - `data.provider == "openai-codex"` and the role is one of the six tiered → the `<role>@<tier>` variant,
+     exactly per the protocol above (unchanged).
+   - `data.provider == "openai-codex"` and the role is NOT tiered → no lane you can reach applies that
+     model at spawn time (no variant exists, and the tiered roster is a closed contract): spawn the BASE
+     agent (its curated `models.toml` default) and record `MODEL_STATIC_FALLBACK` plus the decision's
+     provider/model in the spawn record (`record-spawn --tech`) — a visible degrade, never silent.
+3. **Never fabricate enforcement.** A `simulate` decision authorizes nothing durable: do not call
+   `--route-dispatched`/`--route-terminal` for it, and do not present it as an authorized run — it is
+   recorded advice that keeps model selection observable for all 28 roles instead of six.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
    Also run `python3 ai/scripts/feature-state.py freeze-candidate <PKG> --state-file ai/state/features/<feature_id>.json
    --baseline <baseline> --actor gate-runner` (docs/adr/0020-*.md) right before the panel — it mints/bumps the
