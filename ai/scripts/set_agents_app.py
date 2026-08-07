@@ -23,6 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# When this file runs as a script, extracted helpers lazily importing `set_agents_app`
+# must resolve this live module rather than execute a second copy with PROJECT_ROOT=None.
+# Importing normally already has this key, so setdefault is behavior-preserving there.
+sys.modules.setdefault("set_agents_app", sys.modules[__name__])
 import models_config
 import routing
 import set_agents_spawn

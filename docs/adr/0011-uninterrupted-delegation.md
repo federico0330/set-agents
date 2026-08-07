@@ -51,7 +51,8 @@ or when a `HUMAN_DECISION_REQUIRED` blocker is being recorded. The operational t
 
 The end-of-turn block is **kept verbatim**. It is how the user follows the thread without opening state files,
 and `tests/test_harness.py` asserts `"Necesito de vos:"` reaches all three runtimes. This ADR adds the missing
-condition; it does not remove the report.
+condition; it does not remove the report. (Template wording later updated by ADR-0033 — the sentinel line and
+this stopping rule are unchanged; "verbatim" protects the rule, not the report's phrasing.)
 
 Rejected: *deleting or weakening the block*. The block was never the defect — the absence of a stopping rule
 was. Removing it would trade an unnecessary pause for an opaque session.

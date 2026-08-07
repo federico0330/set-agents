@@ -21,7 +21,7 @@ PROBE_CACHE_TTL = 300.0
 # this ONE invocation builder, so the audited pair and the executed child are provably the
 # same binary. Bump PI_PINNED_VERSION deliberately (code review), never silently.
 PI_PACKAGE = "@earendil-works/pi-coding-agent"
-PI_PINNED_VERSION = "0.81.1"
+PI_PINNED_VERSION = "0.84.0"
 
 # PKG-N02 (repair R1): `set_agents_app.py --doctor --harness pi` already allows 60s
 # (DOCTOR_TIMEOUT_SECONDS in set_agents_spawn.py) for a cold `pnpm dlx` resolution on the

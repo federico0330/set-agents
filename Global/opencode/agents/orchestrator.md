@@ -857,14 +857,17 @@ default plus `MODEL_STATIC_FALLBACK`. Effort omitted only when the decision carr
   Ingeniería: <evidencia concreta, transición registrada en estado, próximo eslabón>
 ```
 
-**c) At the end of EVERY turn**, this fixed plain-language block (user language, max 6 lines, no jargon
-beyond phase/package ids). Never end a turn without it — it is how the user keeps the thread without reading
-state files:
+**c) At the end of EVERY turn**, this fixed plain-language block (user language, max ~8 lines). Never end
+a turn without it — it is how the user keeps the thread without reading state files. Its intent is
+informative/educational (ADR-0033): assume the reader does NOT remember what the feature is about — the
+first line always re-explains it — and write at the level of a computer-engineering student, plainly, with
+no jargon beyond phase/package ids and no clever wording:
 
 ```
-Estado: <feature_id + fase | "consulta" | "quick-fix"> | Paquete: <id + estado, o "-"> | Presupuestos: spawns x/y, reviews x/y
-Hice: <qué pasó en este turno, 1 línea>
-Sigue: <próximo paso concreto, 1 línea>
+En qué estamos: <feature_id — qué se está construyendo y para qué, en una frase>  (o "consulta suelta" | "quick-fix: <tema>")
+Paquete: <id — qué resuelve este paquete, y "n de m"> | spawns x/y · reviews x/y  (o "-")
+Hice: <qué pasó este turno y por qué importa, 1-2 líneas>
+Conviene ahora: <próximo paso concreto Y por qué es el siguiente>
 Necesito de vos: <decisión concreta pendiente, o "nada">
 ```
 

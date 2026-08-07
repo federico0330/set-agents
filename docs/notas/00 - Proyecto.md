@@ -26,20 +26,21 @@
 
 ## Quick-fixes recientes
 
+- 2026-08-06T13:33 — Preserve explicit --project context in set_agents_app.py script mode by aliasing __main__ for lazy routing_cli imports (done)
 - 2026-08-03T02:36 — P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id… (done)
 - 2026-07-30T01:22 — P2-vault-mandatory (accepted): exclude_notes_from_git/_notes_currently_excluded chequeaban (project/'.git').is_dir(), f… (done)
 - 2026-07-30T01:22 — P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, gu… (done)
 
 ## Decisiones
 
+- [[decisiones/2026-08-07 correccion-diagnostico-400-out-of-extra-usage-en-pi|Correccion diagnostico 400 out-of-extra-usage en pi]]
+- [[decisiones/2026-08-07 real-installs-pi-opencode-pin-0840|pi y opencode pasan a instalacion real; PI_PINNED_VERSION 0.81.1 -> 0.84.0]]
+- [[decisiones/2026-08-07 end-of-turn-block-informative|Bloque de fin de turno pasa a formato informativo (ADR-0033)]]
 - [[decisiones/2026-08-05 adr-0032-materializacion-spawn-y-pins|ADR-0032: materialización en el spawn para opencode/codex y pins de modelo]]
 - [[decisiones/2026-08-05 adr-0031-observabilidad-por-spawn|Observabilidad por spawn (ADR-0031): log de decisiones + campos estructurados en record-spawn]]
 - [[decisiones/2026-08-03 ac-01i-grunt-no-flip-en-verified-review-2-proveedores|AC-01(i): grunt no puede flippear provider en verified review con catalogo de 2 proveedores]]
 - [[decisiones/2026-08-03 audit-debt-006-p2-cierre-parcial-016|Cierre parcial de audit-debt-006-p2: PR-07/08/09 saldadas por 016; PR-06/10/11 siguen diferidas]]
 - [[decisiones/2026-08-02 p1f-01-repair-entry-pop-package-id-opcional|P1F-01 aceptado como deuda low: el pop de repair_entry depende del --package-id opcional]]
-- [[decisiones/2026-08-02 build-staging-no-concurrent-full-gates|Los gates de suite completa no se corren en paralelo: build.sh colisiona en staging compartido]]
-- [[decisiones/2026-08-02 ac-13-roster-half-environment-gated|AC-13: la mitad de discoverability viva del roster queda environment-gated, no BLOCKED de feature]]
-- [[decisiones/2026-08-02 ac09-ac10-pi-minimal-target-superseded-by-013|AC-08/AC-14 supersedes ac09-ac10-pi-minimal-target-accepted: pi gains a real install.py target and generated agent tree]]
 
 ## Referencias
 

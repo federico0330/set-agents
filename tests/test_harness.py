@@ -2734,15 +2734,17 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("route dec1_" + "c" * 32, note)
         self.assertNotIn("SPAWN-001 gate-runner ·", note)
 
-    def test_orchestrator_narration_reaches_all_three_harnesses(self):
-        # The user reads the harness through OpenCode, Claude Code and Codex.
-        # generate.py copies the canonical body verbatim into all three, so this
+    def test_orchestrator_narration_reaches_all_four_harnesses(self):
+        # The user reads the harness through OpenCode, Claude Code, Codex and pi.
+        # generate.py copies the canonical body verbatim into all four, so this
         # is the test that proves the transparency protocol is not OpenCode-only.
         run("./build.sh")
         artifacts = [
             (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
             (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
             (ROOT / "Global/codex/agents/orchestrator.toml").read_text(encoding="utf-8"),
+            (ROOT / "Global/pi/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (ROOT / "Global/pi/AGENTS.md").read_text(encoding="utf-8"),
         ]
         for text in artifacts:
             self.assertIn("▸ Instancio", text)
@@ -2753,8 +2755,11 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("terminó", text)
             self.assertIn("log-narrative", text)
             self.assertIn("record-spawn --client", text)
-            # The end-of-turn block must survive alongside the new protocol.
+            # The end-of-turn block must survive alongside the new protocol,
+            # in its ADR-0033 informative form.
             self.assertIn("Necesito de vos:", text)
+            self.assertIn("En qué estamos:", text)
+            self.assertIn("Conviene ahora:", text)
 
     def test_context_is_allowlisted_read_only_across_all_three_runtimes(self):
         # ADR-0012/AC-19: --context is a THIRD sanctioned channel, distinct from the mutating
@@ -2824,10 +2829,13 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("--evidence", text)
             # AC-08: the one stop that survives.
             self.assertIn("every provider is exhausted", text)
-        # The end-of-turn block itself is untouched — this package adds the
-        # condition for ending a turn, it does not remove the report.
+        # The end-of-turn block's stopping rule is untouched — this package adds
+        # the condition for ending a turn, it does not remove the report. The
+        # report's wording is ADR-0033's informative template.
         for text in artifacts:
             self.assertIn("Necesito de vos:", text)
+            self.assertIn("En qué estamos:", text)
+            self.assertIn("Conviene ahora:", text)
 
     def test_shared_doctrine_covers_turn_continuity(self):
         # The pause the user hit was in OpenCode, where AGENTS.md is the doctrine

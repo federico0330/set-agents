@@ -2907,6 +2907,32 @@ class RoutingTests(unittest.TestCase):
             finally:
                 set_agents_app.ROOT=old_root
 
+    def test_route_decide_script_uses_explicit_project_context(self):
+        # Regression: running set_agents_app.py as a script used to let routing_cli's
+        # lazy `import set_agents_app` execute a second module copy. That copy retained
+        # PROJECT_ROOT=None, so every explicit project's high-risk context was reported
+        # missing even though the pack was present and fresh.
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"project"
+            (root/"ai/state/features").mkdir(parents=True)
+            (root/"docs").mkdir()
+            pack=root/"docs/pack.md"; pack.write_text("ctx")
+            self._write_feature_doc(root,"active-feat","PACKAGE_GATES","in_progress",
+                                    "2020-01-01T00:00:00+00:00")
+            os.utime(pack,(time.time(),time.time()))
+            bins,_=self._probe_stubs(td)
+            env=self._cli_env(Path(td)/"routing-root",bins)
+            descriptor=json.dumps({"role":"gate-runner","task_class":"inspection","risk":"high",
+                                   "selected_runtime":"claude-code","feature_id":"active-feat",
+                                   "package_id":"P1"})
+            result=self._cli_run(["--route-decide","-","--project",str(root),"--json"],env,descriptor)
+            self.assertEqual(result.returncode,0,(result.stdout,result.stderr))
+            envelope=json.loads(result.stdout)
+            self.assertTrue(envelope["ok"])
+            self.assertTrue(envelope["data"]["context_ok"])
+            self.assertEqual(envelope["data"]["feature_id"],"active-feat")
+            self.assertEqual(envelope["data"]["package_id"],"P1")
+
     def _toml_row(self, row):
         lines=["[[routes]]"]
         for key, value in row.items():
