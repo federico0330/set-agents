@@ -18,15 +18,15 @@
 
 ## Hallazgos
 
-- F-02 [high] closed — 
-- F-04 [medium] refuted —  · refutado por finding-verifier: The claimed cost cannot occur: the failing assertion carries the guard's own output, so the failure self-diagnoses at t… [tests/test_harness.py:989 asserts returncode 0 with verified.stdout + verified.…]
-- F-05 [low] refuted —  · refutado por finding-verifier: AC-13 promises that init cannot assert an approval that never happened by way of the spec sha256; it says nothing about… [docs/specs/009-self-application/spec.md:133-141 states AC-13 in terms of the sp…]
-- F-06 [medium] refuted —  · refutado por finding-verifier: Re-raises a recorded, reasoned exclusion, and its premise that the debt is invisible from the artifacts is false: it is… [ai/state/decisions-log.jsonl:31 holds the slug cuatro-archivos-de-estado-afirma…]
-- F-07 [low] refuted —  · refutado por finding-verifier: It describes no defect and says so in its own text. Every enforceable property it examined is implemented and exercised… [check-feature-state.py:150-153 refuses an empty reason with WAIVER_WITHOUT_REAS…]
-- F-01 [high] closed — 
-- F-03 [high] closed — 
-- F-08 [medium] closed — 
-- F-09 [low] refuted —  · refutado por finding-verifier: The explicit --mode feature is required rather than wrong: the CLI default is scoped and full SDD budgets are opt-in, s… [ai/scripts/feature-state.py:2427 sets --mode default scoped with the adjacent c…]
+- F-02 [high] closed
+- F-04 [medium] refuted · refutado por finding-verifier: The claimed cost cannot occur: the failing assertion carries the guard's own output, so the failure self-diagnoses at t… [tests/test_harness.py:989 asserts returncode 0 with verified.stdout + verified.…]
+- F-05 [low] refuted · refutado por finding-verifier: AC-13 promises that init cannot assert an approval that never happened by way of the spec sha256; it says nothing about… [docs/specs/009-self-application/spec.md:133-141 states AC-13 in terms of the sp…]
+- F-06 [medium] refuted · refutado por finding-verifier: Re-raises a recorded, reasoned exclusion, and its premise that the debt is invisible from the artifacts is false: it is… [ai/state/decisions-log.jsonl:31 holds the slug cuatro-archivos-de-estado-afirma…]
+- F-07 [low] refuted · refutado por finding-verifier: It describes no defect and says so in its own text. Every enforceable property it examined is implemented and exercised… [check-feature-state.py:150-153 refuses an empty reason with WAIVER_WITHOUT_REAS…]
+- F-01 [high] closed
+- F-03 [high] closed
+- F-08 [medium] closed
+- F-09 [low] refuted · refutado por finding-verifier: The explicit --mode feature is required rather than wrong: the CLI default is scoped and full SDD budgets are opt-in, s… [ai/scripts/feature-state.py:2427 sets --mode default scoped with the adjacent c…]
 
 ## Recorrido
 

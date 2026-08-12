@@ -83,6 +83,32 @@ re-derive).
 Runtime gate timeout: `e2e.sh` cuts the runtime-verifier at `E2E_TIMEOUT` seconds (default 600).
 If a project's E2E legitimately needs longer, export a bigger `E2E_TIMEOUT` instead of authorizing reruns.
 
+## Running long commands without going silent (ADR-0041, AC-06/AC-07/AC-08)
+
+**Never pipe a long-running gate through `| tail -N`.** Without `-f`, `tail` structurally cannot
+emit a single byte until it sees EOF, regardless of how the upstream command buffers its own
+writes (measured: even an explicitly-flushed writer piped through `stdbuf -oL ... | tail -3`
+stays silent for the whole run). An agent watching that pipe looks stalled for the entire
+command, which is how multiple agents died mid-session with `Agent stalled: no progress for
+600s` — that 600s watchdog belongs to the **agent runtime**, not to this repository, and this
+feature cannot change it; what this repo controls is not creating the silence that trips it.
+
+Correct patterns for a command whose own output has real gaps, in order of preference:
+
+1. Let the output flow raw (no pipe at all) — the default and simplest choice.
+2. Redirect to a file and read it after the command exits, or poll the file's size/tail while
+   the command is still running in the background — never pipe the live command through `tail`.
+3. `ai/scripts/heartbeat-run.py --interval N -- <command> [args...]` — streams the child's
+   merged stdout/stderr line by line as it arrives and injects its own heartbeat line if `N`
+   seconds pass with no real output, so something is always emitted well under any watchdog.
+   Default interval 60s. This does not make the command faster; a slow command is a separate
+   problem from a silent one.
+
+If a tool needs naming for "make this command's own stdout line-buffered", it is `python3 -u` /
+`PYTHONUNBUFFERED=1` — portable. `stdbuf` is GNU coreutils and does not exist on macOS/BSD, where CI
+also runs (`.github/workflows/*.yml`, job `verify-macos`); besides being non-portable, it does not
+fix the `| tail -N` case above.
+
 Known debt: `Global/_canonical/opencode-agents/package-gate-runner.md` hardcodes absolute paths from the
 original `~/iey/iey-ai` project in its allow-list. Outside that repo those permissions are inert (the agent
 is scoped to the `replenishment-v2` feature only), but new machines inherit dead paths until that prompt is

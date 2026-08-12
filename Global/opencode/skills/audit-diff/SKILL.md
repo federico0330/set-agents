@@ -77,5 +77,10 @@ must-fix. A finding IS a blocking problem (1); no findings = `AUDIT_PASS` (0). D
   verification: command/test/check that proves the fix
 ```
 
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).
+
 ## Rule
 Never patch code here. Never approve on the implementer's word. Vague comments are not findings.

@@ -20,3 +20,10 @@ Un usuario con perfil local distinto no recibe un falso positivo de drift. A cam
 ## Notas propias
 
 _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
+
+**Rectificación 2026-08-12** (no borra lo de arriba): la frase del bloque auto "install.sh y
+setup_models.py siguen funcionando sin tocarlos" es correcta para `install.sh`, pero **falsa para
+`setup_models.py`** — sí se rompía (por una razón distinta al perfil: corre `--check`
+inmediatamente después de escribir un `models.toml` nuevo, antes de que nada regenere `Global/`).
+Detalle y arreglo en
+[[decisiones/2026-08-12 correccion-setup-models-si-habia-que-tocarlo|correccion-setup-models-si-habia-que-tocarlo]].

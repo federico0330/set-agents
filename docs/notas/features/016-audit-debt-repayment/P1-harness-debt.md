@@ -20,7 +20,7 @@
 
 ## Hallazgos
 
-- P1F-01 [low] open — 
+- P1F-01 [low] open
 
 ## Recorrido
 

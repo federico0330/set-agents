@@ -18,25 +18,25 @@
 
 ## Hallazgos
 
-- F-01 [critical] closed — 
-- F-02 [critical] closed — 
-- F-03 [high] closed — 
-- F-04 [high] closed — 
-- F-05 [medium] closed — 
-- F-06 [medium] closed — 
-- F-07 [medium] closed — 
-- F-08 [medium] closed — 
-- F-09 [medium] closed — 
-- F-10 [medium] closed — 
-- F-11 [medium] closed — 
-- F-12 [low] closed — 
-- F-13 [low] closed — 
-- F-14 [low] closed — 
-- F-15 [low] closed — 
-- NEW-01 [high] closed — 
-- NEW-02 [medium] closed — 
-- NEW-03 [medium] closed — 
-- NEW-04 [low] closed — 
+- F-01 [critical] closed
+- F-02 [critical] closed
+- F-03 [high] closed
+- F-04 [high] closed
+- F-05 [medium] closed
+- F-06 [medium] closed
+- F-07 [medium] closed
+- F-08 [medium] closed
+- F-09 [medium] closed
+- F-10 [medium] closed
+- F-11 [medium] closed
+- F-12 [low] closed
+- F-13 [low] closed
+- F-14 [low] closed
+- F-15 [low] closed
+- NEW-01 [high] closed
+- NEW-02 [medium] closed
+- NEW-03 [medium] closed
+- NEW-04 [low] closed
 
 ## Recorrido
 

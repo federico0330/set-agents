@@ -20,7 +20,7 @@
 - [[features/016-audit-debt-repayment|016-audit-debt-repayment]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/019-harness-evolution|019-harness-evolution]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/020-honest-dashboard|020-honest-dashboard]] — fase `DONE` · paquetes 2/2 · **DONE**
-- [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `PACKAGE_REVIEW` · paquetes 0/2
+- [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
 
 ## Qué falta
 
@@ -33,6 +33,7 @@
 
 ## Quick-fixes recientes
 
+- 2026-08-12T15:24 — render_notes emitia trailing whitespace en la linea de un finding sin category ni summary, rompiendo git diff --check y… (done)
 - 2026-08-06T13:33 — Preserve explicit --project context in set_agents_app.py script mode by aliasing __main__ for lazy routing_cli imports (done)
 - 2026-08-03T02:36 — P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id… (done)
 - 2026-07-30T01:22 — P2-vault-mandatory (accepted): exclude_notes_from_git/_notes_currently_excluded chequeaban (project/'.git').is_dir(), f… (done)
@@ -40,21 +41,21 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-12 sexto-stall-segunda-muerte-del-mismo-encargo|HUMAN_DECISION_REQUIRED: sexto stall de la sesion y segunda muerte del review de P2]]
+- [[decisiones/2026-08-12 quinto-stall-corrige-el-patron-y-la-mitigacion|Quinto stall: el patron no era 'agentes mutadores' y nombrar la herramienta no alcanza]]
+- [[decisiones/2026-08-12 olvide-route-dispatched-en-el-relanzamiento|Cuarto desliz de bookkeeping del orquestador: omiti --route-dispatched en un relanzamiento]]
+- [[decisiones/2026-08-12 p2-murio-por-limite-de-sesion-con-trabajo-parcial|El implementer de P2 murio por limite de sesion con AC-06, 08 y 09 hechos y AC-07 pendiente]]
+- [[decisiones/2026-08-12 segunda-vez-owned-paths-con-adr-adivinado|Segunda vez que escribo owned_paths con un nombre de ADR que todavia no existe]]
+- [[decisiones/2026-08-12 commitear-un-paquete-en-review-es-guardar-no-aceptar|Commitear un paquete que esta en PACKAGE_REVIEW: guardar no es aceptar]]
 - [[decisiones/2026-08-12 correccion-setup-models-si-habia-que-tocarlo|CORRECCION: la nota que decia que setup_models.py seguia funcionando sin tocarlo era falsa]]
 - [[decisiones/2026-08-12 la-evidencia-de-build-check-de-019-y-020-no-probaba-drift|Los gates de 019 y 020 que citaban 'build.sh --check -> CHECK_PASS' como prueba de sin-drift no probaban eso]]
-- [[decisiones/2026-08-12 check-compara-con-perfil-canonico-fijo|build.sh --check compara siempre con --profile go-zen fijo, no con el perfil local]]
-- [[decisiones/2026-08-12 cuarto-stall-de-la-sesion-patron-de-infraestructura|Cuarto stall de infraestructura de la sesion: el patron es de agentes mutadores de corrida larga, no de un encargo puntual]]
-- [[decisiones/2026-08-12 owned-paths-desactualizado-por-cambio-de-diseno|owned_paths escrito contra un diseno que el ADR despues cambio: error del orquestador, no del implementer]]
-- [[decisiones/2026-08-12 anclas-file-line-de-docs-modules-derivan-sin-red|Las anclas file:line sembradas en docs/modules/ derivaron dentro de la misma feature: la desviacion de AC-17 dejo de ser teorica]]
-- [[decisiones/2026-08-12 cuarta-verificacion-fabricada-y-patron-del-hermano|Cuarta verificacion fabricada del rol reparador, y el patron de reparar el ejemplo en vez de la clase (tercera iteracion)]]
-- [[decisiones/2026-08-11 reopen-resetea-contadores-opcion-A-autorizada|Federico autorizo la opcion A: reopen resetea el contador cuyo agotamiento produjo el blocker]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-12T14:28:51+00:00_
+_Actualizado: 2026-08-12T21:09:05+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

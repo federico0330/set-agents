@@ -19,14 +19,14 @@
 
 ## Hallazgos
 
-- F-01 [high] refuted —  · refutado por finding-verifier: The blind spot is real but the risk it names is covered, by measurement rather than assertion. AC-03 as approved states… [docs/specs/009-self-application/spec.md:92-94 states the skip rule; scratch rep…]
-- F-03 [medium] closed — 
-- F-05 [medium] refuted —  · refutado por finding-verifier: Describes a hypothetical future edit, not a defect in the delivered code. [ai/scripts/verify.sh:69-73 holds three non-empty reasons; ai/scripts/verify.sh:…]
-- F-02 [high] closed — 
-- F-04 [medium] closed — 
-- F-06 [medium] refuted —  · refutado por finding-verifier: A pre-existing property of the ownership tool misattributed to this package, whose proposed repair is affirmatively har… [git log --oneline -- ai/scripts/check-owned-paths.py returned f32a033 from feat…]
-- F-07 [medium] refuted —  · refutado por finding-verifier: Imposes an obligation neither the approved contract nor the repo convention contains. No P1 criterion requires an ADR, … [docs/specs/009-self-application/spec.md:83-110 contains no ADR requirement in a…]
-- F-08 [low] refuted —  · refutado por finding-verifier: Pre-existing and out of the criterion scope. The hand-edit permission is in the pre-image of the diff, so the package d… [git diff bdf2a2b2 -- Global/_canonical/agents/memory-scribe.md shows the pre-im…]
+- F-01 [high] refuted · refutado por finding-verifier: The blind spot is real but the risk it names is covered, by measurement rather than assertion. AC-03 as approved states… [docs/specs/009-self-application/spec.md:92-94 states the skip rule; scratch rep…]
+- F-03 [medium] closed
+- F-05 [medium] refuted · refutado por finding-verifier: Describes a hypothetical future edit, not a defect in the delivered code. [ai/scripts/verify.sh:69-73 holds three non-empty reasons; ai/scripts/verify.sh:…]
+- F-02 [high] closed
+- F-04 [medium] closed
+- F-06 [medium] refuted · refutado por finding-verifier: A pre-existing property of the ownership tool misattributed to this package, whose proposed repair is affirmatively har… [git log --oneline -- ai/scripts/check-owned-paths.py returned f32a033 from feat…]
+- F-07 [medium] refuted · refutado por finding-verifier: Imposes an obligation neither the approved contract nor the repo convention contains. No P1 criterion requires an ADR, … [docs/specs/009-self-application/spec.md:83-110 contains no ADR requirement in a…]
+- F-08 [low] refuted · refutado por finding-verifier: Pre-existing and out of the criterion scope. The hand-edit permission is in the pre-image of the diff, so the package d… [git diff bdf2a2b2 -- Global/_canonical/agents/memory-scribe.md shows the pre-im…]
 
 ## Recorrido
 

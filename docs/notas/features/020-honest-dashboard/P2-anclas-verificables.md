@@ -19,11 +19,11 @@
 
 ## Hallazgos
 
-- F-01 [medium] closed — 
-- F-02 [medium] closed — 
-- F-03 [low] closed — 
-- F-04 [low] open — 
-- F-05 [medium] closed — 
+- F-01 [medium] closed
+- F-02 [medium] closed
+- F-03 [low] closed
+- F-04 [low] open
+- F-05 [medium] closed
 
 ## Recorrido
 

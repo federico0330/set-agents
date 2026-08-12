@@ -23,3 +23,8 @@ Approved spec/version, package plan, diff, gate results, assumptions, and known 
 ## Cadence
 One deep review per integrated package. A second pass is focused on repair delta. Full re-review only when repair
 changes architecture, public contracts, or risk surface substantially.
+
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).

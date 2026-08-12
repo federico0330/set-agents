@@ -2337,6 +2337,23 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("render_notes", log_z)
             self.assertIn("RuntimeError: boom-outer", log_z)
 
+    def test_package_note_finding_without_category_or_summary_has_no_trailing_whitespace(self):
+        # Regression: a finding missing both `category` and `summary` used to render
+        # "- ID [sev] status — " -- a bare em dash followed by nothing, which is trailing
+        # whitespace (git diff --check flags it, and it broke verify.sh). No label means
+        # no separator to introduce: the line must simply stop after `status`.
+        fs = self._import("feature-state")
+        package = {
+            "title": "T",
+            "status": "in_progress",
+            "findings": [{"id": "F01", "severity": "medium", "status": "closed"}],
+        }
+        body = fs._package_body("feat-x", package)
+        finding_line = next(line for line in body.splitlines() if line.startswith("- F01"))
+        self.assertEqual(finding_line, finding_line.rstrip(),
+                          "finding line must carry no trailing whitespace")
+        self.assertEqual(finding_line, "- F01 [medium] closed")
+
     def test_render_failure_log_rotates_past_its_size_cap(self):
         fs = self._import("feature-state")
         with tempfile.TemporaryDirectory() as td:
@@ -8992,6 +9009,158 @@ class HarnessTests(unittest.TestCase):
         # AC-29: /explicar is a command the orchestrator runs, not a new role.
         roles = (ROOT / "roles.tsv").read_text()
         self.assertNotIn("explicar", roles)
+
+    def test_heartbeat_run_never_goes_more_than_the_interval_without_emitting(self):
+        # AC-06 (021/P2, ADR-0041): a SYNTHETIC subprocess with known pauses and a reduced
+        # threshold, timestamped as each line is READ (never a real gate suite -- that would
+        # make tests slower to prove something is fast, which the spec forbids). Lines are read
+        # directly off the wrapper's own pipe, never through `tail`, which is the exact
+        # antipattern this AC exists to stop reproducing inside its own test.
+        interval = 0.3
+        child = (
+            "import time\n"
+            "print('start', flush=True)\n"
+            "time.sleep(1.0)\n"
+            "print('after-gap-one', flush=True)\n"
+            "time.sleep(1.0)\n"
+            "print('after-gap-two', flush=True)\n"
+        )
+        proc = subprocess.Popen(
+            [sys.executable, str(ROOT / "ai/scripts/heartbeat-run.py"), "--interval", str(interval),
+             "--", sys.executable, "-u", "-c", child],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=ROOT,
+        )
+        assert proc.stdout is not None
+        lines = []
+        gaps = []
+        last = time.monotonic()
+        with proc.stdout:
+            for raw in proc.stdout:
+                now = time.monotonic()
+                gaps.append(now - last)
+                last = now
+                lines.append(raw.rstrip("\n"))
+        proc.wait(timeout=10)
+        self.assertEqual(proc.returncode, 0, lines)
+        self.assertIn("start", lines)
+        self.assertIn("after-gap-one", lines)
+        self.assertIn("after-gap-two", lines)
+        heartbeats = [line for line in lines if "heartbeat-run" in line]
+        self.assertGreaterEqual(len(heartbeats), 2, lines)  # at least one per real gap
+        # Generous tolerance over `interval` for scheduler jitter -- still far tighter than the
+        # ~60s default, and orders of magnitude under the 600s watchdog this package stops
+        # tripping by never reproducing the `| tail -N` shape that starves it of output.
+        self.assertLessEqual(max(gaps), interval + 1.0, gaps)
+
+    def test_heartbeat_run_reports_a_missing_command_without_a_traceback(self):
+        # A-01 repair (021/P2): a nonexistent command used to raise `FileNotFoundError` straight
+        # out of `subprocess.Popen`, printing a full Python traceback -- the rc did not lie, but
+        # it exposed an internal stack, inconsistent with `--interval 0` / a bad flag, which both
+        # fail clean with rc=2 via argparse.
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "ai/scripts/heartbeat-run.py"), "--interval", "1",
+             "--", "this-command-does-not-exist-xyz"],
+            capture_output=True, text=True, cwd=ROOT,
+        )
+        self.assertNotEqual(proc.returncode, 0, proc)
+        self.assertNotIn("Traceback", proc.stdout, proc.stdout)
+        self.assertNotIn("Traceback", proc.stderr, proc.stderr)
+        self.assertIn("heartbeat-run: cannot execute", proc.stdout + proc.stderr)
+
+    def test_the_tail_pipe_antipattern_never_lands_in_a_versioned_brief_or_template(self):
+        # AC-09 (021/P2, ADR-0041): prevention, not correction -- verified by the spec-challenge
+        # (F-05) that the pattern never lived in a versioned file (Global/_canonical "briefs",
+        # PROYECTO "plantillas" scaffolded into every new project), only in ephemeral spawn
+        # text. This pins it going forward. Pattern fixed by the spec (F-07), not left to this
+        # implementer: anchored to the literal pipe so it never fires on "detail"/"details".
+        pattern = re.compile(r"\| *tail\b")
+        # Direction 1: does not fire on the false positive a naive `grep tail` produces.
+        for benign in (
+            "no stack traces or internal detail to clients",
+            "implementation details",
+            "full detail only in server logs",
+        ):
+            self.assertIsNone(pattern.search(benign), benign)
+        # Direction 2: still catches every real shape of the antipattern -- not narrowed so far
+        # it misses the thing it exists to catch.
+        for offender in ("cmd | tail -3", "cmd 2>&1 | tail -20", "cmd|tail -f", "long_cmd  |   tail -n 5"):
+            self.assertIsNotNone(pattern.search(offender), offender)
+        hits = []
+        scanned = 0
+        for tree in (ROOT / "Global/_canonical", ROOT / "PROYECTO"):
+            for path in sorted(tree.rglob("*")):
+                if not path.is_file():
+                    continue
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    continue
+                scanned += 1
+                for lineno, line in enumerate(text.splitlines(), 1):
+                    if pattern.search(line):
+                        hits.append(f"{path.relative_to(ROOT)}:{lineno}")
+        self.assertGreater(scanned, 50, "scanned suspiciously few files; the globs are wrong")
+        self.assertEqual(hits, [], f"the '| tail' antipattern landed in a versioned brief/template: {hits}")
+
+    def test_tips_uso_and_adr0041_document_the_corrected_root_cause_and_the_watchdog_boundary(self):
+        # AC-07/AC-08 (021/P2, ADR-0041): the doctrine fixes the correct pattern for long
+        # commands, names portable tools only, and writes down that the 600s watchdog belongs
+        # to the agent runtime, not this repository -- without that sentence, "we fixed the
+        # stalls" reads as "they cannot happen again for any other reason", which is false.
+        tips = (ROOT / "TIPS-USO.md").read_text()
+        self.assertIn("Never pipe a long-running gate through `| tail -N`", tips)
+        self.assertIn("heartbeat-run.py", tips)
+        self.assertIn("agent runtime", tips)
+        self.assertIn("PYTHONUNBUFFERED=1", tips)
+        # The root-cause correction: stdbuf is named only to say it does NOT fix the case, never
+        # as an instruction to use it as the remedy (that was the original, false diagnosis).
+        # Two substrings (not one phrase) on purpose: prose wraps at column width, and a single
+        # long phrase spanning a line break would make this assertion fragile to reflow.
+        self.assertIn("stdbuf` is GNU coreutils and does not exist on macOS/BSD", tips)
+        self.assertIn("it does not", tips)
+        self.assertIn("fix the `| tail -N` case above", tips)
+
+        adr = (ROOT / "docs/adr/0041-build-check-verifies-global.md").read_text()
+        self.assertIn("El remedio no es `stdbuf`", adr)
+        self.assertIn("runtime del agente", adr)
+        self.assertIn("heartbeat-run.py", adr)
+
+    def test_spawn_prompt_skill_tells_the_orchestrator_not_to_pipe_gates_through_tail(self):
+        # AC-07 (021/P2, ADR-0041): TIPS-USO.md is read by a human, not injected into a spawn
+        # message -- it does not stop the next spawn message from repeating the antipattern. The
+        # surface that actually propagates is the orchestrator's own fixed spawn-message template,
+        # loaded when composing ANY subagent spawn (spawn-prompt SKILL.md), so the fix lives there
+        # once instead of duplicated into the 28 role briefs (out of scope per the context pack).
+        skill = (ROOT / "Global/_canonical/skills/spawn-prompt/SKILL.md").read_text()
+        self.assertIn(
+            "Never write a `tail -N` pipe into a long-running command in TAREA/PRESUPUESTO", skill
+        )
+        # Root-cause correction, split like the TIPS-USO.md assertion above: prose wraps at column
+        # width, so a single long phrase spanning the line break would be fragile to reflow.
+        self.assertIn("`stdbuf` does", skill)
+        self.assertIn("not fix this (measured", skill)
+        self.assertIn("ai/scripts/heartbeat-run.py --interval N", skill)
+        self.assertIn("`python3 -u`/`PYTHONUNBUFFERED=1`", skill)
+        self.assertIn("GNU coreutils and does", skill)
+        self.assertIn("not exist on macOS/BSD CI", skill)
+        # The antipattern itself must never appear as a literal pipe in this file -- it is
+        # described in prose ("a `tail -N` pipe"), never demonstrated as `| tail`.
+        self.assertIsNone(re.compile(r"\| *tail\b").search(skill))
+
+    def test_the_tail_doctrine_also_reaches_the_skills_the_executor_loads(self):
+        # B-01 repair (021/P2): spawn-prompt/SKILL.md is `enabled_for: orchestrator` -- it governs
+        # what the orchestrator WRITES into a spawn message, not what the reviewer/executor loads
+        # for itself. package-review and audit-diff are loaded by package-reviewer/delta-reviewer/
+        # adversarial-judge/security-auditor, who also run long-running commands on their own
+        # initiative. A short pointer (not the full doctrine, not duplicated into 28 briefs) must
+        # live where the executor actually loads it.
+        for rel in ("Global/_canonical/skills/package-review/SKILL.md",
+                    "Global/_canonical/skills/audit-diff/SKILL.md"):
+            text = (ROOT / rel).read_text()
+            self.assertIn("tail", text, rel)
+            self.assertIn("heartbeat-run.py", text, rel)
+            self.assertIn("stall", text, rel)
+            self.assertIsNone(re.compile(r"\| *tail\b").search(text), rel)
 
 
 class _FakeTTY:

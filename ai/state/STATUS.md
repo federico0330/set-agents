@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-12T14:28:51+00:00
+Actualizado: 2026-08-12T21:09:06+00:00
 
 ## Features
 
@@ -25,16 +25,37 @@ Actualizado: 2026-08-12T14:28:51+00:00
 | 016-audit-debt-repayment | feature | DONE | P1-harness-debt (accepted) | 2/2 | 10/12 | 1/2 | 1 | - | - | 2026-08-03T00:02:59+00:00 transition |
 | 019-harness-evolution | feature | DONE | P5-tools-discovery (accepted) | 5/5 | 14/12 | 1/2 | 0 | - | - | 2026-08-12T02:43:19+00:00 transition |
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
-| 021-gates-que-no-mienten-ni-callan | feature | PACKAGE_REVIEW | P1-check-que-verifica (package_review) | 0/2 | 2/12 | 0/2 | 0 | - | - | 2026-08-12T14:28:51+00:00 record-spawn |
+| 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 
 ## Quick-fixes recientes
 
+- [2026-08-12T15:24:52+00:00] render_notes emitia trailing whitespace en la linea de un finding sin category ni summary, rompiendo git diff --check y por lo tanto verify.sh. Defecto PREEXISTENTE (ya estaba en notas commiteadas de 007, 009, 012 y 013); recien entro al diff porque se regenero una nota nueva. 83 de 324 findings del repo caen en ese caso. Arreglo: el separador em-dash solo se emite si hay label, con _short aplicado antes del chequeo para cubrir labels de solo whitespace. Test de regresion en test_harness.py:2340-2356 con mordida confirmada. sync-notes regenero 14 notas. Los 5 espejos con md5 identico. — archivos: ai/scripts/feature_state_lib/render_notes.py, tests/test_harness.py — gate: verify.sh -> VERIFY_PASS con 973 OK / 3 skips y EXIT=0; build.sh --check -> GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio — resultado: done
 - [2026-08-06T13:33:48+00:00] Preserve explicit --project context in set_agents_app.py script mode by aliasing __main__ for lazy routing_cli imports — archivos: ai/scripts/set_agents_app.py, tests/test_routing.py — gate: python3 -m unittest focused router context tests: 2 PASS; py_compile PASS; git diff --check PASS; live route-decide context_ok=true — resultado: done
 - [2026-08-03T02:36:03+00:00] P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id is optional on transition, a manual transition without it skipped the pop and let a stale repair_entry from a prior cycle auto-escape review inference. Hoisted the pop to always run on to_phase==PACKAGE_REPAIR, resolving the package via package_by_id (falls back to current_package_id) inside try/except StateError. — archivos: ai/scripts/feature-state.py, PROYECTO/ai/scripts/feature-state.py, tests/test_harness.py — gate: git diff --check: clean — resultado: done
 - [2026-07-30T01:22:42+00:00] P2-vault-mandatory (accepted): exclude_notes_from_git/_notes_currently_excluded chequeaban (project/'.git').is_dir(), falso para un git worktree enlazado (.git es archivo ahi) -- docs/notas quedaba trackeado por git en vez de excluido, contradiciendo DEC-5. Fix: resolver via 'git rev-parse --show-toplevel/--git-common-dir' anclado a que el proyecto SEA el top-level (no solo estar dentro de un repo), con env purgado de GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR/GIT_INDEX_FILE, timeout y manejo de git ausente. Bono: vault_doctor_report ahora distingue dangling de un symlink cuyo target fue borrado (antes reportaba healthy). Encontrado migrando ~/iey de verdad; revisado por un segundo agente (package-reviewer) que encontro 7 hallazgos adicionales sobre el primer fix, todos reparados y re-verificados con pass. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass (2da pasada) — resultado: done
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-12T21:09:05+00:00] done
+Cliente: La feature 021 quedo cerrada. El control que decia verificar que los archivos generados estaban al dia ahora los verifica de verdad, y cuando el harness trabaja varios minutos se nota en vez de parecer colgado.
+Ingeniería: 021 DONE. 2 paquetes, ADR-0041. build.sh --check pasa de no comparar nada a comparar los 4 arboles con perfil go-zen fijo; heartbeat-run.py mas la doctrina imperativa en spawn-prompt y punteros en los skills del ejecutor. Suite 970 -> 979. Los gates finales se corrieron CON heartbeat-run.py y emitio 4 latidos en 489s.
+
+[2026-08-12T20:21:56+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
+Cliente: Segunda mitad de la verificacion independiente.
+Ingeniería: Parte B: AC-07 (donde vive la doctrina y si propaga de verdad), AC-09 (el test y su mordida), residuos del antipatron, y la pregunta de si AC-07 promete mas de lo que entrega dado que la doctrina la carga el que REDACTA y no el que ejecuta. Sin suite completa.
+
+[2026-08-12T20:21:56+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
+Cliente: Primera mitad de la verificacion independiente, en dos partes chicas porque la version completa murio dos veces.
+Ingeniería: Review PARTIDO tras dos muertes por stall del encargo completo (decision registrada en slug sexto-stall-segunda-muerte-del-mismo-encargo, Federico eligio la opcion a). Parte A: AC-06 heartbeat-run.py y sus bordes, mas AC-08. Sin suite completa. Misma decision de routing para las dos mitades.
+
+[2026-08-12T18:07:34+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
+Cliente: Ultima verificacion independiente antes de cerrar esta feature.
+Ingeniería: package-reviewer sobre 021/P2: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-luna. Re-decidido con risk=medium tras un primer decide con risk=low que devolvia haiku: el paquete agrega un script ejecutable que corren los agentes y doctrina que propaga a los 4 arboles, no es low. El paquete se completo en DOS instancias: la primera murio por limite de sesion dej…
+
+[2026-08-12T15:59:43+00:00] P2-gates-que-no-callan · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
+Cliente: Ultimo tramo de esta feature: que cuando el harness este trabajando varios minutos, se note, en vez de parecer colgado.
+Ingeniería: P2 de 021 (AC-06..09). Causa raiz CORREGIDA: no es buffering del escritor sino que tail -N sin -f no puede emitir hasta EOF; stdbuf NO lo arregla, verificado. AC-09 es prevencion hacia adelante, no correccion: el patron no esta en ningun archivo versionado (grep da cero en Global/_canonical y en los context packs), vivia en texto efimero de spawn. Patron de grep ya fijado en la spec: barra-vertic…
 
 [2026-08-12T14:28:51+00:00] P1-check-que-verifica · package-reviewer · started · modelo anthropic/sonnet · effort medium
 Cliente: Un revisor independiente comprueba que el control arreglado detecta de verdad, y que no rompio el instalador ni el cambio de modelos.
@@ -75,24 +96,4 @@ Ingeniería: integrator sobre 019: los 5 paquetes accepted, los 5 con module_imp
 [2026-08-12T01:32:09+00:00] P5-tools-discovery · delta-reviewer · started · modelo anthropic/opus · effort medium
 Cliente: Verificacion final independiente del ultimo paquete.
 Ingeniería: delta-reviewer ronda 4 sobre P5. Alcance: NEW-03 (forma nativa completa del spec mcp) y NEW-04 (transcripcion corregida). El orquestador ya re-verifico las 8 variantes en vivo. Contramedidas vigentes por decisions-log slug cuarta-verificacion-fabricada-y-patron-del-hermano: auditoria al azar en TODAS las rondas, y atacar la clase, no el ejemplo.
-
-[2026-08-12T00:37:40+00:00] P5-tools-discovery · delta-reviewer · started · modelo anthropic/opus · effort medium
-Cliente: Ultima verificacion independiente del paquete antes de cerrarlo.
-Ingeniería: delta-reviewer ronda 3 sobre P5: anthropic/opus frontier, independence_verified=true. Alcance: solo NEW-02 y las dos correcciones cosmeticas. El repair encontro un segundo call site (cmd_mcp_toggle :2191) que el reviewer anterior no habia nombrado.
-
-[2026-08-11T23:44:57+00:00] P5-tools-discovery · delta-reviewer · started · modelo anthropic/opus · effort medium
-Cliente: El revisor vuelve a atacar, esta vez por la puerta que encontro la vez pasada, para confirmar que quedo cerrada sin romper lo que funcionaba.
-Ingeniería: delta-reviewer ronda 2 sobre P5: anthropic/opus frontier, independence_verified=true frente al writer openai-codex/gpt-5.6-terra. Ejes: atacar el camino de lectura con su propio tools.local.toml adversario (no leer la evidencia); confirmar que las 20 entradas curadas siguen instalandose igual y que curl|bash de gcloud pasa; atacar la clase de F-06 con formas que la lista NO enumeraba; y auditar a…
-
-[2026-08-11T22:57:19+00:00] P5-tools-discovery · repair-agent · started · modelo openai-codex/gpt-5.6-terra · effort high
-Cliente: Segunda vuelta de arreglos: el revisor encontro un camino que las dos revisiones anteriores no habian mirado, y una parte del arreglo anterior que quedo a medias.
-Ingeniería: P5 repair ronda 2. NEW-01 (high): tools.local.toml untracked llega a bash -c por --tools-install --yes sin pasar por _validate_install_command, que en cmd_tools_install aparece solo en un comentario. F-06 reabierto: la reparacion anterior se hizo contra la lista de ejemplos del finding en vez de contra el defecto, y una tabla sin 'detect' sigue reventando la consola. Ultima reparacion disponible …
-
-[2026-08-11T22:20:43+00:00] P5-tools-discovery · delta-reviewer · started · modelo anthropic/opus · effort medium
-Cliente: Un revisor independiente comprueba que los dos agujeros de seguridad quedaron realmente tapados, atacandolos el mismo en vez de leer el informe.
-Ingeniería: delta-reviewer sobre P5: anthropic/opus frontier, independence_verified=true frente al writer openai-codex/gpt-5.6-terra. Alcance: las 15 reparaciones. Ejes: re-ejecutar los dos ataques criticos (F-01 y F-02) y confirmarlos FALLANDO; probar bypasses propios contra la allowlist de caracteres y el denylist de escaladores; confirmar que curl|bash del catalogo real sigue pasando; y auditar una muestr…
-
-[2026-08-11T19:21:45+00:00] P5-tools-discovery · package-reviewer · started · modelo anthropic/opus · effort medium
-Cliente: Un revisor independiente, de otro proveedor que el que escribio el paquete, audita el flujo de aprobacion de herramientas antes de darlo por bueno. Es la parte del sistema que decide que puede ejecutar un agente sin preguntarte.
-Ingeniería: package-reviewer sobre P5: anthropic/opus en claude-code, tier frontier, effort medium, independence_verified=true frente al writer openai-codex/gpt-5.6-terra (decision dec1_7b5568f3b598b9b205b0606f1a07ae37). Ruteado con task_class=security y risk=high: el paquete extiende coord_policy._tools_channel_allowed y el mapa de permisos de OpenCode en generate.py. Ejes reforzados: casos adversarios prop…
 

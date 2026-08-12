@@ -18,9 +18,9 @@
 
 ## Hallazgos
 
-- F-01 [high] closed — 
-- F-02 [medium] closed — 
-- F-03 [medium] closed — 
+- F-01 [high] closed
+- F-02 [medium] closed
+- F-03 [medium] closed
 
 ## Recorrido
 

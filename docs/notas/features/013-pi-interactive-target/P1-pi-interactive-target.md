@@ -24,13 +24,13 @@
 
 ## Hallazgos
 
-- SEC-01 [high] closed — 
-- SEC-02 [low] refuted —  · refutado por finding-verifier: El scope agents/-only es exactamente lo que el contrato aprobado manda: AC-09 razona que skills/ y prompts/ estaban vac… [docs/specs/013-pi-interactive-target/spec.md:696-706 vs ai/scripts/install.py:2…]
-- RF-01 [medium] closed — 
-- RF-02 [medium] closed — 
-- RF-03 [low] closed — 
-- RF-04 [low] closed — 
-- RF-05 [low] closed — 
+- SEC-01 [high] closed
+- SEC-02 [low] refuted · refutado por finding-verifier: El scope agents/-only es exactamente lo que el contrato aprobado manda: AC-09 razona que skills/ y prompts/ estaban vac… [docs/specs/013-pi-interactive-target/spec.md:696-706 vs ai/scripts/install.py:2…]
+- RF-01 [medium] closed
+- RF-02 [medium] closed
+- RF-03 [low] closed
+- RF-04 [low] closed
+- RF-05 [low] closed
 
 ## Recorrido
 

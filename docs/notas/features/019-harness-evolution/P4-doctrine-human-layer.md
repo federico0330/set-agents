@@ -19,8 +19,8 @@
 
 ## Hallazgos
 
-- F-01 [low] closed — 
-- F-02 [low] closed — 
+- F-01 [low] closed
+- F-02 [low] closed
 
 ## Recorrido
 

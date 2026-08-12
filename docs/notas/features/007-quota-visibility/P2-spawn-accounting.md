@@ -20,19 +20,19 @@
 
 ## Hallazgos
 
-- F-SEC-01 [critical] closed — 
-- F-SEC-02 [high] closed — 
-- F-SEC-03 [medium] closed — 
-- F-SEC-04 [medium] closed — 
-- F-PR-01 [high] closed — 
-- F-PR-02 [high] closed — 
-- F-PR-03 [medium] closed — 
-- F-PR-04 [medium] closed — 
-- F-PR-05 [low] closed — 
-- F-PR-06 [low] refuted —  · refutado por finding-verifier: La afirmacion central ('full-table-scan', 'sin indice') es falsa, medida con EXPLAIN QUERY PLAN contra un store schema-… [EXPLAIN QUERY PLAN SELECT SUM(usage_input),... FROM dispatches WHERE project_ke…]
-- N-01 [high] closed — 
-- N-02 [low] closed — 
-- N-03 [low] closed — 
+- F-SEC-01 [critical] closed
+- F-SEC-02 [high] closed
+- F-SEC-03 [medium] closed
+- F-SEC-04 [medium] closed
+- F-PR-01 [high] closed
+- F-PR-02 [high] closed
+- F-PR-03 [medium] closed
+- F-PR-04 [medium] closed
+- F-PR-05 [low] closed
+- F-PR-06 [low] refuted · refutado por finding-verifier: La afirmacion central ('full-table-scan', 'sin indice') es falsa, medida con EXPLAIN QUERY PLAN contra un store schema-… [EXPLAIN QUERY PLAN SELECT SUM(usage_input),... FROM dispatches WHERE project_ke…]
+- N-01 [high] closed
+- N-02 [low] closed
+- N-03 [low] closed
 
 ## Recorrido
 

@@ -18,7 +18,7 @@
 
 ## Hallazgos
 
-- F-01 [medium] refuted —  · refutado por finding-verifier: El sujeto de la frase disputada es la COMPARACION de DDL, y la propia reproduccion del hallazgo la prueba cierta: la ba… [ai/scripts/routing_core/store.py:302-304 es la comparacion, que pasa; el rechaz…]
+- F-01 [medium] refuted · refutado por finding-verifier: El sujeto de la frase disputada es la COMPARACION de DDL, y la propia reproduccion del hallazgo la prueba cierta: la ba… [ai/scripts/routing_core/store.py:302-304 es la comparacion, que pasa; el rechaz…]
 
 ## Recorrido
 

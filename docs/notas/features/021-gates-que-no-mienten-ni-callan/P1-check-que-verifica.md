@@ -15,8 +15,24 @@
 - [x] La suite deja de corregir drift preexistente en silencio (AC-04) (completed) · Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2).
 - [x] Anotar que probaban realmente los gates de 019 y 020 (AC-05) + ADR-0041 (completed) · Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2).
 
+## Hallazgos
+
+- P1-F01 [medium] closed
+- P1-F02 [low] closed
+- P1-F03 [low] closed
+- P1-F04 [low] closed
+
 ## Recorrido
 
+- review: repair_required (4 hallazgos)
+- verificación: 0 refutados, 4 sostenidos
+- repair: P1-F01 → 1 archivos
+- repair: P1-F02 → 1 archivos
+- repair: P1-F03 → 2 archivos
+- repair: P1-F04 → 2 archivos
+- delta review: pass
+- testing: pass
+- runtime QA: pass
 - gate `verify`: pass
 - gate `build-check`: pass
 - gate `diff-check`: pass

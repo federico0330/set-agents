@@ -1,24 +1,23 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-11T08:19:22` · generado 2026-08-12T11:19:22+00:00_
+_Ventana: desde `2026-08-11T18:09:06` · generado 2026-08-12T21:09:06+00:00_
 
 ## Necesita tu decisión
 
-- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau… (hace 18 días)
-- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a… (hace 12 días)
+- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau… (hace 19 días)
+- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a… (hace 13 días)
 
 ## Qué quedó listo
 
-- **019-harness-evolution** — Retomamos el paquete 4 (la capa humana de la doctrina). El trabajo ya estaba hecho en disco por la instancia anterior, que murió antes de dejar su comprobante; una instancia fresca lo esta auditando contra los criterios y escribiendo la evidencia.
-- **019-harness-evolution** — Paquete 4 cerrado y aceptado. El harness ahora te cuenta, al cerrar cada paquete, que cambio en tu modelo mental del sistema; resuelve solo lo que ya estaba decidido en vez de volver a preguntarlo; y tiene un comando nuevo, /explicar, que lee el codigo real y te lo traduce, avisandote si la documen…
 - **019-harness-evolution** — La feature 019 quedo cerrada: los cinco paquetes aceptados, integrados y con los gates globales en verde. El harness ahora adopta solo los proveedores que configuras, prefiere lo que ya pagas, te explica que cambio en tu forma de pensar el sistema, resuelve antes de preguntarte, y te pide permiso p…
 - **020-honest-dashboard** — La feature 020 quedo cerrada. El informe de la manana ahora abre con lo que necesita tu decision, y la documentacion de modulos tiene un comando que contrasta sus referencias contra el codigo real.
+- **021-gates-que-no-mienten-ni-callan** — La feature 021 quedo cerrada. El control que decia verificar que los archivos generados estaban al dia ahora los verifica de verdad, y cuando el harness trabaja varios minutos se nota en vez de parecer colgado.
 
 ## Qué se está haciendo
 
-- **006-execution-graph** — fase `PACKAGE_ACCEPTED` — ⚠️ estancada hace 9 días
-- **010-spawn-provenance** — fase `PACKAGE_ACCEPTED` — ⚠️ estancada hace 9 días
+- **006-execution-graph** — fase `PACKAGE_ACCEPTED` — ⚠️ estancada hace 10 días
+- **010-spawn-provenance** — fase `PACKAGE_ACCEPTED` — ⚠️ estancada hace 10 días
 
 ## Qué falta
 
@@ -29,17 +28,16 @@ _Ventana: desde `2026-08-11T08:19:22` · generado 2026-08-12T11:19:22+00:00_
 
 ## Qué cambió en el software
 
-- **generacion-arboles** — El arbol canonico (Global/_canonical/) sumo un comando nuevo, /explicar, con su skill, y la doctrina de tres roles (orchestrator, integrator, architect) mas request-triage y las 4 fuentes de Global/_… (019-harness-evolution/P4-doctrine-human-layer)
 - **consola** — La consola dejo de tener un catalogo de herramientas cerrado. load_catalog ahora mergea tools.toml (curado, trackeado) con tools.local.toml (untracked, por clon del harness), y aparecieron --tools-pr… (019-harness-evolution/P5-tools-discovery)
 - **routing** — El catalogo de rutas dejo de ser exclusivamente curado. resolve_discovered_providers (routing_core/catalog.py) resuelve la politica discovered_providers = 'auto' dentro de build_effective_snapshot, y… (019-harness-evolution/P1-provider-auto-adoption)
 - **routing** — El sort key de seleccion incorporo billing_rank entre TIER_ORDER y _bias_rank (routing_core/service.py:382), alimentado por PROVIDER_BILLING_KIND en catalog.py. A igual tier gana suscripcion o free s… (019-harness-evolution/P2-billing-aware-ordering)
 - **narracion-notas** — Un unico predicado compartido en model.py (feature_is_live, open_blocker, blocked_days, stale_days, feature_is_stale, STALE_THRESHOLD_DAYS) reemplazo las dos copias mal escritas que tenian cmd_digest… (020-honest-dashboard/P1-digest-no-esconde)
 - **narracion-notas** — Nuevo motor check_anchors.py y comando feature-state.py check-anchors: extrae las referencias file:line de docs/modules/, resuelve el basename SOLO dentro de los paths que el modulo declara en module… (020-honest-dashboard/P2-anclas-verificables)
+- **generacion-arboles** — build.sh --check dejo de ser un no-op: genera con --profile go-zen FIJO y compara contra los cuatro arboles de Global/, fallando con rc distinto de cero y nombrando los archivos. Antes solo cotejaba … (021-gates-que-no-mienten-ni-callan/P1-check-que-verifica)
+- **generacion-arboles** — Nuevo ai/scripts/heartbeat-run.py: corre un comando largo streameando su salida linea a linea e inyectando un latido sintetico si pasa el intervalo sin emitir. La doctrina contra el antipatron quedo … (021-gates-que-no-mienten-ni-callan/P2-gates-que-no-callan)
 
 ## Decisiones nuevas
 
-- **El approve del catalogo de herramientas no entra al canal del agente** — --tools-propose SI entra al canal permitido del agente; --tools-approve NO. El approve ES la aprobacion humana: si el agente puede correrlo por su cuenta, el flujo propose -> humano -> approve es tea…
-- **El primer implementer de P5 murio por stall de infraestructura; se relanza una vez** — Es una muerte de infraestructura, no una falla en la tarea: no consume presupuesto de reintentos (doctrina de continuidad de turno, ADR-0011). Se relanza una sola vez. El run se cierra como failure p…
 - **El presupuesto de verificacion cuenta LLAMADAS a record-verification, no veredictos** — record-verification acepta multiples --verdict en una sola invocacion: los veredictos van BATCHEADOS en una llamada por ronda de verificacion, no uno por finding. Se reabre el paquete y se sigue con …
 - **Excepcion de ownership sobre cmd_tools_install y variante elegida para F-02** — 1) EXCEPCION DE OWNERSHIP APROBADA: F-03 obliga a tocar cmd_tools_install:1544 (el startswith('sudo ')), que el context pack habia puesto fuera de alcance. La prohibicion apuntaba a que no se relajar…
 - **El repair de P5 murio por stall de infraestructura; se relanza una vez (asignacion distinta al implementer)** — Es una muerte de infraestructura, no una falla en la tarea, y es una ASIGNACION DISTINTA a la del implementer (que ya gasto su relanzamiento): el presupuesto de un relanzamiento se cuenta por asignac…
@@ -49,6 +47,19 @@ _Ventana: desde `2026-08-11T08:19:22` · generado 2026-08-12T11:19:22+00:00_
 - **Las anclas file:line sembradas en docs/modules/ derivaron dentro de la misma feature: la desviacion de AC-17 dejo de ser teorica** — Se registra como deuda conocida de 019, NO se parchea a mano en la integracion: corregir los numeros hoy los deja corridos otra vez con el proximo paquete que toque esos archivos, que es precisamente…
 - **owned_paths escrito contra un diseno que el ADR despues cambio: error del orquestador, no del implementer** — Se registran las tres rutas faltantes como excepciones aprobadas con su razon, y se deja constancia de que render_notes.py sobra en la lista. update-package no expone --owned-path, asi que la excepci…
 - **Cuarto stall de infraestructura de la sesion: el patron es de agentes mutadores de corrida larga, no de un encargo puntual** — Se relanza una vez, como en los casos anteriores, con la mitigacion que ya funciono dos veces: escribir el archivo de evidencia en el primer minuto y guardar a disco despues de cada tramo, para que u…
+- **build.sh --check compara siempre con --profile go-zen fijo, no con el perfil local** — Federico eligio el perfil canonico fijo: --check genera el STAGING con --profile go-zen sin importar el active-profile local. El gate responde asi la pregunta de repositorio -- 'lo commiteado en Glob…
+- **Los gates de 019 y 020 que citaban 'build.sh --check -> CHECK_PASS' como prueba de sin-drift no probaban eso** — No se reabren 019 ni 020: su codigo esta revisado y sus suites verdes, y verify.sh SI hacia la comparacion real (:24-28) aunque despues de que la propia suite pisara el drift. Se deja constancia de q…
+- **CORRECCION: la nota que decia que setup_models.py seguia funcionando sin tocarlo era falsa** — La afirmacion queda RECTIFICADA, no borrada. El arreglo es _generate_smoke_test (setup_models.py:107-120): reutiliza build.sh --output para el smoke test de 'genera sin explotar' que --check daba ant…
+- **Commitear un paquete que esta en PACKAGE_REVIEW: guardar no es aceptar** — El commit fue una operacion de RESGUARDO, no de aceptacion, y el mensaje lo dice explicito: '021/P1 (ADR-0041) -- IMPLEMENTADO Y CON GATES VERDES, BAJO REVIEW'. El disparador fue concreto: 234 archiv…
+- **Segunda vez que escribo owned_paths con un nombre de ADR que todavia no existe** — CONTRAMEDIDA PERMANENTE: al crear un paquete, owned_paths lleva el DIRECTORIO del ADR (docs/adr/) o nada, nunca un nombre de archivo inventado. El nombre lo elige quien escribe el ADR, y el numero es…
+- **El implementer de P2 murio por limite de sesion con AC-06, 08 y 09 hechos y AC-07 pendiente** — Se relanza acotado UNICAMENTE a AC-07. El resto no se rehace: esta hecho, testeado y verificado. La mitigacion de escribir a disco por tramo funciono -- es la tercera vez en la sesion que un agente m…
+- **Cuarto desliz de bookkeeping del orquestador: omiti --route-dispatched en un relanzamiento** — Corregido dispatchando y cerrando el run en orden. LECCION: la secuencia route-decide -> record-spawn -> route-dispatched es una unidad; omitir el tercer paso rompe la verificacion de independencia d…
+- **Quinto stall: el patron no era 'agentes mutadores' y nombrar la herramienta no alcanza** — DOS CORRECCIONES a caracterizaciones previas del orquestador. (1) El patron NO es 'agentes mutadores de corrida larga': este era read-only. Lo comun a los cinco stalls es ESPERAR UN COMANDO LARGO SIN…
+- **HUMAN_DECISION_REQUIRED: sexto stall de la sesion y segunda muerte del review de P2** — NO se intenta un tercer relanzamiento identico. Se reporta como blocker y se le ofrecen a Federico tres caminos: (a) partir el review en dos encargos mas chicos, cada uno con menos ejes y sin correr …
+
+## Quick-fixes
+
+- render_notes emitia trailing whitespace en la linea de un finding sin category ni summary, rompiendo git diff --check y por lo tanto verify.sh. Defecto PREEXISTENTE (ya estaba en notas commiteadas de… (done)
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

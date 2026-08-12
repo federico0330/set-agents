@@ -125,8 +125,110 @@ vive en `ai/state/decisions-log.jsonl` / `docs/notas/decisiones/`.
   `Global/` en absoluto.
 - Los tres call sites que dependían de `rc=0` de `--check` (`install.sh:370`,
   `setup_models.py:397`, `setup_models.py:570`) se re-verificaron corriéndolos, no se asumió: ver
-  `docs/specs/021-gates-que-no-mienten-ni-callan/evidence/P1-implementer.md`.
+  `docs/specs/021-gates-que-no-mienten-ni-callan/evidence/P1-implementer.md`. De los tres, solo
+  `install.sh:370` siguió funcionando sin tocarlo. **Los otros dos sí se rompían de verdad**:
+  `setup_models.py` corre `--check` inmediatamente después de escribir un `models.toml` nuevo, antes
+  de que nada regenere `Global/` a partir de ese cambio (eso lo hace `./build.sh` a secas, en un
+  commit aparte) — con `--check` respondiendo ahora "¿`Global/` coincide con una generación fresca?"
+  (punto 1 de este ADR), cualquier cambio de modelo real reportaba `GLOBAL_TREE_DRIFT`, no porque el
+  cambio estuviera mal sino porque nadie había regenerado `Global/` todavía. Es la pregunta
+  equivocada en ese punto del flujo: ahí lo que hace falta es un smoke test de "¿esta config nueva
+  genera sin explotar?", sin comparar contra `Global/`. El arreglo, dentro del alcance de este
+  paquete, agregó `_generate_smoke_test(profile)` (`ai/scripts/setup_models.py:107-121`), que llama
+  a `build.sh --output <tmp> --profile <profile>` — un modo que ya existía en `build.sh`, sin tocar —
+  y reproduce la misma validación de "generó sin explotar" que `--check` daba antes como efecto
+  colateral de construir su STAGING, sin la comparación contra `Global/` que ahora `--check` sí hace.
+  Los dos call sites (`setup_models.py:589-604` no interactivo, `setup_models.py:416-421` wizard)
+  pasaron a llamar a `_generate_smoke_test(profile)` en vez de `build.sh --check`, y el mensaje de
+  error `BUILD_CHECK_FAIL` se separó en `MODELS_GENERATE_FAIL` (no generó) y `BUILD_INSTALL_FAIL` (no
+  instaló) — antes compartían el mismo texto, que confundía las dos causas.
 - `verify.sh` no cambió de forma: ya tenía el orden correcto (`:6` antes que `:17`); lo que cambió
   es que ahora esa posición relativa importa de verdad, porque `:6` dejó de ser un no-op de facto.
 - `TIPS-USO.md` documenta la regla de orden y la nueva semántica de `--check`/`BUILD_CHECK_PASS`.
 - Ningún call site de los 17 que la suite usa para regenerar `Global/` se tocó.
+
+## Addendum — PKG-2 `P2-gates-que-no-callan` (AC-06..AC-09): D-3, la segunda mitad de esta decisión
+
+Estado: Accepted (2026-08-12).
+
+### Contexto
+
+D-3 de la spec: cuatro agentes murieron en la sesión del 2026-08-11 con `Agent stalled: no
+progress for 600s`, todos mutadores de corrida larga que habían pipeado un gate a `| tail -N`
+(patrón recomendado en texto efímero de spawn, nunca en un archivo versionado — verificado con
+`grep -rnE "\| *tail\b"` sobre `Global/_canonical/` y `PROYECTO/`, cero ocurrencias antes y
+después de este paquete).
+
+### La causa raíz que se creía es falsa — corregido explícitamente para que no vuelva
+
+El primer diagnóstico de esta sesión decía "el pipe bufferea por bloques" y proponía `stdbuf`
+como remedio. **Es falso, medido dos veces por este paquete** (evidencia completa en
+`docs/specs/021-gates-que-no-mienten-ni-callan/evidence/P2-implementer.md`, §2):
+
+1. `timeout 25 bash -c 'python3 -m unittest discover -s tests -v 2>&1 | tail -3'` — cero bytes en
+   25s contra la suite real.
+2. `timeout 8 bash -c 'stdbuf -oL python3 -u -c "<escritor con flush=True explícito por línea>" |
+   tail -3'` — **cero bytes en 8s**, con un escritor que ya no bufferea nada por su cuenta.
+3. El mismo escritor del punto 2, sin `tail` en la cadena, emite línea por línea con normalidad.
+
+`tail -N` sin `-f` **estructuralmente no puede emitir nada hasta ver EOF**, sea cual sea el
+buffering upstream — el escritor del punto 2 y el del punto 3 son idénticos; la única diferencia
+es la presencia de `| tail -3`. **El remedio no es `stdbuf`**: es no poner `tail -N` en la cadena
+de un comando largo. Además `stdbuf` es GNU coreutils y no existe en macOS/BSD, donde corre el CI
+(`.github/workflows/*.yml`, job `verify-macos`) — si se nombra una herramienta para volver
+line-buffered la salida propia de un comando, es `python3 -u` / `PYTHONUNBUFFERED=1`, portable.
+
+### Decisión
+
+1. **AC-06 — `ai/scripts/heartbeat-run.py`**: un wrapper que corre el comando dado, reenvía su
+   stdout+stderr combinado línea por línea a medida que llegan (nunca espera a que el hijo
+   termine) e inyecta su propia línea de latido si pasan `--interval` segundos (default 60) sin
+   una línea real. No acelera el comando — AC-06 es sobre silencio, no sobre velocidad; eso es un
+   no-goal explícito de la spec.
+2. **AC-07 — doctrina en `TIPS-USO.md`** (sección "Running long commands without going silent"):
+   fija el patrón prohibido (`| tail -N`) y los tres patrones correctos, en orden de preferencia:
+   dejar fluir la salida cruda, redirigir a archivo y leer después, o `heartbeat-run.py`. Nombra
+   `python3 -u`/`PYTHONUNBUFFERED=1`, nunca `stdbuf`, por portabilidad. `TIPS-USO.md` lo documenta
+   para quien lo lee a mano, pero no propaga a un encargo nuevo. La misma regla vive también en
+   `Global/_canonical/skills/spawn-prompt/SKILL.md` (sección Rules) — la plantilla fija que el
+   orquestador carga para redactar CUALQUIER spawn (ADR-0026) — porque esa es la superficie real
+   que evita que el próximo encargo vuelva a decir `| tail -N`, sin duplicarlo en los 28 briefs de
+   rol. Se propaga a los cuatro árboles (`Global/opencode`, `Global/claude-code`, `Global/codex`,
+   `Global/pi`) vía `./build.sh`, verificado por `./build.sh --check`.
+3. **AC-08 — el límite queda escrito, acá y en `TIPS-USO.md`**: el watchdog de 600s es del
+   **runtime del agente**, no de este repositorio; esta feature no lo puede cambiar. Lo único que
+   el repo controla es no crear la condición de silencio que lo dispara. Sin esta aclaración
+   escrita, "arreglamos los stalls" se leería como que no pueden volver a pasar por ninguna otra
+   causa — y sí pueden: cualquier comando con una pausa real mayor al watchdog, corrido SIN
+   `heartbeat-run.py` y sin salida propia, sigue pudiendo estancar a quien lo mire.
+4. **AC-09 — prevención hacia adelante, no corrección** (F-05 del challenge): el patrón
+   `| tail -N` nunca estuvo en un archivo versionado (`Global/_canonical/`, `PROYECTO/`) — vivía
+   en texto efímero de spawn. El test nuevo (`tests/test_harness.py`,
+   `test_the_tail_pipe_antipattern_never_lands_in_a_versioned_brief_or_template`) fija que no
+   aparezca de ahora en más, con el patrón exacto ya decidido por la spec (F-07): `\| *tail\b`,
+   anclado al pipe literal — un `grep` ingenuo por `tail` da falsos positivos dentro de
+   "detail"/"details" (13 medidos en `Global/_canonical/` al momento de este paquete, todos en esa
+   palabra).
+
+### Alternativas rechazadas
+
+- **Recomendar `stdbuf -oL` en la doctrina como forma de evitar el stall.** No arregla nada: el
+  problema no es el buffering del escritor (medido arriba), es `tail -N` en sí. Además no es
+  portable (GNU-only, ausente en macOS/BSD donde corre el CI).
+- **Acelerar la suite para que el umbral de 60s nunca se alcance.** No-goal explícito de la spec:
+  que tarde 7-10 minutos es un problema distinto de que calle: este paquete resuelve el segundo.
+- **Tocar el watchdog de 600s.** No está en este repositorio; pertenece al runtime del agente.
+- **Reabrir 019/020 para borrar el patrón de sus context packs.** No aplica: el patrón nunca
+  estuvo en un archivo versionado de esas features (verificado por `grep`), así que no hay nada
+  que borrar — AC-09 es prevención, no corrección.
+
+### Consecuencias
+
+- `ai/scripts/heartbeat-run.py` queda disponible para cualquier comando largo, dentro o fuera de
+  este repositorio; no reemplaza ni modifica `verify.sh`/`build.sh` (ningún call site existente se
+  tocó).
+- `TIPS-USO.md` documenta el patrón prohibido y los correctos; un test de doctrina ancla que el
+  patrón prohibido no aparezca en `Global/_canonical/` (briefs de agente) ni en `PROYECTO/`
+  (plantillas que se copian a cada proyecto nuevo).
+- El límite del watchdog de 600s queda escrito como propiedad del runtime, no de este repo, en
+  este ADR y en `TIPS-USO.md`.

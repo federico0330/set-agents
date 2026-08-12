@@ -24,14 +24,14 @@
 
 ## Hallazgos
 
-- SEC14-01 [low] closed — 
-- RF14-01 [medium] closed — 
-- RF14-02 [low] closed — 
-- RF14-03 [medium] closed — 
-- RF14-04 [low] closed — 
-- RF14-05 [low] closed — 
-- RF14-06 [low] closed — 
-- RF14-07 [low] closed — 
+- SEC14-01 [low] closed
+- RF14-01 [medium] closed
+- RF14-02 [low] closed
+- RF14-03 [medium] closed
+- RF14-04 [low] closed
+- RF14-05 [low] closed
+- RF14-06 [low] closed
+- RF14-07 [low] closed
 
 ## Recorrido
 

@@ -33,7 +33,7 @@
 - F-11 [low] closed — testing
 - F-12 [low] closed — correctness
 - F-13 [low] closed — integration
-- SEC-001 [critical] closed — 
+- SEC-001 [critical] closed
 - SEC-002 [medium] closed — security
 - N-02 [low] closed — documentation
 

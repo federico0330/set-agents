@@ -18,8 +18,8 @@
 
 ## Hallazgos
 
-- P2F-01 [high] closed — 
-- P2F-02 [low] closed — 
+- P2F-01 [high] closed
+- P2F-02 [low] closed
 
 ## Recorrido
 

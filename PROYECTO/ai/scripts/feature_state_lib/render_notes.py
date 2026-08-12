@@ -199,8 +199,10 @@ def _package_body(fid: str, package: dict[str, Any]) -> str:
     if findings:
         lines += ["", "## Hallazgos", ""]
         for finding in findings:
-            label = finding.get("category") or finding.get("summary") or ""
-            line = f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')} — {_short(label)}"
+            label = _short(finding.get("category") or finding.get("summary") or "")
+            line = f"- {finding.get('id')} [{finding.get('severity')}] {finding.get('status', 'open')}"
+            if label:
+                line += f" — {label}"
             if finding.get("status") == "refuted":
                 # The grounds AND the proof belong in the record, not in a chat log: a
                 # reason without its evidence is the claim without the burden.
