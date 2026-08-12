@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-03T02:37:32+00:00
+Actualizado: 2026-08-12T11:19:22+00:00
 
 [2026-07-28T13:04:40+00:00] P1-quota-failover · spec-challenger · done
 Cliente: El desafio encontro que el failover automatico que planee no puede alcanzar tu caso. El arnes solo controla como subproceso el carril Pi; cuando se queda sin tokens un subagente de Claude Code -- que es exactamente lo que te pasa -- no hay ningun proceso que el arnes pueda clasificar ni volver a lanzar. Ademas encontro que uno de mis argumentos era falso: cite una restriccion de la base de datos …

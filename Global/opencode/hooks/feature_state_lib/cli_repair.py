@@ -46,7 +46,8 @@ def cmd_record_gate(args: argparse.Namespace) -> int:
             # The gates<->implementation loop was the only cycle without its own cap;
             # repeated gate failures now hit a hard budget instead of burning spawns.
             if attempts["gate_failures"] >= data.get("budgets", {}).get("max_gate_failures_per_package", 3):
-                return block_with_reason(data, args.actor, args.package_id, "gate failure budget exhausted")
+                return block_with_reason(data, args.actor, args.package_id, "gate failure budget exhausted",
+                                         counter={"scope": "attempts", "key": "gate_failures"})
         model.record_event(data, "record-gate", data["phase"], data["phase"], args.actor, args.package_id, {"name": args.name, "status": args.status, "global": args.global_gate}, args.event_id)
         return True
 
@@ -230,7 +231,8 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
         for finding in repaired:
             finding["repair_attempts"] = finding.get("repair_attempts", 0) + 1
             if finding["repair_attempts"] > data["budgets"]["max_repairs_per_finding"]:
-                return block_with_reason(data, args.actor, args.package_id, f"repair budget exhausted for {finding['id']}")
+                return block_with_reason(data, args.actor, args.package_id, f"repair budget exhausted for {finding['id']}",
+                                         counter={"scope": "finding", "key": "repair_attempts", "finding_id": finding["id"]})
             finding["status"] = "closed"
         repair = {"finding_ids": ids, "changed_files": changed_files, "verification": args.verification or [], "at": now()}
         if getattr(args, "changed_lines", None) is not None:
@@ -314,7 +316,8 @@ def cmd_record_delta_review(args: argparse.Namespace) -> int:
         elif requires_full:
             attempts = package.setdefault("attempts", {})
             if attempts.get("deep_review_cycles", 0) >= data["budgets"]["max_deep_review_cycles"]:
-                return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted before full re-review")
+                return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted before full re-review",
+                                         counter={"scope": "attempts", "key": "deep_review_cycles"})
             data["phase"] = "PACKAGE_REVIEW"
             package["status"] = "full_review_required"
         elif args.verdict == "repair_required":

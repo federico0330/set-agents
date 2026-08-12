@@ -30,6 +30,8 @@ GENERIC=(
   feature_state_lib/parser.py
   feature_state_lib/candidate_identity.py
   feature_state_lib/cli_integration.py
+  feature_state_lib/cli_modules.py
+  feature_state_lib/render_modules.py
   check-owned-paths.py classify-risk.py check-repair-ceiling.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh
 )
 

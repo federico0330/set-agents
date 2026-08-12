@@ -68,6 +68,11 @@ Resolve-first (ADR-0025) — these are NOT stop conditions:
 - A CLI that needs login: run its own interactive flow (`vercel login`, `gh auth login`) first; only a flow
   demanding a physical human action becomes `blocked`, and your report must show the attempt.
 - A production operation the user explicitly requested: that is the task, not a blocker — do it and record it.
+- A CLI/MCP/skill outside the curated catalog (ADR-0038): run `--tools-propose <name> --kind cli|mcp|skill
+  --detect <bin> --install-<method> "<cmd>" --why "<motivo>"` yourself — it only validates and prints the
+  consolidated question, never installs, never writes the catalog — and return that printed question in
+  your output for the orchestrator to relay. `--tools-approve` is never yours to run; it is the human
+  approval step itself.
 
 ## Department knowledge
 

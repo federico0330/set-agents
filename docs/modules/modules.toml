@@ -1,0 +1,39 @@
+# Registro de módulos cognitivos (AC-18, ADR-0036). Fuente de la detección de impacto:
+# `owned_paths` de un paquete y `changed_files` de sus repairs se matchean (fnmatch) contra
+# los globs de `paths` para sugerir candidatos (`module-impact-detect`). Fail-closed: clave
+# desconocida en una tabla [module.<slug>], o slug con forma inválida, es un error explícito
+# de `render_modules.load_modules_toml`, nunca un match silenciosamente vacío.
+#
+# Este archivo es opt-in por proyecto (docs/modules/ no existe hasta que alguien lo crea);
+# no bloquea nada por sí solo si el repo no lo tiene.
+
+[module.routing]
+nombre = "Routing (trusted dispatch)"
+responsabilidad = "Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el resultado y expone explain/report de solo lectura."
+paths = ["ai/scripts/routing.py", "ai/scripts/routing_core/**", "ai/catalogs/routes.v1.toml"]
+
+[module.estado]
+nombre = "Estado del pipeline (feature-state)"
+responsabilidad = "Máquina de estados de paquetes/features: fases legales, gates, reviews, findings, y ahora impacto de módulo — la fuente de verdad que STATUS.md/bitácora/notas derivan."
+paths = ["ai/scripts/feature-state.py", "ai/scripts/feature_state_lib/**", "ai/scripts/check-feature-state.py"]
+
+[module.generacion-arboles]
+nombre = "Generación de árboles de agentes"
+responsabilidad = "Compila roles.tsv + models.toml + prompts canónicos en los árboles nativos por runtime (Claude Code, OpenCode, Codex, Pi) que build.sh instala."
+paths = ["ai/scripts/generate.py", "ai/scripts/models_config.py", "Global/_canonical/**"]
+
+[module.consola]
+nombre = "App de consola (set-agents)"
+responsabilidad = "CLI+TUI unificado: install/repair, self-update, routing (--route-decide/--route-doctor/...), catálogo de tools/MCP, wizard de modelos."
+paths = ["ai/scripts/set_agents_app.py", "ai/scripts/tui.py"]
+
+[module.narracion-notas]
+nombre = "Narración y notas vivas"
+responsabilidad = "Deriva STATUS.md, bitácora y docs/notas/ (Obsidian-ready) del estado en cada mutación; digest matinal y el propio render never-raises que docs/modules/ reutiliza."
+paths = [
+  "ai/scripts/feature_state_lib/render_notes.py",
+  "ai/scripts/feature_state_lib/render_bitacora.py",
+  "ai/scripts/feature_state_lib/render_status.py",
+  "ai/scripts/feature_state_lib/render_modules.py",
+  "docs/notas/**",
+]

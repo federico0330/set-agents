@@ -131,6 +131,13 @@ def _drive_to_receipt(repo, base_sha, candidate_sha, package_id="PKG-01", featur
         "--evidence", "clean", cwd=repo)
     _fs("record-receipt", package_id, "--state-file", str(state), "--actor", "test", cwd=repo)
     _fs("accept-package", package_id, "--state-file", str(state), "--actor", "test", cwd=repo)
+    # ADR-0036: entering INTEGRATION now also requires module-impact coverage per accepted
+    # package (a check distinct from, and orthogonal to, this file's own receipt gate --
+    # see ADR-0036's comparison with ADR-0024). This synthetic fixture waives it: the point
+    # of these tests is the receipt wrapper, not module documentation.
+    _fs("record-module-impact", "--package-id", package_id, "--module-impact-waived",
+        "--reason", "synthetic integration-hook fixture (test_integration_hook.py)",
+        "--state-file", str(state), "--actor", "test", cwd=repo)
     return state
 
 

@@ -18,7 +18,17 @@ After one or more packages reach `PACKAGE_ACCEPTED`, especially before `DONE`.
 2. Resolve merge/integration issues and update wiring needed for accepted packages to work together.
 3. Run or request global deterministic gates.
 4. Verify the sum of accepted packages still satisfies the approved spec and BDD scenarios.
-5. Update feature state with integration evidence and remaining blockers. Consolidate the delivery
+5. **Keep `docs/modules/` honest before the gate demands it (ADR-0036).** For each accepted package, run
+   `module-impact-detect <fid> --package-id P` and, for every real candidate it names, register
+   `record-module-impact <fid> --package-id P --module <slug> --cambio "..." --modelo-mental "..."` — or,
+   when the package genuinely touched no module (a quick doc fix, a config-only change), the waiver
+   (`--module-impact-waived --reason "..."`). Then verify `docs/architecture/overview.md` and the docs of
+   every module the package touched are not stale against the diff — this does not mean regenerating the
+   six sembradas sections by hand on every package; it means the `## Últimos cambios estructurales` entry
+   landed and the sembrada prose still describes what the code does now, editing it only when it no longer
+   does. This is not optional bookkeeping: `transitions.check_transition` refuses `to_phase ==
+   "INTEGRATION"` for any accepted package missing `module_impacts` or the waiver.
+6. Update feature state with integration evidence and remaining blockers. Consolidate the delivery
    evidence at `docs/specs/<feature_id>/evidence/` (gate outputs, runtime QA reports, screenshots) — this
    folder is what the adversarial judge reviews and what the user can hand to the client.
 

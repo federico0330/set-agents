@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +117,28 @@ def cmd_log_decision(args: argparse.Namespace) -> int:
     return 0
 
 
+def _warn_check_anchors_never_raises(state_dir: Path) -> None:
+    """AC-09 (020-honest-dashboard PKG-2, ADR-0040): same never-raises contract as
+    render_notes.py's own (`render_notes.py:281-285`, `RENDER_FAILURE_LOG`) -- `check-
+    anchors` is explicitly NOT a gate of any phase (spec no-goal), so sync-notes runs it
+    best-effort and only WARNS on stderr. A broken verifier, or anchors it finds broken,
+    must never fail this consolidation command; see
+    tests/test_check_anchors.py::SyncNotesNeverRaisesTests for the mutation that pins
+    this (a verifier forced to raise still lets sync-notes finish and print
+    NOTES_SYNCED)."""
+    try:
+        from feature_state_lib.check_anchors import check_anchors  # deferred: see module docstring
+        repo_root = state_dir.resolve().parent.parent  # ai/state -> repo root, same derivation as default_notes above
+        result = check_anchors(repo_root)
+        if not result["ok"]:
+            broken = result["broken"]
+            print(f"ANCHORS_WARN broken={len(broken)} (check-anchors es informativo, no bloquea)", file=sys.stderr)
+            for item in broken[:20]:
+                print(f"  {item['doc']}:{item['line']} {item['raw']} -> {item['reason']}", file=sys.stderr)
+    except Exception as exc:  # never-raises: a broken checker must not break sync-notes
+        print(f"ANCHORS_CHECK_FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
+
+
 def cmd_sync_notes(args: argparse.Namespace) -> int:
     """Consolidation point: full regen of STATUS, bitacora, and the living notes.
 
@@ -132,6 +155,9 @@ def cmd_sync_notes(args: argparse.Namespace) -> int:
     render_status(anchor)
     render_bitacora(anchor)
     written = model.render_notes(anchor, str(notes_dir), args.project_name, force=True)
+    from feature_state_lib.render_modules import render_modules  # deferred: see module docstring
+    written += render_modules(anchor, force=True)
+    _warn_check_anchors_never_raises(state_dir)
     print(f"NOTES_SYNCED n={len(written)}")
     print_json({"ok": True, "notes_dir": str(notes_dir), "written": written})
     return 0
@@ -177,9 +203,28 @@ def cmd_digest(args: argparse.Namespace) -> int:
 
     lines = [f"_Ventana: desde `{since}` · generado {now()}_", ""]
 
+    # AC-01 (020-honest-dashboard, ADR-0040): FIRST section in the document, before "Qué
+    # quedó listo". Every feature with an unresolved blocker, independent of final_state
+    # (the search itself never filters by it, even though today only BLOCKED reaches
+    # here) -- days counted from the LAST blocker without `resolved_at`, never
+    # `updated_at` blindly (model.open_blocker). Fixed rather than appear-and-disappear: a
+    # section that comes and goes reads as noise, a steady one reads as a dashboard (same
+    # principle ADR-0027 already applies to "Qué falta").
+    lines += ["## Necesita tu decisión", ""]
+    needs_decision = [(d, model.open_blocker(d)) for d in states]
+    needs_decision = [(d, blocker) for d, blocker in needs_decision if blocker]
+    if needs_decision:
+        for data, blocker in needs_decision:
+            days = model.days_since(blocker.get("at"))
+            lines.append(
+                f"- **{data.get('feature_id')}** — {_short(blocker.get('reason', ''))} (hace {days} días)"
+            )
+    else:
+        lines.append("- _nada pendiente de tu decisión_ ✅")
+
     finished = [e for e in collect_narrative(features_dir, out_dir)
                 if e.get("at", "") >= since and e.get("result") not in ("started", "-", "")]
-    lines += ["## Qué quedó listo", ""]
+    lines += ["", "## Qué quedó listo", ""]
     if finished:
         for entry in finished[-20:]:
             head = " · ".join(p for p in (entry.get("feature_id"), entry.get("package_id"),
@@ -188,22 +233,64 @@ def cmd_digest(args: argparse.Namespace) -> int:
     else:
         lines.append("- _sin cierres registrados en la ventana_")
 
+    # AC-02/AC-03: `live` is the shared predicate's set (feature_is_live -- excludes only
+    # genuinely finished features); `working` drops the blocked ones, which AC-01's
+    # headline above already covers in more detail -- listing them here too would be a
+    # redundant 3rd mention (spec SC-06, tope de dos menciones por feature bloqueada).
     lines += ["", "## Qué se está haciendo", ""]
-    active = [d for d in states if not d.get("final_state")]
-    if active:
-        for data in active:
-            lines.append(f"- **{data.get('feature_id')}** — fase `{data.get('phase')}`")
+    live = [d for d in states if model.feature_is_live(d)]
+    working = [d for d in live if model.open_blocker(d) is None]
+    if working:
+        for data in working:
+            line = f"- **{data.get('feature_id')}** — fase `{data.get('phase')}`"
+            if model.feature_is_stale(data):
+                line += f" — ⚠️ estancada hace {model.stale_days(data)} días"
+            lines.append(line)
     else:
         lines.append("- _ninguna feature activa_")
 
     lines += ["", "## Qué falta", ""]
     pending_any = False
-    for data in active:
+    for data in live:
+        # AC-03 (F-01 repair, tope de dos menciones): a feature already headlined above in
+        # "## Necesita tu decisión" repeats its `⛔ bloqueo:` bit here verbatim -- same text,
+        # same truncation, zero new information (3rd mention). Every OTHER bit
+        # (`_pending_bits` also renders open findings / pending tasks) is new information
+        # and stays: only the literal blocker-duplicate line is dropped, never the feature.
+        headlined = model.open_blocker(data) is not None
         for bit in _pending_bits(data):
+            if headlined and bit.startswith("⛔ bloqueo:"):
+                continue
             lines.append(f"- **{data.get('feature_id')}** {bit}")
             pending_any = True
     if not pending_any:
         lines.append("- _nada pendiente_ ✅")
+
+    # AC-22 (019/PKG-3, ADR-0036): module_impacts recorded in the window, across every
+    # package of every feature -- same "derived from state, never hand-maintained" posture
+    # as every other section here.
+    module_changes = []
+    for data in states:
+        for package in data.get("packages", []) or []:
+            if not isinstance(package, dict):
+                continue
+            for impact in package.get("module_impacts", []) or []:
+                if isinstance(impact, dict) and impact.get("at", "") >= since:
+                    module_changes.append({**impact, "feature_id": impact.get("feature_id") or data.get("feature_id")})
+    lines += ["", "## Qué cambió en el software", ""]
+    if module_changes:
+        # F-03 repair evidence (P3 review): this reads module_impacts straight out of raw
+        # state (not schema-validated), so module/feature_id/package_id -- like every other
+        # state-sourced field this digest renders -- must pass through `_short` before
+        # landing in a file merge_note protects, or a crafted value can inject a fake
+        # heading/arbitrary content into BUENOS-DIAS.md's machine block.
+        for entry in sorted(module_changes, key=lambda e: e.get("at", "")):
+            lines.append(
+                f"- **{_short(entry.get('module', '?'), 80)}** — {_short(entry.get('cambio', ''), 200)} "
+                f"({_short(entry.get('feature_id', '?'), 80)}/{_short(entry.get('package_id', '?'), 80)})"
+            )
+    else:
+        lines.append("- _sin cambios de módulo registrados en la ventana_")
 
     from feature_state_lib.render_bitacora import read_jsonl as _read
     from feature_state_lib.render_notes import DECISIONS_LOG as _DECISIONS
@@ -341,6 +428,10 @@ def run_dry_workflow(feature_id: str) -> dict[str, Any]:
     package["status"] = "accepted"
     data["phase"] = "PACKAGE_ACCEPTED"
     model.record_event(data, "accept-package", "PACKAGE_RUNTIME_QA", "PACKAGE_ACCEPTED", "orchestrator", "PKG-01")
+    # ADR-0036: entering INTEGRATION requires module-impact coverage per accepted package.
+    # This synthetic run demonstrates the waiver path -- record-module-impact is the CLI's
+    # own dedicated verb, exercised for real by tests/test_module_docs.py.
+    package["module_impact_waiver"] = {"reason": "dry-run demonstration", "at": now(), "actor": "orchestrator"}
     direct("transition", "PACKAGE_ACCEPTED", "INTEGRATION", "orchestrator", "PKG-01")
     data["global_gates"].append({"name": "global verify", "status": "pass", "required": True, "evidence": "dry-run", "at": now()})
     direct("transition", "INTEGRATION", "DONE", "orchestrator", "PKG-01")

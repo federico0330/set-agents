@@ -41,7 +41,12 @@ ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
 DISCOVERABLE_PROVIDERS = {"openai-codex", "anthropic", "opencode-zen", "opencode-go"}
 ROUTING_DEFAULTS = {
     "enabled_providers": ["openai-codex", "anthropic"], "xhigh_benchmarked": False,
-    "discovered_providers": [],
+    # ADR-0034 (019 PKG-1): "auto" is the new default -- discovered_providers derives
+    # from the live probed inventory (routing_core.catalog.resolve_discovered_providers)
+    # intersected with the audited _PAIR_COMMANDS provider set, never wider. An explicit
+    # [] still means "disabled entirely" and survives emit() (compared against this exact
+    # default value below, never truthiness, so [] no longer round-trips into "auto").
+    "discovered_providers": "auto",
     "max_enabled": False, "fallback_limit": 1, "single_writer": True,
     "sla": {"fast": {"checkpoint_minutes": 18, "cutoff_minutes": 20, "ceiling_minutes": 30}},
     "budgets": {"direct_spawns": 0, "fast_spawns": 1, "scoped_spawns": 4,
@@ -202,12 +207,15 @@ def _normalize_schema2(config, source_schema):
         die("models.toml: [routing.budgets] has unknown field")
     routing["sla"] = {**ROUTING_DEFAULTS["sla"], **routing.get("sla", {})}
     routing["budgets"] = {**ROUTING_DEFAULTS["budgets"], **routing.get("budgets", {})}
-    # ADR-0029: closed to the audited probe set; empty (the default) disables the
-    # synthesized-routes path entirely — production behavior identical to pre-017.
-    discovered = routing.get("discovered_providers", [])
-    if (not isinstance(discovered, list) or len(discovered) != len(set(discovered))
+    # ADR-0029/ADR-0034: closed to the audited probe set. Either the literal string
+    # "auto" (new default, ADR-0034 -- derived from the live probe, never a wider
+    # universe) or a unique explicit list; an explicit [] is the "disabled entirely"
+    # opt-out and stays that way (never the same as "auto" being simply unset).
+    discovered = routing.get("discovered_providers", ROUTING_DEFAULTS["discovered_providers"])
+    if discovered != "auto" and (
+            not isinstance(discovered, list) or len(discovered) != len(set(discovered))
             or not all(isinstance(x, str) and x in DISCOVERABLE_PROVIDERS for x in discovered)):
-        die("models.toml: [routing].discovered_providers must be a unique list within the audited provider set")
+        die("models.toml: [routing].discovered_providers must be \"auto\" or a unique list within the audited provider set")
     if (not isinstance(routing["enabled_providers"], list) or not routing["enabled_providers"] or not all(isinstance(x, str) and x in ROUTING_PROVIDERS for x in routing["enabled_providers"])
             or len(routing["enabled_providers"]) != len(set(routing["enabled_providers"]))
             or not isinstance(routing["xhigh_benchmarked"], bool) or routing["max_enabled"] is not False
@@ -518,10 +526,14 @@ def emit(config):
     lines.extend(["", "[routing]"])
     for key in ("enabled_providers", "xhigh_benchmarked", "max_enabled", "fallback_limit", "single_writer"):
         lines.append(f"{key} = {_value(config['routing'][key])}")
-    # ADR-0029: preserved across re-emits (the "site 5" lesson from the opencode_zen/
-    # opencode_go allowlists — a key the wizard drops on rewrite is data loss). Only
-    # emitted when configured, so an untouched repo emits byte-identical output.
-    if config["routing"].get("discovered_providers"):
+    # ADR-0029/ADR-0034: preserved across re-emits (the "site 5" lesson from the
+    # opencode_zen/opencode_go allowlists — a key the wizard drops on rewrite is data
+    # loss). Compared against the actual DEFAULT value (never mere truthiness): with
+    # "auto" as the default, an explicit [] (opt-out) is itself non-default and MUST be
+    # emitted, or a re-emit would silently resurrect "auto" on the next load. Omitted
+    # only when the value is genuinely the default, so an untouched repo still emits
+    # byte-identical output.
+    if config["routing"].get("discovered_providers") != ROUTING_DEFAULTS["discovered_providers"]:
         lines.append(f"discovered_providers = {_value(config['routing']['discovered_providers'])}")
     lines.extend(["", "[routing.sla.fast]"])
     for key in ("checkpoint_minutes", "cutoff_minutes", "ceiling_minutes"):

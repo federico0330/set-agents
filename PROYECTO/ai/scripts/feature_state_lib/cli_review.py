@@ -30,7 +30,8 @@ def cmd_record_review(args: argparse.Namespace) -> int:
             raise StateError("cannot record package review: " + "; ".join(errors))
         attempts = package.setdefault("attempts", {})
         if attempts.get("deep_review_cycles", 0) >= data["budgets"]["max_deep_review_cycles"]:
-            return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted")
+            return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted",
+                                     counter={"scope": "attempts", "key": "deep_review_cycles"})
         findings = normalize_findings(args.finding or [])
         # PR-01: the record carries its own actor now -- additive, so nothing that reads
         # `reviews[]` for its existing keys breaks. `_add_package_findings`'s join to the

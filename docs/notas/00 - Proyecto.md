@@ -18,11 +18,18 @@
 - [[features/014-model-preference-policy|014-model-preference-policy]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/015-anthropic-dispatch-parity|015-anthropic-dispatch-parity]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/016-audit-debt-repayment|016-audit-debt-repayment]] — fase `DONE` · paquetes 2/2 · **DONE**
+- [[features/019-harness-evolution|019-harness-evolution]] — fase `DONE` · paquetes 5/5 · **DONE**
+- [[features/020-honest-dashboard|020-honest-dashboard]] — fase `DONE` · paquetes 2/2 · **DONE**
+- [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `PACKAGE_REVIEW` · paquetes 0/2
 
 ## Qué falta
 
-- **006-execution-graph** → `INTEGRATION` — all packages accepted
-- **010-spawn-provenance** → `INTEGRATION` — all packages accepted
+- **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
+- **002-adaptive-pi-orchestration** 5 hallazgos abiertos
+- **006-execution-graph** → `PACKAGE_ACCEPTED` — P3-graph-view: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
+- **010-spawn-provenance** → `PACKAGE_ACCEPTED` — P1-spawn-provenance: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
+- **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
+- **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
 
 ## Quick-fixes recientes
 
@@ -33,21 +40,21 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-07 correccion-diagnostico-400-out-of-extra-usage-en-pi|Correccion diagnostico 400 out-of-extra-usage en pi]]
-- [[decisiones/2026-08-07 real-installs-pi-opencode-pin-0840|pi y opencode pasan a instalacion real; PI_PINNED_VERSION 0.81.1 -> 0.84.0]]
-- [[decisiones/2026-08-07 end-of-turn-block-informative|Bloque de fin de turno pasa a formato informativo (ADR-0033)]]
-- [[decisiones/2026-08-05 adr-0032-materializacion-spawn-y-pins|ADR-0032: materialización en el spawn para opencode/codex y pins de modelo]]
-- [[decisiones/2026-08-05 adr-0031-observabilidad-por-spawn|Observabilidad por spawn (ADR-0031): log de decisiones + campos estructurados en record-spawn]]
-- [[decisiones/2026-08-03 ac-01i-grunt-no-flip-en-verified-review-2-proveedores|AC-01(i): grunt no puede flippear provider en verified review con catalogo de 2 proveedores]]
-- [[decisiones/2026-08-03 audit-debt-006-p2-cierre-parcial-016|Cierre parcial de audit-debt-006-p2: PR-07/08/09 saldadas por 016; PR-06/10/11 siguen diferidas]]
-- [[decisiones/2026-08-02 p1f-01-repair-entry-pop-package-id-opcional|P1F-01 aceptado como deuda low: el pop de repair_entry depende del --package-id opcional]]
+- [[decisiones/2026-08-12 correccion-setup-models-si-habia-que-tocarlo|CORRECCION: la nota que decia que setup_models.py seguia funcionando sin tocarlo era falsa]]
+- [[decisiones/2026-08-12 la-evidencia-de-build-check-de-019-y-020-no-probaba-drift|Los gates de 019 y 020 que citaban 'build.sh --check -> CHECK_PASS' como prueba de sin-drift no probaban eso]]
+- [[decisiones/2026-08-12 check-compara-con-perfil-canonico-fijo|build.sh --check compara siempre con --profile go-zen fijo, no con el perfil local]]
+- [[decisiones/2026-08-12 cuarto-stall-de-la-sesion-patron-de-infraestructura|Cuarto stall de infraestructura de la sesion: el patron es de agentes mutadores de corrida larga, no de un encargo puntual]]
+- [[decisiones/2026-08-12 owned-paths-desactualizado-por-cambio-de-diseno|owned_paths escrito contra un diseno que el ADR despues cambio: error del orquestador, no del implementer]]
+- [[decisiones/2026-08-12 anclas-file-line-de-docs-modules-derivan-sin-red|Las anclas file:line sembradas en docs/modules/ derivaron dentro de la misma feature: la desviacion de AC-17 dejo de ser teorica]]
+- [[decisiones/2026-08-12 cuarta-verificacion-fabricada-y-patron-del-hermano|Cuarta verificacion fabricada del rol reparador, y el patron de reparar el ejemplo en vez de la clase (tercera iteracion)]]
+- [[decisiones/2026-08-11 reopen-resetea-contadores-opcion-A-autorizada|Federico autorizo la opcion A: reopen resetea el contador cuyo agotamiento produjo el blocker]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-03T00:38:12+00:00_
+_Actualizado: 2026-08-12T14:28:51+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

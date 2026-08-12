@@ -16,9 +16,13 @@ failure this skill exists to prevent (applying the heavy flow to a problem that 
 
 ## Step 0 — intake (always, before delegating)
 1. Restate the request in one line and name the **mode** you are choosing + why.
-2. If the request is ambiguous on scope, risk, or intent, ask **1–2 scoping questions first** — do NOT start.
-   Terse in execution, but interrogate up front. This is where you "stop the cart".
-3. Only then delegate the first action of the chosen mode.
+2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
+   original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
+   scoping doubt one of those already answers is resolved with `log-decision`, not asked.
+3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+   questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
+   cart".
+4. Only then delegate the first action of the chosen mode.
 
 ## The five modes
 

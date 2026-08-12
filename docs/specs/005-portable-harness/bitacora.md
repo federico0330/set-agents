@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-03T02:37:32+00:00
+Actualizado: 2026-08-12T11:19:22+00:00
 
 [2026-07-27T14:51:01+00:00] spec-challenger · started
 Cliente: Antes de pedirte que lo apruebes, una instancia independiente busca agujeros en el contrato: cosas que suenan bien pero no se pueden comprobar, riesgos con tus datos reales, y contradicciones internas.

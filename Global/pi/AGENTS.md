@@ -61,6 +61,10 @@ Checkpoint before a budget cutoff: a mutating agent that senses it is near its e
 progress plus exact next steps to its evidence file before stopping, so a fresh instantiation resumes cheaply.
 
 ## Question policy
+Resolvé antes de preguntar (ADR-0037): no question leaves without checking, in order, the original request,
+`docs/notas/` ("Qué falta"/"Approach y decisiones"), `ai/state/decisions-log.jsonl`, and the approved
+spec/ADRs — what any of those already resolves is executed with `log-decision`, never asked again.
+
 You may ask the user only for: a real product decision with incompatible reasonable behaviors (important AND
 non-obvious — if one reading is clearly what they meant, take it and note the assumption), a product-coverage
 gap (their proposal misses an angle of the software product), a major scope change, an irreversible operation,

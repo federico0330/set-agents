@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat as _stat
 import subprocess
 import time
@@ -14,6 +15,10 @@ from .domain import CatalogSnapshot, RoutingError, StaticRoute, _sorted_strings
 # ADR-0006 (AM-2): probe cache is a filtering-only optimization. TTL bounds staleness;
 # the invalidation key covers uid and the canonical catalog/routing config.
 PROBE_CACHE_TTL = 300.0
+# ADR-0034 (019 PKG-1, AC-08): bump whenever the cache's CONTENT SHAPE or key semantics
+# change -- a stale on-disk document written under an old schema can never be read back
+# as if it matched the new one, without waiting for a manual TTL/format migration.
+_CACHE_SCHEMA_VERSION = 2
 
 # ADR-0007 (P3-pi-lane, T-301/T-305): pi is invoked through an EXACT pinned version, never
 # the bare `pi` on PATH (the managed `~/.local/bin/pi` wrapper only soft-pins by release
@@ -119,6 +124,22 @@ _OPENCODE_PROVIDER_KEYS = {"openai-codex": "openai", "anthropic": "anthropic",
 # translates a model name within one already-matched provider, a different axis).
 _OPENCODE_CLI_IDS = {"openai-codex": "openai", "anthropic": "anthropic",
                      "opencode-zen": "opencode", "opencode-go": "opencode-go"}
+# ADR-0034 (019 PKG-1) re-measurement, live, 2026-08-10 (opencode 1.18.14): `opencode
+# auth list --pure` shows 4 real credentials -- `opencode-go`, `openai`, `github-copilot`,
+# `opencode` (auth.json keys). `github-copilot` is authenticated but `opencode models
+# github-copilot --pure` (even with `--refresh`) answers `Error: Provider not found:
+# github-copilot` -- no CLI id verifies it, so NO pair is added for it here (M-1, fail-
+# closed: never hardcode an unverified CLI id, never derive one by a display-name-to-
+# CLI-id heuristic like "replace the space with a hyphen" -- that would have produced
+# the WRONG id for `opencode-go` itself, "opencode go" -> "opencode-go" only works by
+# coincidence for that one pair and fails silently for anything else). The opencode
+# `openai` provider (OAuth ChatGPT) is NOT a new provider either -- it is the display/CLI
+# name this table ALREADY maps to `openai-codex` (M-2); no duplicate catalog provider is
+# added for it. Detection is structural, not a separate code path: `github-copilot`
+# never appears in `_PAIR_COMMANDS`, so `_probe_pairs` never even queries it -- the rest
+# of the inventory is never at risk of an unverified id leaking in. `--route-doctor`
+# (PKG-2, ADR-0035) is the surface that will report "detected, unlistable" to a human;
+# nothing here needs to change for that report to be accurate.
 # The audited pair table is the single source of runtime/provider compatibility:
 # a pair absent here can never authenticate, list models, or appear in identities.
 # 012 AC-01: two OpenCode-lane pairs added, `opencode-zen`/`opencode-go` — real,
@@ -143,9 +164,31 @@ _PAIR_COMMANDS = {
 # CATALOG_INVALID for every provider, existing two included). OpenCode Go is a monthly
 # subscription; OpenCode Zen is metered/API-key (user clarification, logged at
 # ai/state/decisions-log.jsonl, slug opencode-zen-go-billing-model-distinto-no-mismo-pool).
-# Records the fact only; no weighting/selection logic reads this map yet (008-P3's
-# territory, out of scope here).
-PROVIDER_BILLING_KIND = {"opencode-zen": "metered", "opencode-go": "subscription"}
+# ADR-0035 (019 PKG-2): completed to cover every DISCOVERABLE_PROVIDERS member --
+# `openai-codex`/`anthropic` are the curated subscription lanes (Codex CLI login, Claude
+# Code OAuth), `opencode-go` stays subscription, `opencode-zen` stays the sole metered
+# entry. This is the day `billing_rank` (below) starts reading it -- the previous "no
+# weighting/selection logic reads this map yet" note is retired.
+PROVIDER_BILLING_KIND = {"openai-codex": "subscription", "anthropic": "subscription",
+                         "opencode-go": "subscription", "opencode-zen": "metered"}
+# ADR-0035 AC-12: the FREE-model convention is the `-free` suffix -- the exact same
+# pattern `inference._FAST_HINTS` already treats as a signal, never a second, competing
+# definition of "free" invented here.
+_FREE_MODEL_SUFFIX = re.compile(r"-free(\b|$)")
+
+
+def billing_rank(provider: str, model: str) -> int:
+    """ADR-0035 (AC-12): pure order-only signal, `0` (cheap: subscription or a free-suffixed
+    model) or `1` (metered, or a provider this map does not even know -- fail-closed toward
+    the expensive rank, never toward the cheap one for an unrecognized provider). Consulted
+    ONLY by `service.route`'s sort key, strictly between `TIER_ORDER` and `_bias_rank`
+    (ADR-0035 d.3) -- it can never affect which candidates reach the sort, only the order
+    among candidates that already survived every hard exclusion."""
+    if PROVIDER_BILLING_KIND.get(provider) == "subscription":
+        return 0
+    if isinstance(model, str) and _FREE_MODEL_SUFFIX.search(model):
+        return 0
+    return 1
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -194,13 +237,19 @@ def _parse_claude_auth(stdout: str) -> bool:
 
 
 def _parse_opencode_auth(stdout: str) -> set[str]:
-    """`opencode auth list --pure` prints decorated credential rows, one provider name per bullet."""
+    """`opencode auth list --pure` prints decorated credential rows, one provider name per
+    bullet. ADR-0034 (AC-07): only `●`/`*` mark a REAL, usable credential; `○` is opencode's
+    own "pending/incomplete" marker (e.g. an invitation not yet accepted, a session that
+    needs re-auth) and must never count as authenticated -- treating it as live would widen
+    the audited set past what is actually usable, the opposite of fail-closed. Live-measured
+    2026-08-10 (opencode 1.18.14): every row on this machine is `●`, so this fix has no
+    observable effect on today's real inventory -- it closes the defect regardless."""
     providers = set()
     for line in _clean_lines(stdout):
         if line.startswith("Error"):
             raise RoutingError("PROVIDER_UNAUTHENTICATED")
-        if line.startswith(("●", "○", "*")):
-            body = line.lstrip("●○* ").strip()
+        if line.startswith(("●", "*")):
+            body = line.lstrip("●* ").strip()
             if body:
                 # The trailing word is the credential method (api/oauth); the rest is the provider name.
                 name = body.rsplit(None, 1)[0] if len(body.split()) > 1 else body
@@ -258,10 +307,62 @@ def pi_auth_provider_keys() -> frozenset[str]:
     return frozenset(key for key in doc if isinstance(key, str))
 
 
-def _cache_key(config: dict) -> str:
+def _opencode_binary_signature() -> str:
+    """ADR-0034 (AC-08): path + mtime of the `opencode` binary PATH resolves right now --
+    swapping the binary (upgrade, reinstall, a different shim) invalidates every existing
+    cache entry without a manual version bump. No subprocess here, just a PATH lookup and
+    a stat -- safe to call from a pure hashing function. Unresolvable is a fixed sentinel
+    that simply never equals a real signature, so the cache is skipped (fail-closed), never
+    fabricated as a match."""
+    path = shutil.which("opencode")
+    if not path:
+        return "opencode:absent"
+    try:
+        mtime_ns = os.stat(path).st_mtime_ns
+    except OSError:
+        return "opencode:absent"
+    return f"opencode:{path}:{mtime_ns}"
+
+
+def _live_opencode_auth_signature(timeout: float) -> str:
+    """ADR-0034 (AC-08): a cheap, ALWAYS-fresh (never itself cached) read of `opencode
+    auth list --pure` -- credential NAMES only, never a model listing, never persisted
+    to disk on its own -- folded into the cache key so the authenticated-provider set is
+    genuinely re-checked on every composition that consults the cache, instead of trusted
+    from whatever it was when the cache was last written. Any surprise (missing binary,
+    timeout, non-zero exit, parse failure) is the empty signature, fail-closed: an
+    unreadable auth state simply differs from a real one, so the cache is missed and a
+    full fresh probe runs -- it can never fabricate a match."""
+    probe_env = dict(os.environ, CI="1", NO_COLOR="1", TERM="dumb")
+    try:
+        completed = subprocess.run(("opencode", "auth", "list", "--pure"), stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                   timeout=timeout, check=False, env=probe_env)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if completed.returncode != 0:
+        return ""
+    try:
+        return ",".join(sorted(_parse_opencode_auth(completed.stdout)))
+    except RoutingError:
+        return ""
+
+
+def _cache_key(config: dict, auth_signature: str = "") -> str:
+    """ADR-0006 base key (uid + canonical catalog/routing config), extended by ADR-0034
+    AC-08 with the resolved `opencode` binary's path+mtime (no I/O beyond a stat, so this
+    function stays pure/no-subprocess for every existing direct caller) and the cache
+    schema version, always; plus `auth_signature` -- the caller-supplied, freshly-read,
+    normalized authenticated-provider set -- only when the caller actually has one.
+    `probe_inventory` is the only production caller that supplies a non-empty
+    `auth_signature` (see `_live_opencode_auth_signature` above); every pre-existing
+    direct caller (including tests) keeps calling this with the same two-argument shape
+    it always had and is unaffected."""
     canon = json.dumps({"catalog": config.get("catalog", {}), "routing": config.get("routing", {})},
                        sort_keys=True, default=str)
-    return hashlib.sha256(f"{os.getuid()}\n{canon}".encode("utf-8")).hexdigest()
+    parts = "\n".join((str(os.getuid()), canon, str(_CACHE_SCHEMA_VERSION),
+                       _opencode_binary_signature(), auth_signature))
+    return hashlib.sha256(parts.encode("utf-8")).hexdigest()
 
 
 def _validate_cache_dir(root: Path) -> bool:
@@ -441,6 +542,12 @@ def probe_inventory(config: dict, timeout: float = 20.0, cache_root=None, fresh:
     costs one retry, never the whole cache window. `cache_write=False`
     (SEC-A03: the simulate/explain lane) reads a warm cache but never
     persists one, preserving explain's no-mutation contract.
+
+    ADR-0034 (AC-08): whenever a cache is even consulted, the authenticated-opencode-
+    provider set is re-read fresh (`_live_opencode_auth_signature`, one cheap credential-
+    only call, never itself cached) and folded into the lookup/write key -- a credential
+    change is caught immediately, never only after the TTL window; the cache on disk
+    still holds model LISTINGS only, never the raw signature.
     """
     now = time.time() if now is None else now
     if pairs is not None:
@@ -448,7 +555,8 @@ def probe_inventory(config: dict, timeout: float = 20.0, cache_root=None, fresh:
         return _probe_pairs(config, selected, timeout)
     all_pairs = list(_PAIR_COMMANDS)
     use_cache = cache_root is not None and _validate_cache_dir(Path(cache_root))
-    key = _cache_key(config) if use_cache else None
+    auth_signature = _live_opencode_auth_signature(timeout) if use_cache else ""
+    key = _cache_key(config, auth_signature) if use_cache else None
     cached = _read_probe_cache(cache_root, key, now, config) if (use_cache and not fresh) else None
     if cached is not None:
         missing = [pair for pair in all_pairs if pair not in cached]
@@ -575,6 +683,116 @@ def build_snapshot(catalog_path: Path, roster: list[dict], config: dict, digest=
 # DIFFERENT entry point that a caller opts into via [routing].discovered_providers,
 # absent by default, and the curated allowlist path never flows through it).
 
+def resolve_discovered_providers(config: dict, inventory: dict) -> tuple[str, ...]:
+    """ADR-0034 (AC-01/AC-02): the ONE function that turns `[routing].discovered_providers`
+    into the concrete provider tuple `build_effective_snapshot` synthesizes routes for.
+    `service.py`'s initial composition AND its `recheck` lambda (re-probed on a fresh
+    inventory at authorization time) both call this SAME pure function -- deriving the
+    universe two different ways would let a candidate authorized against one derivation
+    fail `AUTHORIZATION_INVALID` against the other purely from derivation drift, never a
+    real auth change.
+
+    `"auto"` derives from the PROBED inventory (never a static list) intersected with the
+    audited `_PAIR_COMMANDS` provider set -- copilot and any other never-audited provider
+    can never appear here no matter what a probe observes (M-1). An explicit list is used
+    as-is (already validated against `DISCOVERABLE_PROVIDERS` at models_config load time);
+    anything else (missing key, malformed value from a caller that skipped validation) is
+    the empty tuple, fail-closed.
+    """
+    raw = (config.get("routing") or {}).get("discovered_providers") if isinstance(config, dict) else None
+    if raw == "auto":
+        audited_providers = {provider for _, provider in _PAIR_COMMANDS}
+        # `inventory` never stores an empty-model pair (`_probe_pairs`'s own `if models:`
+        # guard), so key presence alone already means "live" -- no extra truthiness check.
+        live_providers = {provider for (_, provider) in inventory}
+        return tuple(sorted(live_providers & audited_providers))
+    if isinstance(raw, (list, tuple)):
+        return tuple(raw)
+    return ()
+
+
+def route_doctor(config: dict, cache_root=None, timeout: float = 20.0, now=None) -> dict:
+    """ADR-0035 (AC-15): read-only diagnostic snapshot for `set-agents --route-doctor`.
+
+    Never opens a routing run, never authorizes anything, and never WRITES the probe
+    cache (only inspects it, when `cache_root` is given) -- every subprocess call here
+    is either a fresh auth-only read or `probe_inventory(..., pairs=...)`, which
+    `probe_inventory` itself always runs fresh/uncached for an explicit `pairs` list
+    (see its own docstring), so this function can never leave a mutated cache file
+    behind and never races the composition path's own cache.
+
+    Reports, for every audited OpenCode-lane pair: authenticated (fresh
+    `opencode auth list --pure` read), how many models it lists (fresh
+    `opencode models <id> --pure`), and its billing kind. Additionally -- this is
+    what makes M-1 (ADR-0034) diagnosable without reading code -- any OTHER
+    authenticated OpenCode credential this table does NOT map to a CLI id (today
+    exactly `github-copilot`) is reported `detected_unlistable=True`, never probed for
+    models (there is no verified CLI id to probe with), never added to any pair table.
+    """
+    now = time.time() if now is None else now
+    probe_env = dict(os.environ, CI="1", NO_COLOR="1", TERM="dumb")
+    try:
+        auth_result = subprocess.run(("opencode", "auth", "list", "--pure"), stdin=subprocess.DEVNULL,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                     timeout=timeout, check=False, env=probe_env)
+        raw_auth = _parse_opencode_auth(auth_result.stdout) if auth_result.returncode == 0 else set()
+    except (OSError, subprocess.TimeoutExpired, RoutingError):
+        raw_auth = set()
+    opencode_pairs = [pair for pair in _PAIR_COMMANDS if pair[0] == "opencode"]
+    # Always fresh, never cached, never written -- `pairs=` bypasses the cache entirely
+    # in `probe_inventory` itself (its `if pairs is not None:` branch).
+    fresh_inventory = probe_inventory(config, timeout=timeout, pairs=opencode_pairs)
+    providers = []
+    for provider, cli_id in sorted(_OPENCODE_CLI_IDS.items()):
+        display = _OPENCODE_PROVIDER_KEYS[provider]
+        models = fresh_inventory.get(("opencode", provider), set())
+        providers.append({
+            "provider": provider, "runtime": "opencode",
+            "authenticated": display in raw_auth,
+            "models_listable": len(models),
+            "billing": PROVIDER_BILLING_KIND.get(provider, "unknown"),
+            "detected_unlistable": False,
+        })
+    known_display = set(_OPENCODE_PROVIDER_KEYS.values())
+    for display in sorted(raw_auth - known_display):
+        # M-1: authenticated but no audited CLI id maps to it -- never a pair, never
+        # probed for models, reported so a human can see it instead of guessing.
+        providers.append({
+            "provider": display, "runtime": "opencode",
+            "authenticated": True, "models_listable": 0,
+            "billing": "unknown", "detected_unlistable": True,
+        })
+    cache = {"used": False, "reason": "CACHE_ROOT_ABSENT"}
+    if cache_root is not None:
+        root = Path(cache_root)
+        if not _validate_cache_dir(root):
+            cache = {"used": False, "reason": "CACHE_DIR_INVALID"}
+        else:
+            auth_signature = _live_opencode_auth_signature(timeout)
+            key = _cache_key(config, auth_signature)
+            path = root / "probe-cache.json"
+            try:
+                st = path.lstat()
+                if _stat.S_ISLNK(st.st_mode) or not _stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or _stat.S_IMODE(st.st_mode) != 0o600:
+                    cache = {"used": False, "reason": "CACHE_FILE_UNSAFE"}
+                else:
+                    doc = json.loads(path.read_text(encoding="utf-8"))
+                    at = doc.get("at") if isinstance(doc, dict) else None
+                    key_current = isinstance(doc, dict) and doc.get("key") == key
+                    age = (now - at) if isinstance(at, (int, float)) and not isinstance(at, bool) else None
+                    expired = age is None or age < 0 or age > PROBE_CACHE_TTL
+                    cache = {
+                        "used": bool(key_current and not expired),
+                        "key_current": bool(key_current),
+                        "age_seconds": age,
+                        "reason": "OK" if (key_current and not expired) else
+                                  ("KEY_MISMATCH" if not key_current else "EXPIRED"),
+                    }
+            except (OSError, ValueError):
+                cache = {"used": False, "reason": "CACHE_ABSENT_OR_UNREADABLE"}
+    return {"providers": providers, "cache": cache}
+
+
 def discovered_models(config: dict, provider: str, inventory: dict) -> set[str]:
     """Every model the probe actually observed for `provider`, across runtimes.
 
@@ -602,10 +820,14 @@ def build_effective_snapshot(catalog_path: Path, roster: list[dict], config: dic
     twin is ever added; `[catalog].exclude` entries (`"provider:model"` strings in
     models.toml) veto individual discovered ids; providers outside the audited
     `_PAIR_COMMANDS` set are never synthesized, no matter what the config says.
+
+    ADR-0034: `providers` comes from `resolve_discovered_providers` -- the single
+    function that also drives `service.py`'s recheck lambda, so `"auto"` derives from
+    the SAME live-inventory-intersect-audited rule both places (AC-02).
     """
     from .inference import synthesize_route_row
     base = build_snapshot(catalog_path, roster, config, digest)
-    providers = (config.get("routing") or {}).get("discovered_providers") or []
+    providers = resolve_discovered_providers(config, inventory)
     if not providers:
         return base, frozenset()
     roster_names = tuple(sorted({row["role"] for row in roster}))

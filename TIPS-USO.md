@@ -48,11 +48,26 @@ Detalles en `INSTALACION.md`.
 ## Safe generation and installation
 
 ```bash
-./build.sh --check     # generate in temporary staging and validate
-./build.sh --diff      # compare staging with tracked generated output
+./build.sh --check     # forced --profile go-zen: diff a fresh build against Global/, fail
+                        # naming files on any drift (self-scaffold AND the four Global/ trees;
+                        # ADR-0041). Ignores the local active-profile/--profile on purpose:
+                        # Global/ is committed under go-zen, and a local lane would break
+                        # install.sh's onboarding and every setup-models.sh model change.
+./build.sh --diff      # compare staging (local profile) with tracked generated output --
+                        # "show me", always exits 0, never a gate
 ./build.sh             # refresh tracked generated output
 ./build.sh --install   # show managed live diff, ask once, back up, install, smoke-test
 ```
+
+**Gate order (ADR-0041, AC-04):** `./build.sh --check` runs SIEMPRE before the full test suite
+whenever both are cited as evidence for a gate — `ai/scripts/verify.sh` already has this order
+(`--check` at `:6`, the suite at `:17`), because the suite regenerates `Global/` dozens of times
+as a side effect of exercising `generate.py` (`tests/test_harness.py`), which papers over real
+drift by the time anything looks at it afterward. The same rule applies to standalone citations
+(there is real precedent for citing them loose, `HANDOFF-PASO9.md:103`). A CI job that runs the
+suite alone without `--check` (`windows-bootstrap` in `.github/workflows/ci.yml`, which cannot
+run a bash script) proves the Python scripts and the suite pass on Windows — it is never evidence
+that `Global/` has no drift.
 
 Installation merges only managed configuration keys, preserves unrelated plugins/files, removes legacy Codex
 role prompts, and rolls back managed paths if smoke checks fail. Backups live under

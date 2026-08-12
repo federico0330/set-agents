@@ -49,6 +49,34 @@ class PanelLinesTests(unittest.TestCase):
         text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
         self.assertIn("opencode-zen", text)
 
+    def test_auto_resolves_the_live_inventory_never_iterates_the_string(self):
+        # ADR-0035 (AC-16): the exact defect this replaces -- `list("auto")` printing
+        # "a, u, t, o" -- reproduced live before this fix and registered as the package's
+        # first task. `"auto"` is a policy, resolved via `_resolve_live_discovered`,
+        # never iterated as a string.
+        config = _config()
+        config["routing"]["discovered_providers"] = "auto"
+        with mock.patch.object(setup_models, "_resolve_live_discovered",
+                               return_value=("opencode-zen", "opencode-go")):
+            text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+        self.assertIn("proveedores descubiertos rutables: auto → opencode-zen (metered), "
+                      "opencode-go (suscripción)", text)
+        self.assertNotIn("a, u, t, o", text)
+
+    def test_auto_with_nothing_live_says_so_instead_of_iterating(self):
+        config = _config()
+        config["routing"]["discovered_providers"] = "auto"
+        with mock.patch.object(setup_models, "_resolve_live_discovered", return_value=()):
+            text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+        self.assertIn("auto → ninguno vivo ahora", text)
+
+    def test_auto_probe_failure_degrades_to_an_explicit_message(self):
+        config = _config()
+        config["routing"]["discovered_providers"] = "auto"
+        with mock.patch.object(setup_models, "_resolve_live_discovered", return_value=None):
+            text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+        self.assertIn("auto → no verificable ahora", text)
+
 
 class WizardBehaviorTests(unittest.TestCase):
     def _run(self, picks, config=None):
@@ -78,13 +106,35 @@ class WizardBehaviorTests(unittest.TestCase):
         self.assertIn("auto", out)
 
     def test_discovered_provider_toggle_round_trips(self):
+        # ADR-0035 (AC-16): option 7 is now a three-way policy picker (auto/manual/none);
+        # "Lista manual" (index 1) still offers the per-provider toggle, but its
+        # candidates come from `models_config.DISCOVERABLE_PROVIDERS` (sorted:
+        # anthropic, openai-codex, opencode-go, opencode-zen), not a literal tuple --
+        # index 3 in that sorted list is `opencode-zen`.
         config, out, _ = self._run([
             setup_models.tui.Selected(6),   # Proveedores descubiertos
-            setup_models.tui.Selected(0),   # opencode-zen
+            setup_models.tui.Selected(1),   # Lista manual
+            setup_models.tui.Selected(3),   # opencode-zen (sorted DISCOVERABLE_PROVIDERS)
             setup_models.tui.Selected(4),   # Salir sin guardar
         ])
         self.assertEqual(config["routing"]["discovered_providers"], ["opencode-zen"])
         self.assertIn("MODEL_METADATA_INFERRED", out)
+
+    def test_discovered_provider_auto_and_none_policies(self):
+        config, out, _ = self._run([
+            setup_models.tui.Selected(6),   # Proveedores descubiertos
+            setup_models.tui.Selected(0),   # auto (recomendado)
+            setup_models.tui.Selected(4),   # Salir sin guardar
+        ])
+        self.assertEqual(config["routing"]["discovered_providers"], "auto")
+        self.assertIn("discovered_providers = auto", out)
+
+        config, out, _ = self._run([
+            setup_models.tui.Selected(6),   # Proveedores descubiertos
+            setup_models.tui.Selected(2),   # Ninguno
+            setup_models.tui.Selected(4),   # Salir sin guardar
+        ])
+        self.assertEqual(config["routing"]["discovered_providers"], [])
 
 
 if __name__ == "__main__":

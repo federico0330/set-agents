@@ -4,8 +4,8 @@ from __future__ import annotations
 import secrets
 import time
 from pathlib import Path
-from .catalog import build_snapshot, canonical_model, probe_inventory
-from .inference import vendor_stem as _vendor_stem
+from .catalog import build_snapshot, canonical_model, probe_inventory, billing_rank
+from .inference import vendor_stem as _vendor_stem, stem_resolved as _stem_resolved
 from .domain import (RISK_ORDER, TIER_ORDER, RoutingError, StaticRoute, TaskRequest, _ObservedTaskFacts,
                      combined_risk, required_tier, RouteDecision, resolve_bias_class)
 
@@ -131,16 +131,24 @@ class RoutingService:
         # MODEL_PIN_UNAVAILABLE reason code, never a fabricated authorization.
         model_pin = dict((model_preference or {}).get("model_pin") or {})
         inventory = probe_inventory(config, cache_root=cache_root, fresh=fresh_probes, cache_write=not simulate)
-        # ADR-0029 (017 PKG-B2): the OPT-IN discovered-routes path. With
-        # [routing].discovered_providers empty (the default), this branch is dead and
-        # composition is byte-for-byte the pre-017 sealed shape — same builder, same
-        # recheck lambda. With providers declared, the snapshot (and the authorization
-        # revalidation recheck) both flow through build_effective_snapshot, so a
-        # synthesized route revalidates against the same effective universe it was
-        # selected from — never against the narrower curated snapshot (which would
-        # fail every synthesized authorization as AUTHORIZATION_INVALID).
-        discovered = tuple((config.get("routing") or {}).get("discovered_providers") or ()) if isinstance(config, dict) else ()
-        if discovered:
+        # ADR-0029 (017 PKG-B2), extended by ADR-0034 (019 PKG-1): the OPT-IN
+        # discovered-routes path. With [routing].discovered_providers unset entirely from
+        # a config that skips models_config validation (e.g. a bare {} in a unit test),
+        # this branch is dead and composition is byte-for-byte the pre-017 sealed shape —
+        # same builder, same recheck lambda. ADR-0034's new default is the STRING "auto",
+        # which now also takes this branch: `catalog.resolve_discovered_providers` (the
+        # SAME pure function `build_effective_snapshot` calls internally) derives the
+        # concrete provider set from the ACTUAL probed inventory every time, so the
+        # initial composition and this `recheck` lambda — which re-probes a fresh
+        # inventory — necessarily derive from the SAME rule, never two independently
+        # drifting universes (a real hazard: derive-then-diverge would fail every
+        # synthesized authorization as AUTHORIZATION_INVALID on its own re-check). With
+        # providers declared (or "auto" resolving non-empty), the snapshot (and the
+        # authorization revalidation recheck) both flow through build_effective_snapshot,
+        # so a synthesized route revalidates against the same effective universe it was
+        # selected from — never against the narrower curated snapshot.
+        discovery_configured = isinstance(config, dict) and bool((config.get("routing") or {}).get("discovered_providers"))
+        if discovery_configured:
             from .catalog import build_effective_snapshot
             snapshot, inferred_ids = build_effective_snapshot(catalog_path, roster, config, inventory)
             recheck = lambda: build_effective_snapshot(  # noqa: E731
@@ -310,6 +318,15 @@ class RoutingService:
             elif not set(facts.required_tools).union(request.required_tools).issubset(route.tools): reason="TOOLS_MISSING"
             elif needs_context and (not facts.context_present or not facts.critical_coverage): reason="CONTEXT_MISSING"
             elif writer and route.family == writer.family: reason="REVIEW_FAMILY_CONFLICT"
+            # ADR-0034 (AC-06): a synthesized reviewer candidate whose OWN vendor stem
+            # never resolved against any known pattern (`inference.stem_resolved`) can
+            # never be PROVEN independent of the writer — it is excluded outright,
+            # fail-closed, before the stem-equality comparison below even runs. This is
+            # the "inference can only remove independence, never grant it" rule (ADR-0029
+            # d.3) applied to the resolution step itself, not just the comparison: an
+            # unresolved stem is not a weaker signal of independence, it is NO signal.
+            elif (writer and route.route_id in self._inferred_ids
+                  and not _stem_resolved(route.model)): reason="REVIEW_IDENTITY_UNRESOLVED_INFERRED"
             # ADR-0029 d.3: inference only ever REMOVES independence. A synthesized
             # candidate compares by coarse vendor stem against the writer's model —
             # an inferred kimi-* reviewer is never independent of any kimi-* writer,
@@ -347,78 +364,126 @@ class RoutingService:
         # across tiers (the tier FLOOR was already enforced as TIER_INSUFFICIENT), but a
         # pin never outranks reviewer independence. Unpinned decisions rank every
         # candidate equal here, leaving the pre-ADR-0032 ordering byte-identical.
-        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], _bias_rank(x[0].provider, bias_preference), x[0].curated_priority, x[0].route_id))
+        # ADR-0034 (AC-04): `is_inferred` sits immediately BEFORE `curated_priority` — a
+        # curated row (0) always outranks a synthesized one (1) at equal tier/bias, as an
+        # EXPLICIT flag rather than relying on every synthesized row's `curated_priority`
+        # happening to be a large magic number (1000, `inference.synthesize_route_row`).
+        # ADR-0035 (AC-13): `billing_rank` is inserted HERE, strictly between `TIER_ORDER`
+        # (position 2) and `_bias_rank` (today's position 3, shifted to 4) — a subscription
+        # or free-suffixed candidate outranks a metered one only among candidates ALREADY
+        # tied on independence/pin/tier; the exclusion loop above (identity, auth, role,
+        # tools, context, reviewer independence, tier floor) is completely untouched, so a
+        # metered candidate that is the ONLY one to satisfy the tier floor or the ONLY one
+        # to survive the independence exclusions still wins here exactly as before this
+        # ADR — cost is an ordering criterion among survivors, never an eligibility one.
+        # Final tuple this ADR leaves:
+        # (same_provider_as_writer, pin_rank, TIER_ORDER, billing_rank, _bias_rank,
+        #  is_inferred, curated_priority, route_id).
+        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], billing_rank(x[0].provider, x[0].model), _bias_rank(x[0].provider, bias_preference), 1 if x[0].route_id in self._inferred_ids else 0, x[0].curated_priority, x[0].route_id))
         if not candidates:
             return RouteDecision(None,None,None,None,None,None,False,("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",),tuple(exclusions),bias_class=bias_class,preference_configured=preference_configured)
-        selected, identity = candidates[0]; fallback = candidates[1][1] if len(candidates) > 1 else None
-        # AC-09 (016-audit-debt-repayment): purely additive audit-trail element. When the
-        # SELECTED candidate's effective runtime (identity[1], already computed by
-        # `_effective_runtime` in the exclusion loop above) differs from the caller's
-        # literal requested `facts.selected_runtime`, a redirect happened for this
-        # decision. Recorded as an extra `reason_codes` entry alongside whatever codes a
-        # branch already emits — never replaces or reorders an existing code, never
-        # changes `success`/`runtime`/`identity`/`fallback`. Distinguishable from every
-        # existing code (none of them share this prefix).
-        redirect_reason = (
-            (f"RUNTIME_REDIRECTED requested={facts.selected_runtime} effective={identity[1]}",)
-            if identity[1] != facts.selected_runtime else ()
-        )
-        # ADR-0029: a decision carried by a synthesized route says so, always — the
-        # inferred tier/family are surfaced next to the selection instead of passing
-        # as curation-grade fact. Purely additive to reason_codes, like the redirect.
-        if selected.route_id in self._inferred_ids:
+        # ADR-0034 (AC-08): the block below used to run ONCE against the top-ranked
+        # candidate and abort with PROVIDER_UNAUTHENTICATED the moment the FRESH reprobe
+        # rejected it -- wasting every other still-eligible candidate a dynamic
+        # inventory may offer. It now retries against the next already-filtered
+        # candidate (never a re-run of the exclusion loop above -- independence/tier/
+        # tools were already enforced for every entry in `candidates`) specifically when
+        # the reprobe rejects the current pick; every other failure mode below
+        # (CATALOG_INVALID, AUTHORIZATION_INVALID, the invocation-time inventory check)
+        # still returns immediately on whatever candidate it hit, unchanged, exactly as
+        # before this ADR -- only a reprobe rejection re-ranks and loops.
+        while True:
+            selected, identity = candidates[0]; fallback = candidates[1][1] if len(candidates) > 1 else None
+            # AC-09 (016-audit-debt-repayment): purely additive audit-trail element. When the
+            # SELECTED candidate's effective runtime (identity[1], already computed by
+            # `_effective_runtime` in the exclusion loop above) differs from the caller's
+            # literal requested `facts.selected_runtime`, a redirect happened for this
+            # decision. Recorded as an extra `reason_codes` entry alongside whatever codes a
+            # branch already emits — never replaces or reorders an existing code, never
+            # changes `success`/`runtime`/`identity`/`fallback`. Distinguishable from every
+            # existing code (none of them share this prefix).
+            redirect_reason = (
+                (f"RUNTIME_REDIRECTED requested={facts.selected_runtime} effective={identity[1]}",)
+                if identity[1] != facts.selected_runtime else ()
+            )
+            # ADR-0029: a decision carried by a synthesized route says so, always — the
+            # inferred tier/family are surfaced next to the selection instead of passing
+            # as curation-grade fact. Purely additive to reason_codes, like the redirect.
+            if selected.route_id in self._inferred_ids:
+                redirect_reason = redirect_reason + (
+                    f"MODEL_METADATA_INFERRED tier={selected.tier} family={selected.family}",)
+            # ADR-0035 (AC-14): the billing rank that decided this candidate's position
+            # among its tier/independence-tied peers, always surfaced -- purely additive
+            # to reason_codes, same discipline as RUNTIME_REDIRECTED/MODEL_METADATA_INFERRED
+            # above: never replaces or reorders an existing code, never changes
+            # `success`/`runtime`/`identity`/`fallback`.
             redirect_reason = redirect_reason + (
-                f"MODEL_METADATA_INFERRED tier={selected.tier} family={selected.family}",)
-        # ADR-0032: a pinned decision always says so — MODEL_PINNED when the user's pin
-        # is what actually got selected, MODEL_PIN_UNAVAILABLE when a pin exists but the
-        # pinned identity was excluded/absent and the dynamic pick prevailed. Purely
-        # additive to reason_codes, same discipline as RUNTIME_REDIRECTED above.
-        if pin:
-            marker = "MODEL_PINNED" if (selected.provider, selected.model) == pin else "MODEL_PIN_UNAVAILABLE"
-            redirect_reason = redirect_reason + (f"{marker} {pin[0]}/{pin[1]}",)
-        if self.simulate or role_class != "writer":
-            # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
-            # reason code — true only for a review decision that matched a real terminal writer and
-            # survived the family+model+provider hard exclusions above (REVIEW_MODEL_CONFLICT added
-            # 012 repair SEC-001); an unverified reviewer never sets it.
-            verified = role_class == "review" and writer is not None and not unverified
-            return RouteDecision(*identity, False,
-                                 (("REVIEW_IDENTITY_UNVERIFIED",) if unverified else ()) + redirect_reason,
-                                 tuple(exclusions), fallback, independence_verified=verified,
-                                 bias_class=bias_class, preference_configured=preference_configured)
-        # The static binding is recomputed from the route's canonical fields and the
-        # identity is revalidated against a fresh on-disk snapshot before the durable,
-        # one-use authorization. Inventory was probed fresh for this invocation;
-        # re-probing per authorization is an approved exception (ADR-0005 R3).
-        recomputed = StaticRoute.identifier(selected.catalog_version, selected.provider, selected.model, selected.family,
-                                            selected.effort, (selected.tier,), selected.roles, selected.tools, selected.curated_priority)
-        try:
-            fresh = self._recheck()
-        except RoutingError:
-            return RouteDecision(None,None,None,None,None,None,False,("CATALOG_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
-        if recomputed != selected.route_id or not fresh.identity_allowed(identity) or (fallback and not fresh.identity_allowed(fallback)):
-            return RouteDecision(None,None,None,None,None,None,False,("AUTHORIZATION_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
-        # AC-01: `identity[1]`/`fallback[1]` ARE the effective runtimes already computed
-        # per-candidate in the exclusion loop above (identity index 1 in the
-        # `(route_id, runtime, provider, model, family, effort)` tuple) — reused here
-        # rather than recomputed, so the post-selection re-check can never drift from
-        # what the candidate was actually authorized under, including for a fallback on
-        # a DIFFERENT provider than `selected` (each carries its own effective runtime).
-        if selected.model not in self.inventory.get((identity[1], selected.provider), frozenset()):
-            return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
-        # AM-2 fresh-selected: the cache only filtered candidates; the pair that is about to be
-        # durably authorized (and the fallback's, if different) is re-probed fresh right now.
-        if self._reprobe is not None:
-            pairs = {(identity[1], selected.provider)}
-            if fallback: pairs.add((fallback[1], fallback[2]))
+                f"BILLING_RANK provider={selected.provider} rank={billing_rank(selected.provider, selected.model)}",)
+            # ADR-0032: a pinned decision always says so — MODEL_PINNED when the user's pin
+            # is what actually got selected, MODEL_PIN_UNAVAILABLE when a pin exists but the
+            # pinned identity was excluded/absent and the dynamic pick prevailed. Purely
+            # additive to reason_codes, same discipline as RUNTIME_REDIRECTED above.
+            if pin:
+                marker = "MODEL_PINNED" if (selected.provider, selected.model) == pin else "MODEL_PIN_UNAVAILABLE"
+                redirect_reason = redirect_reason + (f"{marker} {pin[0]}/{pin[1]}",)
+            if self.simulate or role_class != "writer":
+                # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
+                # reason code — true only for a review decision that matched a real terminal writer and
+                # survived the family+model+provider hard exclusions above (REVIEW_MODEL_CONFLICT added
+                # 012 repair SEC-001); an unverified reviewer never sets it.
+                verified = role_class == "review" and writer is not None and not unverified
+                return RouteDecision(*identity, False,
+                                     (("REVIEW_IDENTITY_UNVERIFIED",) if unverified else ()) + redirect_reason,
+                                     tuple(exclusions), fallback, independence_verified=verified,
+                                     bias_class=bias_class, preference_configured=preference_configured)
+            # The static binding is recomputed from the route's canonical fields and the
+            # identity is revalidated against a fresh on-disk snapshot before the durable,
+            # one-use authorization. Inventory was probed fresh for this invocation;
+            # re-probing per authorization is an approved exception (ADR-0005 R3).
+            recomputed = StaticRoute.identifier(selected.catalog_version, selected.provider, selected.model, selected.family,
+                                                selected.effort, (selected.tier,), selected.roles, selected.tools, selected.curated_priority)
             try:
-                verified = self._reprobe(sorted(pairs))
-            except Exception:
+                fresh = self._recheck()
+            except RoutingError:
+                return RouteDecision(None,None,None,None,None,None,False,("CATALOG_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
+            if recomputed != selected.route_id or not fresh.identity_allowed(identity) or (fallback and not fresh.identity_allowed(fallback)):
+                return RouteDecision(None,None,None,None,None,None,False,("AUTHORIZATION_INVALID",),bias_class=bias_class,preference_configured=preference_configured)
+            # AC-01: `identity[1]`/`fallback[1]` ARE the effective runtimes already computed
+            # per-candidate in the exclusion loop above (identity index 1 in the
+            # `(route_id, runtime, provider, model, family, effort)` tuple) — reused here
+            # rather than recomputed, so the post-selection re-check can never drift from
+            # what the candidate was actually authorized under, including for a fallback on
+            # a DIFFERENT provider than `selected` (each carries its own effective runtime).
+            if selected.model not in self.inventory.get((identity[1], selected.provider), frozenset()):
                 return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
-            if selected.model not in verified.get((identity[1], selected.provider), set()):
-                return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
-            if fallback and fallback[3] not in verified.get((fallback[1], fallback[2]), set()):
-                fallback = None  # an unverified fallback is dropped, never durably offered
+            # AM-2 fresh-selected: the cache only filtered candidates; the pair that is about to be
+            # durably authorized (and the fallback's, if different) is re-probed fresh right now.
+            if self._reprobe is not None:
+                pairs = {(identity[1], selected.provider)}
+                if fallback: pairs.add((fallback[1], fallback[2]))
+                try:
+                    verified = self._reprobe(sorted(pairs))
+                except Exception:
+                    return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
+                if selected.model not in verified.get((identity[1], selected.provider), set()):
+                    # ADR-0034 (AC-08): the top pick failed its fresh reprobe -- drop it and
+                    # retry with the NEXT already-filtered candidate rather than aborting;
+                    # only exhausting every candidate returns PROVIDER_UNAUTHENTICATED.
+                    # F-04 (P1 repair): the dropped candidate leaves a trace in the durable
+                    # `exclusions` list -- additive only, same discipline as
+                    # RUNTIME_REDIRECTED/MODEL_PIN_UNAVAILABLE above: never replaces or
+                    # reorders an existing exclusion, never changes success/runtime/
+                    # identity/fallback. Without this, a winner that was NOT the top-ranked
+                    # candidate shows up in decisions-v1.jsonl with no explanation at all.
+                    exclusions.append({"route_id": selected.route_id,
+                                        "reason": f"REPROBE_REJECTED {selected.provider}/{selected.model}"})
+                    candidates = candidates[1:]
+                    if not candidates:
+                        return RouteDecision(None,None,None,None,None,None,False,("PROVIDER_UNAUTHENTICATED",),bias_class=bias_class,preference_configured=preference_configured)
+                    continue
+                if fallback and fallback[3] not in verified.get((fallback[1], fallback[2]), set()):
+                    fallback = None  # an unverified fallback is dropped, never durably offered
+            break
         run_id = self.store.new_run_id()
         nonce = self._issuer.mint(identity, fallback, facts.role, role_class, self.snapshot)
         try:

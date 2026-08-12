@@ -50,7 +50,12 @@ state machines, or introduces a new module.
    the old. Keep it high-level on purpose (short Mermaid diagram + 2-3 lines of text per section — data flow,
    key workflows, use cases, component map); it links to `docs/adr/README.md` for the "why" instead of
    duplicating decision content. This is how the user stays able to see the system's current shape without
-   re-reading every ADR.
+   re-reading every ADR. **When the design introduces a new module** (a coherent, independently
+   describable slice of the system — not every file, but a real seam), add its `[module.<slug>]` entry to
+   `docs/modules/modules.toml` (`nombre`, `responsabilidad`, `paths`) — `feature-state.py sync-notes`
+   renders its initial `docs/modules/<slug>.md` from that entry (ADR-0036) — `overview.md` stays the
+   high-level map; `docs/modules/` is where the per-module detail lives from day one, not retrofitted
+   later by whoever first documents its impact.
 8. Define the contract the implementer must honor (public APIs, invariants, what must NOT change).
 
 ## Quality rules

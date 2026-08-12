@@ -1,7 +1,22 @@
 # Architecture overview
 
-This is the current high-level map for trusted routing P1R. It describes the accepted architecture target, not
-evidence that implementation is complete; decision rationale lives in the [ADR index](../adr/README.md).
+This is the high-level map of the harness as of ADR-0036 (feature 019-harness-evolution). It describes the
+accepted architecture target, not evidence that implementation is complete; decision rationale lives in the
+[ADR index](../adr/README.md). **Per-module detail lives in [`docs/modules/`](../modules/modules.toml)
+(ADR-0036). Of that schema's eight sections, only three are machine-regenerated on every state mutation
+that records a module impact — `## Responsabilidad`, `## Posee`, and `## Últimos cambios estructurales` —
+and those three are the layer least likely to go stale. The remaining five, including `## Posee / Depende
+de` (its "Depende de" half has no structured source in state), are human-owned prose, seeded once when the
+doc is created and preserved by the same merge that protects "## Notas propias" elsewhere; they can go
+stale like any other hand-written doc, and are only as current as their last edit. This document stays
+hand-maintained and system-wide; `docs/modules/<slug>.md` is the per-module source of truth for "what does
+this actually do right now".**
+
+The sections below (routing/dispatch, two-root install, vault topology) predate ADR-0036 and describe the
+trusted-routing subsystem specifically — see [`docs/modules/routing.md`](../modules/routing.md), whose
+`## Responsabilidad`/`## Posee`/`## Últimos cambios estructurales` are machine-regenerated and whose
+remaining sections (including `## Posee / Depende de`) are human-verified `file:line` prose, not
+automatically kept in sync with this narrative.
 
 ## Component map
 

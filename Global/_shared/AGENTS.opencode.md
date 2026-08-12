@@ -60,6 +60,10 @@ document with its URL. Model memory about moving targets (library APIs, prices, 
 source. When no source is available, say "sin verificar" explicitly. Applies in every mode, consult included.
 
 ## Question policy
+Resolvé antes de preguntar (ADR-0037): no question leaves without checking, in order, the original request,
+`docs/notas/` ("Qué falta"/"Approach y decisiones"), `ai/state/decisions-log.jsonl`, and the approved
+spec/ADRs — what any of those already resolves is executed with `log-decision`, never asked again.
+
 Workers and reviewers do not ask the user during normal execution. The orchestrator asks only for incompatible
 product decisions, major scope changes, irreversible operations, missing credentials/access, or blockers after
 retry budget. Routine test failures, gate reruns, required repairs, and continuing approved work do not require

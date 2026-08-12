@@ -3,8 +3,11 @@
 
 Non-interactive core: --status, --check, --set, --add-model, --add, --drop.
 Interactive wizard (no arguments): menu over the same primitives, then offers
-./build.sh --check and --install. Writing is atomic and always validated in
-memory first (all three lanes); an invalid change never reaches the file.
+a full-generate smoke test (`build.sh --output`, see `_generate_smoke_test`;
+NOT `build.sh --check`, whose job since ADR-0041 is comparing Global/, not
+validating a config nothing has regenerated Global/ from yet) and --install.
+Writing is atomic and always validated in memory first (all three lanes); an
+invalid change never reaches the file.
 """
 
 import argparse
@@ -27,6 +30,23 @@ AREA_SIMPLE_FIELDS = ("claude", "codex", "codex_effort")
 # ADR-0032: which catalog list suggests models for a pinned provider.
 PIN_PROVIDER_CATALOGS = {"openai-codex": "codex", "anthropic": "claude",
                          "opencode-zen": "opencode_zen", "opencode-go": "opencode_go"}
+
+
+def _resolve_live_discovered(config):
+    """ADR-0035 (AC-16): resolves `[routing].discovered_providers == "auto"` against the
+    live probed inventory (`routing_core.catalog.resolve_discovered_providers`) -- never
+    iterates the string itself. `None` on any failure (missing routing_core state, a
+    broken probe), distinguishable from an empty tuple (`"auto"`, but nothing live right
+    now) -- the panel renders each differently. Uses the same cached probe root the CLI
+    uses (`set_agents_app.STATE_DIR`), so a warm cache keeps this cheap on every wizard
+    redraw; a cold one pays the same probe cost `--route-decide`/`--route-doctor` would."""
+    try:
+        from routing_core.catalog import probe_inventory, resolve_discovered_providers
+        import set_agents_app
+        inventory = probe_inventory(config, cache_root=set_agents_app.STATE_DIR)
+        return resolve_discovered_providers(config, inventory)
+    except Exception:
+        return None
 
 
 def _load_pins():
@@ -82,6 +102,23 @@ def validate(config, roles_path):
             models_config.load_roles(lane, roles_path, temp)
     finally:
         os.unlink(temp)
+
+
+def _generate_smoke_test(profile):
+    """Full generate() pipeline for `profile`, to a throwaway dir -- never Global/.
+
+    Before ADR-0041, `build.sh --check` doubled as this smoke test purely as a side effect of
+    always building its STAGING tree, and never actually compared it against anything. Now that
+    `--check` means "does Global/ match a fresh go-zen build" (AC-01), it is the wrong question
+    right after writing a NEW models.toml that nothing has regenerated Global/ from yet -- every
+    real edit would report drift against a tree the edit hasn't touched. `build.sh --output DIR
+    --profile P` is the same "does this fully generate" validation `--check` used to provide
+    (same generate.py call, same die()s on an incoherent config), without the Global/ diff.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        return subprocess.run(
+            [str(ROOT / "build.sh"), "--output", tmp, "--profile", profile],
+        )
 
 
 def dropped_cells(config, roster, subscription):
@@ -153,15 +190,24 @@ def _panel_lines(config, roster, profile, detected=None):
             subs.append(f"{key}=auto{'✓' if live else ''}")
         else:
             subs.append(f"{key}={'✓pin' if subscriptions[key] else '✗off'}")
-    discovered = config.get("routing", {}).get("discovered_providers", [])
+    # Repair F-03 (P2 review): the effective system default (`models_config.
+    # ROUTING_DEFAULTS["discovered_providers"]`) is `"auto"`, not `[]` -- `load_config`
+    # always materializes `"auto"` so this default was unreachable through the normal
+    # path, but a caller handing this function a raw dict without the key (e.g. a direct
+    # unit test or a future caller bypassing `load_config`) rendered the panel as if
+    # auto-adoption were off. Aligned with the single source of truth instead of a
+    # second, competing default.
+    discovered = config.get("routing", {}).get(
+        "discovered_providers", models_config.ROUTING_DEFAULTS["discovered_providers"])
     tiered = len({key for key, value in config.get("roles", {}).items() if "tiers" in value})
     lines = [
         f"lane: {profile} (auto)    suscripciones: {' '.join(subs) or '-'}",
         "routing dinámico: el router decide por spawn para TODOS los roles (ADR-0030; --route-explain)"
         + (f" · variantes @tier: {tiered} roles" if tiered else ""),
     ]
-    # ADR-0032: la política vigente, por rol o global — Automático (el router decide) o
-    # pin explícito del usuario. El origen de cada valor por spawn queda registrado en
+    # ADR-0032/ADR-0034: la política vigente, por rol o global — Automático (el router
+    # decide, incluidos los providers descubiertos que ADR-0034 hace routables) o pin
+    # explícito del usuario. El origen de cada valor por spawn queda registrado en
     # decisions-v1.jsonl (selection_path: pin|dynamic; el fallback curado se registra en
     # el spawn como MODEL_STATIC_FALLBACK).
     pins = _load_pins()
@@ -172,9 +218,34 @@ def _panel_lines(config, roster, profile, detected=None):
     else:
         rendered = ", ".join(f"{role}={p}/{m}" for role, (p, m) in sorted(pins.items()))
         lines.append(f"política: Automático + {len(pins)} pin(s) — {rendered}")
-    if discovered:
+    # ADR-0035 (AC-16): `"auto"` is a POLICY, never a sequence -- it is resolved against
+    # the live probed inventory (`routing_core.catalog.resolve_discovered_providers`),
+    # never iterated as a string (the exact `list("auto") == ['a','u','t','o']` defect
+    # this replaces, reproduced live before this fix: "proveedores descubiertos rutables:
+    # a, u, t, o"). An explicit list is still shown as-is, unchanged from before.
+    if discovered == "auto":
+        live = _resolve_live_discovered(config)
+        if live is None:
+            lines.append("proveedores descubiertos rutables: auto → no verificable ahora (probe falló; ver --route-doctor)")
+        elif not live:
+            lines.append("proveedores descubiertos rutables: auto → ninguno vivo ahora (ver --route-doctor)")
+        else:
+            from routing_core.catalog import PROVIDER_BILLING_KIND
+            billing_es = {"subscription": "suscripción", "metered": "metered"}
+            rendered_live = ", ".join(
+                f"{provider} ({billing_es.get(PROVIDER_BILLING_KIND.get(provider, 'unknown'), 'desconocido')})"
+                for provider in live)
+            lines.append(f"proveedores descubiertos rutables: auto → {rendered_live}")
+    elif isinstance(discovered, str) and discovered:
+        # Repair F-03: any OTHER truthy string (not "auto") is an unexpected shape --
+        # `', '.join(discovered)` would silently iterate it character by character (the
+        # exact `list("auto") == ['a', 'u', 't', 'o']` defect the comment above already
+        # fixed for the literal "auto" case). Degrade to an explicit message instead of
+        # ever joining a string as if it were a sequence of provider names.
+        lines.append(f"proveedores descubiertos rutables: valor de configuración inesperado ({discovered!r})")
+    elif discovered:
         lines.append(f"proveedores descubiertos rutables: {', '.join(discovered)}")
-    lines.append("DEFAULTS CURADOS (fallback cuando el lane no aplica la decisión):")
+    lines.append("DEFAULTS CURADOS (fallback cuando el lane no aplica la decisión; ADR-0034/ADR-0035):")
     lines.append(f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]")
     duties = [d for d in models_config.DUTY_ORDER if d in config.get("areas", {})]
     duties += sorted(set(config.get("areas", {})) - set(duties))
@@ -342,9 +413,10 @@ def wizard(config, roster, profile, roles_path, models_out):
                 continue
             models_config.emit_atomic(models_out, config)
             print(f"MODELS_WRITTEN {models_out}")
-            if _safe_input("¿Correr ./build.sh --check ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
-                if subprocess.run([str(ROOT / "build.sh"), "--check"], check=False).returncode != 0:
-                    print("BUILD_CHECK_FAIL — el archivo quedó escrito; corré ./build.sh --check para ver el detalle")
+            if _safe_input("¿Generar y validar ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
+                if _generate_smoke_test(profile).returncode != 0:
+                    print(f"MODELS_GENERATE_FAIL — el archivo quedó escrito; corré "
+                          f"./build.sh --output /tmp/x --profile {profile} para ver el detalle")
                     return 1
                 if _safe_input("¿Instalar globalmente (./build.sh --install)? [y/N] ").strip().lower() in {"y", "yes", "s", "si"}:
                     subprocess.run([str(ROOT / "build.sh"), "--install"], check=False)
@@ -359,25 +431,51 @@ def wizard(config, roster, profile, roles_path, models_out):
                 print(line)
             _safe_input("Enter para volver… ")
         elif option == "7":
-            # ADR-0029 opt-in: which discovered opencode providers become routable.
+            # ADR-0034/ADR-0035 (AC-16): three explicit policies, not a single hardcoded
+            # toggle pair -- "auto" (recommended, ADR-0034's new default: derives the
+            # routable set from the live probed inventory), "lista manual" (the previous
+            # per-provider toggle, but candidates now come from the AUDITED set --
+            # `models_config.DISCOVERABLE_PROVIDERS`, never a literal tuple, so a future
+            # fifth audited provider appears here without touching this file), or
+            # "ninguno" (explicit `[]`, ADR-0034 point 1: total opt-out that survives
+            # `emit()`).
             routing = config.setdefault("routing", {})
-            current = list(routing.get("discovered_providers", []))
-            options = []
-            for provider in ("opencode-zen", "opencode-go"):
-                mark = "rutable" if provider in current else "solo probeable"
-                options.append(f"{provider} — hoy: {mark}")
-            picked = tui.run_picker(options, prompt="Togglear proveedor descubierto:")
-            if not isinstance(picked, tui.Selected):
+            current = routing.get("discovered_providers", "auto")
+            state = tui.run_picker(
+                ("auto (recomendado) — el router decide del inventario vivo (ADR-0034)",
+                 "Lista manual — elegís vos, por provider auditado",
+                 "Ninguno — desactiva la auto-adopción"),
+                prompt="Proveedores descubiertos:")
+            if not isinstance(state, tui.Selected):
                 continue
-            provider = ("opencode-zen", "opencode-go")[picked.index]
-            if provider in current:
-                current.remove(provider)
+            if state.index == 0:
+                routing["discovered_providers"] = "auto"
+                dirty = True
+                print("OK: discovered_providers = auto (ADR-0034: deriva del inventario vivo; "
+                      "la fila curada sigue ganando el empate)")
+            elif state.index == 2:
+                routing["discovered_providers"] = []
+                dirty = True
+                print("OK: discovered_providers = [] (auto-adopción desactivada)")
             else:
-                current.append(provider)
-            routing["discovered_providers"] = sorted(current)
-            dirty = True
-            print(f"OK: discovered_providers = {routing['discovered_providers']} (ADR-0029: la curada gana; "
-                  "lo inferido lleva MODEL_METADATA_INFERRED)")
+                candidates = sorted(models_config.DISCOVERABLE_PROVIDERS)
+                manual_current = list(current) if isinstance(current, (list, tuple)) else []
+                options = []
+                for provider in candidates:
+                    mark = "rutable" if provider in manual_current else "solo probeable"
+                    options.append(f"{provider} — hoy: {mark}")
+                picked = tui.run_picker(options, prompt="Togglear proveedor descubierto:")
+                if not isinstance(picked, tui.Selected):
+                    continue
+                provider = candidates[picked.index]
+                if provider in manual_current:
+                    manual_current.remove(provider)
+                else:
+                    manual_current.append(provider)
+                routing["discovered_providers"] = sorted(manual_current)
+                dirty = True
+                print(f"OK: discovered_providers = {routing['discovered_providers']} (ADR-0034: la curada gana; "
+                      "lo inferido lleva MODEL_METADATA_INFERRED)")
         elif option == "8":
             # ADR-0032: política por rol (o global '*') — Automático (el router decide por
             # spawn) o pin explícito. Escribe model-preference.toml vía el CLI sancionado,
@@ -489,16 +587,20 @@ def main():
         models_config.emit_atomic(output, config)
         print(f"MODELS_WRITTEN {output}")
         if not plumbing:
-            try:
-                subprocess.run([str(ROOT / "build.sh"), "--check"], check=True)
-                if not args.no_install:
-                    install = [str(ROOT / "build.sh"), "--install"]
-                    if args.yes:
-                        install.append("--yes")
-                    subprocess.run(install, check=True)
-            except subprocess.CalledProcessError as exc:
-                print(f"BUILD_CHECK_FAIL rc={exc.returncode} — corré ./build.sh --check para ver el detalle", file=sys.stderr)
+            smoke = _generate_smoke_test(profile)
+            if smoke.returncode != 0:
+                print(f"MODELS_GENERATE_FAIL rc={smoke.returncode} — corré "
+                      f"./build.sh --output /tmp/x --profile {profile} para ver el detalle", file=sys.stderr)
                 return 1
+            if not args.no_install:
+                install = [str(ROOT / "build.sh"), "--install"]
+                if args.yes:
+                    install.append("--yes")
+                try:
+                    subprocess.run(install, check=True)
+                except subprocess.CalledProcessError as exc:
+                    print(f"BUILD_INSTALL_FAIL rc={exc.returncode} — corré ./build.sh --install para ver el detalle", file=sys.stderr)
+                    return 1
         return 0
     except ModelsError as exc:
         print(f"MODELS_INVALID: {exc}", file=sys.stderr)

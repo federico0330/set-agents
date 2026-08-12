@@ -282,6 +282,12 @@ class RoutingTests(unittest.TestCase):
         with self.assertRaises(ValueError): routing_catalog._parse_claude_auth("Logged in")
         auth="\x1b[90m│\n●  OpenAI \x1b[90moauth\x1b[0m\n●  OpenCode Zen api\n└  2 credentials\n"
         self.assertEqual(routing_catalog._parse_opencode_auth(auth),{"openai","opencode zen"})
+        # ADR-0034 (019 PKG-1, AC-07): a `○` row is NOT authenticated -- it used to be
+        # treated the same as `●`/`*` (the defect this closes); a pending/incomplete
+        # credential must never widen the audited set. `*` (a real credential marker,
+        # unaffected by this fix) still counts, same as before.
+        pending="●  OpenAI oauth\n○  OpenCode Go api\n*  Anthropic oauth\n"
+        self.assertEqual(routing_catalog._parse_opencode_auth(pending),{"openai","anthropic"})
         models="\x1b[0mopenai/gpt-5.6-sol\nopenai/gpt-5.4\n"
         self.assertEqual(routing_catalog._parse_opencode_models(models,"openai"),{"gpt-5.6-sol","gpt-5.4"})
         # opencode exits 0 on unknown providers; the error text must fail the pair.
@@ -812,10 +818,14 @@ class RoutingTests(unittest.TestCase):
             # AC-09/AC-10 (016-audit-debt-repayment): the redirect is now additively observable
             # in `reason_codes` -- `success`/`runtime`/`identity`/`fallback` stay byte-identical
             # to before this contract (asserted below, unchanged), only this new element is added.
-            self.assertEqual(len(review.reason_codes), 1)
+            # ADR-0035 (AC-14): every decision now additively carries a BILLING_RANK code
+            # (subscription anthropic/opus, rank 0) alongside the redirect -- two codes, not
+            # one, from this ADR forward.
+            self.assertEqual(len(review.reason_codes), 2)
             self.assertTrue(review.reason_codes[0].startswith("RUNTIME_REDIRECTED"))
             self.assertIn("opencode", review.reason_codes[0])  # requested runtime
             self.assertIn("claude-code", review.reason_codes[0])  # effective runtime
+            self.assertEqual(review.reason_codes[1], "BILLING_RANK provider=anthropic rank=0")
             self.assertEqual(review.provider, "anthropic")
             self.assertEqual(review.model, "opus")
             self.assertEqual(review.runtime, "claude-code")  # the EFFECTIVE, not requested, runtime
@@ -842,10 +852,12 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual((review.provider, review.model), ("anthropic", "opus"))
             self.assertIsNone(review.fallback_identity)
             self.assertTrue(review.independence_verified)
-            # "after" (new, additive):
-            self.assertEqual(len(review.reason_codes), 1)
+            # "after" (new, additive). ADR-0035 (AC-14): BILLING_RANK is now also always
+            # additively present -- two codes, not one, from this ADR forward.
+            self.assertEqual(len(review.reason_codes), 2)
             self.assertTrue(review.reason_codes[0].startswith("RUNTIME_REDIRECTED"))
             self.assertIn("requested=opencode", review.reason_codes[0])
+            self.assertEqual(review.reason_codes[1], "BILLING_RANK provider=anthropic rank=0")
             self.assertIn("effective=claude-code", review.reason_codes[0])
 
     def test_ac01_shape_c_pi_already_authenticated_pair_is_never_redirected(self):
@@ -998,8 +1010,10 @@ class RoutingTests(unittest.TestCase):
             # AC-09/AC-10 (016-audit-debt-repayment): this shape is itself a redirect (opencode ->
             # claude-code), so `reason_codes` now additively carries the new observability code --
             # `independence_verified`/`execution_enabled`/`runtime`/`provider`/`model` stay unchanged.
-            self.assertEqual(len(review.reason_codes), 1)
+            # ADR-0035 (AC-14): BILLING_RANK is now also always additively present.
+            self.assertEqual(len(review.reason_codes), 2)
             self.assertTrue(review.reason_codes[0].startswith("RUNTIME_REDIRECTED"))
+            self.assertEqual(review.reason_codes[1], "BILLING_RANK provider=anthropic rank=0")
             self.assertTrue(review.independence_verified)
             self.assertFalse(review.execution_enabled)
             self.assertEqual((review.runtime, review.provider, review.model), ("claude-code", "anthropic", "opus"))
@@ -1070,7 +1084,10 @@ class RoutingTests(unittest.TestCase):
                                self.observed(svc, "package-reviewer", "opencode"), unverified_review=True)
         # Unchanged: still the benign, non-hard-denial shape -- never a redirect, never a halt.
         self.assertFalse(review.execution_enabled)
-        self.assertEqual(review.reason_codes, ("REVIEW_IDENTITY_UNVERIFIED",))
+        # ADR-0035 (AC-14): BILLING_RANK is now always additively present.
+        self.assertEqual(review.reason_codes[0], "REVIEW_IDENTITY_UNVERIFIED")
+        self.assertTrue(review.reason_codes[1].startswith("BILLING_RANK "))
+        self.assertEqual(len(review.reason_codes), 2)
         self.assertFalse(review.independence_verified)
         # Round 3, decision 1: the `.claude`-axis balanced-tier residual round 2 named is
         # WITHDRAWN, not merely accepted -- neither static default collides with any
@@ -2158,7 +2175,12 @@ class RoutingTests(unittest.TestCase):
         svc=self.service(simulate=True)
         facts=self.observed(svc,"package-reviewer","claude-code",context_required=False)
         d=svc.route(routing.TaskRequest("package-reviewer","change","documentation",selected_runtime="claude-code"),facts,unverified_review=True)
-        self.assertFalse(d.execution_enabled); self.assertEqual(d.reason_codes,("REVIEW_IDENTITY_UNVERIFIED",))
+        self.assertFalse(d.execution_enabled)
+        # ADR-0035 (AC-14): BILLING_RANK is now always additively present alongside
+        # REVIEW_IDENTITY_UNVERIFIED.
+        self.assertEqual(d.reason_codes[0],"REVIEW_IDENTITY_UNVERIFIED")
+        self.assertTrue(d.reason_codes[1].startswith("BILLING_RANK "))
+        self.assertEqual(len(d.reason_codes),2)
         self.assertIsNotNone(d.model)
         strict=svc.route(routing.TaskRequest("package-reviewer","change","documentation",selected_runtime="claude-code"),
                          self.observed(svc,"package-reviewer","claude-code",context_required=False))
@@ -2634,7 +2656,9 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual(writer.returncode,0,(writer.stdout,writer.stderr))
             wdata=json.loads(writer.stdout)
             self.assertTrue(wdata["ok"]); self.assertTrue(wdata["data"]["execution_enabled"])
-            self.assertEqual(wdata["data"]["reason_codes"],[])
+            # ADR-0035 (AC-14): BILLING_RANK is now always additively present.
+            self.assertEqual(len(wdata["data"]["reason_codes"]),1)
+            self.assertTrue(wdata["data"]["reason_codes"][0].startswith("BILLING_RANK "))
             run_id=wdata["data"]["run_id"]; self.assertTrue(run_id.startswith("run1_"))
             self.assertEqual(wdata["data"]["tier"],"fast")
 
@@ -2643,14 +2667,20 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual(other.returncode,0,(other.stdout,other.stderr))
             odata=json.loads(other.stdout)
             self.assertTrue(odata["ok"]); self.assertFalse(odata["data"]["execution_enabled"])
-            self.assertEqual(odata["data"]["reason_codes"],[])
+            # ADR-0035 (AC-14): BILLING_RANK is now always additively present.
+            self.assertEqual(len(odata["data"]["reason_codes"]),1)
+            self.assertTrue(odata["data"]["reason_codes"][0].startswith("BILLING_RANK "))
 
             # Reviewer without review_of_run_id: unverified, ok=true, exit 0, tier still reported.
             unverified=decide({"role":"package-reviewer","task_class":"documentation","selected_runtime":"claude-code"})
             self.assertEqual(unverified.returncode,0,(unverified.stdout,unverified.stderr))
             udata=json.loads(unverified.stdout)
             self.assertTrue(udata["ok"]); self.assertFalse(udata["data"]["execution_enabled"])
-            self.assertEqual(udata["data"]["reason_codes"],["REVIEW_IDENTITY_UNVERIFIED"])
+            # ADR-0035 (AC-14): BILLING_RANK is now always additively present alongside
+            # REVIEW_IDENTITY_UNVERIFIED.
+            self.assertEqual(udata["data"]["reason_codes"][0],"REVIEW_IDENTITY_UNVERIFIED")
+            self.assertTrue(udata["data"]["reason_codes"][1].startswith("BILLING_RANK "))
+            self.assertEqual(len(udata["data"]["reason_codes"]),2)
             self.assertIsNotNone(udata["data"]["model"])
             self.assertFalse(udata["data"]["independence_verified"])
 
@@ -2678,7 +2708,9 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual(verified.returncode,0,(verified.stdout,verified.stderr))
             vdata=json.loads(verified.stdout)
             self.assertTrue(vdata["ok"]); self.assertFalse(vdata["data"]["execution_enabled"])
-            self.assertEqual(vdata["data"]["reason_codes"],[])
+            # ADR-0035 (AC-14): BILLING_RANK is now always additively present.
+            self.assertEqual(len(vdata["data"]["reason_codes"]),1)
+            self.assertTrue(vdata["data"]["reason_codes"][0].startswith("BILLING_RANK "))
             self.assertTrue(vdata["data"]["independence_verified"])
             self.assertNotEqual(vdata["data"]["provider"],"openai-codex")
 
@@ -2831,6 +2863,17 @@ class RoutingTests(unittest.TestCase):
         # A hard-failure code co-occurring with a redirect notice is still a real failure.
         self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
             ("FACTS_INCOMPLETE","RUNTIME_REDIRECTED requested=opencode effective=claude-code"))),(False,1))
+        # ADR-0035 (AC-14): BILLING_RANK is the same kind of always-present, purely
+        # observational marker -- alone, alongside REVIEW_IDENTITY_UNVERIFIED, or alongside
+        # a redirect, it never flips ok/exit; a co-occurring hard-failure code still does.
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("BILLING_RANK provider=anthropic rank=0",))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("REVIEW_IDENTITY_UNVERIFIED","BILLING_RANK provider=anthropic rank=0"))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("RUNTIME_REDIRECTED requested=opencode effective=claude-code","BILLING_RANK provider=anthropic rank=0"))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("FACTS_INCOMPLETE","BILLING_RANK provider=anthropic rank=0"))),(False,1))
 
     def test_validate_context_pack_path_rejects_unsafe_values(self):
         # SEC-A02: non-str, absolute, and traversal-outside-ROOT all degrade to "no pack" —
@@ -3145,6 +3188,17 @@ class RoutingTests(unittest.TestCase):
             result = routing_catalog.probe_inventory(narrow, cache_root=None, pairs=[("opencode", "opencode-zen")])
         self.assertEqual(result[("opencode", "opencode-zen")], {"kimi-k2.7-code"})  # glm-5.2 dropped, never invented
 
+    def test_adr0034_ac10_discoverable_providers_lockstep_guard(self):
+        # ADR-0034 (019 PKG-1, AC-10): DISCOVERABLE_PROVIDERS must equal exactly the
+        # provider half of _PAIR_COMMANDS -- the guard that keeps `github-copilot` (M-1,
+        # unlistable) and a duplicate `openai` catalog provider (M-2, already covered by
+        # `openai-codex`) from ever being addable to the "auto"-adopted universe without
+        # this test failing loudly first.
+        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
+        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS, pair_providers)
+        self.assertNotIn("github-copilot", models_config.DISCOVERABLE_PROVIDERS)
+        self.assertNotIn("openai", models_config.DISCOVERABLE_PROVIDERS)
+
     def test_ac05_new_providers_are_probeable_not_routable_today(self):
         # AC-05/AC-11 non-goal: no enabled_providers or ROUTING_PROVIDERS change -- a
         # curated row for either new provider must still be rejected by build_snapshot
@@ -3201,7 +3255,15 @@ class RoutingTests(unittest.TestCase):
 
     def test_ac08_subscription_metered_map_is_provider_keyed_not_a_row_field(self):
         from routing_core import catalog as cat
-        self.assertEqual(cat.PROVIDER_BILLING_KIND, {"opencode-zen": "metered", "opencode-go": "subscription"})
+        # ADR-0035 (019 PKG-2): completed to cover every DISCOVERABLE_PROVIDERS member --
+        # `openai-codex`/`anthropic` (curated subscription lanes) joined `opencode-go`
+        # (subscription); `opencode-zen` stays the sole metered entry. Previously this
+        # asserted only the two OpenCode-lane providers because nothing read the map yet
+        # ("no weighting/selection logic reads this map yet" -- that day is ADR-0035).
+        self.assertEqual(cat.PROVIDER_BILLING_KIND, {
+            "openai-codex": "subscription", "anthropic": "subscription",
+            "opencode-go": "subscription", "opencode-zen": "metered",
+        })
         # Never a row field: the closed row schema (build_snapshot) rejects any extra key,
         # existing providers included -- this is exactly why AC-08 is a provider-keyed map.
         base = dict(provider="openai-codex", model="gpt-5.6-luna", family="gpt-5.6", effort="low",
@@ -3294,6 +3356,90 @@ class RoutingTests(unittest.TestCase):
             # machine before this fix: probed == ceiling == 60/16 for zen/go respectively.
             self.assertTrue(ceiling, (provider, "live ceiling must not be empty"))
             self.assertEqual(probed_models, ceiling, (provider, sorted(ceiling ^ probed_models)))
+
+    # ---- ADR-0035 (019 PKG-2): AC-15 route_doctor
+
+    def test_ac15_route_doctor_reports_m1_github_copilot_as_detected_unlistable(self):
+        # ADR-0035 (AC-15): the exact M-1 case (ADR-0034) -- authenticated, but no
+        # audited CLI id maps to it -- is surfaced, never probed for models, never added
+        # to any pair table.
+        from routing_core import catalog as cat
+        auth_ok = "●  OpenCode Zen api\n●  OpenCode Go api\n●  GitHub Copilot oauth\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            report = cat.route_doctor(self.config, cache_root=None)
+        copilot = next(p for p in report["providers"] if p["provider"] == "github copilot")
+        self.assertTrue(copilot["authenticated"])
+        self.assertTrue(copilot["detected_unlistable"])
+        self.assertEqual(copilot["models_listable"], 0)
+        self.assertEqual(copilot["billing"], "unknown")
+        # Never added as a pair: every OTHER provider entry is one of the audited four.
+        audited = {"openai-codex", "anthropic", "opencode-zen", "opencode-go"}
+        self.assertEqual({p["provider"] for p in report["providers"] if not p["detected_unlistable"]}, audited)
+
+    def test_ac15_route_doctor_reports_auth_models_and_billing_per_pair(self):
+        from routing_core import catalog as cat
+        auth_ok = "●  OpenCode Zen api\n●  OpenCode Go api\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            if argv[:3] == ("opencode", "models", "opencode"):
+                return types.SimpleNamespace(returncode=0, stdout="opencode/kimi-k2.7-code\n", stderr="")
+            if argv[:3] == ("opencode", "models", "opencode-go"):
+                return types.SimpleNamespace(returncode=0, stdout="opencode-go/kimi-k2.7-code\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            report = cat.route_doctor(self.config, cache_root=None)
+        by_provider = {p["provider"]: p for p in report["providers"]}
+        self.assertTrue(by_provider["opencode-zen"]["authenticated"])
+        self.assertEqual(by_provider["opencode-zen"]["models_listable"], 1)
+        self.assertEqual(by_provider["opencode-zen"]["billing"], "metered")
+        self.assertTrue(by_provider["opencode-go"]["authenticated"])
+        self.assertEqual(by_provider["opencode-go"]["billing"], "subscription")
+        # Unauthenticated pairs report authenticated=False, never fabricated as live.
+        self.assertFalse(by_provider["openai-codex"]["authenticated"])
+        self.assertFalse(by_provider["anthropic"]["authenticated"])
+
+    def test_ac15_route_doctor_never_writes_the_probe_cache(self):
+        # Read-only per ADR-0035: `--route-doctor` inspects an existing cache file but
+        # never creates or refreshes one, even when `cache_root` is a valid managed dir.
+        from routing_core import catalog as cat
+        auth_ok = "●  OpenCode Zen api\n●  OpenCode Go api\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "cache"
+            root.mkdir(mode=0o700)
+            with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+                report = cat.route_doctor(self.config, cache_root=root)
+            self.assertFalse((root / "probe-cache.json").exists())
+            self.assertEqual(report["cache"], {"used": False, "reason": "CACHE_ABSENT_OR_UNREADABLE"})
+
+    def test_ac15_route_doctor_cache_diagnostic_reports_key_mismatch_and_expiry(self):
+        from routing_core import catalog as cat
+        auth_ok = "●  OpenCode Zen api\n●  OpenCode Go api\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "cache"
+            root.mkdir(mode=0o700)
+            (root / "probe-cache.json").write_text(json.dumps({"key": "stale", "at": time.time(), "pairs": {}}))
+            os.chmod(root / "probe-cache.json", 0o600)
+            with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+                report = cat.route_doctor(self.config, cache_root=root)
+            self.assertEqual(report["cache"]["reason"], "KEY_MISMATCH")
+            self.assertFalse(report["cache"]["used"])
 
     # ---- 012 repair (panel RP-01): SEC-001 and F-01..F-13
 
@@ -3564,6 +3710,298 @@ class RoutingTests(unittest.TestCase):
             self.assertNotIn("opencode|opencode-zen", cache_doc["pairs"])
             self.assertNotIn("opencode|opencode-go", cache_doc["pairs"])
 
+    # --------------------------------------------------- ADR-0034 (019 PKG-1, AC-02..09)
+
+    def test_adr0034_ac02_composition_and_recheck_derive_discovery_through_the_same_path(self):
+        # AC-02: `service.py`'s initial composition and its `recheck` lambda MUST derive
+        # the synthesized-routes universe through the exact same pure function
+        # (`catalog.resolve_discovered_providers`, via `build_effective_snapshot`) --
+        # deriving it two different ways is the hazard this test pins (a candidate
+        # authorized on one derivation failing AUTHORIZATION_INVALID on the other,
+        # purely from drift, never a real auth change). Source-grep tripwire, same style
+        # already used in this file for the sort-key shape (014's own precedent).
+        source = (ROOT / "ai/scripts/routing_core/service.py").read_text()
+        self.assertIn("discovery_configured = isinstance(config, dict)", source)
+        # Both the initial `snapshot, inferred_ids = ...` line and the `recheck` lambda
+        # call `build_effective_snapshot` -- neither ever calls `build_snapshot` directly
+        # when `discovery_configured` is true.
+        self.assertIn("snapshot, inferred_ids = build_effective_snapshot(catalog_path, roster, config, inventory)", source)
+        self.assertIn("recheck = lambda: build_effective_snapshot(", source)
+        # F-03 (P1 repair): the plain, un-derived `build_snapshot(catalog_path, roster,
+        # config), frozenset()` construction (the pre-017/pre-019 sealed shape) appears
+        # EXACTLY ONCE in this module -- inside the `else` branch of `discovery_configured`
+        # -- never as a second, silently-reintroduced call reachable when discovery IS
+        # configured (the exact drift AC-02 forbids).
+        plain_snapshot_call = "build_snapshot(catalog_path, roster, config), frozenset()"
+        self.assertEqual(source.count(plain_snapshot_call), 1)
+        else_branch = source.split("        else:\n", 1)[1]
+        self.assertIn(plain_snapshot_call, else_branch)
+
+    def test_adr0034_ac03_opencode_spawn_shares_the_catalog_cli_id_table(self):
+        # AC-03: opencode_spawn.opencode_model_ref reads routing_core.catalog's own
+        # _OPENCODE_CLI_IDS table -- never a second, independently-maintained copy that
+        # could desync (Codex audit finding #4: a router-authorized discovered provider
+        # dying PROVIDER_UNSUPPORTED at materialization time, AFTER authorization).
+        import opencode_spawn as oc
+        from routing_core.catalog import _OPENCODE_CLI_IDS
+        for provider in ("openai-codex", "opencode-zen", "opencode-go"):
+            expected = f"{_OPENCODE_CLI_IDS[provider]}/some-model-1"
+            self.assertEqual(oc.opencode_model_ref(provider, "some-model-1"), expected)
+        # anthropic is EXCLUDED here on purpose even though the shared table carries an
+        # entry for it -- the claude-code cross-lane redirect owns it, never opencode.
+        with self.assertRaises(oc.SpawnError):
+            oc.opencode_model_ref("anthropic", "opus")
+        with self.assertRaises(oc.SpawnError):
+            oc.opencode_model_ref("totally-unknown-provider", "some-model")
+
+    def test_adr0034_ac06_unresolved_vendor_stem_excludes_a_synthesized_reviewer(self):
+        # AC-06: a synthesized (inferred) reviewer candidate whose bare model id matches
+        # NO known `_VENDOR_STEMS` pattern can never be proven independent of the writer
+        # -- excluded outright, fail-closed, with the new reason code, regardless of
+        # whether its (fallback) family string happens to differ from the writer's.
+        from routing_core.domain import CatalogSnapshot, StaticRoute
+        full_roles = ("implementer", "package-reviewer")
+        tools = ("read", "shell", "write")
+        writer_route = StaticRoute(2, "openai-codex", "gpt-5.6-sol", "gpt-5.6", "medium", "balanced", full_roles, tools, 10,
+                                   StaticRoute.identifier(2, "openai-codex", "gpt-5.6-sol", "gpt-5.6", "medium", ("balanced",), full_roles, tools, 10))
+        unresolved_route = StaticRoute(2, "opencode-zen", "totally-unknown-vendor-id", "totally-unknown-vendor-id",
+                                       "medium", "balanced", full_roles, tools, 1000,
+                                       StaticRoute.identifier(2, "opencode-zen", "totally-unknown-vendor-id",
+                                                              "totally-unknown-vendor-id", "medium", ("balanced",), full_roles, tools, 1000))
+        identities = frozenset({
+            (writer_route.route_id, "codex", writer_route.provider, writer_route.model, writer_route.family, writer_route.effort),
+            (unresolved_route.route_id, "opencode", unresolved_route.provider, unresolved_route.model, unresolved_route.family, unresolved_route.effort),
+        })
+        snapshot = CatalogSnapshot((writer_route, unresolved_route), identities)
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-sol"}, ("opencode", "opencode-zen"): {"totally-unknown-vendor-id"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc = routing.RoutingService._for_tests(snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "state"))
+            svc._inferred_ids = frozenset({unresolved_route.route_id})
+            writer_decision = svc.route(routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex"),
+                                        self.observed(svc, "implementer", "codex"))
+            self.assertTrue(writer_decision.execution_enabled, writer_decision.reason_codes)
+            svc.store.mark_dispatched(writer_decision.run_id)
+            svc.store.close_run(writer_decision.run_id, "success")
+            review_request = routing.TaskRequest("package-reviewer", "inspection", "documentation", selected_runtime="opencode")
+            review_facts = self.observed(svc, "package-reviewer", "opencode", operation="inspection", read_write="read")
+            review = svc.route(review_request, review_facts, review_of_run_id=writer_decision.run_id)
+        self.assertFalse(review.execution_enabled)
+        self.assertEqual(review.reason_codes, ("REVIEWER_INDEPENDENCE_UNAVAILABLE",))
+        self.assertIn({"route_id": unresolved_route.route_id, "reason": "REVIEW_IDENTITY_UNRESOLVED_INFERRED"}, review.exclusions)
+
+    def test_adr0034_ac02_ac06_discovered_reviewer_resolves_reviewer_independence_unavailable(self):
+        # F-01 (P1 repair): AC-02/AC-06's own headline benefit -- "a scenario that today
+        # returns REVIEWER_INDEPENDENCE_UNAVAILABLE resolves once a discovered provider is
+        # available" -- was never pinned by any test, leaving a future refactor of the
+        # exclusion loop or the sort key free to silently kill the package's whole reason
+        # for existing with the suite still green. Reproduces the live case measured
+        # during implementation: writer `openai-codex/gpt-5.6-sol`, the only CURATED
+        # reviewer candidate conflicts on PROVIDER (`openai-codex/gpt-5.6-luna`, same
+        # provider as the writer) so, pre-discovery, this decision is exactly the
+        # `REVIEWER_INDEPENDENCE_UNAVAILABLE` halt the live log showed 9 times. With
+        # discovery, an INFERRED `opencode-zen/kimi-k3` reviewer is selected (resolvable,
+        # distinct vendor stem) and its own inferred sibling `opencode-zen/gpt-5.1-codex`
+        # (same `gpt` stem as the writer) is excluded.
+        from routing_core.domain import CatalogSnapshot, StaticRoute
+        full_roles = ("implementer", "package-reviewer")
+        tools = ("read", "shell", "write")
+
+        def route(provider, model, family, priority):
+            return StaticRoute(2, provider, model, family, "medium", "balanced", full_roles, tools, priority,
+                                StaticRoute.identifier(2, provider, model, family, "medium", ("balanced",),
+                                                        full_roles, tools, priority))
+
+        writer_route = route("openai-codex", "gpt-5.6-sol", "gpt-5.6", 10)
+        curated_conflict_route = route("openai-codex", "gpt-5.6-luna", "gpt-5.6", 5)  # same provider -> hard-excluded
+        inferred_kimi_route = route("opencode-zen", "kimi-k3", "kimi-k3", 1000)  # distinct, resolvable stem
+        inferred_gpt_route = route("opencode-zen", "gpt-5.1-codex", "gpt-5.1-codex", 1000)  # same stem as writer
+
+        def identities_for(r):
+            return {(r.route_id, rt, r.provider, r.model, r.family, r.effort) for rt in ("codex", "opencode")}
+
+        identities = frozenset().union(*(identities_for(r) for r in
+                                          (writer_route, curated_conflict_route, inferred_kimi_route, inferred_gpt_route)))
+        snapshot = CatalogSnapshot((writer_route, curated_conflict_route, inferred_kimi_route, inferred_gpt_route), identities)
+        inventory = {("codex", "openai-codex"): {"gpt-5.6-sol"},
+                     ("opencode", "openai-codex"): {"gpt-5.6-sol", "gpt-5.6-luna"},
+                     ("opencode", "opencode-zen"): {"kimi-k3", "gpt-5.1-codex"}}
+        with tempfile.TemporaryDirectory() as td:
+            # Without discovery (no inferred candidates at all), the sole curated
+            # reviewer candidate is provider-conflicted -- proving the pre-package halt
+            # this scenario actually reproduces.
+            curated_only_snapshot = CatalogSnapshot((writer_route, curated_conflict_route), identities)
+            curated_only_svc = routing.RoutingService._for_tests(
+                curated_only_snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "curated-only"))
+            writer_decision = curated_only_svc.route(
+                routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex"),
+                self.observed(curated_only_svc, "implementer", "codex"))
+            self.assertTrue(writer_decision.execution_enabled, writer_decision.reason_codes)
+            curated_only_svc.store.mark_dispatched(writer_decision.run_id)
+            curated_only_svc.store.close_run(writer_decision.run_id, "success")
+            pre_discovery_review = curated_only_svc.route(
+                routing.TaskRequest("package-reviewer", "inspection", "documentation", selected_runtime="opencode"),
+                self.observed(curated_only_svc, "package-reviewer", "opencode", operation="inspection", read_write="read"),
+                review_of_run_id=writer_decision.run_id)
+            self.assertFalse(pre_discovery_review.execution_enabled)
+            self.assertEqual(pre_discovery_review.reason_codes, ("REVIEWER_INDEPENDENCE_UNAVAILABLE",))
+
+            # Now the discovered candidates are on the table: the same writer decision
+            # resolves to a selected, independence-verified, inferred reviewer.
+            svc = routing.RoutingService._for_tests(snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "discovered"))
+            svc._inferred_ids = frozenset({inferred_kimi_route.route_id, inferred_gpt_route.route_id})
+            writer_decision2 = svc.route(routing.TaskRequest("implementer", "change", "documentation", selected_runtime="codex"),
+                                         self.observed(svc, "implementer", "codex"))
+            self.assertTrue(writer_decision2.execution_enabled, writer_decision2.reason_codes)
+            svc.store.mark_dispatched(writer_decision2.run_id)
+            svc.store.close_run(writer_decision2.run_id, "success")
+            review_request = routing.TaskRequest("package-reviewer", "inspection", "documentation", selected_runtime="opencode")
+            review_facts = self.observed(svc, "package-reviewer", "opencode", operation="inspection", read_write="read")
+            review = svc.route(review_request, review_facts, review_of_run_id=writer_decision2.run_id)
+        self.assertFalse(review.execution_enabled)  # reviews never set execution_enabled
+        self.assertTrue(review.independence_verified, review.reason_codes)
+        self.assertEqual((review.provider, review.model), ("opencode-zen", "kimi-k3"))
+        self.assertIn("MODEL_METADATA_INFERRED tier=balanced family=kimi-k3", review.reason_codes)
+        self.assertIn({"route_id": curated_conflict_route.route_id, "reason": "REVIEW_FAMILY_CONFLICT"}, review.exclusions)
+        self.assertIn({"route_id": inferred_gpt_route.route_id, "reason": "REVIEW_FAMILY_CONFLICT"}, review.exclusions)
+
+    def test_adr0034_ac06_same_vendor_stem_inferred_reviewer_never_serves_a_same_stem_writer(self):
+        # F-01 (P1 repair), negative case named by the spec: an inferred `opencode-zen`
+        # `claude-*` route can never review an `anthropic` writer, even though the two
+        # are different CURATED providers -- same coarse vendor stem ("claude") is
+        # exactly the independence signal ADR-0029 d.3 says inference can only REMOVE.
+        from routing_core.domain import CatalogSnapshot, StaticRoute
+        full_roles = ("implementer", "package-reviewer")
+        tools = ("read", "shell", "write")
+        writer_route = StaticRoute(2, "anthropic", "opus", "opus", "medium", "balanced", full_roles, tools, 10,
+                                   StaticRoute.identifier(2, "anthropic", "opus", "opus", "medium", ("balanced",),
+                                                           full_roles, tools, 10))
+        inferred_zen_claude_route = StaticRoute(2, "opencode-zen", "claude-3-tiny", "claude-3-tiny", "medium", "balanced",
+                                                full_roles, tools, 1000,
+                                                StaticRoute.identifier(2, "opencode-zen", "claude-3-tiny", "claude-3-tiny",
+                                                                       "medium", ("balanced",), full_roles, tools, 1000))
+        identities = frozenset({
+            (writer_route.route_id, "claude-code", writer_route.provider, writer_route.model, writer_route.family, writer_route.effort),
+            (inferred_zen_claude_route.route_id, "claude-code", inferred_zen_claude_route.provider, inferred_zen_claude_route.model,
+             inferred_zen_claude_route.family, inferred_zen_claude_route.effort),
+        })
+        snapshot = CatalogSnapshot((writer_route, inferred_zen_claude_route), identities)
+        inventory = {("claude-code", "anthropic"): {"opus"}, ("claude-code", "opencode-zen"): {"claude-3-tiny"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc = routing.RoutingService._for_tests(snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "state"))
+            svc._inferred_ids = frozenset({inferred_zen_claude_route.route_id})
+            writer_decision = svc.route(routing.TaskRequest("implementer", "change", "documentation", selected_runtime="claude-code"),
+                                        self.observed(svc, "implementer", "claude-code"))
+            self.assertTrue(writer_decision.execution_enabled, writer_decision.reason_codes)
+            svc.store.mark_dispatched(writer_decision.run_id)
+            svc.store.close_run(writer_decision.run_id, "success")
+            review_request = routing.TaskRequest("package-reviewer", "inspection", "documentation", selected_runtime="claude-code")
+            review_facts = self.observed(svc, "package-reviewer", "claude-code", operation="inspection", read_write="read")
+            review = svc.route(review_request, review_facts, review_of_run_id=writer_decision.run_id)
+        self.assertFalse(review.execution_enabled)
+        self.assertFalse(review.independence_verified)
+        self.assertEqual(review.reason_codes, ("REVIEWER_INDEPENDENCE_UNAVAILABLE",))
+        self.assertIn({"route_id": inferred_zen_claude_route.route_id, "reason": "REVIEW_FAMILY_CONFLICT"}, review.exclusions)
+
+    def test_adr0034_ac08_reprobe_rejection_reranks_to_the_next_candidate(self):
+        # AC-08: the top-ranked candidate failing its FRESH reprobe used to abort the
+        # whole decision with PROVIDER_UNAUTHENTICATED; it now retries against the next
+        # already-filtered candidate, only exhausting to PROVIDER_UNAUTHENTICATED when
+        # NONE survive.
+        inv = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol"}}
+        rejected = {"gpt-5.6-luna"}  # the higher-ranked candidate (lower curated_priority wins ties;
+                                      # both are "fast"-eligible here, tier/bias/curated_priority order it first)
+
+        def flaky_reprobe(pairs):
+            return {pair: {m for m in inv.get(pair, set()) if m not in rejected} for pair in pairs}
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "s", inventory=inv, reprobe=flaky_reprobe)
+            decision = svc.route(routing.TaskRequest("implementer", "change", "mechanical", selected_runtime="codex"),
+                                 self.observed(svc, "implementer", "codex", task_class="mechanical", context_required=False))
+            self.assertTrue(decision.execution_enabled, decision.reason_codes)
+            self.assertEqual(decision.model, "gpt-5.6-sol")  # the rejected candidate was skipped, not aborted on
+            svc.store.abandon(decision.run_id)
+
+        def all_rejecting_reprobe(pairs):
+            return {pair: set() for pair in pairs}
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "s", inventory=inv, reprobe=all_rejecting_reprobe)
+            decision = svc.route(routing.TaskRequest("implementer", "change", "mechanical", selected_runtime="codex"),
+                                 self.observed(svc, "implementer", "codex", task_class="mechanical", context_required=False))
+            self.assertFalse(decision.execution_enabled)
+            self.assertEqual(decision.reason_codes, ("PROVIDER_UNAUTHENTICATED",))
+            self.assertEqual(svc.store.open_runs(), [])  # nothing durably authorized on exhaustion
+
+    def test_adr0034_f04_repair_reprobe_rejection_leaves_an_exclusion_trace(self):
+        # F-04 (P1 repair): the AC-08 re-rank above used to drop the reprobe-rejected top
+        # candidate WITHOUT a trace -- no exclusion entry, no reason code -- so the
+        # winning decision (a candidate that was NOT top-ranked) showed up in
+        # decisions-v1.jsonl with nothing explaining why. This is purely additive: the
+        # winning decision's own identity/runtime/success are unchanged from the AC-08
+        # test above, and the codes REPAIR added never replace or reorder existing ones.
+        inv = {("codex", "openai-codex"): {"gpt-5.6-luna", "gpt-5.6-sol"}}
+        rejected = {"gpt-5.6-luna"}
+
+        def flaky_reprobe(pairs):
+            return {pair: {m for m in inv.get(pair, set()) if m not in rejected} for pair in pairs}
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "s", inventory=inv, reprobe=flaky_reprobe)
+            rejected_route = next(r for r in svc.snapshot.routes if r.provider == "openai-codex" and r.model == "gpt-5.6-luna")
+            decision = svc.route(routing.TaskRequest("implementer", "change", "mechanical", selected_runtime="codex"),
+                                 self.observed(svc, "implementer", "codex", task_class="mechanical", context_required=False))
+            self.assertTrue(decision.execution_enabled, decision.reason_codes)
+            self.assertEqual(decision.model, "gpt-5.6-sol")
+            self.assertIn({"route_id": rejected_route.route_id, "reason": "REPROBE_REJECTED openai-codex/gpt-5.6-luna"},
+                           decision.exclusions)
+            svc.store.abandon(decision.run_id)
+
+    def test_adr0034_ac09_write_cli_validates_pins_against_the_effective_set_not_just_the_constant(self):
+        # AC-09: the write-CLI path threads `_effective_preference_providers()` through
+        # to the validators, instead of the bare 4-provider constant -- and degrades to
+        # the base constant (never a crash) when the live probe is unavailable.
+        import set_agents_app as app
+        with mock.patch.object(app, "_effective_preference_providers", side_effect=Exception("no probe")):
+            # Even when the live probe blows up, the base constant still validates a
+            # legitimate provider -- never a crash, matching the documented degrade.
+            self.assertEqual(app._MODEL_PREFERENCE_PROVIDERS, ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
+        wider = (*app._MODEL_PREFERENCE_PROVIDERS, "a-future-live-only-provider")
+        validated = app._validate_preference_providers("grunt", ["a-future-live-only-provider"], wider)
+        self.assertEqual(validated, ("a-future-live-only-provider",))
+        with self.assertRaises(app.ModelPreferenceError):
+            app._validate_preference_providers("grunt", ["a-future-live-only-provider"])  # base set alone rejects it
+
+    def test_adr0034_f05_repair_effective_providers_short_circuits_when_base_covers_discoverable(self):
+        # F-05 (P1 repair): `_MODEL_PREFERENCE_PROVIDERS` already covers
+        # `models_config.DISCOVERABLE_PROVIDERS` today (AC-10's own lockstep test), so the
+        # union in `_effective_preference_providers` is a structural no-op -- yet it used
+        # to pay a live `probe_inventory` subprocess probe (each `_PAIR_COMMANDS` entry
+        # can block up to 20s) on every call regardless. The cheap set-comparison
+        # short-circuit must skip the probe entirely on this (today's real) branch.
+        import set_agents_app as app
+        with mock.patch("routing_core.catalog.probe_inventory", return_value={}) as probe:
+            self.assertEqual(app._effective_preference_providers(), app._MODEL_PREFERENCE_PROVIDERS)
+            probe.assert_not_called()
+        # Only once the audited set genuinely grows past the base set does the probe run
+        # again -- proving the short-circuit is a real conditional, not a permanent skip.
+        with mock.patch.object(app.models_config, "DISCOVERABLE_PROVIDERS",
+                                frozenset({*app._MODEL_PREFERENCE_PROVIDERS, "a-future-only-provider"})):
+            with mock.patch("routing_core.catalog.probe_inventory", return_value={}) as probe:
+                with mock.patch("routing_core.catalog.resolve_discovered_providers", return_value=()):
+                    app._effective_preference_providers()
+            probe.assert_called_once()
+
+    def test_adr0034_m1_github_copilot_never_gets_an_audited_pair_even_authenticated(self):
+        # M-1 (ADR-0034): github-copilot is authenticated in the live measurement but
+        # unlistable -- no pair exists for it in `_PAIR_COMMANDS` at all, so "auto" can
+        # never adopt it no matter what a (hypothetical, malformed) inventory claims.
+        self.assertNotIn(("opencode", "github-copilot"), routing_catalog._PAIR_COMMANDS)
+        config = json.loads(json.dumps(self.config))
+        config["routing"]["discovered_providers"] = "auto"
+        # Even if something upstream ever produced an inventory entry for it (never
+        # possible through the real probe, which only iterates `_PAIR_COMMANDS`), the
+        # derivation intersects against the audited provider set and drops it.
+        bogus_inventory = {("opencode", "github-copilot"): {"some-copilot-model"}}
+        self.assertEqual(routing_catalog.resolve_discovered_providers(config, bogus_inventory), ())
+
     # --------------------------------------------- 014-model-preference-policy (AC-01..09)
 
     _MP_TIERED_ROLES = frozenset({"debugger", "delta-reviewer", "finding-verifier",
@@ -3743,26 +4181,148 @@ class RoutingTests(unittest.TestCase):
             self.assertFalse(d1.preference_configured, role)
             self.assertTrue(d2.preference_configured, role)  # configured, even though inert here
 
-    def test_sort_key_tripwire_pins_five_element_tuple_shape(self):
-        # AC-04 point 5: pins the sort tuple's exact element count/order -- independence,
-        # tier, role-class-preference-rank, curated_priority, route_id -- so ANY future
-        # shape change (this contract's or another's) fails loudly, not silently.
+    def test_sort_key_tripwire_pins_full_tuple_shape(self):
+        # AC-04 point 5, extended by ADR-0034 (019 PKG-1) and ADR-0035 (019 PKG-2): pins
+        # the sort tuple's exact element order -- independence, tier, billing_rank
+        # (ADR-0035, new), role-class-preference-rank, is_inferred (ADR-0034), curated_
+        # priority, route_id (the FINAL tie-break, distinct from the route_id reference
+        # `is_inferred`'s own conditional reads to look itself up in `self._inferred_ids`
+        # -- `rindex` below deliberately finds the LAST occurrence, never the first) --
+        # so ANY future shape change (this contract's, 014's, 019 PKG-1's, or PKG-2's)
+        # fails loudly, not silently.
         source = (ROOT / "ai/scripts/routing_core/service.py").read_text()
         match = re.search(r"candidates\.sort\(key=lambda x: \((.*?)\)\)", source)
         self.assertIsNotNone(match, "candidates.sort(...) call not found")
         elements = match.group(1)
-        for token in ("writer.provider", "TIER_ORDER[x[0].tier]", "_bias_rank(x[0].provider, bias_preference)",
-                      "x[0].curated_priority", "x[0].route_id"):
+        for token in ("writer.provider", "TIER_ORDER[x[0].tier]", "billing_rank(x[0].provider, x[0].model)",
+                      "_bias_rank(x[0].provider, bias_preference)",
+                      "x[0].route_id in self._inferred_ids", "x[0].curated_priority", "x[0].route_id"):
             self.assertIn(token, elements)
         independence_pos = elements.index("writer.provider")
         tier_pos = elements.index("TIER_ORDER[x[0].tier]")
+        billing_pos = elements.index("billing_rank(")
         bias_pos = elements.index("_bias_rank(")
+        inferred_pos = elements.index("x[0].route_id in self._inferred_ids")
         priority_pos = elements.index("x[0].curated_priority")
-        route_id_pos = elements.index("x[0].route_id")
+        route_id_pos = elements.rindex("x[0].route_id")  # the trailing tie-break, not the is_inferred lookup
         self.assertLess(independence_pos, tier_pos)
-        self.assertLess(tier_pos, bias_pos)
-        self.assertLess(bias_pos, priority_pos)
+        self.assertLess(tier_pos, billing_pos)
+        self.assertLess(billing_pos, bias_pos)
+        self.assertLess(bias_pos, inferred_pos)
+        self.assertLess(inferred_pos, priority_pos)
         self.assertLess(priority_pos, route_id_pos)
+
+    def test_ac12_billing_rank_pure_function(self):
+        # ADR-0035 (AC-12): 0 for subscription OR a free-suffixed model, 1 for metered or
+        # an unrecognized provider (fail-closed toward the expensive rank).
+        from routing_core import catalog as cat
+        self.assertEqual(cat.billing_rank("openai-codex", "gpt-5.6-sol"), 0)
+        self.assertEqual(cat.billing_rank("anthropic", "opus"), 0)
+        self.assertEqual(cat.billing_rank("opencode-go", "kimi-k3"), 0)
+        self.assertEqual(cat.billing_rank("opencode-zen", "kimi-k2.7-code"), 1)
+        # A metered provider's own free-suffixed model still ranks 0 -- the free-model
+        # convention wins independently of the provider's own billing kind.
+        self.assertEqual(cat.billing_rank("opencode-zen", "deepseek-v4-flash-free"), 0)
+        # A provider entirely absent from the map: fail-closed to the expensive rank,
+        # never assumed cheap just because it is unknown.
+        self.assertEqual(cat.billing_rank("totally-unaudited-provider", "some-model"), 1)
+
+    def _billing_route(self, provider, model, tier, family="fam", roles=("implementer",),
+                       tools=("read", "shell", "write"), curated_priority=1):
+        from routing_core.domain import StaticRoute
+        route_id = StaticRoute.identifier(2, provider, model, family, "medium", (tier,), roles, tools, curated_priority)
+        return StaticRoute(2, provider, model, family, "medium", tier, roles, tools, curated_priority, route_id)
+
+    def test_ac13_zen_wins_when_it_is_the_only_one_satisfying_tier(self):
+        # AC-13 test 1: `implementation`+low risk requires `balanced`. The subscription
+        # candidate only reaches `fast` (TIER_INSUFFICIENT); the metered zen candidate is
+        # the ONLY one at `balanced` -- it is selected despite being metered. The hard
+        # exclusion loop, not billing_rank, is what makes this deterministic; billing_rank
+        # never even gets a second candidate to compare against here.
+        from routing_core.domain import CatalogSnapshot
+        from routing_core.service import RoutingService
+        cheap_fast = self._billing_route("openai-codex", "gpt-5.6-sol", "fast")
+        zen_balanced = self._billing_route("opencode-zen", "kimi-k2.7-code", "balanced")
+        identities = frozenset({
+            (cheap_fast.route_id, "opencode", "openai-codex", "gpt-5.6-sol", "fam", "medium"),
+            (zen_balanced.route_id, "opencode", "opencode-zen", "kimi-k2.7-code", "fam", "medium"),
+        })
+        snapshot = CatalogSnapshot((cheap_fast, zen_balanced), identities)
+        inventory = {("opencode", "openai-codex"): {"gpt-5.6-sol"}, ("opencode", "opencode-zen"): {"kimi-k2.7-code"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc = RoutingService._for_tests(snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "state"))
+            request = routing.TaskRequest("implementer", "change", "implementation", selected_runtime="opencode")
+            decision = svc.route(request, self.observed(svc, "implementer", "opencode", task_class="implementation"))
+        self.assertTrue(decision.execution_enabled, decision.reason_codes)
+        self.assertEqual(decision.provider, "opencode-zen")
+        self.assertIn({"route_id": cheap_fast.route_id, "reason": "TIER_INSUFFICIENT"}, decision.exclusions)
+
+    def test_ac13_zen_wins_when_it_is_the_only_one_giving_reviewer_independence(self):
+        # AC-13 test 2: the writer authorized on `anthropic`; a subscription reviewer
+        # candidate shares that provider (REVIEW_PROVIDER_CONFLICT, hard-excluded); the
+        # metered zen candidate is a DIFFERENT provider and is the only survivor -- it is
+        # selected as reviewer despite being metered.
+        from routing_core.domain import CatalogSnapshot
+        from routing_core.service import RoutingService
+        full_roles = ("implementer", "package-reviewer")
+        writer_route = self._billing_route("anthropic", "opus", "frontier", family="opus", roles=full_roles)
+        same_provider_reviewer = self._billing_route("anthropic", "sonnet", "frontier", family="sonnet", roles=full_roles)
+        zen_reviewer = self._billing_route("opencode-zen", "kimi-k2.7-code", "frontier", family="kimi", roles=full_roles)
+        identities = frozenset({
+            (writer_route.route_id, "claude-code", "anthropic", "opus", "opus", "medium"),
+            (same_provider_reviewer.route_id, "claude-code", "anthropic", "sonnet", "sonnet", "medium"),
+            (zen_reviewer.route_id, "opencode", "opencode-zen", "kimi-k2.7-code", "kimi", "medium"),
+        })
+        snapshot = CatalogSnapshot((writer_route, same_provider_reviewer, zen_reviewer), identities)
+        inventory = {("claude-code", "anthropic"): {"opus", "sonnet"}, ("opencode", "opencode-zen"): {"kimi-k2.7-code"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc = RoutingService._for_tests(snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "state"))
+            writer_request = routing.TaskRequest("implementer", "change", "architecture", selected_runtime="claude-code")
+            writer = svc.route(writer_request, self.observed(svc, "implementer", "claude-code", task_class="architecture", risk="high", criticality="architecture"))
+            self.assertTrue(writer.execution_enabled, writer.reason_codes)
+            svc.store.mark_dispatched(writer.run_id); svc.store.close_run(writer.run_id, "success")
+            review_request = routing.TaskRequest("package-reviewer", "inspection", "architecture", selected_runtime="opencode")
+            review = svc.route(review_request,
+                               self.observed(svc, "package-reviewer", "opencode", operation="inspection", read_write="read",
+                                            task_class="architecture", risk="high", criticality="architecture"),
+                               review_of_run_id=writer.run_id)
+        self.assertTrue(review.independence_verified, review.reason_codes)
+        self.assertEqual(review.provider, "opencode-zen")
+        self.assertIn({"route_id": same_provider_reviewer.route_id, "reason": "REVIEW_PROVIDER_CONFLICT"}, review.exclusions)
+
+    def test_ac13_control_subscription_wins_at_equal_tier(self):
+        # AC-13 control case: at EQUAL tier with a subscription alternative available,
+        # zen (metered) is NOT selected -- billing_rank breaks the tie in favor of the
+        # cheap candidate, the exact opposite of the two cases above.
+        #
+        # Repair F-01 (P2 review): the previous fixture paired `openai-codex` under
+        # runtime `"codex"` against `opencode-zen` under runtime `"opencode"`, while the
+        # request itself asked for `selected_runtime="codex"` -- zen was excluded by
+        # RUNTIME_UNAVAILABLE BEFORE the sort ever ran, so the test validated a hard
+        # exclusion, not the billing_rank tie-break its name and comment claim. Both
+        # candidates below now share the SAME runtime ("opencode") and the SAME tier
+        # ("balanced"), so only `billing_rank` in the sort key can decide between them:
+        # `opencode-go` (subscription) must beat `opencode-zen` (metered). The
+        # `exclusions == ()` assertion pins that no hard-exclusion path is what is
+        # actually deciding this case -- its absence is exactly what let the broken
+        # fixture above pass silently.
+        from routing_core.domain import CatalogSnapshot
+        from routing_core.service import RoutingService
+        subscription = self._billing_route("opencode-go", "kimi-k3", "balanced")
+        zen = self._billing_route("opencode-zen", "kimi-k2.7-code", "balanced")
+        identities = frozenset({
+            (subscription.route_id, "opencode", "opencode-go", "kimi-k3", "fam", "medium"),
+            (zen.route_id, "opencode", "opencode-zen", "kimi-k2.7-code", "fam", "medium"),
+        })
+        snapshot = CatalogSnapshot((subscription, zen), identities)
+        inventory = {("opencode", "opencode-go"): {"kimi-k3"}, ("opencode", "opencode-zen"): {"kimi-k2.7-code"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc = RoutingService._for_tests(snapshot, self.roster, inventory, routing.RoutingStore._for_tests(Path(td) / "state"))
+            request = routing.TaskRequest("implementer", "change", "implementation", selected_runtime="opencode")
+            decision = svc.route(request, self.observed(svc, "implementer", "opencode", task_class="implementation"))
+        self.assertTrue(decision.execution_enabled, decision.reason_codes)
+        self.assertEqual(decision.exclusions, ())
+        self.assertEqual(decision.provider, "opencode-go")
 
     def test_bias_never_reorders_across_independence_boundary(self):
         # AC-04(a)/point 1: a same-provider-as-writer reviewer candidate is hard-excluded

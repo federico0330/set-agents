@@ -74,6 +74,8 @@ from feature_state_lib.cli_reporting import (
     run_dry_workflow, cmd_dry_run, cmd_spawns,
 )
 from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
+from feature_state_lib.cli_modules import cmd_record_module_impact, cmd_module_impact_detect, cmd_check_anchors
+from feature_state_lib.render_modules import render_modules
 from feature_state_lib.parser import add_common_state_args
 
 
@@ -168,6 +170,7 @@ def mutate(
         render_status(path)
         render_bitacora(path, only_feature=only)
         render_notes(path, only_feature=only)
+        render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
     return data, before != data
 
 
@@ -190,10 +193,15 @@ def _hub_body(states: list[dict[str, Any]], out_dir: Path, decisions: list[dict[
     lines += ["", "## Qué falta", ""]
     pending_any = False
     for data in states:
-        # ADR-0027: a feature with a recorded final_state is closed by design —
-        # its machine-advisor "next step" is not a real pending item, and listing
-        # it is exactly the drift the hand-maintained digest suffered from.
-        if data.get("final_state"):
+        # ADR-0027/ADR-0040 (020-honest-dashboard AC-02/AC-12): the shared
+        # `feature_is_live` predicate excludes only what is genuinely finished
+        # (final_state == "DONE") -- a BLOCKED feature stays live and reaches
+        # `_pending_bits`, which already knows how to render its `⛔ bloqueo:` line.
+        # The old truthy check here (`if data.get("final_state"): continue`) treated
+        # BLOCKED exactly like DONE, which is the defect this predicate closes: this
+        # same feature already listed a blocked feature under "## Features" with its
+        # `BLOCKED` tag while silently dropping it from "## Qué falta" one section down.
+        if not model.feature_is_live(data):
             continue
         for bit in _pending_bits(data):
             lines.append(f"- **{data.get('feature_id')}** {bit}")
@@ -390,7 +398,8 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         attempts = package.setdefault("attempts", {})
         budget = data.get("budgets", {}).get("max_spawns_per_package", 12)
         if attempts.get("spawns", 0) >= budget:
-            return block_with_reason(data, args.actor, args.package_id, "spawn budget exhausted")
+            return block_with_reason(data, args.actor, args.package_id, "spawn budget exhausted",
+                                     counter={"scope": "attempts", "key": "spawns"})
         attempts["spawns"] = attempts.get("spawns", 0) + 1
         # AC-01: the id is always derived from the counter, never from
         # len(package["spawns"]) -- a package that already had spawns recorded before
@@ -467,7 +476,8 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
             raise StateError("cannot start review panel: " + "; ".join(errors))
         attempts = package.setdefault("attempts", {})
         if attempts.get("deep_review_cycles", 0) >= data["budgets"]["max_deep_review_cycles"]:
-            return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted")
+            return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted",
+                                     counter={"scope": "attempts", "key": "deep_review_cycles"})
         panel_id = args.panel_id or f"RP-{attempts.get('deep_review_cycles', 0) + 1:02d}"
         if any(panel.get("panel_id") == panel_id for panel in package.get("review_panels", [])):
             # Not a no-op: a second open against a live panel_id is either a lost update
@@ -664,7 +674,8 @@ def _apply_verification_waiver(data: dict[str, Any], package: dict[str, Any], at
     # caps every loop.  Same ceiling, separate dimension, no second key to drift.
     if attempts.get("verification_waivers", 0) >= budget:
         return block_with_reason(data, args.actor, args.package_id,
-                                 f"verification waiver budget exhausted for {args.package_id}")
+                                 f"verification waiver budget exhausted for {args.package_id}",
+                                 counter={"scope": "attempts", "key": "verification_waivers"})
     # Physical waiver, not a prose one: skipping verification is legal only
     # when nothing above `low` is open, where the spawn costs more than the
     # repairs it would prevent.
@@ -695,7 +706,8 @@ def _apply_verdicts(data: dict[str, Any], package: dict[str, Any], attempts: dic
     # unreachable.
     if attempts.get("verifications", 0) >= budget:
         return block_with_reason(data, args.actor, args.package_id,
-                                 f"verification budget exhausted for {args.package_id}")
+                                 f"verification budget exhausted for {args.package_id}",
+                                 counter={"scope": "attempts", "key": "verifications"})
 
     if any(item["verdict"] == "refuted" for item in verdicts) and args.actor not in REFUTING_ACTORS:
         # Retiring a blocking finding with no code change is the verifier's verb
@@ -1049,6 +1061,30 @@ def build_parser() -> argparse.ArgumentParser:
     receipt.add_argument("package_id")
     receipt.add_argument("--feature-id")
     receipt.set_defaults(func=cmd_record_receipt)
+
+    module_impact = sub.add_parser("record-module-impact")
+    add_common_state_args(module_impact)
+    module_impact.add_argument("feature_id", nargs="?")
+    module_impact.add_argument("--package-id", required=True)
+    module_impact.add_argument("--module", help="slug declarado en docs/modules/modules.toml")
+    module_impact.add_argument("--cambio", help="qué cambió estructuralmente")
+    module_impact.add_argument("--modelo-mental", help="qué tenés que saber ahora")
+    module_impact.add_argument("--module-impact-waived", action="store_true",
+                               help="válvula barata (ADR-0036): declara por qué este paquete no documenta impacto")
+    module_impact.add_argument("--reason", help="motivo del waiver (requerido con --module-impact-waived)")
+    module_impact.set_defaults(func=cmd_record_module_impact)
+
+    module_detect = sub.add_parser("module-impact-detect")
+    module_detect.add_argument("feature_id", nargs="?")
+    module_detect.add_argument("--package-id", required=True)
+    module_detect.add_argument("--state-file")
+    module_detect.set_defaults(func=cmd_module_impact_detect)
+
+    anchors = sub.add_parser("check-anchors", help="read-only file:line anchor verifier for docs/modules/*.md (ADR-0040, not a gate)")
+    anchors.add_argument("--module", help="chequear solo este slug de docs/modules/modules.toml")
+    anchors.add_argument("--repo-root", help="default: cwd")
+    anchors.add_argument("--modules-dir", help="default: <repo-root>/docs/modules")
+    anchors.set_defaults(func=cmd_check_anchors)
 
     block = sub.add_parser("block")
     add_common_state_args(block)

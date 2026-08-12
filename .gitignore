@@ -36,3 +36,11 @@ active-profile
 # Obsidian workspace and MCP session dumps
 .obsidian/
 .playwright-mcp/
+
+# ADR-0038: tools discovery -- the open-catalog overlay and its pending-proposal
+# staging file. F-11 repair: these live at ROOT (SET_AGENTS_ROOT, the harness CLONE
+# root -- ai/scripts/set_agents_app.py:41), never per-project -- an approve in any
+# project on this machine adds to the SAME catalog every other project on this clone
+# sees. Never curated, never committed either way.
+tools.local.toml
+tools.proposals.json

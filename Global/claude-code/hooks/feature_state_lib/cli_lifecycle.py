@@ -189,7 +189,18 @@ def cmd_status(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
     data = load_state(path)
     fail_if_invalid(data)
-    return output_state(data, False, path)
+    # AC-04 (020-honest-dashboard, ADR-0040): the same predicate/threshold AC-01/AC-03
+    # read (model.blocked_days/model.stale_days) -- a command that told a different truth
+    # than the digest/hub is exactly the class of bug this feature closes. Additive on top
+    # of `output_state`'s shared shape (every other mutating command still calls
+    # `output_state` unchanged); only `status` gains these two keys.
+    print_json({
+        "ok": True, "changed": False, "state_file": str(path), "state": data,
+        "next": next_transition(data),
+        "blocked_days": model.blocked_days(data),
+        "stale_days": model.stale_days(data),
+    })
+    return 0
 
 
 def cmd_next(args: argparse.Namespace) -> int:
@@ -393,13 +404,66 @@ def cmd_fail_task(args: argparse.Namespace) -> int:
     return output_state(data, changed, path)
 
 
-def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, reason: str) -> bool:
+def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, reason: str,
+                       counter: dict[str, Any] | None = None) -> bool:
+    """ADR-0039: `counter`, when given, names EXACTLY the budget counter whose exhaustion
+    produced this block -- structured, never inferred from `reason`'s prose (that string is
+    free text on several call sites, e.g. `args.evidence or "package testing blocked"`, and
+    matching against it would repeat the exact SEC-001 mistake `coord_policy.py` documents
+    as expensive). `cmd_reopen` reads this key back to reset ONLY that one counter. Two
+    shapes, both closed vocabularies:
+      - `{"scope": "attempts", "key": <name>}` for a `package["attempts"][<name>]` counter
+        (spawns, deep_review_cycles, gate_failures, verifications, verification_waivers).
+      - `{"scope": "finding", "key": "repair_attempts", "finding_id": <id>}` for the
+        per-finding `repair_attempts` counter `record-repair` enforces -- it lives on the
+        finding, not on `package["attempts"]`, so it needs its own finding_id to locate.
+    Omitted (the default) for every block that is not a budget exhaustion -- a manual
+    `cmd_block`, or a verdict/testing/runtime-QA refusal the caller phrases in free text.
+    `cmd_reopen` then resets nothing for that blocker, which is also what happens for every
+    blocker persisted before this key existed: fail-closed, not inferred.
+    """
     from_phase = data["phase"]
     data["phase"] = "BLOCKED"
     data["final_state"] = "BLOCKED"
-    data.setdefault("blockers", []).append({"package_id": package_id, "reason": reason, "at": now()})
+    blocker = {"package_id": package_id, "reason": reason, "at": now()}
+    if counter:
+        blocker["counter"] = counter
+    data.setdefault("blockers", []).append(blocker)
     model.record_event(data, "block", from_phase, "BLOCKED", actor, package_id, {"reason": reason})
     return True
+
+
+def _reset_blocker_counter(data: dict[str, Any], blocker: dict[str, Any]) -> None:
+    """ADR-0039: reset EXACTLY the counter `block_with_reason` tagged on this blocker, and
+    nothing else. Malformed or absent `counter` (every blocker persisted before this
+    feature, or one of the non-budget blocks that never carries one) is a silent no-op --
+    reopen still resolves the blocker and moves the phase, it just resets no counter, same
+    as the behaviour before this fix.
+    """
+    counter = blocker.get("counter")
+    if not isinstance(counter, dict):
+        return
+    scope = counter.get("scope")
+    key = counter.get("key")
+    package_id = blocker.get("package_id")
+    if scope not in {"attempts", "finding"} or not key or not package_id:
+        return
+    try:
+        package = package_by_id(data, package_id)
+    except StateError:
+        # The package this blocker named no longer exists (supersede-package, a hand-edited
+        # fixture) -- nothing to reset, and reopen itself does not need this package to
+        # resolve the phase.
+        return
+    if scope == "attempts":
+        attempts = package.get("attempts")
+        if isinstance(attempts, dict) and key in attempts:
+            attempts[key] = 0
+    else:  # scope == "finding"
+        finding_id = counter.get("finding_id")
+        finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
+        if finding is not None and key in finding:
+            finding[key] = 0
 
 
 def cmd_block(args: argparse.Namespace) -> int:
@@ -413,6 +477,14 @@ def cmd_block(args: argparse.Namespace) -> int:
 
 
 def cmd_reopen(args: argparse.Namespace) -> int:
+    """ADR-0039: beyond moving BLOCKED back to PACKAGE_PLANNING, this resets the ONE budget
+    counter (if any) whose exhaustion produced each blocker this call resolves -- a package
+    that hit `max_verifications_per_package` (or any other budget) used to stay permanently
+    unable to record a verdict even after reopen, because `attempts[...]` was never touched.
+    The reset is directed, never a blanket clear of every counter on the package: see
+    `block_with_reason`'s docstring for the structured `counter` key this reads, and
+    `_reset_blocker_counter` for the reset itself.
+    """
     path = state_file_arg(args)
 
     def update(data: dict[str, Any]) -> bool:
@@ -423,9 +495,12 @@ def cmd_reopen(args: argparse.Namespace) -> int:
             raise StateError("reopen requires explicit --reason and --authorized-by")
         resolved_at = now()
         for blocker in data.get("blockers", []):
+            newly_resolved = "resolved_at" not in blocker
             blocker.setdefault("resolved_at", resolved_at)
             blocker.setdefault("resolved_reason", args.reason)
             blocker.setdefault("resolved_by", args.authorized_by)
+            if newly_resolved:
+                _reset_blocker_counter(data, blocker)
         data["phase"] = "PACKAGE_PLANNING"
         data.pop("final_state", None)
         model.record_event(

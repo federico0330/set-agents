@@ -73,11 +73,19 @@ HOOK
   fi
 }
 
-STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes.XXXXXX")"
-trap 'rm -rf "$STAGING"' EXIT
-args=(python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING")
-[ -z "$PROFILE" ] || args+=(--profile "$PROFILE")
-"${args[@]}"
+# check never reads this generic STAGING (it always compared self-scaffold files directly, and
+# now also diffs a SEPARATE tree forced to --profile go-zen below, per ADR-0041 point 1) -- build
+# it only for the modes that actually consume it, so `--check` doesn't run generate.py twice
+# under two different profiles and doesn't print generate.py's own "CHECK_PASS: generated and
+# validated profile X" (that line is "ran without exploding", not a drift verdict; printing it
+# here read as a second, contradictory verdict next to build.sh's own).
+if [ "$MODE" != "check" ]; then
+  STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes.XXXXXX")"
+  trap 'rm -rf "$STAGING"' EXIT
+  args=(python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING")
+  [ -z "$PROFILE" ] || args+=(--profile "$PROFILE")
+  "${args[@]}"
+fi
 
 case "$MODE" in
   check)
@@ -95,6 +103,30 @@ case "$MODE" in
     done
     [ "$drift" -eq 0 ] || exit 1
     echo "SELF_SCAFFOLD_SYNC_OK files=2"
+
+    # AC-01 (ADR-0041): the self-scaffold comparison above never looked at Global/ -- this is
+    # the check that was missing. Forced to --profile go-zen ALWAYS, ignoring $PROFILE/--profile
+    # and the local active-profile file: Global/ is committed under go-zen, and a local lane
+    # would break install.sh:370 (onboarding, before any "go" pair is live) and
+    # setup_models.py:397,570 (every model change, their whole reason to exist). Reuses
+    # verify.sh:26-28's diff pattern (a real gate, no `|| true`), not --diff's (:99-104 below,
+    # which always exits 0 and stays untouched as the "show me" mode).
+    CHECK_STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-check.XXXXXX")"
+    trap 'rm -rf "$CHECK_STAGING"' EXIT
+    python3 "$ROOT/ai/scripts/generate.py" --output "$CHECK_STAGING" --profile go-zen >/dev/null
+    tree_drift=0
+    for harness in opencode claude-code codex pi; do
+      if ! diff -ruN "$ROOT/Global/$harness" "$CHECK_STAGING/$harness"; then
+        tree_drift=1
+      fi
+    done
+    if [ "$tree_drift" -eq 0 ]; then
+      echo "GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=4"
+    else
+      echo "GLOBAL_TREE_DRIFT profile=go-zen"
+      exit 1
+    fi
+    echo "BUILD_CHECK_PASS"
     ;;
   diff)
     diff -ruN "$ROOT/Global/opencode" "$STAGING/opencode" || true

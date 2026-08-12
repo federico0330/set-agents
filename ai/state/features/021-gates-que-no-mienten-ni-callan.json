@@ -1,0 +1,602 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-12T12:38:15+00:00",
+    "hash": "e324d748afc07bf897256a4ad572486baf607b4ca297c562b8306e1721ef258f",
+    "path": "docs/specs/021-gates-que-no-mienten-ni-callan/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P1-check-que-verifica",
+  "feature_id": "021-gates-que-no-mienten-ni-callan",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (pedido directo: arregla el build.sh --check y los cuatro stalls de infraestructura)",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/021-gates-que-no-mienten-ni-callan/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T12:18:13+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "build.sh --check compara STAGING contra los 4 arboles y falla con rc distinto de cero (AC-01)",
+          "Salida que distingue las dos verificaciones (AC-02)",
+          "Test que ensucia Global/ y exige que --check falle; rojo contra el build.sh de hoy (AC-03)",
+          "La suite deja de corregir drift preexistente en silencio (AC-04)",
+          "Anotar que probaban realmente los gates de 019 y 020 (AC-05) + ADR-0041"
+        ]
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T12:18:13+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Modo de gates con latido: ningun intervalo sin emitir supera el umbral (AC-06)",
+          "La doctrina deja de recomendar comando-largo-pipe-tail; frase exacta y testeable (AC-07)",
+          "Dejar escrito que el watchdog es del runtime del agente, no del repo (AC-08)",
+          "Test que prueba que el patron prohibido no aparece en briefs ni plantillas (AC-09)"
+        ]
+      },
+      "package_id": "P2-gates-que-no-callan",
+      "timestamp": "2026-08-12T12:18:14+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "amend-spec",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "approved_by": "federico (decision explicita sobre el perfil de comparacion) + spec-challenger independiente",
+        "new_hash": "e324d748afc07bf897256a4ad572486baf607b4ca297c562b8306e1721ef258f",
+        "reason": "Enmendada tras el challenge (revision_required, 2 bloqueantes + 5 importantes + 2 menores). F-01 BLOQUEANTE, resuelto por decision de Federico: --check compara SIEMPRE con --profile go-zen fijo, ignorando el active-profile local; con perfil local romperia install.sh:370 (onboarding en toda maquina sin el par go vivo) y setup_models.py:397,570 (el flujo entero de cambiar de modelo), porque active-profile esta en .gitignore, se resuelve por maquina y los perfiles difieren en 19 archivos. F-02/F-03 BLOQUEANTES: AC-04 pasa de 'elegi el camino mas chico' a fijar el ORDENAMIENTO como via -- verify.sh ya corre --check antes de la suite, asi que con AC-01 el drift se detecta antes de que la suite lo pise, sin tocar los 17 call sites; si se demuestra que no alcanza, es HUMAN_DECISION_REQUIRED, no reescritura silenciosa. F-04: la causa raiz que yo habia escrito era FALSA -- no es buffering del escritor sino que tail -N sin -f no puede emitir hasta EOF; verificado que stdbuf -oL cmd | tail -3 se cuelga igual, asi que el remedio que propuse no arreglaba nada. F-05: mi afirmacion de que el patron estaba en los context packs que escribi era FALSA -- grep da cero en Global/_canonical/ y en los packs de 019 y 020; AC-09 se reformula como prevencion hacia adelante, no como correccion. F-06: stdbuf es GNU y no existe en macOS, donde corre el CI; se usa python3 -u / PYTHONUNBUFFERED. F-07: patron de grep fijado en la spec como '\\| *tail\\b' anclado al pipe, porque un grep ingenuo por 'tail' da 10 falsos positivos en 'detail'. F-08: reusar el diff de verify.sh:26-28 y NO el de --diff, que lleva || true y siempre sale 0. F-09: especificado como se mide el umbral de 60s con un subproceso sintetico."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T12:38:15+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T13:34:37+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T13:34:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Arreglar el control que decia verificar que los archivos generados estaban al dia y en realidad no verificaba nada.",
+        "effort": "medium",
+        "model": "gpt-5.6-sol",
+        "provider": "openai-codex",
+        "purpose": "Implementar ADR-0041: que build.sh --check compare de verdad contra Global/",
+        "role": "implementer",
+        "route_id": "run1_bd77f9269e4366144ea3ed0e20ef8df8",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P1 de 021 (AC-01..05): --check compara el STAGING contra los 4 arboles con --profile go-zen FIJO (decision de Federico: con perfil local rompe install.sh:370 y setup_models.py). Reusa el diff de verify.sh:26-28, no el de --diff que lleva || true. AC-04 se resuelve por ORDENAMIENTO, sin tocar los 17 call sites."
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T13:35:29+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "build.sh --check compara STAGING contra los 4 arboles y falla con rc distinto de cero (AC-01)"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "build.sh --check compara STAGING contra los 4 arboles y falla con rc distinto de cero (AC-01)",
+        "validations": [
+          "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+        ]
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Salida que distingue las dos verificaciones (AC-02)"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Salida que distingue las dos verificaciones (AC-02)",
+        "validations": [
+          "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+        ]
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Test que ensucia Global/ y exige que --check falle; rojo contra el build.sh de hoy (AC-03)"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:06+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Test que ensucia Global/ y exige que --check falle; rojo contra el build.sh de hoy (AC-03)",
+        "validations": [
+          "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+        ]
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "La suite deja de corregir drift preexistente en silencio (AC-04)"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "La suite deja de corregir drift preexistente en silencio (AC-04)",
+        "validations": [
+          "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+        ]
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Anotar que probaban realmente los gates de 019 y 020 (AC-05) + ADR-0041"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Anotar que probaban realmente los gates de 019 y 020 (AC-05) + ADR-0041",
+        "validations": [
+          "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+        ]
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:21:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:26+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:26+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:26+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:26+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:26+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:26+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor independiente comprueba que el control arreglado detecta de verdad, y que no rompio el instalador ni el cambio de modelos.",
+        "effort": "medium",
+        "model": "sonnet",
+        "provider": "anthropic",
+        "purpose": "Review independiente de P1: el gate que ahora si verifica",
+        "role": "package-reviewer",
+        "route_id": "dec1_527da951eb57a79094e8efe0285db1f3",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "package-reviewer sobre 021/P1: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol. Eje critico: el implementer TOCO setup_models.py, que el context pack no listaba en owned_paths, porque encontro que la nota del orquestador ('sigue funcionando sin tocarlo') era falsa. Hay que validar el hallazgo, el arreglo y la ampliacion de alcance."
+      },
+      "package_id": "P1-check-que-verifica",
+      "timestamp": "2026-08-12T14:28:51+00:00",
+      "to": "PACKAGE_REVIEW"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 2,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": "docs/specs/021-gates-que-no-mienten-ni-callan/context/P1-check-que-verifica.md",
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": "working-tree @ 76b50a7 (021/P1: build.sh:76-130, ai/scripts/setup_models.py:107-120,417,590, tests/test_harness.py:141-158 y :7916-7929, TIPS-USO.md, docs/adr/0041-build-check-verifies-global.md nuevo + README)",
+      "findings": [],
+      "gates": [
+        {
+          "at": "2026-08-12T14:28:26+00:00",
+          "evidence": "./ai/scripts/verify.sh -> CANONICAL_PATHS_OK / FEATURE_STATE_OK / VERIFY_PASS. Suite 972 (base 970, +2 tests nuevos).",
+          "name": "verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-12T14:28:26+00:00",
+          "evidence": "./build.sh --check con su SEMANTICA NUEVA -> GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=4 + BUILD_CHECK_PASS. Las dos verificaciones quedan distinguidas en la salida (AC-02); antes era un solo CHECK_PASS que venia de generate.py. Verificado en vivo por el orquestador: con un Global/ sucio da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo.",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-12T14:28:26+00:00",
+          "evidence": "git diff --check -> DIFFCHECK_CLEAN",
+          "name": "diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que build.sh --check compare de verdad contra Global/ y que la suite deje de enmascarar el drift",
+      "owned_paths": [
+        "build.sh",
+        "ai/scripts/verify.sh",
+        "tests/test_harness.py",
+        "docs/adr/0041-gates-que-no-mienten-ni-callan.md"
+      ],
+      "package_id": "P1-check-que-verifica",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-12T13:35:29+00:00",
+          "client": "Arreglar el control que decia verificar que los archivos generados estaban al dia y en realidad no verificaba nada.",
+          "effort": "medium",
+          "model": "gpt-5.6-sol",
+          "provider": "openai-codex",
+          "purpose": "Implementar ADR-0041: que build.sh --check compare de verdad contra Global/",
+          "role": "implementer",
+          "route_id": "run1_bd77f9269e4366144ea3ed0e20ef8df8",
+          "spawn_id": "SPAWN-001",
+          "tech": "P1 de 021 (AC-01..05): --check compara el STAGING contra los 4 arboles con --profile go-zen FIJO (decision de Federico: con perfil local rompe install.sh:370 y setup_models.py). Reusa el diff de verify.sh:26-28, no el de --diff que lleva || true. AC-04 se resuelve por ORDENAMIENTO, sin tocar los 17 call sites."
+        },
+        {
+          "at": "2026-08-12T14:28:51+00:00",
+          "client": "Un revisor independiente comprueba que el control arreglado detecta de verdad, y que no rompio el instalador ni el cambio de modelos.",
+          "effort": "medium",
+          "model": "sonnet",
+          "provider": "anthropic",
+          "purpose": "Review independiente de P1: el gate que ahora si verifica",
+          "role": "package-reviewer",
+          "route_id": "dec1_527da951eb57a79094e8efe0285db1f3",
+          "spawn_id": "SPAWN-002",
+          "tech": "package-reviewer sobre 021/P1: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol. Eje critico: el implementer TOCO setup_models.py, que el context pack no listaba en owned_paths, porque encontro que la nota del orquestador ('sigue funcionando sin tocarlo') era falsa. Hay que validar el hallazgo, el arreglo y la ampliacion de alcance."
+        }
+      ],
+      "status": "package_review",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "build.sh --check compara STAGING contra los 4 arboles y falla con rc distinto de cero (AC-01)",
+          "local_validations": [
+            "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Salida que distingue las dos verificaciones (AC-02)",
+          "local_validations": [
+            "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Test que ensucia Global/ y exige que --check falle; rojo contra el build.sh de hoy (AC-03)",
+          "local_validations": [
+            "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "La suite deja de corregir drift preexistente en silencio (AC-04)",
+          "local_validations": [
+            "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Anotar que probaban realmente los gates de 019 y 020 (AC-05) + ADR-0041",
+          "local_validations": [
+            "Verificado en vivo por el orquestador: con Global/ sucio ./build.sh --check da rc=1 y GLOBAL_TREE_DRIFT nombrando el archivo; restaurado da rc=0. Suite 972 (base 970, +2)."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "P1-check-que-verifica"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que correr los gates no deje al que los corre mudo mas de 60s, y que la doctrina deje de recomendar el patron que lo causa",
+      "owned_paths": [
+        "ai/scripts/verify.sh",
+        "Global/_canonical/agents",
+        "Global/_canonical/skills/spawn-prompt",
+        "tests/test_harness.py"
+      ],
+      "package_id": "P2-gates-que-no-callan",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Modo de gates con latido: ningun intervalo sin emitir supera el umbral (AC-06)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "La doctrina deja de recomendar comando-largo-pipe-tail; frase exacta y testeable (AC-07)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Dejar escrito que el watchdog es del runtime del agente, no del repo (AC-08)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Test que prueba que el patron prohibido no aparece en briefs ni plantillas (AC-09)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_REVIEW",
+  "revision": 23,
+  "schema_version": 1,
+  "spec_amendments": [
+    {
+      "actor": "orchestrator",
+      "approved_by": "federico (decision explicita sobre el perfil de comparacion) + spec-challenger independiente",
+      "at": "2026-08-12T12:38:15+00:00",
+      "hash": "e324d748afc07bf897256a4ad572486baf607b4ca297c562b8306e1721ef258f",
+      "old_hash": "f13d27901ea1a3a469d4eb189bf41d2ff8c6cc152e5f62e7f2018eb5f53e304c",
+      "old_path": "docs/specs/021-gates-que-no-mienten-ni-callan/spec.md",
+      "path": "docs/specs/021-gates-que-no-mienten-ni-callan/spec.md",
+      "reason": "Enmendada tras el challenge (revision_required, 2 bloqueantes + 5 importantes + 2 menores). F-01 BLOQUEANTE, resuelto por decision de Federico: --check compara SIEMPRE con --profile go-zen fijo, ignorando el active-profile local; con perfil local romperia install.sh:370 (onboarding en toda maquina sin el par go vivo) y setup_models.py:397,570 (el flujo entero de cambiar de modelo), porque active-profile esta en .gitignore, se resuelve por maquina y los perfiles difieren en 19 archivos. F-02/F-03 BLOQUEANTES: AC-04 pasa de 'elegi el camino mas chico' a fijar el ORDENAMIENTO como via -- verify.sh ya corre --check antes de la suite, asi que con AC-01 el drift se detecta antes de que la suite lo pise, sin tocar los 17 call sites; si se demuestra que no alcanza, es HUMAN_DECISION_REQUIRED, no reescritura silenciosa. F-04: la causa raiz que yo habia escrito era FALSA -- no es buffering del escritor sino que tail -N sin -f no puede emitir hasta EOF; verificado que stdbuf -oL cmd | tail -3 se cuelga igual, asi que el remedio que propuse no arreglaba nada. F-05: mi afirmacion de que el patron estaba en los context packs que escribi era FALSA -- grep da cero en Global/_canonical/ y en los packs de 019 y 020; AC-09 se reformula como prevencion hacia adelante, no como correccion. F-06: stdbuf es GNU y no existe en macOS, donde corre el CI; se usa python3 -u / PYTHONUNBUFFERED. F-07: patron de grep fijado en la spec como '\\| *tail\\b' anclado al pipe, porque un grep ingenuo por 'tail' da 10 falsos positivos en 'detail'. F-08: reusar el diff de verify.sh:26-28 y NO el de --diff, que lleva || true y siempre sale 0. F-09: especificado como se mide el umbral de 60s con un subproceso sintetico."
+    }
+  ],
+  "updated_at": "2026-08-12T14:28:51+00:00"
+}

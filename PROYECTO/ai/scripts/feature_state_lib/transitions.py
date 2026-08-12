@@ -10,6 +10,7 @@ from typing import Any
 from feature_state_lib.model import (
     StateError, LEGAL_TRANSITIONS, TERMINAL, has_open_findings, package_by_id,
     package_accept_ready, package_review_ready, tasks_complete, done_ready,
+    module_impacts_ready,
 )
 
 
@@ -35,6 +36,15 @@ def check_transition(data: dict[str, Any], to_phase: str, package_id: str | None
         package = package_by_id(data, package_id)
         if not package.get("testing") or package["testing"][-1].get("status") != "pass":
             raise StateError("cannot enter PACKAGE_RUNTIME_QA: package testing must pass first")
+    if to_phase == "INTEGRATION":
+        # ADR-0036: deliberately DOES include a hard precondition here, unlike
+        # candidate_identity.integration_ready (ADR-0024) -- see that ADR's comparison.
+        # module_impacts_ready reads only this package's own state and has a one-command
+        # cheap waiver, so it never has ADR-0024's "external verification with no escape
+        # hatch" shape.
+        errors = module_impacts_ready(data)
+        if errors:
+            raise StateError("cannot enter INTEGRATION: " + "; ".join(errors))
     if to_phase == "DONE":
         errors = done_ready(data)
         if errors:
@@ -109,6 +119,10 @@ def next_transition(data: dict[str, Any]) -> dict[str, Any]:
         # ADR-0028: superseded counts as closed here too, matching done_ready.
         if any(package.get("status") not in ("accepted", "superseded") for package in data.get("packages", [])):
             return {"phase": phase, "next": "PACKAGE_PLANNING", "reason": "remaining packages exist"}
+        # ADR-0036: the advisor never recommends a transition check_transition would refuse.
+        impact_errors = module_impacts_ready(data)
+        if impact_errors:
+            return {"phase": phase, "next": "PACKAGE_ACCEPTED", "reason": "; ".join(impact_errors)}
         return {"phase": phase, "next": "INTEGRATION", "reason": "all packages accepted"}
     if phase == "INTEGRATION":
         return {"phase": phase, "next": "DONE", "reason": "run final global gates first"}

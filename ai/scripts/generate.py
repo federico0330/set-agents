@@ -250,6 +250,15 @@ def oc_permissions(capability, roles, role=None, yolo=False, variant_names=()):
                   # coord_policy.py's dedicated walker (glob-only format), but the CLI
                   # itself re-validates catalog membership and refuses sudo/TTY-less runs.
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --tools*": allow',
+                  # ADR-0038: --tools-propose is meant to be part of the --tools* allow just
+                  # above (validates + prints a question, never installs, never writes the
+                  # catalog). --tools-approve is NOT -- it is the human approval step itself
+                  # (ai/state/decisions-log.jsonl, slug tools-approve-fuera-del-canal-del-agente),
+                  # and this glob format is coarser than coord_policy.py's dedicated walker: a
+                  # bare "--tools*": allow would swallow it by prefix. Placed AFTER the allow
+                  # above so it wins (this list's existing last-match-wins convention, same
+                  # shape as --mcp-remove*: deny right after --mcp*: allow below).
+                  '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --tools-approve*": deny',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp*": allow',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --mcp-remove*": deny',
                   '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow',

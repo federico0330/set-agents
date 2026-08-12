@@ -20,15 +20,21 @@ three-way outcome shape, same redaction/containment posture. The `@tier` variant
 the in-process delegation path KEEP existing — this module is the additive dynamic path
 (ADR-0030: "this change adds a dynamic road, it does not delete the variants").
 
-Model-id mapping (catalog identity -> opencode `provider/model` ref):
+Model-id mapping (catalog identity -> opencode `provider/model` ref), ADR-0034 (019
+PKG-1, AC-03): read from `routing_core.catalog._OPENCODE_CLI_IDS` -- the SAME table the
+catalog itself probes and validates identities against, never a second hand-kept copy:
   - `openai-codex` -> `openai/<model>` (the exact prefix every `models.toml`
     opencode-lane value already uses for this provider, e.g. `openai/gpt-5.6-sol`).
   - `opencode-zen` -> `opencode/<model>`; `opencode-go` -> `opencode-go/<model>`
     (the provider ids `routing_core.catalog`'s own `opencode models <provider>` probes
-    use — reachable only through ADR-0029's opt-in discovered routes).
-  - `anthropic` fails closed (`PROVIDER_UNSUPPORTED`): anthropic decisions are served by
-    the `claude-code` cross-lane redirect (`service._PROVIDER_RUNTIME_REDIRECTS`), never
-    ad-hoc through an unverified opencode auth surface.
+    use — reachable only through ADR-0029/ADR-0034's discovered-routes path).
+  - `anthropic` fails closed (`PROVIDER_UNSUPPORTED`) even though the shared table
+    carries an entry for it: anthropic decisions are served by the `claude-code`
+    cross-lane redirect (`service._PROVIDER_RUNTIME_REDIRECTS`), never ad-hoc through an
+    unverified opencode auth surface. `PROVIDER_UNSUPPORTED` is reserved for that one
+    deliberate exclusion plus anything genuinely absent from the shared table -- never
+    for a provider the router already authorized through a different, desynced copy of
+    this mapping (the exact defect this ADR closes).
 
 Effort: `--variant <effort>` for the closed routing universe {low, medium, high, xhigh}
 only — advisory, exactly like pi's `--thinking` (ADR-0030 effort extension): an absent
@@ -114,13 +120,25 @@ class SpawnError(Exception):
 
 
 _MODEL_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
-_PROVIDER_PREFIXES = {"openai-codex": "openai", "opencode-zen": "opencode", "opencode-go": "opencode-go"}
+# ADR-0034 (019 PKG-1, AC-03): this used to be a SEPARATE, partial copy of
+# `routing_core.catalog._OPENCODE_CLI_IDS` (missing `anthropic`, kept in sync only by
+# hand) -- a provider the router authorized through the discovered-routes path could
+# reach here, find no entry, and die `PROVIDER_UNSUPPORTED` AFTER already being
+# authorized (Codex audit finding #4). `opencode_model_ref` below now reads the SAME
+# table the catalog probes and validates against, imported lazily (this module is a
+# leaf, `routing_core.catalog` is not on its normal import path) -- one source, never
+# two copies to desync again. `anthropic` is EXCLUDED here on purpose even though the
+# catalog table carries it: anthropic decisions are served by the `claude-code`
+# cross-lane redirect (`service._PROVIDER_RUNTIME_REDIRECTS`), never through an
+# unverified opencode auth surface, so it stays a hard `PROVIDER_UNSUPPORTED` here
+# regardless of what the shared table says.
 
 
 def opencode_model_ref(provider: str, model: str) -> str:
     """Catalog (provider, model) -> opencode `provider/model` ref. Fails closed for
     anthropic (the claude-code redirect owns it) and any unknown provider."""
-    prefix = _PROVIDER_PREFIXES.get(provider)
+    from routing_core.catalog import _OPENCODE_CLI_IDS  # lazy: this module is a leaf
+    prefix = None if provider == "anthropic" else _OPENCODE_CLI_IDS.get(provider)
     if prefix is None:
         raise SpawnError("PROVIDER_UNSUPPORTED")
     if not _MODEL_TOKEN_RE.fullmatch(model or ""):

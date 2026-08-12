@@ -1,0 +1,1797 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-12T02:57:32+00:00",
+    "hash": "432dd66a7d50d9ab60e9676dae8034b1b9a3cd6a8398d07a62185bfc404a1bc9",
+    "path": "docs/specs/020-honest-dashboard/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P2-anclas-verificables",
+  "feature_id": "020-honest-dashboard",
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-12T11:19:21+00:00",
+      "evidence": "Gates globales de 020 corridos por el orquestador tras aceptar los dos paquetes: ./ai/scripts/verify.sh -> FEATURE_STATE_OK / VERIFY_PASS (970 OK); ./build.sh --check -> CHECK_PASS + SELF_SCAFFOLD_SYNC_OK files=2; git diff --check -> DIFFCHECK_CLEAN; y check-anchors -> rc=0, la herramienta que la feature construyo aplicada a si misma.",
+      "name": "global verify",
+      "required": true,
+      "status": "pass"
+    }
+  ],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (delegado explicitamente para mejoras acotadas en la sesion nocturna del 2026-08-11)",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/020-honest-dashboard/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T02:45:23+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "amend-spec",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "approved_by": "federico (delegado) tras spec-challenge independiente: revision_required con enmiendas concretas, todas dentro del mandato acotado",
+        "new_hash": "432dd66a7d50d9ab60e9676dae8034b1b9a3cd6a8398d07a62185bfc404a1bc9",
+        "reason": "SC-01 (bloqueante): resolucion de basename acotada a los paths del modulo en modules.toml, nunca busqueda global -- feature_state_lib esta duplicado byte a byte en 5 arboles y la busqueda global seria no deterministica. SC-02 (bloqueante): se cubren las DOS formas de ancla (completa y abreviada :N), porque en los docs de hoy son casi 1:1 y cubrir solo la obvia daria rc=0 verificando la mitad -- falsa seguridad. SC-03: AC-08 recortado a simbolo en backticks adyacente en la misma linea, comparacion de texto, sin parsear Python; se conserva porque es el caso insignia (consola.md:26, main() corrido +742). SC-04: AC-04 reformulado a campos calculados verificables (blocked_days/stale_days) en cmd_status. SC-05: AC-12 NUEVO por el tercer artefacto que el challenger encontro -- _hub_body en feature-state.py repite el mismo bug y 00 - Proyecto.md tambien esconde las bloqueadas en Que falta; y AC-02 pasa a exigir un PREDICADO COMPARTIDO, porque el defecto se duplico justamente por no tener uno. SC-06: las bloqueadas quedan exentas de la marca de estancadas, tope de dos menciones por feature. SC-07: los dias se cuentan desde el at del ultimo blocker sin resolver, no desde updated_at. SC-08/10/11 documentados como limitaciones conocidas en la spec."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T02:57:32+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Predicado compartido de feature viva + constante de umbral, consumido por los tres artefactos (AC-02)",
+          "Seccion Necesita tu decision en el digest, dias desde el ultimo blocker sin resolver (AC-01)",
+          "Marca de estancada para las vivas no bloqueadas, bloqueadas exentas (AC-03)",
+          "blocked_days y stale_days en cmd_status desde el mismo predicado (AC-04)",
+          "_hub_body deja de saltear las terminales en Que falta (AC-12)",
+          "Tests que fallan en rojo contra el codigo de hoy (AC-05, AC-12) + ADR-0040"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T02:58:38+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Gramatica de anclas: forma completa y abreviada :N, basename acotado a los paths del modulo (AC-06)",
+          "Comando check-anchors read-only, rc distinto de cero si hay anclas rotas (AC-07)",
+          "Verificacion semantica acotada a simbolo en backticks adyacente (AC-08)",
+          "Enganche en sync-notes con contrato never-raises (AC-09)",
+          "Corregir las anclas rotas de hoy, rc=0 sobre los cinco modulos (AC-10)",
+          "Tests que prueban el defecto: linea fuera de rango y simbolo movido (AC-11)"
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T02:58:39+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T02:59:32+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T02:59:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Arranca el arreglo del informe matinal: que las cosas trabadas esperandote aparezcan primero en vez de desaparecer.",
+        "effort": "medium",
+        "model": "gpt-5.6-sol",
+        "provider": "openai-codex",
+        "purpose": "Implementar ADR-0040: predicado compartido y tablero que no esconde lo bloqueado",
+        "role": "implementer",
+        "route_id": "run1_b346026cee37a6594969231ab20357de",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P1 de 020 (AC-01..05, AC-12): un predicado compartido de feature viva reemplaza las dos copias mal escritas (cli_reporting.py:194 y _hub_body), seccion Necesita tu decision con dias desde el ultimo blocker sin resolver, marca de estancada con las bloqueadas exentas, blocked_days/stale_days en cmd_status, y tests que fallan en rojo contra el codigo de hoy."
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T03:00:02+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests que fallan en rojo contra el codigo de hoy (AC-05, AC-12) + ADR-0040"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests que fallan en rojo contra el codigo de hoy (AC-05, AC-12) + ADR-0040",
+        "validations": [
+          "tests/test_digest.py HonestPredicateTests + test_honest_predicate.py (21 unitarios) + 2 en test_harness.py; ADR-0040 indexado. Suite 917 -> 943"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "blocked_days y stale_days en cmd_status desde el mismo predicado (AC-04)"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "blocked_days y stale_days en cmd_status desde el mismo predicado (AC-04)",
+        "validations": [
+          "cmd_status sobre 002 y 011 devuelve blocked_days 18 y 12, coherente con el digest"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Seccion Necesita tu decision en el digest, dias desde el ultimo blocker sin resolver (AC-01)"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Seccion Necesita tu decision en el digest, dias desde el ultimo blocker sin resolver (AC-01)",
+        "validations": [
+          "BUENOS-DIAS.md:6-9 verificado en vivo por el orquestador: nombra 002 (hace 18 dias) y 011 (hace 12 dias)"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Marca de estancada para las vivas no bloqueadas, bloqueadas exentas (AC-03)"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Marca de estancada para las vivas no bloqueadas, bloqueadas exentas (AC-03)",
+        "validations": [
+          "tope de dos menciones por feature bloqueada, verificado en el digest regenerado"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "_hub_body deja de saltear las terminales en Que falta (AC-12)"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "_hub_body deja de saltear las terminales en Que falta (AC-12)",
+        "validations": [
+          "00 - Proyecto.md:26-27 verificado por el orquestador: 002 aparece con su bloqueo y sus 5 hallazgos abiertos"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Predicado compartido de feature viva + constante de umbral, consumido por los tres artefactos (AC-02)"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:19+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Predicado compartido de feature viva + constante de umbral, consumido por los tres artefactos (AC-02)",
+        "validations": [
+          "model.py: feature_is_live, open_blocker, days_since, blocked_days, stale_days, feature_is_stale, STALE_THRESHOLD_DAYS; consumido por cmd_digest, _hub_body y cmd_status"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:20+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T04:10:20+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:20+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Un revisor independiente audita el arreglo del informe matinal antes de darlo por bueno.",
+        "effort": "medium",
+        "model": "sonnet",
+        "provider": "anthropic",
+        "purpose": "Review independiente de P1: tablero honesto y predicado compartido",
+        "role": "package-reviewer",
+        "route_id": "dec1_7bf90eba2bb44e6ba1be83a1ebd7bc92",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "package-reviewer sobre 020/P1: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol. Eje especial: el implementer MODIFICO un fixture de test preexistente (final_state 'done' -> 'DONE'); hay que verificar que el invariante sigue probado y no que se ajusto el test para que pase."
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:10:42+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:33:28+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 3,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:33:58+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 3
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T04:33:58+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:11:47+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:11:47+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:11:47+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:11:48+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:12:07+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:12:07+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-02"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:12:07+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:12:07+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-03"
+        ]
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:12:07+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:34:49+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:34:49+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:34:49+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "module": "narracion-notas"
+      },
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:34:49+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-digest-no-esconde",
+      "timestamp": "2026-08-12T05:34:49+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T05:35:45+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T05:35:46+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T05:35:46+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Ultimo tramo: que la documentacion de modulos no pueda decir que algo esta en una linea donde ya no esta.",
+        "effort": "medium",
+        "model": "gpt-5.6-sol",
+        "provider": "openai-codex",
+        "purpose": "Implementar el verificador de anclas file:line de docs/modules/",
+        "role": "implementer",
+        "route_id": "run1_c5214efc4b0d73beea87d3e922b6ec85",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P2 de 020 (AC-06..11): gramatica de dos formas de ancla con resolucion por basename acotada a los paths del modulo, comando check-anchors read-only con rc distinto de cero, verificacion semantica acotada a simbolo en backticks adyacente, enganche never-raises en sync-notes, y correccion de las anclas rotas de hoy."
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T05:36:28+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "El primer intento murio por infraestructura sin escribir nada. Se relanza una vez.",
+        "effort": "medium",
+        "model": "gpt-5.6-sol",
+        "provider": "openai-codex",
+        "purpose": "Relanzamiento tras stall: verificador de anclas file:line",
+        "role": "implementer",
+        "route_id": "run1_05f7b094421e38137485dcbf27349065",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Relanzamiento unico de P2. Mitigacion: escribir evidencia en el primer minuto y guardar a disco por tramo. Si vuelve a morir, se parte en dos encargos mas chicos en vez de un tercer intento completo."
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T05:49:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Gramatica de anclas: forma completa y abreviada :N, basename acotado a los paths del modulo (AC-06)"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Gramatica de anclas: forma completa y abreviada :N, basename acotado a los paths del modulo (AC-06)",
+        "validations": [
+          "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Comando check-anchors read-only, rc distinto de cero si hay anclas rotas (AC-07)"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Comando check-anchors read-only, rc distinto de cero si hay anclas rotas (AC-07)",
+        "validations": [
+          "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Verificacion semantica acotada a simbolo en backticks adyacente (AC-08)"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Verificacion semantica acotada a simbolo en backticks adyacente (AC-08)",
+        "validations": [
+          "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Enganche en sync-notes con contrato never-raises (AC-09)"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Enganche en sync-notes con contrato never-raises (AC-09)",
+        "validations": [
+          "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Corregir las anclas rotas de hoy, rc=0 sobre los cinco modulos (AC-10)"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Corregir las anclas rotas de hoy, rc=0 sobre los cinco modulos (AC-10)",
+        "validations": [
+          "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "start-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests que prueban el defecto: linea fuera de rango y simbolo movido (AC-11)"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Tests que prueban el defecto: linea fuera de rango y simbolo movido (AC-11)",
+        "validations": [
+          "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "verify",
+        "status": "pass"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "global": false,
+        "name": "diff-check",
+        "status": "pass"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:15+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:15+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:15+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:46:15+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 4,
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:57:37+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 2
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T06:57:38+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-01"
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:28:58+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:28:59+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-02"
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:28:59+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:28:59+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-03"
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:28:59+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:56:52+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T07:56:53+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "F-05"
+        ]
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T08:19:06+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T11:09:34+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T11:09:34+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T11:09:34+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "module": "narracion-notas"
+      },
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T11:09:35+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P2-anclas-verificables",
+      "timestamp": "2026-08-12T11:09:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T11:09:45+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "global verify",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T11:19:21+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T11:19:21+00:00",
+      "to": "DONE"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 3,
+    "human_questions_after_approval": 0,
+    "package_reviews": 2,
+    "repair_batches": 7,
+    "task_deep_reviews": 0,
+    "verifications": 3
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-04",
+        "AC-05",
+        "AC-12"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/feature_state_lib/model.py",
+          "reason": "Donde vive TODO el predicado compartido de AC-02, el corazon del paquete. Omitido por error del orquestador al crear el paquete: owned_paths se escribio contra un diseno previo que ponia el predicado en render_notes.py, y ADR-0040 lo descarto explicitamente en sus alternativas rechazadas. Aprobada por el orquestador, que reconoce el error como propio; probado por el reviewer con check-owned-paths.py (OWNERSHIP_FAIL rc=2).",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/feature_state_lib/cli_lifecycle.py",
+          "reason": "cmd_status, superficie de AC-04. Misma causa. Aprobada por el orquestador, que reconoce el error como propio; probado por el reviewer con check-owned-paths.py (OWNERSHIP_FAIL rc=2).",
+          "status": "approved"
+        },
+        {
+          "path": "tests/test_digest.py",
+          "reason": "Tres de los cinco tests nuevos del paquete y la correccion del fixture. Misma causa. Aprobada por el orquestador, que reconoce el error como propio; probado por el reviewer con check-owned-paths.py (OWNERSHIP_FAIL rc=2).",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/feature_state_lib/render_notes.py",
+          "reason": "Declarado en owned_paths pero SIN ningun diff: remanente del plan previo que ponia el predicado ahi. ADR-0040 lo descarto. Se deja constancia de que la declaracion sobra, no de que falte.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 3,
+        "spawns": 2,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": "docs/specs/020-honest-dashboard/context/P1-digest-no-esconde.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-12T05:34:49+00:00",
+          "closed_findings": [
+            "F-01",
+            "F-02",
+            "F-03"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "delta-reviewer independiente (anthropic/sonnet): PASS, requires_full_review=false, cero findings nuevos. F-01 verificado en vivo: 2 y 2 menciones con los bits informativos intactos. Probo las ESQUINAS de la regla condicional con fixtures sinteticos en tmpdir: bloqueada sin otros bits queda en 1 mencion (honesto -- el spec dice tope, no exactamente dos); bloqueada con bit no duplicado da 2; no bloqueada con bits no filtra nada. Y descarto una esquina que yo habia planteado: 'bloqueo resuelto con final_state todavia BLOCKED' es INALCANZABLE por el CLI, porque cmd_reopen setea resolved_at y hace pop de final_state en la misma mutacion atomica. F-02 con mordida real: revirtio el filtro con cp (no con git, por la prohibicion explicita tras el incidente anterior) y obtuvo el rojo identico al pegado. F-03 verificado: las cuatro excepciones estan en el estado con su razon auditable. Los 5 espejos con md5 identico, y extendio la verificacion a model.py, cli_lifecycle.py y render_notes.py. Precision de evidencia sin consecuencia: su corrida dio skipped=2 y la evidencia declara 3; rastreo los cinco skips condicionales y son gates de entorno y credenciales ajenos al paquete, con test_digest.py en 10/10 sin skips.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "working-tree @ 76b50a7 (020/P1: model.py predicado compartido, cli_reporting.py, cli_lifecycle.py, feature-state.py _hub_body, docs/adr/0040-*, tests/test_digest.py + test_honest_predicate.py + test_harness.py, mas espejos)",
+      "findings": [
+        {
+          "detail": "AC-03 y ADR-0040 prometen tope de dos menciones. _pending_bits puede devolver mas de un bit por feature y el bucle de Que falta imprime una linea por bit. Re-verificado por el orquestador sobre el digest real: grep de 002 devuelve 3 lineas -- :8 titular, :26 el bloqueo repetido literal, :27 los 5 hallazgos abiertos. Mismo patron en 011.",
+          "id": "F-01",
+          "location": "cli_reporting.py:228-234 + render_notes.py:143-173",
+          "repair_attempts": 1,
+          "required": "DECISION DEL ORQUESTADOR, mas precisa que las dos opciones del review: para una feature que YA tiene titular en 'Necesita tu decision', omitir en 'Que falta' unicamente el bit de BLOQUEO -- duplicacion literal del titular, mismo texto y mismo truncado -- y conservar los demas bits, que si aportan informacion nueva (los 5 hallazgos de 002, las tareas de 011). Da exactamente dos menciones sin perder informacion. No se afloja el AC ni se reescribe el ADR.",
+          "severity": "high",
+          "status": "closed",
+          "title": "El tope de dos menciones de AC-03 no se cumple: 002 y 011 aparecen tres veces",
+          "verified_at": "2026-08-12T04:33:58+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Solo verifica presencia/ausencia por seccion, sin una sola asercion de conteo. Y el fixture 003-blocked tiene packages vacio, asi que _pending_bits nunca puede devolver mas de un bit: el escenario que rompe el tope es estructuralmente irrepresentable.",
+          "id": "F-02",
+          "location": "tests/test_digest.py:127-153 y :202-215",
+          "repair_attempts": 1,
+          "required": "Sumar al fixture un package con al menos un finding abierto o una tarea pendiente, y una asercion que cuente el total de menciones en todo el documento, capado en 2.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "El test que dice probar el tope nunca cuenta menciones: el test decorativo de este paquete",
+          "verified_at": "2026-08-12T04:33:58+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Faltan model.py (donde vive todo el predicado de AC-02), cli_lifecycle.py (AC-04) y tests/test_digest.py; figura docs/adr/0040-honest-dashboard.md que no existe. render_notes.py esta declarado sin diff: remanente del plan anterior que el ADR descarto. Probado con check-owned-paths.py del propio repo. ES ERROR DEL ORQUESTADOR al crear el paquete.",
+          "id": "F-03",
+          "location": "ai/state/features/020-honest-dashboard.json, owned_paths de P1",
+          "repair_attempts": 1,
+          "required": "Actualizar owned_paths a la superficie real, o registrar la correccion como excepcion aprobada si update-package no expone el campo.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "owned_paths desactualizado respecto de la superficie real y nombre de ADR incorrecto",
+          "verified_at": "2026-08-12T04:33:58+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-12T04:10:20+00:00",
+          "evidence": "./ai/scripts/verify.sh -> FEATURE_STATE_OK / VERIFY_PASS. Suite 943 OK / 3 skips (base 917, +26). Verificado ademas por el orquestador que ningun state file real tiene final_state fuera de TERMINAL={DONE,BLOCKED}.",
+          "name": "verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-12T04:10:20+00:00",
+          "evidence": "./build.sh --check -> CHECK_PASS + SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-12T04:10:20+00:00",
+          "evidence": "git diff --check -> DIFFCHECK_CLEAN",
+          "name": "diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-12T05:34:49+00:00",
+          "cambio": "Un unico predicado compartido en model.py (feature_is_live, open_blocker, blocked_days, stale_days, feature_is_stale, STALE_THRESHOLD_DAYS) reemplazo las dos copias mal escritas que tenian cmd_digest y _hub_body, que trataban final_state como truthy en vez de compararlo contra DONE. El digest gano la seccion '## Necesita tu decision' al principio, con los dias contados desde el ultimo blocker sin resolver; las features vivas no bloqueadas se marcan estancadas pasados 7 dias; y cmd_status expone blocked_days y stale_days.",
+          "feature_id": "020-honest-dashboard",
+          "modelo_mental": "El informe matinal dejo de esconder lo que te necesita: una feature bloqueada ya no desaparece por tener final_state. Lo importante para el futuro no es la seccion nueva sino donde vive la regla: si volves a preguntar 'esta feature sigue viva' en un artefacto derivado nuevo, llamas a model.feature_is_live -- no lo reimplementes. El defecto existio dos veces exactamente porque la respuesta estaba escrita dos veces.",
+          "module": "narracion-notas",
+          "package_id": "P1-digest-no-esconde"
+        }
+      ],
+      "objective": "Que el digest, el hub de notas y --status no escondan lo que necesita una decision humana, con un unico predicado compartido",
+      "owned_paths": [
+        "ai/scripts/feature_state_lib/cli_reporting.py",
+        "ai/scripts/feature_state_lib/render_notes.py",
+        "ai/scripts/feature-state.py",
+        "tests/test_harness.py",
+        "docs/adr/0040-honest-dashboard.md"
+      ],
+      "package_id": "P1-digest-no-esconde",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [
+        {
+          "at": "2026-08-12T05:12:07+00:00",
+          "changed_files": [
+            "ai/scripts/feature_state_lib/cli_reporting.py",
+            "tests/test_digest.py",
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md"
+          ],
+          "finding_ids": [
+            "F-01"
+          ],
+          "verification": [
+            "Re-verificado en vivo por el orquestador: grep -c sobre docs/notas/BUENOS-DIAS.md real da 2 menciones para 002 y 2 para 011 (antes 3 y 3), y los bits informativos SOBREVIVEN -- :26 '5 hallazgos abiertos' y :29 'tareas pendientes en P1-quota-failover'. Se omite solo el bit de bloqueo, que era duplicacion literal del titular. Cero perdida de informacion."
+          ]
+        },
+        {
+          "at": "2026-08-12T05:12:07+00:00",
+          "changed_files": [
+            "ai/scripts/feature_state_lib/cli_reporting.py",
+            "tests/test_digest.py",
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md"
+          ],
+          "finding_ids": [
+            "F-02"
+          ],
+          "verification": [
+            "Verificado por el orquestador leyendo tests/test_digest.py: el fixture 003-blocked ahora carga un package con un finding abierto (shape de 002 real), y :242-246 hace total_mentions = text.count('003-blocked') con assertEqual(total_mentions, 2). El escenario que rompe el tope pasa a ser representable. Nota: mi primer grep no lo encontro por ser demasiado estrecho (la asercion esta partida en varias lineas); la afirmacion del repair era correcta."
+          ]
+        },
+        {
+          "at": "2026-08-12T05:12:07+00:00",
+          "changed_files": [
+            "ai/scripts/feature_state_lib/cli_reporting.py",
+            "tests/test_digest.py",
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md"
+          ],
+          "finding_ids": [
+            "F-03"
+          ],
+          "verification": [
+            "Corregido por el ORQUESTADOR, no por el repair: era error propio. Registradas cuatro excepciones aprobadas -- model.py, cli_lifecycle.py y tests/test_digest.py como tocadas y no declaradas, y render_notes.py como declarada de mas sin diff. update-package no expone --owned-path, asi que la excepcion es el mecanismo disponible; no se edito el JSON a mano. Leccion durable registrada en decisions-log (slug owned-paths-desactualizado-por-cambio-de-diseno): cuando el ADR fija un diseno distinto al planeado, owned_paths se actualiza en el mismo movimiento."
+          ]
+        }
+      ],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-12T04:33:58+00:00",
+          "evidence": "package-reviewer independiente (anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol). EJE PRIORITARIO RESUELTO A FAVOR DEL IMPLEMENTER: el cambio del fixture 'done' -> 'DONE' NO es debilitamiento. El reviewer corrio el test viejo contra el codigo nuevo y pego el rojo, demostrando que bajo el predicado nuevo la minuscula deja de tratarse como terminada y la feature se MUESTRA DE MAS: fail-safe, nunca fail-open, que es la propiedad que la feature exige. Verifico ademas con grep sobre todo ai/scripts/ que las unicas asignaciones son literales en mayusculas o args.to_phase, cerrado por LEGAL_TRANSITIONS. AC-02 confirmado: el predicado esta en UN lugar y los tres consumidores llaman a model.*; las dos lineas truthy de feature-state.py:189,236 son etiquetas de valor, no una tercera copia. AC-01 verificado contra los state files reales: blocked_days 18 y 12, coincidentes con el digest, stale_days None por estar exentas. Los 21 tests unitarios voluntarios NO son decorativos: blocker malformado, timestamp naive, limite exacto de 7 dias, ultimo-no-primero, con mutacion real. INCIDENTE REPORTADO CON TRANSPARENCIA: el reviewer revirtio sin querer el hunk de model.py con git checkout --, lo detecto, lo repuso desde PROYECTO y verifico paridad; re-verificado por el orquestador con md5sum: los 5 arboles dan 8eccaaad y feature_is_live esta en los cinco.",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03"
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-12T05:34:49+00:00",
+          "browser": "",
+          "checks": [
+            "El digest nombra las features bloqueadas con sus dias",
+            "El hub las nombra en Que falta",
+            "cmd_status devuelve blocked_days coherente",
+            "Tope de dos menciones sin perder informacion"
+          ],
+          "evidence": "Superficie de runtime = los artefactos generados. Verificado por el orquestador sobre los archivos reales: BUENOS-DIAS.md:6-9 abre con '## Necesita tu decision' nombrando 002 (hace 18 dias) y 011 (hace 12 dias); '00 - Proyecto.md':26-27 las lista en Que falta con su bloqueo y sus hallazgos; cmd_status devuelve blocked_days 18 y 12; y grep -c da exactamente 2 menciones por feature con los bits informativos presentes.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-12T03:00:02+00:00",
+          "client": "Arranca el arreglo del informe matinal: que las cosas trabadas esperandote aparezcan primero en vez de desaparecer.",
+          "effort": "medium",
+          "model": "gpt-5.6-sol",
+          "provider": "openai-codex",
+          "purpose": "Implementar ADR-0040: predicado compartido y tablero que no esconde lo bloqueado",
+          "role": "implementer",
+          "route_id": "run1_b346026cee37a6594969231ab20357de",
+          "spawn_id": "SPAWN-001",
+          "tech": "P1 de 020 (AC-01..05, AC-12): un predicado compartido de feature viva reemplaza las dos copias mal escritas (cli_reporting.py:194 y _hub_body), seccion Necesita tu decision con dias desde el ultimo blocker sin resolver, marca de estancada con las bloqueadas exentas, blocked_days/stale_days en cmd_status, y tests que fallan en rojo contra el codigo de hoy."
+        },
+        {
+          "at": "2026-08-12T04:10:42+00:00",
+          "client": "Un revisor independiente audita el arreglo del informe matinal antes de darlo por bueno.",
+          "effort": "medium",
+          "model": "sonnet",
+          "provider": "anthropic",
+          "purpose": "Review independiente de P1: tablero honesto y predicado compartido",
+          "role": "package-reviewer",
+          "route_id": "dec1_7bf90eba2bb44e6ba1be83a1ebd7bc92",
+          "spawn_id": "SPAWN-002",
+          "tech": "package-reviewer sobre 020/P1: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol. Eje especial: el implementer MODIFICO un fixture de test preexistente (final_state 'done' -> 'DONE'); hay que verificar que el invariante sigue probado y no que se ajusto el test para que pase."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Predicado compartido de feature viva + constante de umbral, consumido por los tres artefactos (AC-02)",
+          "local_validations": [
+            "model.py: feature_is_live, open_blocker, days_since, blocked_days, stale_days, feature_is_stale, STALE_THRESHOLD_DAYS; consumido por cmd_digest, _hub_body y cmd_status"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Seccion Necesita tu decision en el digest, dias desde el ultimo blocker sin resolver (AC-01)",
+          "local_validations": [
+            "BUENOS-DIAS.md:6-9 verificado en vivo por el orquestador: nombra 002 (hace 18 dias) y 011 (hace 12 dias)"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Marca de estancada para las vivas no bloqueadas, bloqueadas exentas (AC-03)",
+          "local_validations": [
+            "tope de dos menciones por feature bloqueada, verificado en el digest regenerado"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "blocked_days y stale_days en cmd_status desde el mismo predicado (AC-04)",
+          "local_validations": [
+            "cmd_status sobre 002 y 011 devuelve blocked_days 18 y 12, coherente con el digest"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "_hub_body deja de saltear las terminales en Que falta (AC-12)",
+          "local_validations": [
+            "00 - Proyecto.md:26-27 verificado por el orquestador: 002 aparece con su bloqueo y sus 5 hallazgos abiertos"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Tests que fallan en rojo contra el codigo de hoy (AC-05, AC-12) + ADR-0040",
+          "local_validations": [
+            "tests/test_digest.py HonestPredicateTests + test_honest_predicate.py (21 unitarios) + 2 en test_harness.py; ADR-0040 indexado. Suite 917 -> 943"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-12T05:34:49+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests"
+          ],
+          "evidence": "943 OK (base 917, +26: HonestPredicateTests en test_digest.py, 21 unitarios en test_honest_predicate.py y 2 de cmd_status en test_harness.py). Cero tests borrados o relajados; el unico test preexistente modificado fue un fixture ('done' -> 'DONE'), y el reviewer probo corriendo el test viejo contra el codigo nuevo que el invariante sigue probado y que la direccion de falla es fail-safe.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-12T04:33:58+00:00",
+          "evidence": "Veredictos batcheados en una sola llamada (leccion de 019).",
+          "refuted": [],
+          "upheld": [
+            "F-01",
+            "F-02",
+            "F-03"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-06",
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10",
+        "AC-11"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 4,
+        "spawns": 2,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": "docs/specs/020-honest-dashboard/context/P2-anclas-verificables.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-12T07:56:52+00:00",
+          "closed_findings": [
+            "F-01",
+            "F-02"
+          ],
+          "new_or_reopened_findings": [
+            "F-05"
+          ],
+          "reason": "delta-reviewer independiente (anthropic/sonnet): NO PASA por un finding medium puramente documental; requires_full_review=false. F-01 CERRADO: reconstruyo los dos escenarios en tempdir sintetico y confirmo que el hint estatico nombra la cita cruzada y remite a ADR-0040 \u00a75 con el remedio concreto, sin busqueda global (verifico que _resolve_basename y _expand_module_files nunca miran fuera del file_index del modulo). Mordida propia con cp, no con git. F-02 CERRADO: reconto por su cuenta 12/38 con desglose exacto 10/18 completas y 2/20 abreviadas, y probo la mordida ensanchando _SYMBOL_RE. Sin regresion: 970 OK, build.sh --check limpio, 17 pares de hash x 5 espejos, check-anchors rc=0 con los mismos form_counts, git diff --check rc=0, sin scope creep. Nota: su corrida dio 2 skips y no 3, y rastreo que el tercero depende de si route-decide es elegible en la maquina en ese momento, cosa que el propio implementer ya habia documentado como variable.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-08-12T11:09:34+00:00",
+          "closed_findings": [
+            "F-05"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "delta-reviewer independiente: PASS, cero findings nuevos, requires_full_review=false. Corrio EL MISMO script contra el arbol real y obtuvo 75/479 = 15.658% fila por fila igual a lo pegado; confirmo el bug de raiz con grep (entry['line'] en :173 es la fila del .md, target_start en :178 se calcula y nunca se agrega al dict). Verifico que la cifra vieja quedo anotada en los TRES archivos, no borrada. Confirmo que 'bajo pero no despreciable' desaparecio y que el ADR ahora describe el peor caso como 'una posicion corrida de cada cuatro'. Y VERIFICO EL ARGUMENTO de la negativa sobre target_start leyendo cmd_check_anchors y check_anchors: es cierto que las entradas rotas entran en result['broken'] y que cli_modules.py:130 hace print_json del result completo, asi que agregar la clave cambiaria la salida observable del comando real. La negativa esta bien razonada, no es una excusa. Comportamiento intacto: rc=0, anchor_count=38, form_counts identicos, 970 OK, CHECK_PASS + SELF_SCAFFOLD_SYNC_OK files=2, los 5 espejos con el mismo md5, git diff --check limpio.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [
+        "P1-digest-no-esconde"
+      ],
+      "diff_ref": "working-tree @ 76b50a7 (020/P2: check_anchors.py nuevo, cli_modules.py, cli_reporting.py, feature-state.py, tests/test_check_anchors.py nuevo, docs/modules/*.md corregidos, ADR-0040 seccion 5, mas espejos)",
+      "findings": [
+        {
+          "detail": "La razon 'no file named X inside this module declared paths' es identica para dos causas muy distintas: el archivo no existe en ningun lado, o existe pero pertenece a OTRO modulo (cita cruzada, irresoluble por diseno de SC-01). El propio implementer identifico el riesgo por escrito en sus known_risks pero solo lo resolvio en el docstring y en ADR-0040 \u00a75, documentos que un autor de docs/modules/*.md no tiene por que leer antes de escribir una linea. El reviewer lo reprodujo con un fixture aislado.",
+          "id": "F-01",
+          "location": "ai/scripts/feature_state_lib/check_anchors.py:118-120",
+          "repair_attempts": 1,
+          "required": "Agregar al mensaje un hint estatico (no una busqueda global, que violaria SC-01) que nombre la posibilidad de la cita cruzada y remita a ADR-0040 \u00a75. Test que fije el hint.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "El mensaje de ancla irresoluble confunde 'el archivo no existe' con 'el archivo esta en otro modulo'",
+          "verified_at": "2026-08-12T06:57:38+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "La gramatica exige que el simbolo entre backticks este separado del ancla por SOLO espacio en blanco. Cualquier conector ('es', 'define', una coma) apaga el chequeo semantico y cae a rango-only. El reviewer conto sobre los 5 docs reales: de 38 anclas, solo 12 reciben chequeo semantico; otras 16 tienen simbolo en la misma linea que un lector asumiria verificado y no lo esta. Y lo reprodujo con una afirmacion GENUINAMENTE FALSA que pasa: doc con 'foo.py:8 es alpha()' donde la linea 8 real dice beta -> ok=True, rc=0. Esta DENTRO de la letra de AC-08 y SC-03 lo acoto a proposito, asi que no es bug de codigo; el defecto es que la evidencia presenta '38 anclas, dos formas cubiertas' de un modo que sobreestima la cobertura semantica.",
+          "id": "F-02",
+          "location": "ai/scripts/feature_state_lib/check_anchors.py:67 y :123-125",
+          "repair_attempts": 1,
+          "required": "Declarar explicitamente en ADR-0040 \u00a75 y en la evidencia la fraccion real (12/38 con chequeo semantico activo), no solo el conteo por forma gramatical. Y que el docstring de _adjacent_symbol advierta que un conector desactiva el chequeo, con el ejemplo.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "La cobertura semantica real es 12 de 38 anclas (32%), y la evidencia no lo declara",
+          "verified_at": "2026-08-12T06:57:38+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "La evidencia documenta UN falso negativo real (generate.py:669). El reviewer simulo drift sobre las 12 anclas con chequeo semantico activo, probando cada desplazamiento de +/-1 a +/-20: entre 4 y 10 de las 40 posiciones siguen pasando por coincidencia textual con comentarios y docstrings cercanos que mencionan el mismo simbolo en prosa. No es un caso aislado, es una propiedad estructural de la ventana. El trade-off ya esta aceptado por SC-03 ('nada de parsear Python'); lo que falta es la magnitud.",
+          "id": "F-03",
+          "location": "ai/scripts/feature_state_lib/check_anchors.py:74 y :128-140",
+          "repair_attempts": 1,
+          "required": "Que ADR-0040 \u00a75 acompane la frase 'una coincidencia casual puede hacer pasar una linea que en realidad esta mal' con el orden de magnitud medido, para que quien algun dia decida convertir esto en gate sepa cuanta proteccion real da.",
+          "severity": "low",
+          "status": "closed",
+          "title": "La ventana semantica de +/-2 tiene una tasa de falso negativo del 10-25% bajo drift simulado"
+        },
+        {
+          "detail": "Correr la suite completa invoca ./build.sh en modo generate (no --check) decenas de veces contra el arbol REAL, haciendo rm -rf y cp -a de Global/$harness. El reviewer midio: git diff --stat daba 6049 insertions al empezar y 6047 despues de correr la suite. Habia 2 lineas de drift preexistente que CHECK_PASS y SELF_SCAFFOLD_SYNC_OK no detectan, porque no comparan contra el estado real de Global/ sino que validan dos archivos puntuales y la generacion interna. FUERA DEL DIFF DE P2: check_anchors.py y docs/modules/ no tocan Global/_canonical. Re-verificado por el orquestador: tras correr ./build.sh el arbol quedo estable en 6047 y CHECK_PASS.",
+          "id": "F-04",
+          "location": "tests/test_harness.py (multiples run(./build.sh)) y build.sh",
+          "required": "Ninguno dentro de P2. Queda como aviso registrado: el gate de drift no cubre lo que su nombre sugiere, y la suite enmascara el problema al regenerar de verdad. Merece su propia feature si se quiere cerrar.",
+          "severity": "low",
+          "status": "open",
+          "title": "Drift latente en Global/* que ningun build.sh --check detectaba, y la suite lo corrige silenciosamente"
+        },
+        {
+          "detail": "El script de medicion de F-03 usa r['line'] como line_no, y r['line'] (asignado en check_anchors.py:161) es la fila del ancla DENTRO del .md, no la linea real citada en el archivo destino (que existe internamente como target_start pero nunca se guarda en el dict que devuelve _scan_doc). O sea: centro la ventana de +/-20 alrededor de la fila 26 de consola.md en vez de la 3252 de set_agents_app.py, midiendo drift sobre una zona que no tiene nada que ver con main(). El delta-reviewer repitio la simulacion extrayendo la linea real de r['raw'] y obtuvo 75/479 = 15.658% agregado, con rango por ancla de 4 a 10 sobre 40 (10-25%), que REPRODUCE casi exacto el numero del reviewer original -- confirmando que quien midio mal fue el repair, no el reviewer. La hipotesis de 'denominadores distintos' que el ORQUESTADOR registro en la verificacion de F-03 era falsa y ademas contradecia el propio texto del repair (ADR-0040:206-207 dice 'de 3 a 5 posiciones falsas por ancla afectada', que no coincide con '4 a 10' bajo ninguna interpretacion de denominador: es la misma unidad con un resultado erroneo).",
+          "id": "F-05",
+          "location": "docs/adr/0040-honest-digest-shared-liveness-predicate.md:202-211, evidence/P2-repair.md:155-232, evidence/P2-implementer.md:216-255",
+          "repair_attempts": 1,
+          "required": "Recalcular con la linea real citada y actualizar ADR-0040 \u00a75 y las dos evidencias con ~75/479 (~15.7%) agregado y 4-10 de 40 (10-25%) por ancla. Ajustar la caracterizacion: 'bajo pero no despreciable' no describe un peor caso de 1 de cada 4. Solo documentacion: no toca check_anchors.py, no cambia gramatica, resolucion ni comportamiento observable.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "La cifra de falso negativo del ADR es producto de un bug de medicion y subestima el riesgo 4.5x",
+          "verified_at": "2026-08-12T07:56:53+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-12T06:46:14+00:00",
+          "evidence": "./ai/scripts/verify.sh -> FEATURE_STATE_OK / VERIFY_PASS. Suite 968 OK / 3 skips (base 943, +25 tests nuevos en test_check_anchors.py).",
+          "name": "verify",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-12T06:46:14+00:00",
+          "evidence": "./build.sh --check -> CHECK_PASS + SELF_SCAFFOLD_SYNC_OK files=2",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-12T06:46:15+00:00",
+          "evidence": "git diff --check -> DIFFCHECK_CLEAN",
+          "name": "diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-12T11:09:35+00:00",
+          "cambio": "Nuevo motor check_anchors.py y comando feature-state.py check-anchors: extrae las referencias file:line de docs/modules/, resuelve el basename SOLO dentro de los paths que el modulo declara en modules.toml, valida rango, y verifica el simbolo cuando viene en backticks inmediatamente adyacentes. Enganchado en sync-notes con contrato never-raises. Se corrigieron 12 anclas derivadas y 3 citas cruzadas pasaron a prosa.",
+          "feature_id": "020-honest-dashboard",
+          "modelo_mental": "Una referencia file:line en docs/modules/ ya no puede mentir en silencio: hay un comando que la contrasta. Pero conoce tus limites -- un rc=0 significa 'ninguna linea esta fuera de rango y el 32% de los simbolos adyacentes coincide', NO 'la documentacion no miente'. Y la verificacion de simbolo tiene un margen de falso negativo de 10-25% por ancla por la ventana de +/-2. Lo mas importante en el dia a dia: si citas un archivo de OTRO modulo, la referencia es irresoluble por diseno -- nombra el modulo en prosa y no pongas el numero de linea.",
+          "module": "narracion-notas",
+          "package_id": "P2-anclas-verificables"
+        }
+      ],
+      "objective": "Que una referencia file:line en docs/modules/ que ya no apunta a lo que dice sea un fallo detectable por comando",
+      "owned_paths": [
+        "ai/scripts/feature_state_lib/check_anchors.py",
+        "ai/scripts/feature_state_lib/cli_modules.py",
+        "ai/scripts/feature-state.py",
+        "docs/modules",
+        "tests/test_module_docs.py"
+      ],
+      "package_id": "P2-anclas-verificables",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repair_entry": "delta_review",
+      "repairs": [
+        {
+          "at": "2026-08-12T07:28:58+00:00",
+          "changed_files": [
+            "ai/scripts/feature_state_lib/check_anchors.py",
+            "tests/test_check_anchors.py",
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md"
+          ],
+          "finding_ids": [
+            "F-01"
+          ],
+          "verification": [
+            "Verificado por el orquestador leyendo _resolve_basename: el mensaje ahora dice 'cross-module citation, unresolvable by design (SC-01, see ADR-0040 sect. 5)' ademas de la razon original, con el hint ESTATICO -- sin busqueda global, SC-01 intacto. Test nuevo con mordida confirmada."
+          ]
+        },
+        {
+          "at": "2026-08-12T07:28:59+00:00",
+          "changed_files": [
+            "ai/scripts/feature_state_lib/check_anchors.py",
+            "tests/test_check_anchors.py",
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md"
+          ],
+          "finding_ids": [
+            "F-02"
+          ],
+          "verification": [
+            "Verificado por el orquestador: ADR-0040:190-191 declara 'solo 12 de 38 (32%) reciben la verificacion semantica activa -- 10 de las 18 completas, 2 de las 20 abreviadas', y :197 escribe la frase de fondo: un rc=0 significa 'ninguna linea esta fuera de rango y el 32% de los simbolos adyacentes coincide', no 'la documentacion no miente'. Docstring de _adjacent_symbol con el ejemplo concreto."
+          ]
+        },
+        {
+          "at": "2026-08-12T07:28:59+00:00",
+          "changed_files": [
+            "ai/scripts/feature_state_lib/check_anchors.py",
+            "tests/test_check_anchors.py",
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md"
+          ],
+          "finding_ids": [
+            "F-03"
+          ],
+          "verification": [
+            "Documental. El repair MIDIO POR SU CUENTA en vez de repetir el numero del reviewer y le dio 17/480 (~3.5%) contra el 10-25% reportado, concentrado en 4 anclas de nombre corto o generico; documento la discrepancia explicitamente en vez de esconderla (ADR-0026). Las dos mediciones usan denominadores distintos -- el reviewer conto posiciones por ancla, el repair sobre el total -- y ambas pueden ser correctas midiendo cosas distintas; eso queda para el delta review."
+          ]
+        },
+        {
+          "at": "2026-08-12T08:19:06+00:00",
+          "changed_files": [
+            "docs/adr/0040-honest-digest-shared-liveness-predicate.md",
+            "docs/specs/020-honest-dashboard/evidence/P2-implementer.md",
+            "docs/specs/020-honest-dashboard/evidence/P2-repair.md"
+          ],
+          "finding_ids": [
+            "F-05"
+          ],
+          "verification": [
+            "Verificado por el orquestador: ADR-0040:220 y :301 declaran ahora '15.7% agregado, 10%-25% por ancla, ninguna por debajo del 10%', y :223-224 dejan una NOTA DE CORRECCION explicita que nombra la cifra vieja (17/480 ~3.5%) y por que estaba mal, en vez de reemplazarla en silencio. El repair corrio el script corregido contra el arbol real y obtuvo 75/479, reproduciendo el numero del reviewer original. Comportamiento intacto: check-anchors sigue en rc=0 con anchor_count=38 y los mismos form_counts. DECISION ARGUMENTADA del repair sobre target_start: NO lo agrega al dict, porque cmd_check_anchors hace print_json del result completo y sumar la clave cambiaria el JSON observable de check-anchors para toda ancla rota resuelta; documento en su lugar el patron de extraccion seguro en los tres archivos. Es una negativa bien razonada, no una omision."
+          ]
+        }
+      ],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-12T06:57:37+00:00",
+          "evidence": "package-reviewer independiente (anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol). EJE 1 RESUELTO A FAVOR DEL IMPLEMENTER: las 3 citas cruzadas convertidas a prosa son diseno legitimo, no gaming de la metrica -- SC-01 hace la cita genuinamente irresoluble, los identificadores exactos se preservan en prosa, y lo unico que se pierde es el numero de linea, que de mantenerse habria derivado en silencio igual (la misma mentira que el paquete ataca). Verificaciones independientes que coincidieron exacto: check-anchors rc=0 con ANCHORS_OK checked=5 anchors=38 y form_counts 18 completas + 20 abreviadas; las 6 anclas symbol-before-anchor corregidas por AC-10 comprobadas una por una con grep; los 25 tests aislados en verde; suite 968 OK / 3 skips; build.sh --check limpio; los 5 espejos con 17 pares de hash cada uno presente 5 veces, sin drift; --module inexistente da rc=2 con mensaje limpio y no traceback; el never-raises de sync-notes confirmado en codigo y test; y los 4 falsos positivos reproducidos directamente, no solo via tests. NO encontro test decorativo entre los 25: cada uno fija un invariante distinguible.",
+          "findings": [
+            "F-01",
+            "F-02",
+            "F-03",
+            "F-04"
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-12T11:09:34+00:00",
+          "browser": "",
+          "checks": [
+            "check-anchors detecta anclas fuera de rango con razon precisa y devuelve rc distinto de cero",
+            "rc=0 sobre los cinco modulos tras corregir las anclas de hoy",
+            "sync-notes no se rompe si el verificador falla",
+            "El mensaje de ancla irresoluble explica la cita cruzada"
+          ],
+          "evidence": "Verificado en vivo por el orquestador y re-verificado por el reviewer: check-anchors da rc=0 con ANCHORS_OK checked=5 anchors=38; con un ancla fuera de rango da rc=1 con 'line 99999 out of range for ai/scripts/set_agents_app.py (3540 lines)'; el caso insignia quedo corregido a 'ai/scripts/set_agents_app.py:3252 main()' con ruta completa; y el mensaje de irresoluble nombra la cita cruzada y remite a ADR-0040 \u00a75 con el remedio concreto.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-12T05:36:28+00:00",
+          "client": "Ultimo tramo: que la documentacion de modulos no pueda decir que algo esta en una linea donde ya no esta.",
+          "effort": "medium",
+          "model": "gpt-5.6-sol",
+          "provider": "openai-codex",
+          "purpose": "Implementar el verificador de anclas file:line de docs/modules/",
+          "role": "implementer",
+          "route_id": "run1_c5214efc4b0d73beea87d3e922b6ec85",
+          "spawn_id": "SPAWN-001",
+          "tech": "P2 de 020 (AC-06..11): gramatica de dos formas de ancla con resolucion por basename acotada a los paths del modulo, comando check-anchors read-only con rc distinto de cero, verificacion semantica acotada a simbolo en backticks adyacente, enganche never-raises en sync-notes, y correccion de las anclas rotas de hoy."
+        },
+        {
+          "at": "2026-08-12T05:49:58+00:00",
+          "client": "El primer intento murio por infraestructura sin escribir nada. Se relanza una vez.",
+          "effort": "medium",
+          "model": "gpt-5.6-sol",
+          "provider": "openai-codex",
+          "purpose": "Relanzamiento tras stall: verificador de anclas file:line",
+          "role": "implementer",
+          "route_id": "run1_05f7b094421e38137485dcbf27349065",
+          "spawn_id": "SPAWN-002",
+          "tech": "Relanzamiento unico de P2. Mitigacion: escribir evidencia en el primer minuto y guardar a disco por tramo. Si vuelve a morir, se parte en dos encargos mas chicos en vez de un tercer intento completo."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Gramatica de anclas: forma completa y abreviada :N, basename acotado a los paths del modulo (AC-06)",
+          "local_validations": [
+            "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Comando check-anchors read-only, rc distinto de cero si hay anclas rotas (AC-07)",
+          "local_validations": [
+            "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Verificacion semantica acotada a simbolo en backticks adyacente (AC-08)",
+          "local_validations": [
+            "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Enganche en sync-notes con contrato never-raises (AC-09)",
+          "local_validations": [
+            "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Corregir las anclas rotas de hoy, rc=0 sobre los cinco modulos (AC-10)",
+          "local_validations": [
+            "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Tests que prueban el defecto: linea fuera de rango y simbolo movido (AC-11)",
+          "local_validations": [
+            "check-anchors rc=0 sobre los cinco modulos; rc=1 con ancla fuera de rango, con razon precisa. Suite 968 (base 943, +25). Verificado en vivo por el orquestador."
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-12T11:09:34+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests"
+          ],
+          "evidence": "970 OK (base 943 -> 968 con los 25 de check_anchors -> 970 con los 2 de F-01/F-02). Cero tests borrados o relajados. El reviewer confirmo que ninguno de los 27 de test_check_anchors.py es decorativo: cada uno fija un invariante distinguible, y probo mordida propia sobre dos de ellos.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-12T06:57:38+00:00",
+          "evidence": "Veredictos batcheados.",
+          "refuted": [],
+          "upheld": [
+            "F-01",
+            "F-02"
+          ]
+        },
+        {
+          "at": "2026-08-12T07:56:53+00:00",
+          "evidence": "CORRECCION DEL ORQUESTADOR: en la verificacion de F-03 registre la hipotesis de 'denominadores distintos' como explicacion de la discrepancia. Era FALSA. El delta-reviewer encontro la causa real -- un bug de medicion en el script del repair -- y la reprodujo de punta a punta. Doy por refutada mi propia hipotesis.",
+          "refuted": [],
+          "upheld": [
+            "F-05"
+          ]
+        }
+      ]
+    }
+  ],
+  "phase": "DONE",
+  "revision": 82,
+  "schema_version": 1,
+  "spec_amendments": [
+    {
+      "actor": "orchestrator",
+      "approved_by": "federico (delegado) tras spec-challenge independiente: revision_required con enmiendas concretas, todas dentro del mandato acotado",
+      "at": "2026-08-12T02:57:32+00:00",
+      "hash": "432dd66a7d50d9ab60e9676dae8034b1b9a3cd6a8398d07a62185bfc404a1bc9",
+      "old_hash": "b3eb42f8c934b0b6bcf7a2f7c2e134fd24f26ecb3d59e3458bb9705da6223f35",
+      "old_path": "docs/specs/020-honest-dashboard/spec.md",
+      "path": "docs/specs/020-honest-dashboard/spec.md",
+      "reason": "SC-01 (bloqueante): resolucion de basename acotada a los paths del modulo en modules.toml, nunca busqueda global -- feature_state_lib esta duplicado byte a byte en 5 arboles y la busqueda global seria no deterministica. SC-02 (bloqueante): se cubren las DOS formas de ancla (completa y abreviada :N), porque en los docs de hoy son casi 1:1 y cubrir solo la obvia daria rc=0 verificando la mitad -- falsa seguridad. SC-03: AC-08 recortado a simbolo en backticks adyacente en la misma linea, comparacion de texto, sin parsear Python; se conserva porque es el caso insignia (consola.md:26, main() corrido +742). SC-04: AC-04 reformulado a campos calculados verificables (blocked_days/stale_days) en cmd_status. SC-05: AC-12 NUEVO por el tercer artefacto que el challenger encontro -- _hub_body en feature-state.py repite el mismo bug y 00 - Proyecto.md tambien esconde las bloqueadas en Que falta; y AC-02 pasa a exigir un PREDICADO COMPARTIDO, porque el defecto se duplico justamente por no tener uno. SC-06: las bloqueadas quedan exentas de la marca de estancadas, tope de dos menciones por feature. SC-07: los dias se cuentan desde el at del ultimo blocker sin resolver, no desde updated_at. SC-08/10/11 documentados como limitaciones conocidas en la spec."
+    }
+  ],
+  "updated_at": "2026-08-12T11:19:21+00:00"
+}

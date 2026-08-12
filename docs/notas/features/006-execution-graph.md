@@ -39,7 +39,7 @@
 
 ## Qué falta
 
-- → `INTEGRATION` — all packages accepted
+- → `PACKAGE_ACCEPTED` — P3-graph-view: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
 
 ## Presupuestos
 

@@ -35,6 +35,7 @@ commands/brainstorm.md
 commands/consult.md
 commands/debug.md
 commands/design.md
+commands/explicar.md
 commands/feature-batch.md
 commands/feature-status.md
 commands/next-task.md
@@ -56,8 +57,10 @@ hooks/claude_release_guard.py
 hooks/coord_policy.py
 hooks/feature_state_lib/__init__.py
 hooks/feature_state_lib/candidate_identity.py
+hooks/feature_state_lib/check_anchors.py
 hooks/feature_state_lib/cli_integration.py
 hooks/feature_state_lib/cli_lifecycle.py
+hooks/feature_state_lib/cli_modules.py
 hooks/feature_state_lib/cli_repair.py
 hooks/feature_state_lib/cli_reporting.py
 hooks/feature_state_lib/cli_review.py
@@ -65,6 +68,7 @@ hooks/feature_state_lib/graph.py
 hooks/feature_state_lib/model.py
 hooks/feature_state_lib/parser.py
 hooks/feature_state_lib/render_bitacora.py
+hooks/feature_state_lib/render_modules.py
 hooks/feature_state_lib/render_notes.py
 hooks/feature_state_lib/render_status.py
 hooks/feature_state_lib/transitions.py
@@ -85,6 +89,7 @@ skills/data-structure-selection/SKILL.md
 skills/db-integrity/SKILL.md
 skills/debugging-loop/SKILL.md
 skills/error-handling-http/SKILL.md
+skills/explicar/SKILL.md
 skills/feature-contract/SKILL.md
 skills/frontend-design/SKILL.md
 skills/frontend-error-ux/SKILL.md

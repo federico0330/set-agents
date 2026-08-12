@@ -49,6 +49,11 @@ LEGAL_TRANSITIONS = {
 }
 
 TERMINAL = {"DONE", "BLOCKED"}
+# 020-honest-dashboard/AC-01/AC-03 (ADR-0040): the single staleness threshold every
+# derived artifact (cmd_digest, cmd_status) reads -- a product assumption, not a measured
+# truth (spec SC-10), so it lives as one named constant instead of a number repeated at
+# each call site. Changing it is a one-line edit, never a search-and-replace.
+STALE_THRESHOLD_DAYS = 7
 MUTATING_COMMANDS = {
     "init",
     "transition",
@@ -77,6 +82,7 @@ MUTATING_COMMANDS = {
     "record-receipt",
     "amend-spec",
     "supersede-package",
+    "record-module-impact",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
 # Refuting retires a blocking finding with no code change: it is an authorization verb,
@@ -123,6 +129,71 @@ class StateError(RuntimeError):
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+# ---------------------------------------------------------------- honest-dashboard ---
+# 020-honest-dashboard/ADR-0040: the ONE predicate every derived artifact (cmd_digest,
+# _hub_body, cmd_status) consumes to decide "does this feature still need attention" --
+# centralized here, not reimplemented per site, because that duplication (once in
+# cli_reporting.py, once in feature-state.py, both wrong the same way) is the defect this
+# feature exists to close. Lives in model.py specifically because this module imports
+# nothing else in feature_state_lib (see cli_integration.py:1-13 for the import-cycle
+# reasoning that generalizes here): every consumer already does
+# `from feature_state_lib import model` with no risk of a new cycle.
+
+def feature_is_live(data: dict[str, Any]) -> bool:
+    """Excludes only what is genuinely finished. Exact equality against "DONE", never
+    truthy-on-any-value: `final_state` is closed vocabulary (`TERMINAL`, all upper-case --
+    the only two values any real code path ever writes), and a BLOCKED feature is still
+    live -- it needs a human decision, which is exactly what AC-01 surfaces, not hides.
+    """
+    return data.get("final_state") != "DONE"
+
+
+def open_blocker(data: dict[str, Any]) -> dict[str, Any] | None:
+    """AC-01: the MOST RECENT blocker entry without `resolved_at` -- never the first one
+    (a feature can be blocked, reopened, and blocked again, like 002-adaptive's own
+    history: one resolved entry followed by the live one), and never `updated_at` used as
+    a stand-in for "since when is this actually blocked"."""
+    open_ones = [b for b in data.get("blockers", []) if isinstance(b, dict) and not b.get("resolved_at")]
+    return open_ones[-1] if open_ones else None
+
+
+def days_since(timestamp: str | None) -> int | None:
+    """Whole days between an ISO 8601 timestamp (the shape every `at`/`updated_at` field
+    in this schema is written in) and now, UTC. None when there is nothing to measure --
+    never a fake 0 that would misread as "today" for missing or unparsable data."""
+    if not timestamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(timestamp)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max((datetime.now(timezone.utc) - parsed).days, 0)
+
+
+def blocked_days(data: dict[str, Any]) -> int | None:
+    """AC-04: days since the LAST unresolved blocker -- None when there is none open."""
+    blocker = open_blocker(data)
+    return days_since(blocker.get("at")) if blocker else None
+
+
+def stale_days(data: dict[str, Any]) -> int | None:
+    """AC-03: only meaningful for a live feature that is NOT blocked -- a blocked feature
+    is exempt from the staleness mark by construction (AC-01 already covers it in more
+    detail, and marking it here too would be a redundant third mention, spec SC-06). None
+    for a finished feature, a blocked one, or one with no `updated_at` to measure from.
+    """
+    if not feature_is_live(data) or open_blocker(data) is not None:
+        return None
+    return days_since(data.get("updated_at"))
+
+
+def feature_is_stale(data: dict[str, Any]) -> bool:
+    days = stale_days(data)
+    return days is not None and days >= STALE_THRESHOLD_DAYS
 
 
 def state_path(feature_id: str) -> Path:
@@ -243,6 +314,14 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
                                        #  verifications_summary, terminal_state, minted_at, minted_by}
         "repair_ceiling": None,       # {original_changed_lines, budget_lines, cap_source, frozen_at}
         "strict_tdd": False,          # declared by package-planner at create-package time
+        # AC-20 (019/PKG-3, ADR-0036): [{module, cambio, modelo_mental, feature_id, package_id, at,
+        # actor}] appended by record-module-impact. Every reader uses .get(): packages that predate
+        # this key (every package before this feature) are simply empty, same precedent as `spawns`.
+        "module_impacts": [],
+        # The cheap valve (ADR-0036): {reason, at, actor} set by
+        # `record-module-impact --module-impact-waived --reason`. Mutually exclusive in practice with
+        # a non-empty module_impacts (a package either documents its impact or declares why not).
+        "module_impact_waiver": None,
     }
 
 
@@ -446,6 +525,31 @@ def package_accept_ready(data: dict[str, Any], package: dict[str, Any], actor: s
     return errors
 
 
+def module_impacts_ready(data: dict[str, Any]) -> list[str]:
+    """ADR-0036 (019/PKG-3): every `accepted` package (never `superseded`, same precedent
+    as `done_ready`) needs either a recorded module impact or an explicit waiver before the
+    feature can enter INTEGRATION. Unlike `candidate_identity.integration_ready` (ADR-0024,
+    deliberately kept OUT of `check_transition` because it re-derives against the live repo
+    and has no cheap escape hatch), this check is safe as a hard precondition here: it reads
+    only the package's own state, and the waiver is a single cheap command
+    (`record-module-impact --module-impact-waived --reason`) — never more expensive than the
+    documentation it substitutes for. See ADR-0036 for the full comparison.
+    """
+    errors = []
+    for package in data.get("packages", []):
+        if package.get("status") in ("superseded",):
+            continue
+        if package.get("status") != "accepted":
+            continue
+        if package.get("module_impacts") or package.get("module_impact_waiver"):
+            continue
+        errors.append(
+            f"{package.get('package_id')}: module impact required (record-module-impact) "
+            "or waived (--module-impact-waived --reason)"
+        )
+    return errors
+
+
 def done_ready(data: dict[str, Any]) -> list[str]:
     errors = []
     # ADR-0028: `superseded` is the second terminal package state — a package the
@@ -469,4 +573,8 @@ def done_ready(data: dict[str, Any]) -> list[str]:
     required_criteria = set(data.get("acceptance_criteria") or [])
     if required_criteria and not required_criteria.issubset(covered):
         errors.append("not all acceptance criteria are covered by accepted packages")
+    # ADR-0036: same-shaped backstop as the receipt tripwire above -- the real enforcement
+    # is transitions.check_transition's INTEGRATION precondition; this is the safety net for
+    # a caller that somehow reaches DONE without ever passing through it.
+    errors += module_impacts_ready(data)
     return errors

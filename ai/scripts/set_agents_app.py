@@ -14,6 +14,7 @@ import os
 import pwd
 import re
 import secrets
+import shlex
 import shutil
 import subprocess
 import sys
@@ -27,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # must resolve this live module rather than execute a second copy with PROJECT_ROOT=None.
 # Importing normally already has this key, so setdefault is behavior-preserving there.
 sys.modules.setdefault("set_agents_app", sys.modules[__name__])
+import coord_policy
 import models_config
 import routing
 import set_agents_spawn
@@ -108,16 +110,56 @@ def _model_preference_die(message):
     raise ModelPreferenceError(message)
 
 
-def _validate_preference_providers(class_name, providers):
+def _effective_preference_providers():
+    """ADR-0034 (AC-09): the base audited set (`_MODEL_PREFERENCE_PROVIDERS`, unchanged
+    -- byte-identical to `models_config.DISCOVERABLE_PROVIDERS`) UNION whatever the
+    CURRENT effective snapshot reports as routable, when that snapshot is cheaply
+    resolvable -- a live probe, never network/credential material. Deliberately never
+    called from `load_model_preference`/`load_model_pin` (the boot path, `_read_model_
+    preference_raw`'s callers): probing there would make a plain `models.toml` read
+    depend on a live opencode probe, which the spec explicitly forbids. Only the WRITE
+    CLI paths below (`cmd_model_preference_set`, `cmd_model_pin_set`, ...) -- explicit,
+    interactive user actions where the probe's cost is acceptable -- use this. ANY
+    failure (missing routing_core state, a broken probe, an unreadable models.toml)
+    degrades silently to the base set alone, never a crash: a wider live set is a
+    convenience, never a requirement for pins/preferences to keep working.
+
+    F-05 (P1 repair): the union only ever has an observable effect on a day
+    `resolve_discovered_providers` can return a provider OUTSIDE the base set --
+    which today it structurally cannot: every provider it can produce comes from
+    `routing_core.catalog._PAIR_COMMANDS`'s own audited provider set, and that set is
+    pinned equal to `models_config.DISCOVERABLE_PROVIDERS` (== `_MODEL_PREFERENCE_
+    PROVIDERS`, AC-10's lockstep test). So the probe below is skipped whenever the
+    base set already covers `DISCOVERABLE_PROVIDERS` -- a cheap, exact short-circuit
+    that avoids paying a subprocess probe (each `_PAIR_COMMANDS` entry can block up to
+    20s) on every `--model-pin-set`/`--model-preference-set` call for a union that
+    cannot widen anything yet. The probe only actually runs again once
+    `_PAIR_COMMANDS`'s audited set genuinely grows past the base set (e.g. a future
+    ADR widens discovery beyond today's four providers)."""
+    if set(models_config.DISCOVERABLE_PROVIDERS) <= set(_MODEL_PREFERENCE_PROVIDERS):
+        return _MODEL_PREFERENCE_PROVIDERS
+    try:
+        from routing_core.catalog import probe_inventory, resolve_discovered_providers
+        config = models_config.load_config()
+        inventory = probe_inventory(config, cache_root=STATE_DIR)
+        live = resolve_discovered_providers(config, inventory)
+    except Exception:
+        return _MODEL_PREFERENCE_PROVIDERS
+    return tuple(dict.fromkeys((*_MODEL_PREFERENCE_PROVIDERS, *live)))
+
+
+def _validate_preference_providers(class_name, providers, valid_providers=_MODEL_PREFERENCE_PROVIDERS):
     """AC-02 resolution states 1/2/4d: shared by the config-load path and the CLI write
     path (`load_model_preference`/`cmd_model_preference_set` below) -- a malformed value
     can never even be WRITTEN by the CLI to begin with; a hand-edited file is the only way
-    to reach this same check at load time."""
+    to reach this same check at load time. `valid_providers` (ADR-0034 AC-09) defaults to
+    the static base set (the boot-path callers below never pass anything else, so the
+    arranque stays network-free); the write-CLI passes `_effective_preference_providers()`."""
     if not isinstance(providers, (list, tuple)) or not providers:
         _model_preference_die(f"model-preference.toml: [preference].{class_name} must be a non-empty list of providers")
     validated = []
     for token in providers:
-        if not isinstance(token, str) or token not in _MODEL_PREFERENCE_PROVIDERS:
+        if not isinstance(token, str) or token not in valid_providers:
             _model_preference_die(f"model-preference.toml: [preference].{class_name} contains unknown provider {token!r}")
         validated.append(token)
     if len(validated) != len(set(validated)):
@@ -193,13 +235,16 @@ def load_model_preference(roster_roles=None):
 _MODEL_PIN_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 
 
-def _validate_model_pin_entry(role, value, roster_roles):
+def _validate_model_pin_entry(role, value, roster_roles, valid_providers=_MODEL_PREFERENCE_PROVIDERS):
+    """`valid_providers` (ADR-0034 AC-09): defaults to the static base set, so every
+    boot-path caller (`load_model_pin`) stays network-free; the write-CLI
+    (`cmd_model_pin_set`) passes `_effective_preference_providers()`."""
     if role != "*" and role not in roster_roles:
         _model_preference_die(f"model-preference.toml: [model_pin].{role} does not match any role in roles.tsv")
     if not isinstance(value, str) or value.count("/") != 1:
         _model_preference_die(f"model-preference.toml: [model_pin].{role} must be \"provider/model\"")
     provider, model = value.split("/", 1)
-    if provider not in _MODEL_PREFERENCE_PROVIDERS:
+    if provider not in valid_providers:
         _model_preference_die(f"model-preference.toml: [model_pin].{role} names unknown provider {provider!r}")
     if not _MODEL_PIN_MODEL_RE.fullmatch(model):
         _model_preference_die(f"model-preference.toml: [model_pin].{role} has an invalid model token")
@@ -283,7 +328,11 @@ def cmd_model_preference_set(class_name, providers):
     """AC-02: `--model-preference-set CLASS --provider NAME [--provider NAME ...]` --
     writes/replaces `[preference].<CLASS>`, leaving every other key untouched (the
     round-trip regression test proves this isolation)."""
-    validated = _validate_preference_providers(class_name, providers)
+    # ADR-0034 (AC-09): the explicit write CLI validates against the LIVE effective set
+    # (base union whatever the current snapshot reports routable), never just the
+    # static 4-provider constant -- this is a user action, not the boot path, so the
+    # probe's cost is acceptable here.
+    validated = _validate_preference_providers(class_name, providers, _effective_preference_providers())
     # RF14-06: the ENTIRE existing document -- not just the class/role this write
     # touches -- must validate via `load_model_preference`'s own validators before any
     # merge/re-serialize; a pre-existing invalid entry (e.g. a hand-edited non-list
@@ -348,7 +397,8 @@ def cmd_model_pin_set(role, target):
     override (pin > dynamic > curated fallback) and reports MODEL_PINNED /
     MODEL_PIN_UNAVAILABLE in the decision's reason codes."""
     roster_roles = {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
-    provider, model = _validate_model_pin_entry(role, target, roster_roles)
+    # ADR-0034 (AC-09): same live-effective-set validation as cmd_model_preference_set.
+    provider, model = _validate_model_pin_entry(role, target, roster_roles, _effective_preference_providers())
     # RF14-06: whole-document validation before any merge/re-serialize.
     load_model_preference(roster_roles)
     load_model_pin(roster_roles)
@@ -435,6 +485,22 @@ def cmd_routing_report(human=False):
     warnings = routing.legacy_warnings(STATE_DIR)
     _routing_output(routing.cli_envelope(not reasons, "routing-report", report, warnings, reasons), human)
     return 1 if reasons else 0
+
+
+def cmd_route_doctor(human=False):
+    """ADR-0035 (AC-15): read-only diagnostic -- same one-line envelope discipline as
+    `--routing-report`/`--route-decide`, never opens a run, never writes the store or the
+    probe cache. Precedent: `cmd_routing_report` above."""
+    try:
+        from routing_core.catalog import route_doctor
+        config = models_config.load_config(ROOT / "models.toml")
+        report = route_doctor(config, cache_root=STATE_DIR)
+        _routing_output(routing.cli_envelope(True, "route-doctor", report, (), ()), human)
+        return 0
+    except models_config.ModelsError:
+        _routing_output(routing.cli_envelope(False, "route-doctor", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
+    except (routing.RoutingError, OSError):
+        _routing_output(routing.cli_envelope(False, "route-doctor", {}, (), ("ROUTING_UNAVAILABLE",)), human); return 1
 
 
 _RUN_ID = re.compile(r"^run1_[0-9a-f]{32}$")
@@ -1101,8 +1167,591 @@ def launch_update_check():
 
 # --------------------------------------------------------------------- tools
 
+def _load_local_catalog():
+    """ADR-0038: `tools.local.toml` is the untracked, optional overlay `--tools-approve`
+    writes to. Its absence can never fail (same never-fails contract as `notes_root`,
+    `render_notes.py:37`) -- a repo without it is just "curated catalog only", and a file
+    that fails to parse degrades the same way rather than crashing every `--tools` call.
+
+    F-04 repair: "degrades" no longer means SILENTLY -- a parse error used to disappear
+    into a bare `except: return {}`, so a two-line `--why` that corrupted this exact file
+    (see `_toml_str`'s docstring) made every previously-approved tool vanish from `--tools`
+    with `rc=0` and no trace at all. A warning to stderr is cheap and turns "the catalog
+    is mysteriously empty" into "here is the file and the exact reason it didn't parse".
+
+    F-06 repair: the never-fails contract was false for input that PARSES fine but is
+    shaped wrong -- a stray top-level scalar (`oops = 1`) or a section entry that isn't
+    itself a table used to reach `load_catalog`/`_tools_header`/`tools_menu`/the state
+    panel as a bare `AttributeError` (`int`/`str` has no `.items()`/`.get()`), not a
+    graceful degrade. Every level this function indexes into is shape-checked; anything
+    that doesn't look like `{kind: {name: {...}}}` is dropped, never crashed on.
+
+    F-06 repair, round 2 (REABIERTO): being a well-formed TABLE (round 1's check) isn't
+    enough -- an entry missing `detect`/`install`, or carrying either with the wrong
+    type, is still a dict and used to sail straight through into `_tools_data`
+    (`entry["detect"]`) and `cmd_tools_install` (`entry["detect"]` then
+    `entry["install"]`) as a bare `KeyError`, which propagates to every caller of
+    `_tools_data` too (`tools_menu`, the state panel). Every kind `--tools-approve`
+    writes uses the SAME uniform schema (ADR-0038 §7, `_dump_toml_catalog`'s own
+    docstring: detect + install, never the curated mcp-native type/command/url) -- this
+    is safe to enforce for every kind in THIS file, not just `cli`, and any entry that
+    doesn't match is dropped with a warning instead of crashing something downstream."""
+    path = ROOT / "tools.local.toml"
+    if not path.is_file():
+        return {}
+    try:
+        raw = tomllib.loads(path.read_text())
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        print(f"WARNING: {path} no se pudo leer ({exc}) -- el catálogo local se ignora "
+              f"hasta que se corrija o se borre el archivo", file=sys.stderr)
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    catalog = {}
+    for kind, entries in raw.items():
+        if kind not in _TOOL_KINDS or not isinstance(entries, dict):
+            continue
+        section = {}
+        for name, entry in entries.items():
+            if not isinstance(entry, dict):
+                continue
+            if not _valid_local_entry_shape(entry):
+                print(f"WARNING: {path} [{kind}.{name}] ignorada -- falta 'detect' o "
+                      f"'install' (o no tienen el tipo esperado); corregí o borrá esa "
+                      f"entrada", file=sys.stderr)
+                continue
+            section[name] = entry
+        if section:
+            catalog[kind] = section
+    return catalog
+
+
+def _valid_local_entry_shape(entry):
+    """F-06 repair, round 2: `detect` must be a non-empty string and `install` a
+    non-empty dict of string -> string -- the exact shape `cmd_tools_approve` always
+    writes (see `_load_local_catalog`'s own docstring on why this applies to every
+    kind, not just cli). Anything else is a well-formed TOML table that is still the
+    wrong shape for what `_tools_data`/`cmd_tools_install`/`_tools_header` index into."""
+    if not isinstance(entry.get("detect"), str) or not entry["detect"].strip():
+        return False
+    install = entry.get("install")
+    if not isinstance(install, dict) or not install:
+        return False
+    return all(isinstance(method, str) and isinstance(cmd, str) for method, cmd in install.items())
+
+
 def load_catalog():
-    return tomllib.loads((ROOT / "tools.toml").read_text())
+    """AC-31/ADR-0038 §6: merges the curated `tools.toml` with the optional local overlay.
+    On a name collision the CURATED entry always wins (silently, here) -- a local catalog
+    must never be able to shadow e.g. `vercel`. This is defense in depth for a hand-edited
+    `tools.local.toml`; the normal path (`cmd_tools_approve`) refuses the collision outright
+    at write time instead of ever producing an entry this merge would just hide."""
+    curated = tomllib.loads((ROOT / "tools.toml").read_text())
+    for section, entries in _load_local_catalog().items():
+        merged = dict(curated.get(section, {}))
+        for name, entry in entries.items():
+            merged.setdefault(name, entry)
+        curated[section] = merged
+    return curated
+
+
+def _is_local_only_entry(kind, name):
+    """NEW-01 repair (delta review round 2, high): tells apart a catalog entry that comes
+    from the CURATED, reviewed, git-tracked `tools.toml` from one that only exists because
+    of the untracked `tools.local.toml` overlay (.gitignore'd -- no gate or review ever
+    sees it, and a hand edit to it never passes through `_validate_proposal`/
+    `_validate_install_command`, unlike the normal `--tools-approve` write path). Mirrors
+    `load_catalog()`'s own curated-wins collision rule byte for byte: a name present in
+    BOTH is curated for every purpose, including this one -- never treated as local just
+    because a local block with that name also exists."""
+    curated = tomllib.loads((ROOT / "tools.toml").read_text())
+    if name in curated.get(kind, {}):
+        return False
+    return name in _load_local_catalog().get(kind, {})
+
+
+# ---------------------------------------------------- tools discovery (ADR-0038, AC-30/31)
+
+_TOOL_KINDS = ("cli", "mcp", "skill")
+# Mirrors pick_method()/tools.toml's real vocabulary -- the closed set of installer
+# methods a proposed `--install-<method>` may name.
+_INSTALL_METHODS = ("pacman", "apt", "dnf", "zypper", "brew", "winget", "choco", "npm", "curl")
+
+# ADR-0038 §3 (F-03 repair): privilege-escalation binaries rejected by BASENAME of every
+# shlex token, never a whitespace-boundary regex on the raw string -- `/usr/bin/sudo` has
+# no whitespace before "sudo" (preceded by "/"), so a `(?:^|\s)sudo(?:\s|$)` regex (the
+# old `_SUDO_RE`) never saw it, and neither did `doas`/`pkexec`/`su -c`/`runas`. Shared by
+# _validate_install_command (propose/approve, rejects outright) AND cmd_tools_install's
+# own sudo-detection (:~1544, ownership exception approved for F-03 -- see
+# ai/state/decisions-log.jsonl slug p5-repair-excepciones-y-diseno): that branch keeps
+# showing the exact command and asking, even under --yes, for every name here, not just
+# a literal `sudo ` prefix.
+# OBS-3 (delta review round 2, low, fixed): `sudoedit`/`run0`/`please` were missing --
+# all three escalate privileges the same way the original five do.
+_PRIVILEGE_ESCALATORS = frozenset(
+    {"sudo", "sudoedit", "doas", "pkexec", "su", "runas", "run0", "please"})
+
+
+def _cmd_privilege_escalator(cmd):
+    """Returns the escalator binary name (e.g. "sudo") found anywhere in `cmd`'s tokens,
+    or None. Tokenizes with shlex (so a quoted argument that merely CONTAINS the word
+    "sudo" inside a longer string doesn't false-positive) and compares each token's
+    basename -- not the raw token -- against `_PRIVILEGE_ESCALATORS`, which is what
+    catches a path-qualified `/usr/bin/sudo` a bare-word check misses. Checked in EVERY
+    token position (`env sudo ...` too), not only the first, matching what the old
+    whitespace-boundary regex already did for the plain-word case.
+
+    OBS-2 (delta review round 2, low, fixed): the basename comparison is case-INsensitive
+    (`.lower()`) -- irrelevant on a case-sensitive filesystem (the real `sudo` binary is
+    always lowercase on Linux) but relevant on a case-insensitive one (macOS default
+    APFS/HFS+, Windows), where `SUDO apt install evil` would otherwise resolve to the
+    same file and slip past an exact-case check. `_PRIVILEGE_ESCALATORS` itself stays
+    all-lowercase; only the comparison is case-folded, so the set never needs every
+    case variant enumerated."""
+    try:
+        tokens = shlex.split(cmd)
+    except ValueError:
+        # Unbalanced quotes etc. -- _ALLOWED_CMD_CHARS_RE below already excludes quote
+        # characters entirely for _validate_install_command's caller, so this path is
+        # unreachable there; kept defensive since cmd_tools_install's caller is the
+        # already-catalogued tools.toml/tools.local.toml, not fresh untrusted input.
+        return None
+    for token in tokens:
+        basename = os.path.basename(token)
+        if basename.lower() in _PRIVILEGE_ESCALATORS:
+            return basename
+    return None
+
+
+# ADR-0038 §3 (F-01 repair): an ALLOWLIST of characters, never a denylist of remembered
+# shell metacharacters. The old denylist (`_SHELL_METACHAR_RE`/`_REDIRECT_RE`) enumerated
+# `;`, `&&`, `||`, backtick, `$(`, `>`, `<` -- and never a bare `&`, which is a full
+# statement separator in `bash -c` exactly like `;` is. A denylist only ever rejects what
+# someone thought to type; an allowlist rejects everything it doesn't recognize. This set
+# is exactly what this repo's own curated `tools.toml` install commands use: letters,
+# digits, a literal space, and the narrow punctuation real package-manager/curl/npm
+# invocations need (path separators, flags, versions, npm `@scope/pkg`, URLs). Every shell
+# control character a `bash -c` string could use to compose a second command is excluded
+# by construction: `;`, `&`, backtick, `$`, `(`, `)`, `<`, `>`, `!`, `*`, `?`, `[`, `]`,
+# `{`, `}`, `\`, `%`, `#`, quotes, and every ASCII control character (newline included).
+# `|` stays IN this set only because the dedicated pipe-shape check right below
+# re-validates it strictly (curl|wget ... | bash|sh, one pipe, nothing else) -- every
+# other still-dangerous character never reaches that far.
+# OBS-1 (delta review round 2, low, fixed): checked with `.fullmatch()`, not `.match()`
+# -- `$` matches at the end of the string OR just before a single trailing newline, so
+# `.match()` accepted a command with exactly one bare `\n` appended. Not independently
+# exploitable (anything meaningful appended after that newline would itself break the
+# match, and `_toml_str` escapes any newline that does reach the TOML writer), but
+# `fullmatch` closes it for free -- Python's own docs recommend `fullmatch` over a
+# `match()` + `$` combination for exactly this reason.
+_ALLOWED_CMD_CHARS_RE = re.compile(r"^[A-Za-z0-9 @+,\-./:=_~|]+$")
+# F-04 repair: `--why`/`--detect` are free text (unlike `<cmd>`, which has its own
+# narrower allowlist above), but they still end up as TOML string VALUES via
+# `_toml_str`/`_dump_toml_catalog` -- reject any ASCII control character (newline
+# included) at the source instead of relying solely on `_toml_str`'s escaping. Fail
+# fast with a clear error beats silently turning a two-line reason into an escaped,
+# ugly-but-technically-valid TOML string.
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
+# The ONE legitimate pipe shape this repo's own curated catalog already uses
+# (tools.toml [cli.gcloud.install] curl = "curl -sSL ... | bash") -- a single trailing
+# pipe from a known fetch tool into a plain shell interpreter, nothing else.
+# OBS-4 (delta review round 2, low, fixed): `\b` is a WORD boundary, not a "real binary
+# name" boundary -- "curl.evil -x | bash" has a `.` right after "curl", which IS a word
+# boundary (word char "l" -> non-word char "."), so the old regex accepted any binary
+# whose name merely STARTS WITH "curl"/"wget". Require actual whitespace right after the
+# fetch tool's name instead (every real invocation in this catalog looks like
+# "curl <flags/url>...", never "curl<anything>") -- `curlish`/`curl.evil` no longer
+# match, `curl -sSL ...`/`wget -qO- ...` (the real, tested shapes) still do.
+_LEGIT_PIPE_RE = re.compile(r"^(?:curl|wget)(?=\s)[^|]*\|\s*(?:bash|sh)\s*$")
+_CANONICAL_TARGET_RE = re.compile(r"Global/_canonical", re.IGNORECASE)
+
+
+def _validate_install_command(cmd):
+    """ADR-0038 §3/§7: fail-closed validation for a PROPOSED install command, shared by
+    cmd_tools_propose (first check) and cmd_tools_approve (re-check via _validate_proposal,
+    defense in depth against a hand-edited tools.proposals.json). Returns a human-readable
+    rejection reason, or None if `cmd` is acceptable to catalog. Privilege escalation
+    (sudo/doas/pkexec/su/runas, see `_cmd_privilege_escalator`) is rejected outright here,
+    a layer earlier than (and in addition to) cmd_tools_install's own escalation prompt
+    (unchanged posture: shows the exact command and asks, even under --yes) -- a
+    "catalogued" entry that always re-prompts anyway would be a confusing thing to have
+    approved in the first place."""
+    if not cmd or not cmd.strip():
+        return "el comando no puede estar vacío"
+    escalator = _cmd_privilege_escalator(cmd)
+    if escalator:
+        return (f"'{escalator}' no está permitido en un comando propuesto — la escalación de "
+                f"privilegios siempre queda manual")
+    if not _ALLOWED_CMD_CHARS_RE.fullmatch(cmd):
+        return ("comando con caracteres no permitidos — solo se aceptan letras, números, espacios "
+                "y - . / : = _ ~ @ + , | (allowlist, ADR-0038 §3)")
+    if "|" in cmd and not _LEGIT_PIPE_RE.match(cmd.strip()):
+        return "pipe no reconocido — el único pipe permitido es 'curl|wget ... | bash|sh' (ver tools.toml gcloud)"
+    if _CANONICAL_TARGET_RE.search(cmd):
+        return "un comando propuesto no puede instalar dentro de Global/_canonical (ADR-0038 §7)"
+    return None
+
+
+def _read_tools_proposals():
+    """F-06 repair: never-fails the same way `_load_local_catalog` does -- a parse error
+    degrades to `{}` (staging is throwaway by nature, no warning needed the way the
+    curated-adjacent `tools.local.toml` gets one), and so does a shape mismatch: a
+    `tools.proposals.json` that parses but isn't a JSON object (e.g. a bare list) used to
+    reach `cmd_tools_approve`'s `.get(name)` as an `AttributeError`; any individual
+    proposal entry that isn't itself an object is dropped the same way."""
+    path = ROOT / "tools.proposals.json"
+    try:
+        raw = json.loads(path.read_text())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {name: value for name, value in raw.items() if isinstance(value, dict)}
+
+
+def _write_tools_proposal(name, proposal):
+    """ADR-0038 §5: the one artifact `--tools-propose` persists -- a staging entry so a
+    later, independent `--tools-approve NAME` (bare name, per AC-31's own grammar) can
+    reproduce byte-for-byte what the human already reviewed. Never the catalog itself,
+    never an install. Re-proposing the same name overwrites its pending entry."""
+    proposals = _read_tools_proposals()
+    proposals[name] = proposal
+    _save_tools_proposals(proposals)
+
+
+# F-04 repair: TOML basic-string escapes for the characters the spec requires escaped
+# (backslash/quote plus the named short escapes) -- the old `_toml_str` only handled
+# `\\` and `"`, so `_toml_str("a\nb")` produced `"a\nb"` with a LITERAL, unescaped
+# newline: an unterminated basic string that broke every subsequent parse of the whole
+# file (`_load_local_catalog` then silently degraded to `{}`, wiping every previously
+# approved tool -- see that function's own docstring). `--why`/`--detect` are rejected
+# outright if they contain a control character (`cmd_tools_propose`/`_validate_proposal`,
+# fail-closed at the source) -- this escaping is defense in depth for whatever reaches
+# here anyway (e.g. a hand-edited tools.proposals.json `cmd_tools_approve` re-validates
+# but a caller of `_dump_toml_catalog` should never be able to emit a broken file).
+_TOML_STR_ESCAPES = {"\\": "\\\\", '"': '\\"', "\b": "\\b", "\t": "\\t",
+                     "\n": "\\n", "\f": "\\f", "\r": "\\r"}
+
+
+def _toml_str(value):
+    out = []
+    for ch in str(value):
+        if ch in _TOML_STR_ESCAPES:
+            out.append(_TOML_STR_ESCAPES[ch])
+        elif ord(ch) < 0x20 or ord(ch) == 0x7f:
+            out.append(f"\\u{ord(ch):04x}")
+        else:
+            out.append(ch)
+    return '"' + "".join(out) + '"'
+
+
+def _dump_toml_catalog(data):
+    """Minimal, schema-specific TOML writer for tools.local.toml's exact shape only --
+    `[<kind>.<name>]` with `detect`/`note` plus one `[<kind>.<name>.install]` subtable
+    (ADR-0038: same uniform schema for every kind, no mcp-native type/command/url). Never
+    a general-purpose TOML serializer -- tomllib is read-only in the stdlib, and every
+    string written here already passed `_validate_install_command`'s fail-closed checks."""
+    lines = [
+        "# tools.local.toml -- generated by `set-agents --tools-approve` (ADR-0038).",
+        "# Untracked (see .gitignore). Hand edits survive, but the next --tools-approve",
+        "# for the same name overwrites its block, and a name colliding with tools.toml",
+        "# is always shadowed by the curated entry (docs/adr/0038-*.md).",
+        "",
+    ]
+    for kind in sorted(data):
+        for name in sorted(data[kind]):
+            entry = data[kind][name]
+            lines.append(f"[{kind}.{name}]")
+            if entry.get("detect"):
+                lines.append(f"detect = {_toml_str(entry['detect'])}")
+            if entry.get("note"):
+                lines.append(f"note = {_toml_str(entry['note'])}")
+            install = entry.get("install") or {}
+            if install:
+                lines.append(f"[{kind}.{name}.install]")
+                for method in sorted(install):
+                    lines.append(f"{method} = {_toml_str(install[method])}")
+            lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def cmd_tools_propose(name, kind, detect, method, cmd, why):
+    """AC-30: validate + print the consolidated question. Never installs, never writes
+    tools.toml/tools.local.toml -- the single artifact it can produce is a staged
+    proposal (see `_write_tools_proposal`'s docstring for why that still counts as "no
+    muta nada" in the sense ADR-0038 §5 argues). F-05 repair: validation goes through
+    `_validate_proposal`, the SAME check `cmd_tools_approve` re-runs against the staged
+    copy later -- the two paths can never validate differently."""
+    why = (why or "").strip()
+    detect = (detect or "").strip()
+    reason = _validate_proposal(name, kind, detect, method, cmd, why)
+    if reason:
+        print(f"TOOLS_PROPOSE_REJECTED {name} — {reason}")
+        return 2
+    proposal = {
+        "kind": kind, "detect": detect, "method": method, "cmd": cmd, "why": why,
+        "proposed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    _write_tools_proposal(name, proposal)
+    print(f"TOOLS_PROPOSE_OK {name}")
+    print(f"  kind={kind}")
+    print(f"  detect={detect}")
+    print(f"  install.{method}={cmd}")
+    print(f"  why={why}")
+    print(f"¿Aprobás agregar '{name}' al catálogo de herramientas? Esto NO instala nada todavía.")
+    # F-07 repair: the old wording ("un agente no puede correr esto") was a technical
+    # claim that's only true for coord_policy-gated channels (ADR-0038 §2) -- a writer
+    # role (implementer, on any lane) has broad, undifferentiated bash access and is NOT
+    # technically blocked from typing this command. The real invariant is doctrinal
+    # ("never yours to run, no matter your role"), not universally enforced.
+    print("Requiere una persona -- el approve nunca es tuyo para correr, sea cual sea tu rol")
+    print("(ADR-0038 §2). Para aprobar:")
+    print(f"  python3 ai/scripts/set_agents_app.py --tools-approve {name}")
+    return 0
+
+
+def _validate_proposal(name, kind, detect, method, cmd, why):
+    """F-05 repair: the SAME validation `cmd_tools_propose` runs against fresh CLI input,
+    run again here so propose and approve can never diverge. Before this existed,
+    `cmd_tools_approve` only re-checked `cmd` (via `_validate_install_command`) and
+    `kind` -- `name`/`method`/`detect` came straight from the staged
+    `tools.proposals.json` and were written into `tools.local.toml` UNQUOTED and
+    unvalidated (a TOML-structure-injection vector via a hand-edited staging file,
+    which is exactly the file this defense-in-depth re-check exists for -- ADR-0038 §5).
+    Returns a human-readable rejection reason, or None if every field is acceptable."""
+    if not coord_policy._CATALOG_NAME.fullmatch(name or ""):
+        return f"nombre inválido (usá {coord_policy._CATALOG_NAME.pattern})"
+    if kind not in _TOOL_KINDS:
+        return f"--kind inválido: {kind} (usá {'|'.join(_TOOL_KINDS)})"
+    if method not in _INSTALL_METHODS:
+        return f"método de instalación desconocido: {method} (usá {'|'.join(_INSTALL_METHODS)})"
+    reason = _validate_install_command(cmd or "")
+    if reason:
+        return reason
+    detect = (detect or "").strip()
+    if not detect:
+        return "falta --detect"
+    if _CONTROL_CHAR_RE.search(detect):
+        return "--detect no puede contener caracteres de control (saltos de línea, tabs, etc.)"
+    why = (why or "").strip()
+    if not why:
+        return "falta --why (motivo)"
+    if _CONTROL_CHAR_RE.search(why):
+        return "--why no puede contener caracteres de control (saltos de línea, tabs, etc.) — usá un motivo de una sola línea"
+    return None
+
+
+def _log_tool_decision(name, kind, why):
+    """AC-31: `log-decision` on approve (qué herramienta, por qué, quién la pidió).
+
+    Deliberately a subprocess to `feature-state.py log-decision` -- the repo's one
+    sanctioned mutation channel for this log (`coord_policy.SAFE` already allowlists
+    `python3 ai/scripts/feature-state.py \\S+`) -- and NOT a direct import of
+    `feature_state_lib.cli_reporting.cmd_log_decision`. Verified live (round-trip
+    evidence, P5-implementer.md): that function reads `model.render_notes`, which only
+    exists because `feature-state.py`'s OWN top-level script monkeypatches
+    `model.render_notes = render_notes` at import time (see that file's own comment on
+    why `render_notes` physically lives there instead of in `feature_state_lib/`) --
+    calling `cmd_log_decision` from a process that never ran `feature-state.py` as
+    `__main__` raises `AttributeError: module 'feature_state_lib.model' has no
+    attribute 'render_notes'`.
+
+    F-11 repair: passes `cwd=ROOT` explicitly -- the catalog this decision documents
+    (`tools.local.toml`/`tools.proposals.json`) always lives at ROOT (the harness clone
+    root, never per-project -- see ADR-0038 §2 and .gitignore's corrected comment), so
+    the decision record must land in that SAME place, not wherever the calling process's
+    CWD happened to be (before this fix, `set-agents --tools-approve x` run from `~`
+    created `~/ai/state/decisions-log.jsonl`, inconsistent with the harness-global
+    catalog).
+
+    F-12 repair: bounded `timeout`, `capture_output` (the subprocess used to inherit
+    stdout, so `feature-state.py`'s own raw JSON leaked into `--tools-approve`'s output),
+    and a non-zero/timeout outcome is reported as a WARNING, never a failure -- the
+    catalog write already happened by the time this runs, so a broken/slow log-decision
+    must not make `--tools-approve` itself look like it failed."""
+    script = Path(__file__).resolve().parent / "feature-state.py"
+    argv = [sys.executable, str(script), "log-decision",
+            "--title", f"Herramienta de catálogo aprobada: {name}",
+            "--context", f"--tools-approve {name} (kind={kind}) -- flujo ADR-0038 "
+                          f"propose -> aprobación humana -> approve.",
+            "--decision", f"Se aprobó agregar '{name}' (kind={kind}) a tools.local.toml. Motivo: {why}",
+            "--consequences", "Disponible vía --tools/--tools-install tras el approve; sudo sigue siempre manual.",
+            "--actor", "tools-approve"]
+    try:
+        result = subprocess.run(argv, check=False, cwd=str(ROOT), timeout=30,
+                                 capture_output=True, text=True)
+    except subprocess.TimeoutExpired:
+        print("WARNING: log-decision (ADR-0038 --tools-approve) superó el timeout de 30s -- "
+              "el catálogo ya quedó escrito, pero la decisión puede no haberse registrado.",
+              file=sys.stderr)
+        return 1
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()[:500]
+        print(f"WARNING: log-decision (ADR-0038 --tools-approve) terminó con rc={result.returncode} -- "
+              f"el catálogo ya quedó escrito. Salida: {detail}", file=sys.stderr)
+    return result.returncode
+
+
+def _save_tools_proposals(proposals):
+    """F-15 repair: single writer for tools.proposals.json -- the exact same
+    `atomic_write`+`json.dumps` shape used to be duplicated inline in
+    `_write_tools_proposal` (stage a new one) and `cmd_tools_approve` (consume/delete
+    one)."""
+    atomic_write(ROOT / "tools.proposals.json", json.dumps(proposals, indent=2, sort_keys=True) + "\n")
+
+
+def cmd_tools_approve(name):
+    """AC-31: writes the staged proposal into tools.local.toml + log-decision. The
+    actual installation still goes through cmd_tools_install unchanged (sudo posture,
+    TTY/--yes gating, MCP-disabled-by-default -- none of that lives here).
+
+    F-02 repair (critical, variant chosen by the orchestrator -- ai/state/decisions-log
+    .jsonl slug p5-repair-excepciones-y-diseno): the approval used to be tied to the bare
+    NAME alone -- it printed only `TOOLS_APPROVE_OK {name} kind={kind}` and never
+    re-showed what it was about to catalog, while the payload lived in
+    `tools.proposals.json` (untracked, writable by any agent between propose and
+    approve). This now re-prints the FULL staged block and requires an interactive
+    confirmation, reusing the exact pattern `cmd_tools_install` already uses for sudo
+    (shows the command, asks, refuses outright without a TTY -- never runs/writes
+    anything silently). AC-31's bare-name grammar for the CLI invocation is unchanged;
+    only what happens once that name resolves to a proposal changed."""
+    proposals = _read_tools_proposals()
+    proposal = proposals.get(name)
+    if proposal is None:
+        print(f"TOOLS_APPROVE_UNKNOWN {name} — no hay propuesta pendiente, corré --tools-propose primero")
+        return 2
+    kind = proposal.get("kind")
+    detect = proposal.get("detect")
+    method = proposal.get("method")
+    cmd = proposal.get("cmd")
+    why = proposal.get("why") or ""
+    reason = _validate_proposal(name, kind, detect, method, cmd, why)
+    if reason:
+        print(f"TOOLS_APPROVE_REJECTED {name} — {reason}")
+        return 2
+    curated = tomllib.loads((ROOT / "tools.toml").read_text())
+    if any(name in curated.get(section, {}) for section in _TOOL_KINDS):
+        print(f"TOOLS_APPROVE_REJECTED {name} — colisiona con el catálogo curado (tools.toml); "
+              f"el curado siempre gana, elegí otro nombre")
+        return 2
+    print(f"Vas a aprobar '{name}' para el catálogo de herramientas:")
+    print(f"  kind={kind}")
+    print(f"  detect={detect}")
+    print(f"  install.{method}={cmd}")
+    print(f"  why={why}")
+    print("Esto agrega la entrada a tools.local.toml. NO instala nada todavía.")
+    if not sys.stdin.isatty():
+        print(f"TOOLS_APPROVE_MANUAL {name}: sin TTY — no se puede confirmar interactivamente, "
+              f"corré este --tools-approve desde una terminal")
+        return 1
+    with tui.suspend_terminal():
+        answer = _safe_input(f"¿Confirmás que esto es lo que aprobás para '{name}'? [y/N] ")
+    if answer.strip().lower() not in {"y", "yes", "s", "si"}:
+        return 1
+    local = _load_local_catalog()
+    section = dict(local.get(kind, {}))
+    section[name] = {
+        "detect": detect,
+        "install": {method: cmd},
+        "note": f"agregado por --tools-approve: {why}",
+    }
+    local[kind] = section
+    atomic_write(ROOT / "tools.local.toml", _dump_toml_catalog(local))
+    del proposals[name]
+    _save_tools_proposals(proposals)
+    _log_tool_decision(name, kind, why)
+    print(f"TOOLS_APPROVE_OK {name} kind={kind}")
+    if kind == "cli":
+        print(f"Para instalar: python3 ai/scripts/set_agents_app.py --tools-install {name}")
+    elif kind == "mcp":
+        # F-10 repair + NEW-02 repair (delta review round 3): kind=mcp entries are
+        # catalogued with the uniform detect/install schema (ADR-0038 "Rejected
+        # alternatives" -- deliberate, no native type/command/url modeled here), which
+        # is NOT what _mcp_json_entry/_codex_section index (spec["type"]). --tools-install
+        # already didn't wire kind=mcp (F-10); this NOTA now says the same for
+        # --mcp-add/--mcp-on too, so a human finds out here instead of hitting
+        # MCP_UNSUPPORTED (_mcp_spec) later.
+        print(f"NOTA: kind=mcp queda catalogado en tools.local.toml pero todavía no tiene "
+              f"instalación automática (ADR-0038 §7/Rejected alternatives) — instalalo a mano "
+              f"con install.{method} de arriba; ni --tools-install ni --mcp-add/--mcp-on lo van "
+              f"a encontrar (falta el esquema type/command/url nativo que esos comandos esperan).")
+    else:
+        # F-10 repair: kind=skill entries are catalogued but NOT wired into
+        # cmd_tools_install/_tools_data (ADR-0038 "Rejected alternatives" -- deliberate,
+        # only kind=cli connects end-to-end). Suggesting --tools-install here used to
+        # print a command that always fails with TOOL_UNKNOWN; now it says so up front.
+        print(f"NOTA: kind={kind} queda catalogado en tools.local.toml pero todavía no tiene "
+              f"instalación automática (ADR-0038 §7/Rejected alternatives) — instalalo a mano "
+              f"con install.{method} de arriba; --tools-install no lo va a encontrar.")
+    return 0
+
+
+def _parse_tools_propose_argv(rest):
+    """Manual walker for --tools-propose's grammar (argparse cannot declare a dynamic
+    --install-<method> flag name, so this subcommand is intercepted in main() before the
+    main parser ever runs -- see _dispatch_tools_discovery). Purely SYNTACTIC: extracts
+    name/kind/detect/method/cmd/why without judging whether any of them is actually
+    valid -- cmd_tools_propose does every semantic check (name grammar, kind enum,
+    command safety), same division of labor coord_policy's own walkers keep with this
+    module's re-checks."""
+    if not rest or rest[0].startswith("--"):
+        raise ValueError("falta <name>")
+    name, rest = rest[0], rest[1:]
+    values = {"kind": None, "detect": None, "why": None}
+    method = cmd = None
+    i = 0
+    while i < len(rest):
+        token = rest[i]
+        if token in ("--kind", "--detect", "--why"):
+            key = token[2:]
+            if i + 1 >= len(rest):
+                raise ValueError(f"falta valor para {token}")
+            if values[key] is not None:
+                raise ValueError(f"{token} repetido")
+            values[key] = rest[i + 1]
+            i += 2
+            continue
+        if token.startswith("--install-") and len(token) > len("--install-"):
+            if i + 1 >= len(rest):
+                raise ValueError(f"falta valor para {token}")
+            if method is not None:
+                raise ValueError("--install-<method> repetido")
+            method, cmd = token[len("--install-"):], rest[i + 1]
+            i += 2
+            continue
+        raise ValueError(f"flag no reconocida: {token}")
+    missing = [f"--{k}" for k, v in values.items() if v is None]
+    if method is None:
+        missing.append("--install-<method>")
+    if missing:
+        raise ValueError(f"faltan flags: {', '.join(missing)}")
+    return name, values["kind"], values["detect"], method, cmd, values["why"]
+
+
+def _parse_tools_approve_argv(rest):
+    """--tools-approve's grammar is deliberately just the bare name (AC-31/ADR-0038 §5)."""
+    if len(rest) != 1 or rest[0].startswith("--"):
+        raise ValueError("uso: --tools-approve <name>")
+    return rest[0]
+
+
+def _dispatch_tools_discovery(verb, rest):
+    """Entry point called from main() BEFORE the main argparse parser runs -- see the
+    comment at that call site for why these two verbs cannot go through the declarative
+    parser at all."""
+    if verb == "--tools-propose":
+        try:
+            name, kind, detect, method, cmd, why = _parse_tools_propose_argv(rest)
+        except ValueError as exc:
+            print(f"TOOLS_PROPOSE_REJECTED — {exc}")
+            return 2
+        return cmd_tools_propose(name, kind, detect, method, cmd, why)
+    try:
+        name = _parse_tools_approve_argv(rest)
+    except ValueError as exc:
+        print(f"TOOLS_APPROVE_REJECTED — {exc}")
+        return 2
+    return cmd_tools_approve(name)
 
 
 def platform_pm():
@@ -1161,8 +1810,36 @@ def cmd_tools():
 def cmd_tools_install(name, dry=False, yes=False):
     entry = load_catalog().get("cli", {}).get(name)
     if entry is None:
-        print(f"TOOL_UNKNOWN {name} — agregalo en tools.toml")
+        # AC-32: no longer a dead end -- the token stays TOOL_UNKNOWN (pinned by
+        # tests/test_harness.py), only the tail changes to the ADR-0038 propose flow.
+        print(f"TOOL_UNKNOWN {name} — no está en el catálogo curado; proponelo (ADR-0038): "
+              f'--tools-propose {name} --kind cli --detect <bin> --install-<method> "<cmd>" --why "<motivo>"')
         return 2
+    if _is_local_only_entry("cli", name):
+        # NEW-01 repair (ADR-0038 §3/§8, delta review round 2, high): `tools.local.toml`
+        # is the untracked overlay `--tools-approve` writes to -- a HAND edit to that file
+        # used to reach `subprocess.run(["bash", "-c", command])` below completely
+        # unvalidated, even under `--yes` (which skips the confirmation prompt entirely,
+        # see the `elif not yes:` branch further down). The read path (this function) is
+        # the ONLY one of the two paths into that file that never ran
+        # `_validate_install_command` -- the write path (`cmd_tools_approve`) always has,
+        # via `_validate_proposal`. Re-run that SAME fail-closed check here, against every
+        # install command this entry actually carries (not just the one method
+        # `pick_method` happens to choose on this platform), before touching
+        # `shutil.which`/`pick_method` at all. Curated `tools.toml` entries are exempt --
+        # reviewed, tracked in git, and some legitimately use sudo, which this would
+        # reject outright instead of the guarded show-and-ask prompt curated sudo entries
+        # keep further down (`_cmd_privilege_escalator`, unchanged).
+        for method, cmd in entry.get("install", {}).items():
+            if method == "doc":
+                continue
+            reason = _validate_install_command(cmd)
+            if reason:
+                print(f"TOOL_REJECTED {name} — la entrada de tools.local.toml no pasa la "
+                      f"validación de instalación (ADR-0038 §3): {reason}. Una entrada "
+                      f"legítima solo llega ahí vía --tools-approve, que ya la valida; "
+                      f"revisá o borrá tools.local.toml.")
+                return 2
     if shutil.which(entry["detect"]):
         print(f"TOOL_SKIP {name} ({version_of(entry['detect'])})")
         return 0
@@ -1176,10 +1853,16 @@ def cmd_tools_install(name, dry=False, yes=False):
     if dry:
         print(f"TOOL_PLAN {name} method={method}")
         return 0
-    if command.startswith("sudo "):
-        # Never silent sudo (same contract as install.sh), even with --yes.
+    if _cmd_privilege_escalator(command):
+        # F-03 repair (ownership exception approved, ai/state/decisions-log.jsonl slug
+        # p5-repair-excepciones-y-diseno): a plain `command.startswith("sudo ")` missed
+        # `/usr/bin/sudo`/doas/pkexec/su/runas -- an escalator with a resolved path took
+        # this whole branch by surprise and, with --yes (already allowed for agents),
+        # reached subprocess.run with no prompt at all. Same basename-of-every-token
+        # check `_validate_install_command` uses; this HARDENS the existing contract
+        # (never silent, same as install.sh) -- it never relaxes it, even under --yes.
         if not sys.stdin.isatty():
-            print(f"TOOL_MANUAL {name}: necesita sudo — corré: {command}")
+            print(f"TOOL_MANUAL {name}: necesita privilegios elevados — corré: {command}")
             return 1
         print(f"Se necesita privilegio de administrador para:\n    {command}")
         # AC-26: reached from the picker (tools_menu -> here), the terminal must be in cooked
@@ -1239,6 +1922,53 @@ def tools_menu():
                             header=_tools_header())
     if isinstance(choice, tui.Selected):
         cmd_tools_install(data[choice.index][0])
+
+
+_TOOLS_PROPOSE_INTRO = ("Proponer una herramienta nueva para el catálogo "
+                         "(no instala nada -- requiere aprobación humana aparte, ADR-0038)")
+
+
+def tools_propose_menu():
+    """AC-35 console entry point for ADR-0038's propose flow: chained free-text/picker
+    prompts (vault_menu's pattern) feeding the SAME cmd_tools_propose() the CLI flags
+    call, so console and CLI share one validation path. Deliberately never offers
+    approve here -- approve is the human's own separate action (ADR-0038 §2); folding it
+    into this same picker would blur the exact boundary the ADR draws."""
+    style = {"color": color, "bold": bold, "dim": dim}
+    with tui.TerminalSession():
+        name_result = tui.run_picker((), freetext_allowed=True, style=style,
+                                      header=_TOOLS_PROPOSE_INTRO, prompt="Nombre (a-z0-9_-, Esc cancela):")
+        name = name_result.value.strip() if isinstance(name_result, tui.FreeText) else ""
+        if not name:
+            return
+        kind_choice = tui.run_picker(_TOOL_KINDS, style=style, header=_TOOLS_PROPOSE_INTRO, prompt="Tipo:")
+        if not isinstance(kind_choice, tui.Selected):
+            return
+        kind = _TOOL_KINDS[kind_choice.index]
+        detect_result = tui.run_picker(
+            (), freetext_allowed=True, style=style, header=_TOOLS_PROPOSE_INTRO,
+            prompt="Binario/archivo para detectar que ya está instalada:")
+        detect = detect_result.value.strip() if isinstance(detect_result, tui.FreeText) else ""
+        if not detect:
+            return
+        method_choice = tui.run_picker(_INSTALL_METHODS, style=style, header=_TOOLS_PROPOSE_INTRO,
+                                        prompt="Método de instalación:")
+        if not isinstance(method_choice, tui.Selected):
+            return
+        method = _INSTALL_METHODS[method_choice.index]
+        cmd_result = tui.run_picker(
+            (), freetext_allowed=True, style=style, header=_TOOLS_PROPOSE_INTRO,
+            prompt=f"Comando completo para instalar con {method}:")
+        cmd = cmd_result.value.strip() if isinstance(cmd_result, tui.FreeText) else ""
+        if not cmd:
+            return
+        why_result = tui.run_picker((), freetext_allowed=True, style=style,
+                                     header=_TOOLS_PROPOSE_INTRO, prompt="Motivo (por qué la necesitás):")
+        why = why_result.value.strip() if isinstance(why_result, tui.FreeText) else ""
+        if not why:
+            return
+    with tui.suspend_terminal():
+        cmd_tools_propose(name, kind, detect, method, cmd, why)
 
 
 # ----------------------------------------------------------------------- mcp
@@ -1389,10 +2119,70 @@ def mcp_write(harness, target, name, spec=None, enabled=None, remove=False):
     atomic_write(path, json.dumps(data, indent=2) + "\n")
 
 
+def _mcp_spec_supported(spec):
+    """NEW-02 repair (delta review round 3) validated only that `type` was PRESENT, not
+    that the rest of the native shape was. That left a gap NEW-03 (round 4) found: a
+    hand-edited `tools.local.toml` that has valid `detect`/`install` (so it clears
+    `_valid_local_entry_shape`, F-06 round 2) AND adds a bare `type` key sails through
+    the old check and reaches `_mcp_json_entry`/`mcp_write` (`mcp_write` -> `_mcp_json_entry`,
+    `:2031-2042`) or `_codex_section` (`:2045-2053`), both of which index every one of these
+    WITHOUT `.get()`:
+      - `spec["type"]`             (`_mcp_json_entry` opencode branch `:2033`; the
+                                     `spec["type"] == "local"` comparisons at `:2034`/`:2040`
+                                     and `_codex_section`'s `:2047` don't KeyError on a
+                                     missing key, but do on `spec` not being a mapping)
+      - `spec["command"]`          (`_mcp_json_entry` opencode-local `:2035`, assigned
+                                     as-is into the native config -- a non-list here writes
+                                     a shape opencode itself doesn't accept, not just a
+                                     Python crash)
+      - `spec["command"][0]`       (`_mcp_json_entry` claude/cursor/gemini-local `:2041`,
+                                     `_codex_section` `:2048`)
+      - `spec["command"][1:]`      (same two sites, `:2041`/`:2049`)
+      - `spec["url"]`              (`_mcp_json_entry` opencode-remote `:2037`,
+                                     claude/cursor/gemini-remote `:2042`, `_codex_section`
+                                     `:2051`)
+    Live-reproduced (sandboxed HOME/ROOT, see P5-repair-4.md): missing `command` ->
+    `KeyError: 'command'`; `command=[]` -> `IndexError`; `command` a STRING (the worst
+    case) -> no crash at all, `command[0]`/`command[1:]` silently slice the string
+    character-by-character and `MCP_ADDED`/`rc=0` writes a corrupt entry into the user's
+    real `~/.claude.json`; `command` a list with a non-string element -> no crash, writes
+    a non-string arg into the native config; `type` outside `{local, remote}` ->
+    `KeyError: 'url'` (falls into the `else` branch of both `_mcp_json_entry` and
+    `_codex_section`, which assumes "not local" means "remote, so `url` exists"); missing
+    or empty `url` -> `KeyError: 'url'` / a silently-written empty URL.
+
+    The fix enforces the NATIVE shape completely, not just the presence of one key: a
+    curated `tools.toml` `[mcp.*]` entry always has this shape by construction (it is
+    hand-authored and reviewed to match exactly what `_mcp_json_entry`/`_codex_section`
+    expect); a `tools.local.toml` overlay entry -- whether it lacks `type` entirely (the
+    common, honest case: `--tools-approve --kind mcp` never writes it, ADR-0038 §7) or
+    was hand-edited to add a `type`-shaped but malformed native block -- fails this check
+    the same way and gets degraded by every caller instead of indexed into and crashed
+    (or worse, silently written corrupt) on."""
+    if not isinstance(spec, dict):
+        return False
+    kind = spec.get("type")
+    if kind not in ("local", "remote"):
+        return False
+    if kind == "local":
+        command = spec.get("command")
+        return (
+            isinstance(command, list) and bool(command)
+            and all(isinstance(part, str) for part in command)
+        )
+    url = spec.get("url")
+    return isinstance(url, str) and bool(url)
+
+
 def _mcp_spec(name):
     spec = load_catalog().get("mcp", {}).get(name)
     if spec is None:
         print(f"MCP_UNKNOWN {name} — agregalo en tools.toml")
+        return None
+    if not _mcp_spec_supported(spec):
+        print(f"MCP_UNSUPPORTED {name} — entrada local de tools.local.toml sin esquema "
+              f"MCP nativo; instalala a mano con install.<method> (ADR-0038)")
+        return None
     return spec
 
 
@@ -1457,6 +2247,19 @@ def cmd_mcp_toggle(name, harness, enabled):
             if enabled and state == "absent":
                 if spec is None:
                     print(f"MCP_UNKNOWN {name} harness={h} — agregalo en tools.toml para poder encenderlo acá")
+                    continue
+                if not _mcp_spec_supported(spec):
+                    # NEW-02 repair (delta review round 3): this call site resolves the
+                    # spec straight off load_catalog() (not via _mcp_spec) so opencode/
+                    # codex can toggle a managed server without needing a tools.toml
+                    # entry at all -- but that means it must run the SAME type-present
+                    # check _mcp_spec does before ever forwarding spec to mcp_write, or a
+                    # local-overlay entry (detect/install, no type -- F-06 round 2's
+                    # shape guarantee, never a native type/command/url) reaches
+                    # _mcp_json_entry's spec["type"] as a bare KeyError.
+                    print(f"MCP_UNSUPPORTED {name} harness={h} — entrada local de "
+                          f"tools.local.toml sin esquema MCP nativo; instalala a mano con "
+                          f"install.<method> (ADR-0038)")
                     continue
                 mcp_write(h, target, name, spec=spec)
             elif not enabled and state != "absent":
@@ -2360,6 +3163,7 @@ MENU_ITEMS = (
     "🔄 Actualizar",
     "🧠 Modelos",
     "🧰 Herramientas (CLIs)",
+    "➕ Proponer herramienta nueva",
     "🔌 MCPs",
     "🧩 Plugins Claude Code",
     "🗒  Vault Obsidian",
@@ -2434,24 +3238,49 @@ def menu():
         elif index == 4:
             tools_menu()
         elif index == 5:
-            mcp_menu()
+            tools_propose_menu()
         elif index == 6:
-            plugins_menu()
+            mcp_menu()
         elif index == 7:
-            vault_menu()
+            plugins_menu()
         elif index == 8:
+            vault_menu()
+        elif index == 9:
             return 0
 
 
 def main():
+    # ADR-0038: --tools-propose/--tools-approve are intercepted here, before the main
+    # argparse parser is even built, because --install-<method> is a dynamic flag NAME
+    # argparse cannot declare (metavar/choices only constrain a flag's VALUE) -- the same
+    # reasoning coord_policy's own argv-walkers use: a fixed declarative grammar can't
+    # express this shape, so it's walked by hand instead (_dispatch_tools_discovery).
+    # This keeps the rest of main()'s mode-exclusivity machinery (_mode_flags/other_mode
+    # below) completely untouched -- these two verbs never reach `parser.parse_args()`.
+    if len(sys.argv) > 1 and sys.argv[1] in ("--tools-propose", "--tools-approve"):
+        return _dispatch_tools_discovery(sys.argv[1], sys.argv[2:])
     parser = argparse.ArgumentParser(
         prog="set-agents",
         description=__doc__,
-        epilog="Primera vez: leé README.md — explica qué vas a ver según tu sistema operativo.",
+        # F-14 repair: --tools-propose/--tools-approve are intercepted above BEFORE this
+        # parser is even built (see the comment there), so --help never showed them --
+        # mentioned here in prose only, deliberately NOT declared as real argparse
+        # arguments (doing that would reopen F-08's SAFE_ARGV gap the moment argparse
+        # knows the verb; fixing that too is a separate, larger change no AC asks for).
+        epilog=(
+            "Primera vez: leé README.md — explica qué vas a ver según tu sistema operativo.\n"
+            "Dos verbos más (ADR-0038, interceptados antes de este parser, no listados arriba): "
+            "--tools-propose <name> --kind cli|mcp|skill --detect <bin> --install-<method> "
+            '"<cmd>" --why "<motivo>" (valida y imprime la pregunta consolidada, nunca instala) '
+            "y --tools-approve <name> (la aprobación humana -- nunca la corre un agente, sea "
+            "cual sea su rol)."
+        ),
     )
     parser.add_argument("--status", action="store_true", help="estado en una línea (APP_STATUS ...)")
     parser.add_argument("--route-explain", metavar="TASK_CLASS")
     parser.add_argument("--routing-report", action="store_true")
+    parser.add_argument("--route-doctor", action="store_true",
+                        help="ADR-0035, solo lectura: por par OpenCode, auth/modelos listados/billing y diagnóstico del cache; expone credenciales sin CLI id verificado (M-1)")
     parser.add_argument("--route-decide", metavar="FILE", help="descriptor JSON ('-' = stdin); decide y, para writers, autoriza")
     parser.add_argument("--route-dispatched", metavar="RUN_ID")
     parser.add_argument("--route-terminal", nargs=2, metavar=("RUN_ID", "OUTCOME"))
@@ -2538,11 +3367,13 @@ def main():
     # straight through every mode check into the interactive menu/help instead of failing closed.
     _mode_flags = (args.route_explain is not None, args.routing_report, args.route_decide is not None,
                    args.route_dispatched is not None, args.route_terminal is not None, args.route_quota_exhausted is not None,
-                   args.routing_open_runs, args.routing_recent_writers, args.routing_decisions, args.routing_migrate)
+                   args.routing_open_runs, args.routing_recent_writers, args.routing_decisions, args.routing_migrate,
+                   args.route_doctor)
     routing_mode = any(_mode_flags)
     _routing_args = {"json", "route_explain", "routing_report", "route_decide", "route_dispatched",
                      "route_terminal", "route_quota_exhausted", "quota_error", "routing_open_runs", "routing_recent_writers",
-                     "routing_decisions", "limit", "routing_migrate", "fresh_probes", "latency_ms", "usage", "project"}
+                     "routing_decisions", "limit", "routing_migrate", "fresh_probes", "latency_ms", "usage", "project",
+                     "route_doctor"}
     other_mode = any(value != parser.get_default(name)
                      for name, value in vars(args).items() if name not in _routing_args)
     modifier_misuse = (args.fresh_probes and args.route_decide is None) or \
@@ -2593,6 +3424,8 @@ def main():
         return cmd_route_explain(args.route_explain, human=routing_human)
     if args.routing_report:
         return cmd_routing_report(human=routing_human)
+    if args.route_doctor:
+        return cmd_route_doctor(human=routing_human)
     if args.route_decide is not None:
         return cmd_route_decide(args.route_decide, human=routing_human, fresh=args.fresh_probes)
     if args.route_dispatched is not None:

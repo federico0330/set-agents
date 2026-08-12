@@ -124,7 +124,14 @@ def _rest_allowed(rest: list[str], modifiers: dict[str, int]) -> bool:
         i += 1 + nargs
     return True
 
-FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")
+# F-01 repair (019-harness-evolution P5 review): the old pattern enumerated `&&` but
+# never a BARE `&` -- in `bash -c`, `&` alone is a full statement separator (backgrounds
+# the left side, then runs the right side) exactly like `;` is, and
+# `_validate_install_command('true & touch /tmp/X')` used to return None (accepted) for
+# exactly that reason. `[\x00-\x1f\x7f]` additionally denies every ASCII control
+# character a command string could carry (defense in depth alongside `allowed()`'s own
+# explicit `"\n" in command` check just below, which only ever covered newline).
+FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\||&)|`|\$\(|[\x00-\x1f\x7f]")
 FORBIDDEN_OPTIONS = re.compile(r"(?:--output(?:=|\s)|--ext-diff|--pre(?:=|\s)|--exec(?:=|\s)|--exec-batch(?:=|\s)|(?:^|\s)-x(?:\s|$)|(?:^|\s)-e(?:\s|$))")
 
 # Short, irreducible safety net: hard-blocked for every role, including subagents that
@@ -171,6 +178,51 @@ def _transition_blocks_integration(argv: list[str]) -> bool:
 # a catalog key or harness id, never a path, never an option, never empty.
 _CATALOG_NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
+# ADR-0038: the closed set of `--install-<method>` suffixes the flag-name itself may
+# carry. `_tools_propose_allowed` below only needs to know this is a *shape* (some
+# lowercase method word), not validate it's a real installer -- `set_agents_app.py`'s
+# own `_INSTALL_METHODS` is the semantic source of truth; this regex only keeps the
+# flag pattern itself from matching something absurd like `--install-` (empty) or
+# `--install-../../etc`.
+_INSTALL_METHOD_FLAG = re.compile(r"--install-[a-z]+")
+
+# ADR-0038: the exact, exhaustively-enumerated flag set `--tools-propose` accepts --
+# `--kind`, `--detect`, `--why`, plus exactly one `--install-<method>`. All four are
+# required, none may repeat, nothing else is allowed to appear.
+_TOOLS_PROPOSE_REQUIRED = frozenset({"--kind", "--detect", "--why", "--install-<method>"})
+
+
+def _tools_propose_allowed(rest: list[str]) -> bool:
+    """ADR-0038: `--tools-propose NAME --kind K --detect D --install-<method> CMD --why W`,
+    nothing else. Same positional-aware-walker discipline as `_tools_channel_allowed`
+    itself (never a trailing-wildcard regex): this only confirms the SHAPE is well-formed
+    -- `cmd_tools_propose` in `set_agents_app.py` re-validates every value semantically
+    (name grammar, kind enum, escalator/hidden-pipe rejection on the command, via its own
+    character ALLOWLIST -- ADR-0038 §3, F-01 repair). A command string containing a real
+    shell metacharacter (`;`, a bare `|`, a bare `&`, backticks, `$(`, `>`, `<`, or any
+    ASCII control character) is already refused upstream by `FORBIDDEN_SYNTAX` before
+    this function ever runs -- see `allowed()` -- so this walker does not need to reason
+    about command CONTENT, only about which flags may appear and how many times. (F-01
+    repair note: the previous version of `FORBIDDEN_SYNTAX` did NOT include a bare `&`,
+    so this claim used to be false for that one character -- fixed alongside this
+    docstring, not just described here.)"""
+    if not rest or not _CATALOG_NAME.fullmatch(rest[0]):
+        return False
+    i, seen = 1, set()
+    while i < len(rest):
+        token = rest[i]
+        if token in {"--kind", "--detect", "--why"}:
+            key = token
+        elif _INSTALL_METHOD_FLAG.fullmatch(token):
+            key = "--install-<method>"
+        else:
+            return False
+        if key in seen or i + 1 >= len(rest):
+            return False
+        seen.add(key)
+        i += 2
+    return seen == _TOOLS_PROPOSE_REQUIRED
+
 
 def _tools_channel_allowed(argv: list[str]) -> bool:
     """ADR-0025 sanctioned tool-catalog channel: `--tools`, `--tools-install NAME
@@ -181,7 +233,15 @@ def _tools_channel_allowed(argv: list[str]) -> bool:
     the historical `--context --scaffold X` escape (see SAFE_ARGV's SEC-001 note)
     shows exactly what a lax rest-of-argv check costs. `set_agents_app.py` itself
     still re-checks everything (catalog membership, sudo refusal, TTY/--yes); this
-    walker only narrows which Bash surface can reach it."""
+    walker only narrows which Bash surface can reach it.
+
+    ADR-0038 adds `--tools-propose` (validates + prints a question, never installs,
+    never writes the catalog) to this same channel. `--tools-approve` deliberately
+    NEVER matches, in either direction of this function: it is the human-approval step
+    itself (`ai/state/decisions-log.jsonl`, slug `tools-approve-fuera-del-canal-del-agente`) --
+    letting an agent run it would make propose->human->approve theatre. The branch
+    below is an explicit, named deny (not just the implicit fallthrough at the bottom)
+    so a future catch-all refactor of this function can't reopen it by accident."""
     if len(argv) < 3 or argv[0] not in {"python3", "python"} or argv[1] != APP_CLI:
         return False
     head, rest = argv[2], argv[3:]
@@ -192,6 +252,10 @@ def _tools_channel_allowed(argv: list[str]) -> bool:
             return False
         extras = rest[1:]
         return all(item in {"--yes", "--dry-run"} for item in extras) and len(set(extras)) == len(extras)
+    if head == "--tools-propose":
+        return _tools_propose_allowed(rest)
+    if head == "--tools-approve":
+        return False
     if head == "--mcp":
         return not rest or (len(rest) == 2 and rest[0] == "--harness" and bool(_CATALOG_NAME.fullmatch(rest[1])))
     if head in {"--mcp-add", "--mcp-on", "--mcp-off"}:
@@ -215,6 +279,25 @@ def _argv_allowed(argv: list[str]) -> bool:
     return False
 
 
+def _contains_tools_approve(argv: list[str]) -> bool:
+    """F-08 repair: `--tools-approve` must never reach the agent channel through ANY
+    allow path -- including a `SAFE_ARGV` entry whose `modifiers` is `None` (the
+    `--route*`/`--routing*` entry) or an incomplete modifier map, neither of which walks
+    the FULL rest of argv the way `_tools_channel_allowed`'s own dedicated walker does.
+    Verified live: `allowed("python3 <APP> --routing-report --tools-approve foo")` used
+    to be `True` -- `SAFE_ARGV`'s routing entry only inspects `argv[2]`
+    (`--routing-report`) and, with `modifiers=None`, never looks past it, so a
+    `--tools-approve` riding along afterward was invisible to it. This is a narrow,
+    SPECIFIC guard (only this one flag, checked in every token position) -- the broader
+    "modifiers=None doesn't walk the rest of argv" gap is PRE-EXISTING (the same shape
+    already lets `--tools-install`/`--yes` ride along a routing invocation) and is not
+    this repair's to fix; `--tools-approve` gets its own guard because this whole
+    package's security invariant depends on that one flag never being reachable, the
+    same discipline `_transition_blocks_integration` already applies for its own
+    single, specific, security-critical shape."""
+    return any(token == "--tools-approve" or token.startswith("--tools-approve=") for token in argv)
+
+
 def allowed(command: str) -> bool:
     command = command.strip()
     if not command or "\n" in command or FORBIDDEN_SYNTAX.search(command) or FORBIDDEN_OPTIONS.search(command):
@@ -226,6 +309,10 @@ def allowed(command: str) -> bool:
     # Checked before both allow-paths below, so neither SAFE_ARGV nor a SAFE regex
     # match can let a direct `transition ... INTEGRATION` through by construction.
     if _transition_blocks_integration(argv):
+        return False
+    # ADR-0038/F-08: same discipline, for --tools-approve specifically -- checked before
+    # any allow path can short-circuit past it.
+    if _contains_tools_approve(argv):
         return False
     if _argv_allowed(argv):
         return True

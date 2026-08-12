@@ -73,9 +73,14 @@ def _decide_status(decision):
     It is filtered out of the reason codes before the closed-table membership check below,
     so a redirect-only decision still matches `()` and a redirect alongside
     REVIEW_IDENTITY_UNVERIFIED still matches that single-element tuple — both exactly as
-    before this code existed. Every other (hard-failure) reason code is untouched.
+    before this code existed. ADR-0035 (AC-14): `BILLING_RANK provider=X rank=N` is the same
+    kind of purely-observational, always-present marker (never a failure signal on its own,
+    per the ADR's own "never changes success/runtime/identity/fallback") — filtered out here
+    the same way, so a decision that would have been ok=true/executable before this ADR stays
+    exactly that after it. Every other (hard-failure) reason code is untouched.
     """
-    codes = tuple(code for code in decision.reason_codes if not code.startswith("RUNTIME_REDIRECTED"))
+    codes = tuple(code for code in decision.reason_codes
+                  if not code.startswith("RUNTIME_REDIRECTED") and not code.startswith("BILLING_RANK "))
     if decision.execution_enabled or codes in _DECIDE_OK_NON_EXECUTABLE_REASONS:
         return True, 0
     return False, 1

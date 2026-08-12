@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-03T02:37:32+00:00
+Actualizado: 2026-08-12T11:19:22+00:00
 
 [2026-07-24T16:27:29+00:00] product-analyst · started
 Cliente: Voy a transformar el plan aprobado en un contrato 2.0 y escenarios verificables, manteniendo 002 intacta y visible como antecedente reemplazado.
