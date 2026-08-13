@@ -51,6 +51,24 @@ class EstadoGeneralTests(unittest.TestCase):
         self.assertIn("probe no disponible", text)
         self.assertNotIn("drift:", text)
 
+    def test_ac19_panel_labels_listado_and_usable_separately_when_they_differ(self):
+        # AC-19: the 'vidriera' surface (first menu item) -- proven with a listed/
+        # usable pair that genuinely DIFFERS, so a regression that reused one count
+        # for both labels (or dropped the split entirely, back to a bare `models=<N>`)
+        # fails this test, not just "some numbers printed".
+        data = {"rows": [], "drift": "ok"}
+        fake_listed = {("opencode", "opencode-zen"): {"a", "b", "c"}}
+        fake_usable = {("opencode", "opencode-zen"): {"a"}}
+        with mock.patch.object(app, "_pi_lane_state", return_value="no"), \
+             mock.patch.object(app, "_install_scope", return_value=None), \
+             mock.patch.object(app, "_tools_data", return_value=[]), \
+             mock.patch.object(app.models_config, "load_config", return_value={}), \
+             mock.patch("routing_core.catalog.prune_legacy_probe_cache", return_value=False), \
+             mock.patch("routing_core.catalog.probe_listed_and_usable", return_value=(fake_listed, fake_usable)):
+            text = "\n".join(app._estado_general_lines(data))
+        self.assertIn("listado=3", text)
+        self.assertIn("usable=1", text)
+
     def test_stale_drift_adds_the_repair_hint(self):
         data = {"rows": [], "drift": "stale"}
         with mock.patch.object(app, "_pi_lane_state", return_value="no"), \

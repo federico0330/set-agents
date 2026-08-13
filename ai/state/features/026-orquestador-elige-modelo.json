@@ -1,0 +1,246 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-13T13:38:43+00:00",
+    "hash": "659eb59f9f95ed5ab831e579e69366f6791af6ded9476a3c3a706c77b988cb31",
+    "path": "docs/specs/026-orquestador-elige-modelo/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 8,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P2-modelo-por-instancia",
+  "feature_id": "026-orquestador-elige-modelo",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (pedido directo 2026-08-13: sacar la obligacion de -fast del orquestador y que pueda elegir el modelo por instancia)",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/026-orquestador-elige-modelo/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:38:43+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Reescribir el test de -fast conservando la regla para implementer y product-analyst (AC-01)",
+          "[areas.coord].opencode a opencode-go/grok-4.5 y opencode/grok-4.5 (AC-02)",
+          "ADR-0044 con la razon y el limite de la lane codex (AC-03)"
+        ]
+      },
+      "package_id": "P1-latencia-por-modelo-no-por-sufijo",
+      "timestamp": "2026-08-13T13:38:43+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Clave nueva en el conjunto cerrado del descriptor (AC-04)",
+          "La preferencia entra DESPUES de las exclusiones, con test por barrera (AC-05)",
+          "reason_code propio cuando el modelo pedido no es elegible (AC-06)",
+          "Efimera: no escribe model-preference.toml ni altera el pin (AC-07)"
+        ]
+      },
+      "package_id": "P2-modelo-por-instancia",
+      "timestamp": "2026-08-13T13:38:43+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "scoped",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "El orquestador deja de estar obligado al sufijo -fast y pasa a un modelo no-GPT de suscripcion",
+      "owned_paths": [
+        "models.toml",
+        "tests/test_harness.py",
+        "docs/adr"
+      ],
+      "package_id": "P1-latencia-por-modelo-no-por-sufijo",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Reescribir el test de -fast conservando la regla para implementer y product-analyst (AC-01)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "[areas.coord].opencode a opencode-go/grok-4.5 y opencode/grok-4.5 (AC-02)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "ADR-0044 con la razon y el limite de la lane codex (AC-03)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-04",
+        "AC-05",
+        "AC-06",
+        "AC-07"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "P1-latencia-por-modelo-no-por-sufijo"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que el orquestador pueda pedir un modelo para un spawn puntual, sin saltear ninguna barrera",
+      "owned_paths": [
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/routing_core",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "P2-modelo-por-instancia",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Clave nueva en el conjunto cerrado del descriptor (AC-04)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "La preferencia entra DESPUES de las exclusiones, con test por barrera (AC-05)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "reason_code propio cuando el modelo pedido no es elegible (AC-06)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Efimera: no escribe model-preference.toml ni altera el pin (AC-07)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 2,
+  "schema_version": 1,
+  "updated_at": "2026-08-13T13:38:43+00:00"
+}

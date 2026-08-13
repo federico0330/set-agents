@@ -20,6 +20,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"ai/scripts"))
 import claude_code_spawn
 import models_config
+import provider_registry
 import routing
 import set_agents_app
 import set_agents_spawn
@@ -334,6 +335,59 @@ class RoutingTests(unittest.TestCase):
             (agent/"auth.json").write_text("not json at all")
             with mock.patch.object(routing_catalog.Path,"home",return_value=home):
                 self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset())
+            # P3-SEC-002 repair (022 PKG-3): a file genuinely owned by THIS uid, but with
+            # the process pretending to be a DIFFERENT uid (the only way to simulate
+            # foreign ownership without root), must fail closed too -- `_read_credential_
+            # json` already had this check; `pi_auth_provider_keys` did not, before this
+            # repair.
+            (agent/"auth.json").write_text(json.dumps({"anthropic":{"apiKey":"sk-x"}}))
+            real_uid = os.getuid()
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home), \
+                 mock.patch.object(routing_catalog.os,"getuid",return_value=real_uid + 1):
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset())
+            # Same file, real uid restored: reads normally again (the mock above is the
+            # only thing standing between the two assertions).
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home):
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset({"anthropic"}))
+
+    def test_pi_auth_provider_keys_rejects_unaudited_and_non_object_entries(self):
+        """P3-F03 repair (022 PKG-3 repair round 2): the docstring above has always
+        promised "provider NAMES only", but before this repair the implementation kept
+        EVERY top-level string key verbatim, regardless of whether `_PAIR_COMMANDS`
+        actually audits it for the `pi` runtime or whether its value even looked like a
+        credential entry. `test_pi_auth_provider_keys_reads_names_only_and_fails_closed`
+        above only ever exercised a top-level LIST (`["not","a","dict"]`) for the
+        "foreign shape" case, which `isinstance(doc, dict)` already rejects before the
+        per-key logic even runs -- it never caught an invalid OBJECT entry. Reproduced
+        live by the orchestrator with a fixture HOME: `{"openai-codex": []}` and
+        `{"proveedor-inventado": {...}}` both produced a NON-empty keyset/signature
+        before this fix. Every case below must yield the empty set."""
+        with tempfile.TemporaryDirectory() as td:
+            home=Path(td); agent=home/".pi/agent"; agent.mkdir(parents=True)
+            cases = [
+                {"openai-codex": []},                       # audited key, non-object value (list)
+                {"proveedor-inventado": {"apiKey": "x"}},    # unaudited key, otherwise well-shaped
+                {"anthropic": "sk-not-an-object"},           # audited key, non-object value (string)
+                {"openai-codex": None},                      # audited key, non-object value (null)
+                {"anthropic": 12345},                        # audited key, non-object value (int)
+                {"opencode-zen": {"apiKey": "x"}},           # a REAL _PAIR_COMMANDS provider, but not for pi
+            ]
+            with mock.patch.object(routing_catalog.Path,"home",return_value=home):
+                for doc in cases:
+                    (agent/"auth.json").write_text(json.dumps(doc))
+                    self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset(),
+                                     msg=f"expected empty keyset for {doc!r}")
+                # Mixed: only the audited key with an object value survives -- invalid
+                # entries are dropped individually, never all-or-nothing across the file.
+                (agent/"auth.json").write_text(json.dumps(
+                    {"anthropic": {"apiKey": "ok"}, "proveedor-inventado": {"apiKey": "x"}, "openai-codex": []}))
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),frozenset({"anthropic"}))
+                # Control: a fully legitimate file (both audited providers, both objects)
+                # is completely unaffected by the filter -- same result as before the fix.
+                (agent/"auth.json").write_text(json.dumps(
+                    {"openai-codex": {"apiKey": "sk-1"}, "anthropic": {"apiKey": "sk-2"}}))
+                self.assertEqual(routing_catalog.pi_auth_provider_keys(),
+                                 frozenset({"openai-codex","anthropic"}))
 
     _PI_STUB = textwrap.dedent('''
         import sys, json
@@ -3169,16 +3223,18 @@ class RoutingTests(unittest.TestCase):
 
     def test_ac04_allowlist_ceiling_moved_in_lockstep_across_the_three_sites(self):
         from routing_core import catalog as cat
-        # Site 2 (_configured_models's key map) reads exactly site 1 (models.toml's
-        # [catalog] table).
-        self.assertEqual(cat._configured_models(self.config, "opencode-zen"), set(self.config["catalog"]["opencode_zen"]))
-        self.assertEqual(cat._configured_models(self.config, "opencode-go"), set(self.config["catalog"]["opencode_go"]))
+        # Site 2 (resolve_ceiling's key map, _CATALOG_KEYS) reads exactly site 1
+        # (models.toml's [catalog] table). Both are "curated" today (non-empty lists).
+        self.assertEqual(cat.resolve_ceiling(self.config, "opencode-zen"),
+                         ("curated", set(self.config["catalog"]["opencode_zen"])))
+        self.assertEqual(cat.resolve_ceiling(self.config, "opencode-go"),
+                         ("curated", set(self.config["catalog"]["opencode_go"])))
         self.assertIn("kimi-k2.7-code", self.config["catalog"]["opencode_zen"])
         self.assertIn("kimi-k2.7-code", self.config["catalog"]["opencode_go"])
         # A model outside the declared ceiling can never surface, even if the CLI reports
         # it: _probe_pairs intersects the parsed roster against `allowed` before returning.
         narrow = json.loads(json.dumps(self.config)); narrow["catalog"]["opencode_zen"] = ["kimi-k2.7-code"]
-        self.assertEqual(cat._configured_models(narrow, "opencode-zen"), {"kimi-k2.7-code"})
+        self.assertEqual(cat.resolve_ceiling(narrow, "opencode-zen"), ("curated", {"kimi-k2.7-code"}))
 
         def fake_run(argv, **kwargs):
             if argv[1:4] == ("auth", "list", "--pure"):
@@ -3189,13 +3245,30 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(result[("opencode", "opencode-zen")], {"kimi-k2.7-code"})  # glm-5.2 dropped, never invented
 
     def test_adr0034_ac10_discoverable_providers_lockstep_guard(self):
-        # ADR-0034 (019 PKG-1, AC-10): DISCOVERABLE_PROVIDERS must equal exactly the
-        # provider half of _PAIR_COMMANDS -- the guard that keeps `github-copilot` (M-1,
-        # unlistable) and a duplicate `openai` catalog provider (M-2, already covered by
-        # `openai-codex`) from ever being addable to the "auto"-adopted universe without
-        # this test failing loudly first.
+        # ADR-0034 (019 PKG-1, AC-10). Pre-ADR-0042, DISCOVERABLE_PROVIDERS and
+        # _PAIR_COMMANDS were two INDEPENDENTLY hand-maintained tables and the cross-check
+        # below was, by itself, the whole guard. Since ADR-0042 (022 PKG-1) both sides
+        # derive from the SAME source now (`provider_registry.PROVIDERS`:
+        # DISCOVERABLE_PROVIDERS directly, `_PAIR_COMMANDS`'s opencode half transitively
+        # via `_OPENCODE_CLI_IDS`) -- so that cross-check ALONE no longer catches a broken
+        # registry: renaming, adding, removing, or reordering a `PROVIDERS` entry moves
+        # both sides together and it stays green (P1 repair, finding F02; it does not test
+        # `github-copilot`/duplicate-`openai` exclusion by itself anymore). The cross-check
+        # is kept below -- it still catches the two modules' derivations disagreeing with
+        # EACH OTHER, a real bug class distinct from a broken registry -- but the guard
+        # against `github-copilot` (M-1, unlistable) and a duplicate `openai` catalog
+        # provider (M-2, already covered by `openai-codex`) ever silently becoming
+        # discoverable is now the hand-pinned literal below. That literal is deliberately
+        # NOT imported or derived from `provider_registry.PROVIDERS`: a TEST is allowed to
+        # hardcode the universe it audits (that is its job -- fail noisily the moment
+        # someone changes the registry, on purpose or not); only PRODUCTION code must never
+        # hand-maintain a second copy. Do not "fix" this by deriving the literal from
+        # PROVIDERS again -- that silently rebuilds the exact false-green this test exists
+        # to prevent.
         pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
         self.assertEqual(models_config.DISCOVERABLE_PROVIDERS, pair_providers)
+        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+                          {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
         self.assertNotIn("github-copilot", models_config.DISCOVERABLE_PROVIDERS)
         self.assertNotIn("openai", models_config.DISCOVERABLE_PROVIDERS)
 
@@ -3346,7 +3419,9 @@ class RoutingTests(unittest.TestCase):
                                      pairs=[("opencode", "opencode-zen"), ("opencode", "opencode-go")])
         for provider in ("opencode-zen", "opencode-go"):
             pair = ("opencode", provider)
-            ceiling = live[provider] & cat._configured_models(self.config, provider)
+            state, allowed = cat.resolve_ceiling(self.config, provider)
+            self.assertEqual(state, "curated", (provider, "this repo's models.toml curates both lanes"))
+            ceiling = live[provider] & allowed
             probed_models = probed.get(pair, set())
             # Repair F-02 (012 repair, high): `probed_models <= ceiling` passes trivially
             # if `probed_models` is EMPTY -- exactly the silent-breakage mode this gate
@@ -3375,7 +3450,12 @@ class RoutingTests(unittest.TestCase):
         copilot = next(p for p in report["providers"] if p["provider"] == "github copilot")
         self.assertTrue(copilot["authenticated"])
         self.assertTrue(copilot["detected_unlistable"])
-        self.assertEqual(copilot["models_listable"], 0)
+        # AC-16/AC-19: the candidate CLI id (`github-copilot`, space->hyphen) was tried
+        # and the mocked CLI answered "Provider not found" for it -- fail-closed, nothing
+        # accepted: never listed, never a verified id, never usable.
+        self.assertEqual(copilot["listed_by_provider"], 0)
+        self.assertIsNone(copilot["verified_cli_id"])
+        self.assertEqual(copilot["usable_after_ceiling"], 0)
         self.assertEqual(copilot["billing"], "unknown")
         # Never added as a pair: every OTHER provider entry is one of the audited four.
         audited = {"openai-codex", "anthropic", "opencode-zen", "opencode-go"}
@@ -3397,13 +3477,207 @@ class RoutingTests(unittest.TestCase):
             report = cat.route_doctor(self.config, cache_root=None)
         by_provider = {p["provider"]: p for p in report["providers"]}
         self.assertTrue(by_provider["opencode-zen"]["authenticated"])
-        self.assertEqual(by_provider["opencode-zen"]["models_listable"], 1)
+        # AC-19: `kimi-k2.7-code` is curated in this repo's models.toml for both lanes,
+        # so listed (raw CLI count) and usable (post-ceiling) coincide here -- the split
+        # only diverges when the provider lists something the ceiling does not curate,
+        # covered by its own dedicated test below.
+        self.assertEqual(by_provider["opencode-zen"]["listed_by_provider"], 1)
+        self.assertEqual(by_provider["opencode-zen"]["usable_after_ceiling"], 1)
         self.assertEqual(by_provider["opencode-zen"]["billing"], "metered")
         self.assertTrue(by_provider["opencode-go"]["authenticated"])
         self.assertEqual(by_provider["opencode-go"]["billing"], "subscription")
         # Unauthenticated pairs report authenticated=False, never fabricated as live.
         self.assertFalse(by_provider["openai-codex"]["authenticated"])
         self.assertFalse(by_provider["anthropic"]["authenticated"])
+
+    def test_ac19_route_doctor_separates_listed_from_usable_after_ceiling(self):
+        # AC-19: a provider that lists a model the curated ceiling does NOT allow must
+        # show a non-zero `listed_by_provider` alongside a LOWER (here zero)
+        # `usable_after_ceiling` -- the exact "listado != usable" defect this AC exists
+        # to surface, never silently collapsed into one misleading `len(models)`.
+        from routing_core import catalog as cat
+        auth_ok = "●  OpenCode Zen api\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            if argv[:3] == ("opencode", "models", "opencode"):
+                return types.SimpleNamespace(returncode=0, stdout="opencode/not-curated-anywhere\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            report = cat.route_doctor(self.config, cache_root=None)
+        zen = next(p for p in report["providers"] if p["provider"] == "opencode-zen")
+        self.assertEqual(zen["listed_by_provider"], 1)
+        self.assertEqual(zen["usable_after_ceiling"], 0)
+
+    # ---- AC-16 (022 PKG-5): empirical verification of a detected_unlistable credential
+
+    def test_ac16_candidate_id_is_the_exact_space_to_hyphen_transform(self):
+        from routing_core import catalog as cat
+        self.assertEqual(cat._unlistable_candidate_id("github copilot"), "github-copilot")
+        self.assertEqual(cat._unlistable_candidate_id("opencode zen"), "opencode-zen")
+        self.assertEqual(cat._unlistable_candidate_id("no-spaces"), "no-spaces")
+
+    def test_ac16_direction_1_cli_confirms_the_candidate_is_accepted(self):
+        # Empirical verification, direction 1: the CLI answers a well-formed
+        # `<candidate>/<model>` listing for the derived candidate -- accepted.
+        from routing_core import catalog as cat
+        with mock.patch.object(cat.subprocess, "run") as run:
+            run.return_value = types.SimpleNamespace(
+                returncode=0, stdout="my-new-vendor/some-model\nmy-new-vendor/other-model\n", stderr="")
+            result = cat._verify_unlistable_credential("my new vendor", timeout=5.0)
+        self.assertIsNotNone(result)
+        candidate, models = result
+        self.assertEqual(candidate, "my-new-vendor")
+        self.assertEqual(models, {"some-model", "other-model"})
+        called_argv = run.call_args.args[0]
+        self.assertEqual(called_argv, ("opencode", "models", "my-new-vendor", "--pure"))
+
+    def test_ac16_direction_2_cli_error_line_is_rejected_nothing_accepted(self):
+        # Empirical verification, direction 2: the CLI answers but with an `Error` line
+        # (the REAL, measured github-copilot response) -- rejected, nothing accepted.
+        from routing_core import catalog as cat
+        with mock.patch.object(cat.subprocess, "run") as run:
+            run.return_value = types.SimpleNamespace(
+                returncode=0, stdout="Error: Provider not found: my-new-vendor\n", stderr="")
+            self.assertIsNone(cat._verify_unlistable_credential("my new vendor", timeout=5.0))
+
+    def test_ac16_direction_2_nonzero_exit_is_rejected_nothing_accepted(self):
+        from routing_core import catalog as cat
+        with mock.patch.object(cat.subprocess, "run") as run:
+            run.return_value = types.SimpleNamespace(returncode=1, stdout="", stderr="boom\n")
+            self.assertIsNone(cat._verify_unlistable_credential("my new vendor", timeout=5.0))
+
+    def test_ac16_direction_2_wrong_prefix_is_rejected_never_a_partial_credit(self):
+        # A listing that answers 0 (opencode's own "errors exit 0" convention) but under
+        # a DIFFERENT prefix than the candidate itself -- malformed relative to the
+        # candidate, never accepted as if it partially matched.
+        from routing_core import catalog as cat
+        with mock.patch.object(cat.subprocess, "run") as run:
+            run.return_value = types.SimpleNamespace(returncode=0, stdout="some-other-id/model\n", stderr="")
+            self.assertIsNone(cat._verify_unlistable_credential("my new vendor", timeout=5.0))
+
+    def test_ac16_direction_2_well_formed_but_empty_listing_is_rejected(self):
+        from routing_core import catalog as cat
+        with mock.patch.object(cat.subprocess, "run") as run:
+            run.return_value = types.SimpleNamespace(returncode=0, stdout="", stderr="")
+            self.assertIsNone(cat._verify_unlistable_credential("my new vendor", timeout=5.0))
+
+    def test_ac16_direction_2_timeout_is_rejected(self):
+        from routing_core import catalog as cat
+        with mock.patch.object(cat.subprocess, "run",
+                               side_effect=subprocess.TimeoutExpired(cmd="opencode", timeout=5.0)):
+            self.assertIsNone(cat._verify_unlistable_credential("my new vendor", timeout=5.0))
+
+    def test_ac16_the_named_trap_opencode_zen_display_name_does_not_verify_its_own_real_id(self):
+        # ADR-0034's own measured trap, exercised directly: the space->hyphen candidate
+        # for "opencode zen" is "opencode-zen", but the REAL CLI id is "opencode" -- a CLI
+        # that only understands "opencode" must make this candidate fail closed, proving
+        # the rule is a measurement (accept only on live confirmation), never a guess
+        # trusted on its own.
+        from routing_core import catalog as cat
+        candidate = cat._unlistable_candidate_id("opencode zen")
+        self.assertEqual(candidate, "opencode-zen")  # the trap: NOT opencode-zen's real id
+
+        def fake_run(argv, **kwargs):
+            if argv[:3] == ("opencode", "models", "opencode"):
+                return types.SimpleNamespace(returncode=0, stdout="opencode/kimi-k2.7-code\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            self.assertIsNone(cat._verify_unlistable_credential("opencode zen", timeout=5.0))
+
+    def test_ac16_route_doctor_reports_a_confirmed_candidate_as_listed_but_still_not_usable(self):
+        # End to end through route_doctor: a NEW, never-audited credential whose
+        # candidate the CLI genuinely confirms is reported with `listed_by_provider>0`
+        # and `verified_cli_id` set -- but `usable_after_ceiling` stays 0 (AC-17: memory
+        # of a CLI id is never an authorization) and it is still `detected_unlistable`
+        # (no audited pair exists for it, unaffected by this package).
+        from routing_core import catalog as cat
+        auth_ok = "●  My New Vendor oauth\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            if argv[:3] == ("opencode", "models", "my-new-vendor"):
+                return types.SimpleNamespace(returncode=0, stdout="my-new-vendor/some-model\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            report = cat.route_doctor(self.config, cache_root=None)
+        vendor = next(p for p in report["providers"] if p["provider"] == "my new vendor")
+        self.assertTrue(vendor["detected_unlistable"])
+        self.assertEqual(vendor["verified_cli_id"], "my-new-vendor")
+        self.assertEqual(vendor["listed_by_provider"], 1)
+        self.assertEqual(vendor["usable_after_ceiling"], 0)
+        # AC-17: still never an audited pair -- confirming a candidate in route_doctor
+        # can never widen what resolve_discovered_providers derives.
+        self.assertNotIn(("opencode", "my-new-vendor"), cat._PAIR_COMMANDS)
+        config = json.loads(json.dumps(self.config))
+        config["routing"]["discovered_providers"] = "auto"
+        bogus_inventory = {("opencode", "my-new-vendor"): {"some-model"}}
+        self.assertEqual(cat.resolve_discovered_providers(config, bogus_inventory), ())
+
+    def test_ac17_baja_is_automatic_and_symmetric_across_two_route_doctor_calls(self):
+        # AC-17: no separate "de-registration" code path -- the very next route_doctor
+        # call, with the SAME candidate now failing, reports unlistable again, purely
+        # because verification always re-runs fresh (nothing persisted in between).
+        from routing_core import catalog as cat
+        auth_ok = "●  My New Vendor oauth\n"
+        state = {"up": True}
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            if argv[:3] == ("opencode", "models", "my-new-vendor") and state["up"]:
+                return types.SimpleNamespace(returncode=0, stdout="my-new-vendor/some-model\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            up = cat.route_doctor(self.config, cache_root=None)
+        vendor_up = next(p for p in up["providers"] if p["provider"] == "my new vendor")
+        self.assertEqual(vendor_up["listed_by_provider"], 1)
+        self.assertEqual(vendor_up["verified_cli_id"], "my-new-vendor")
+        state["up"] = False
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            down = cat.route_doctor(self.config, cache_root=None)
+        vendor_down = next(p for p in down["providers"] if p["provider"] == "my new vendor")
+        self.assertEqual(vendor_down["listed_by_provider"], 0)
+        self.assertIsNone(vendor_down["verified_cli_id"])
+
+    def test_probe_listed_and_usable_matches_route_doctor_for_the_opencode_lane(self):
+        # AC-19: the shared helper `cmd_doctor_all`/`_estado_general_lines` use produces
+        # the SAME listed/usable split route_doctor computes for the opencode lane, no
+        # divergent logic between the three surfaces.
+        from routing_core import catalog as cat
+        auth_ok = "●  OpenCode Zen api\n"
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout=auth_ok, stderr="")
+            if argv[:3] == ("opencode", "models", "opencode"):
+                return types.SimpleNamespace(returncode=0, stdout="opencode/not-curated-anywhere\nopencode/kimi-k2.7-code\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Error: Provider not found\n")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            listed, usable = cat.probe_listed_and_usable(self.config, cache_root=None)
+        pair = ("opencode", "opencode-zen")
+        self.assertEqual(listed[pair], {"not-curated-anywhere", "kimi-k2.7-code"})
+        self.assertEqual(usable[pair], {"kimi-k2.7-code"})  # only the curated one survives the ceiling
+
+    def test_ac19_cmd_doctor_all_prints_the_listed_usable_split_labeled(self):
+        # AC-19: `cmd_doctor_all`'s own print line must carry BOTH counts under their
+        # real names (never collapse into the old misleading `models=<N>`) -- proven
+        # with a listed/usable pair that genuinely DIFFERS, so a future edit that
+        # quietly reused one count for both labels (or swapped which is which) fails
+        # this test, not just "some count printed".
+        fake_listed = {("opencode", "opencode-zen"): {"a", "b", "c"}}
+        fake_usable = {("opencode", "opencode-zen"): {"a"}}
+        out = []
+        with mock.patch("routing_core.catalog.prune_legacy_probe_cache", return_value=False), \
+             mock.patch("routing_core.catalog.probe_listed_and_usable", return_value=(fake_listed, fake_usable)), \
+             mock.patch("builtins.print", side_effect=lambda *a, **k: out.append(" ".join(map(str, a)))):
+            rc = set_agents_app.cmd_doctor_all()
+        self.assertEqual(rc, 0)
+        line = next(l for l in out if l.startswith("PROVIDER opencode-zen"))
+        self.assertIn("listed_by_provider=3", line)
+        self.assertIn("usable_after_ceiling=1", line)
 
     def test_ac15_route_doctor_never_writes_the_probe_cache(self):
         # Read-only per ADR-0035: `--route-doctor` inspects an existing cache file but
@@ -3604,6 +3878,190 @@ class RoutingTests(unittest.TestCase):
                 self.assertIn(key, reloaded["catalog"])
                 self.assertEqual(set(reloaded["catalog"][key]), set(self.config["catalog"][key]))
 
+    # ------------------------------------------------- ADR-0042 (022 PKG-2): tri-state
+    # `[catalog]` ceiling -- `resolve_ceiling` replaces `_configured_models`.
+
+    def test_adr0042_pkg2_ac04_resolve_ceiling_is_a_pure_tri_state_reflection_of_the_toml(self):
+        """AC-04: `resolve_ceiling` replaces `_configured_models`, which collapsed two
+        genuinely different TOML shapes ("no key at all" and "curated as an explicit
+        empty list") into the identical `set()`. This exercises all three states plus
+        the "no dedicated catalog key at all" edge that also resolves to auto."""
+        from routing_core import catalog as cat
+        self.assertEqual(cat.resolve_ceiling(self.config, "opencode-zen"),
+                         ("curated", set(self.config["catalog"]["opencode_zen"])))
+        self.assertEqual(cat.resolve_ceiling(self.config, "openai-codex"),
+                         ("curated", set(self.config["catalog"]["codex"])))
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+        self.assertEqual(cat.resolve_ceiling(auto_cfg, "opencode-zen"), ("auto", None))
+        veto_cfg = json.loads(json.dumps(self.config)); veto_cfg["catalog"]["opencode_go"] = []
+        self.assertEqual(cat.resolve_ceiling(veto_cfg, "opencode-go"), ("veto", set()))
+        self.assertEqual(cat.resolve_ceiling(self.config, "totally-unregistered-provider"), ("auto", None))
+
+    def test_adr0042_pkg2_ac04_probe_pairs_probes_a_provider_with_no_catalog_key_instead_of_skipping_it(self):
+        """The defect this package exists to fix (context pack, verbatim): before this
+        package, `_probe_pairs`'s `if not allowed: continue` skipped ANY provider absent
+        from `[catalog]` entirely -- exactly what forced editing models.toml to add a
+        provider. `auto_cfg` removes `[catalog].opencode_zen`; the SAME CLI stub output
+        is probed once against `auto_cfg` (must surface, unfiltered) and once against
+        the real curated `self.config` (must still be filtered out -- the model is not
+        in the curated allowlist), proving the tri-state distinction end to end. Also
+        covers AC-05 layer 1: a pair absent from `_PAIR_COMMANDS` is never probed no
+        matter what ceiling state a (bogus) provider string would resolve to."""
+        from routing_core import catalog as cat
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+
+        def fake_run(argv, **kwargs):
+            if argv[1:4] == ("auth", "list", "--pure"):
+                return types.SimpleNamespace(returncode=0, stdout="●  OpenCode Zen api\n", stderr="")
+            return types.SimpleNamespace(returncode=0, stdout="opencode/a-brand-new-zen-model-not-curated-anywhere\n", stderr="")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            auto_result = cat.probe_inventory(auto_cfg, cache_root=None,
+                                              pairs=[("opencode", "opencode-zen"), ("opencode", "not-an-audited-provider")])
+            curated_result = cat.probe_inventory(self.config, cache_root=None, pairs=[("opencode", "opencode-zen")])
+        self.assertEqual(auto_result.get(("opencode", "opencode-zen")), {"a-brand-new-zen-model-not-curated-anywhere"})
+        self.assertNotIn(("opencode", "not-an-audited-provider"), auto_result)  # AC-05 layer 1
+        self.assertNotIn(("opencode", "opencode-zen"), curated_result)  # same stdout, curated ceiling still filters it
+
+    def test_adr0042_pkg2_ac04_read_probe_cache_auto_mode_never_goes_permanently_empty(self):
+        """The single easiest regression to reintroduce here (context pack, verbatim): a
+        naive port of the pre-tri-state one-liner (`set(models) & <curated ceiling>`)
+        intersects an "auto" provider's cached models against an EMPTY ceiling (there is
+        none), emptying the cache entry on every single read -- the caller then re-probes
+        on every decision, up to PI_PROBE_MIN_TIMEOUT_SECONDS (60s) for pi. Writes a
+        cache document directly (bypassing any probe) for an auto-ceiling provider and
+        asserts the read survives with its models intact, never silently emptied."""
+        from routing_core import catalog as cat
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+        with tempfile.TemporaryDirectory() as td:
+            cache_root = Path(td) / "root"; cache_root.mkdir(mode=0o700)
+            key = cat._cache_key(auto_cfg)
+            doc = {"key": key, "at": 1000.0, "pairs": {"opencode|opencode-zen": ["some-live-only-zen-model"]}}
+            path = cache_root / "probe-cache.json"; path.write_text(json.dumps(doc)); path.chmod(0o600)
+            out = cat._read_probe_cache(cache_root, key, 1000.5, auto_cfg)
+        self.assertEqual(out, {("opencode", "opencode-zen"): {"some-live-only-zen-model"}})
+
+    def test_adr0042_pkg2_ac06_curated_row_against_auto_or_veto_ceiling_raises_the_named_error(self):
+        """AC-06: differentiated from the generic CATALOG_INVALID every other
+        build_snapshot shape failure raises -- same precedent as
+        CATALOG_FAMILY_COLLISION. Exercised through a synthetic td-based catalog file
+        (never routes.v1.toml itself, which stays untouched -- non-goal)."""
+        from routing_core import catalog as cat
+        model = sorted(self.config["catalog"]["opencode_zen"])[0]
+        full_roster = sorted({row["role"] for row in self.roster})
+        row = dict(provider="opencode-zen", model=model, family="zen-test", effort="medium",
+                  tier="balanced", roles=full_roster, tools=["read"], curated_priority=1)
+        for state, mutate in (("auto", lambda cfg: cfg["catalog"].pop("opencode_zen")),
+                              ("veto", lambda cfg: cfg["catalog"].__setitem__("opencode_zen", []))):
+            cfg = json.loads(json.dumps(self.config)); mutate(cfg)
+            with tempfile.TemporaryDirectory() as td:
+                path = self._write_catalog(td, [row])
+                with self.assertRaisesRegex(routing.RoutingError, "CATALOG_CEILING_REQUIRED", msg=state):
+                    routing_catalog.build_snapshot(path, self.roster, cfg)
+        # Contrast: today's real config resolves this SAME provider as "curated" -- the
+        # new check is additive, never a wider net that swallows the curated case too.
+        self.assertEqual(cat.resolve_ceiling(self.config, "opencode-zen")[0], "curated")
+
+    def test_adr0042_pkg2_ac05_layer2_auto_ceiling_reaches_only_the_synthesized_path(self):
+        """AC-05 layer 2: an "auto" provider can never enter the CURATED snapshot (the
+        negative half, reusing AC-06's own error) -- this proves the POSITIVE half in the
+        same test: the identical auto-ceiling config, through build_effective_snapshot
+        with a live inventory, reaches routing ONLY via the synthesized path, its
+        route_id present in the returned `inferred` set (the MODEL_METADATA_INFERRED
+        marker `service.py` reads)."""
+        from routing_core import catalog as cat
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+        auto_cfg["routing"] = dict(auto_cfg["routing"], discovered_providers=["opencode-zen"])
+        model = "a-live-only-auto-model"
+        inventory = {("opencode", "opencode-zen"): {model}}
+        catalog_path = ROOT / "ai/catalogs/routes.v1.toml"
+        snapshot, inferred = routing_catalog.build_effective_snapshot(catalog_path, self.roster, auto_cfg, inventory)
+        synthesized = [r for r in snapshot.routes if r.provider == "opencode-zen" and r.model == model]
+        self.assertEqual(len(synthesized), 1)
+        self.assertIn(synthesized[0].route_id, inferred)
+        full_roster = sorted({row["role"] for row in self.roster})
+        curated_row = dict(provider="opencode-zen", model=model, family="zen-test", effort="medium",
+                           tier="balanced", roles=full_roster, tools=["read"], curated_priority=1)
+        with tempfile.TemporaryDirectory() as td:
+            path = self._write_catalog(td, [curated_row])
+            with self.assertRaisesRegex(routing.RoutingError, "CATALOG_CEILING_REQUIRED"):
+                routing_catalog.build_snapshot(path, self.roster, auto_cfg)
+
+    def test_adr0042_pkg2_ac05_layer3_billing_rank_still_fails_closed_expensive_under_auto(self):
+        """AC-05 layer 3: `billing_rank` is keyed purely by provider string
+        (PROVIDER_BILLING_KIND), never by config or ceiling state -- switching a
+        provider's [catalog] ceiling to auto/veto cannot change its billing
+        classification. Named as its own layer in AC-05 and re-verified here directly,
+        not merely assumed from PROVIDER_BILLING_KIND's own pre-existing test."""
+        from routing_core import catalog as cat
+        self.assertEqual(cat.billing_rank("opencode-zen", "any-model"), 1)  # metered, expensive
+        self.assertEqual(cat.billing_rank("opencode-go", "any-model"), 0)  # subscription, cheap
+        self.assertEqual(cat.billing_rank("totally-unaudited-provider", "any-model"), 1)  # fail-closed
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+        self.assertEqual(cat.resolve_ceiling(auto_cfg, "opencode-zen")[0], "auto")
+        self.assertEqual(cat.billing_rank("opencode-zen", "any-model"), 1)  # unchanged by ceiling state
+
+    def test_adr0042_pkg2_ac05_layer4_discovered_route_cap_bounds_the_pool_deterministically(self):
+        """AC-05 layer 4 (cap half): live-measured 2026-08-12, opencode-zen alone lists
+        58-61 models -- without a cap, an "auto" provider's raw live-probe count has no
+        ceiling to bound it at all (unlike a curated allowlist, which is bounded by
+        whatever a human curated). This stress-tests with 3x the cap's own worth of
+        synthetic ids to prove the bound is real and the truncation is deterministic
+        (alphabetical, never dict/set iteration order) across repeated calls."""
+        from routing_core import catalog as cat
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+        auto_cfg["routing"] = dict(auto_cfg["routing"], discovered_providers=["opencode-zen"])
+        huge_pool = {f"synthetic-zen-model-{i:04d}" for i in range(cat._DISCOVERED_ROUTE_CAP_PER_PROVIDER * 3)}
+        inventory = {("opencode", "opencode-zen"): huge_pool}
+        catalog_path = ROOT / "ai/catalogs/routes.v1.toml"
+        snapshot, _ = routing_catalog.build_effective_snapshot(catalog_path, self.roster, auto_cfg, inventory)
+        zen_routes = [r for r in snapshot.routes if r.provider == "opencode-zen"]
+        self.assertEqual(len(zen_routes), cat._DISCOVERED_ROUTE_CAP_PER_PROVIDER)
+        expected = sorted(huge_pool)[:cat._DISCOVERED_ROUTE_CAP_PER_PROVIDER]
+        self.assertEqual(sorted(r.model for r in zen_routes), expected)
+        snapshot2, _ = routing_catalog.build_effective_snapshot(catalog_path, self.roster, auto_cfg, inventory)
+        self.assertEqual(sorted(r.model for r in snapshot2.routes if r.provider == "opencode-zen"), expected)
+
+    def test_adr0042_pkg2_ac05_layer4_exclude_provider_wildcard_vetoes_the_entire_provider(self):
+        """AC-05 layer 4 (exclude half): `[catalog].exclude` extended from single
+        `"provider:model"` vetoes to a `"provider:*"` wildcard that drops an entire
+        discovered provider from the synthesized path in one line -- proven alongside the
+        pre-existing per-model form to show neither interferes with the other."""
+        from routing_core import catalog as cat
+        cfg = json.loads(json.dumps(self.config))
+        cfg["catalog"]["exclude"] = ["opencode-zen:*"]
+        cfg["routing"] = dict(cfg["routing"], discovered_providers=["opencode-zen", "opencode-go"])
+        inventory = {("opencode", "opencode-zen"): {"should-never-appear"},
+                    ("opencode", "opencode-go"): {"kimi-k2.7-code"}}
+        catalog_path = ROOT / "ai/catalogs/routes.v1.toml"
+        snapshot, _ = routing_catalog.build_effective_snapshot(catalog_path, self.roster, cfg, inventory)
+        self.assertFalse([r for r in snapshot.routes if r.provider == "opencode-zen"])
+        self.assertEqual(len([r for r in snapshot.routes if r.provider == "opencode-go" and r.model == "kimi-k2.7-code"]), 1)
+        cfg2 = json.loads(json.dumps(cfg)); cfg2["catalog"]["exclude"] = ["opencode-go:kimi-k2.7-code"]
+        snapshot2, _ = routing_catalog.build_effective_snapshot(catalog_path, self.roster, cfg2, inventory)
+        self.assertFalse([r for r in snapshot2.routes if r.provider == "opencode-go" and r.model == "kimi-k2.7-code"])
+        self.assertTrue([r for r in snapshot2.routes if r.provider == "opencode-zen"])  # zen unaffected by the go-only exclude
+
+    def test_adr0042_pkg2_ac04_models_config_accepts_empty_list_veto_and_round_trips_it(self):
+        """AC-04's other half (context pack): models_config.py:155-160 used to `die` on
+        `[]` for these two keys -- that IS the veto state now, and must load and
+        round-trip cleanly, distinct from silently reverting to "auto" (absence) on
+        re-emit. Absence itself must also round-trip as absence, never resurrected."""
+        from routing_core import catalog as cat
+        veto_cfg = json.loads(json.dumps(self.config)); veto_cfg["catalog"]["opencode_go"] = []
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "models.toml"
+            path.write_text(models_config.emit(veto_cfg))
+            reloaded = models_config.load_config(path)
+        self.assertEqual(reloaded["catalog"]["opencode_go"], [])
+        self.assertEqual(cat.resolve_ceiling(reloaded, "opencode-go"), ("veto", set()))
+        auto_cfg = json.loads(json.dumps(self.config)); del auto_cfg["catalog"]["opencode_zen"]
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "models.toml"
+            path.write_text(models_config.emit(auto_cfg))
+            reloaded_auto = models_config.load_config(path)
+        self.assertNotIn("opencode_zen", reloaded_auto["catalog"])
+        self.assertEqual(cat.resolve_ceiling(reloaded_auto, "opencode-zen"), ("auto", None))
+
     def test_ac06_f06_credential_check_precedes_the_expensive_models_call(self):
         """Repair F-06 (012 repair, medium, +69%/+10.5s measured without this fix): the
         credential-set membership check (map 1) must run BEFORE the second, more
@@ -3709,6 +4167,401 @@ class RoutingTests(unittest.TestCase):
             cache_doc = json.loads((cache_root / "probe-cache.json").read_text())
             self.assertNotIn("opencode|opencode-zen", cache_doc["pairs"])
             self.assertNotIn("opencode|opencode-go", cache_doc["pairs"])
+
+    # ---------------------------------------------------- ADR-0043 (022 PKG-3, AC-07..10)
+
+    def test_adr0043_ac07_ac08_codex_auth_signature_ignores_rotating_material_reacts_to_logout(self):
+        """AC-07 (stat-only, no subprocess) + AC-08's two properties for codex: a refresh
+        (rotates last_refresh/every token field, keeps tokens.account_id and the
+        OPENAI_API_KEY presence bit) never moves the signature; a logout (file deleted)
+        moves it immediately, never a fabricated match with the empty sentinel."""
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td); codex_dir = home / ".codex"; codex_dir.mkdir()
+            auth = codex_dir / "auth.json"
+            auth.write_text(json.dumps({
+                "OPENAI_API_KEY": None, "auth_mode": "chatgpt", "last_refresh": "2026-08-12T00:00:00Z",
+                "tokens": {"access_token": "secret-before", "account_id": "acct_123",
+                           "id_token": "id-before", "refresh_token": "refresh-before"},
+            }))
+            with mock.patch.object(cat.Path, "home", return_value=home):
+                before = cat._codex_auth_signature()
+                self.assertTrue(before)
+                self.assertNotIn("acct_123", before); self.assertNotIn("secret-before", before)
+                # AC-08 property 1: refresh.
+                auth.write_text(json.dumps({
+                    "OPENAI_API_KEY": None, "auth_mode": "chatgpt", "last_refresh": "2026-08-12T00:05:00Z",
+                    "tokens": {"access_token": "secret-AFTER", "account_id": "acct_123",
+                               "id_token": "id-AFTER", "refresh_token": "refresh-AFTER"},
+                }))
+                self.assertEqual(cat._codex_auth_signature(), before)
+                # AC-08 property 2: logout/delete.
+                auth.unlink()
+                after_logout = cat._codex_auth_signature()
+                self.assertNotEqual(after_logout, before)
+                self.assertEqual(after_logout, "")
+
+    def test_adr0043_ac07_ac08_claude_code_auth_signature_ignores_material_and_the_unrelated_mcp_block(self):
+        """AC-07/AC-08 for claude-code, PLUS the trap the context pack names explicitly:
+        `~/.claude/.credentials.json` also holds `mcpOAuth` (today a Vercel token) in the
+        SAME file -- a refresh of that UNRELATED MCP credential must never move this
+        signature, only a real Claude Code OAuth refresh (harmless, ignored) or a real
+        logout (file deleted, signature changes) may."""
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td); claude_dir = home / ".claude"; claude_dir.mkdir()
+            creds = claude_dir / ".credentials.json"
+            base_oauth = {"accessToken": "secret-before", "expiresAt": 1000, "rateLimitTier": "tier1",
+                         "refreshToken": "refresh-before", "refreshTokenExpiresAt": 2000,
+                         "scopes": ["user:inference"], "subscriptionType": "max"}
+            creds.write_text(json.dumps({"claudeAiOauth": base_oauth,
+                                         "mcpOAuth": {"vercel": {"accessToken": "vercel-secret-before"}}}))
+            with mock.patch.object(cat.Path, "home", return_value=home):
+                before = cat._claude_code_auth_signature()
+                self.assertTrue(before)
+                self.assertNotIn("secret-before", before)
+                # AC-08 property 1: a Claude Code refresh rotates accessToken/expiresAt/
+                # refreshToken/refreshTokenExpiresAt, keeps the three fields read here.
+                refreshed_oauth = {**base_oauth, "accessToken": "secret-AFTER", "expiresAt": 9999,
+                                   "refreshToken": "refresh-AFTER", "refreshTokenExpiresAt": 8888}
+                creds.write_text(json.dumps({"claudeAiOauth": refreshed_oauth,
+                                             "mcpOAuth": {"vercel": {"accessToken": "vercel-secret-before"}}}))
+                self.assertEqual(cat._claude_code_auth_signature(), before)
+                # The trap itself: an UNRELATED MCP token refresh must never move this.
+                creds.write_text(json.dumps({"claudeAiOauth": refreshed_oauth,
+                                             "mcpOAuth": {"vercel": {"accessToken": "vercel-secret-AFTER-mcp-refresh"}}}))
+                self.assertEqual(cat._claude_code_auth_signature(), before)
+                # AC-08 property 2: logout/delete.
+                creds.unlink()
+                after_logout = cat._claude_code_auth_signature()
+                self.assertNotEqual(after_logout, before)
+                self.assertEqual(after_logout, "")
+
+    def test_adr0043_ac07_pi_auth_signature_folds_provider_keys_and_the_pinned_version(self):
+        from routing_core import catalog as cat
+        with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"anthropic"})):
+            with_anthropic = cat._pi_auth_signature()
+        with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset()):
+            without = cat._pi_auth_signature()
+        self.assertNotEqual(with_anthropic, without)
+        # P3-SEC-002 repair (022 PKG-3, AC-09): an empty key-set (file absent, symlink,
+        # foreign-owned, corrupt/foreign-shaped JSON) must fail closed to the EMPTY
+        # STRING specifically -- not merely "different from a real signature". Before
+        # this repair, `without` above was a fixed non-empty hash of
+        # `"|" + PI_PINNED_VERSION"` (empty names, real pin), which is what made it
+        # merely "different" rather than the empty sentinel `_cache_key`'s other five
+        # signatures already use to mean "skip the cache, this runtime is unreadable".
+        self.assertEqual(without, "")
+        self.assertTrue(with_anthropic)
+        with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"anthropic"})), \
+             mock.patch.object(cat, "PI_PINNED_VERSION", "9.9.9"):
+            different_pin = cat._pi_auth_signature()
+        self.assertNotEqual(with_anthropic, different_pin)
+
+    def test_adr0043_p3sec002_repair_pi_auth_signature_never_participates_in_the_real_authentication_decision(self):
+        """P3-SEC-002 repair (022 PKG-3, AC-09): `_pi_auth_signature()`'s ONLY consumer is
+        `_cache_key` (cache freshness, `catalog.py:~535`); the REAL per-pair
+        authentication decision for pi is `_probe_pairs`'s `else: # pi` branch calling
+        `pi_auth_provider_keys()` DIRECTLY (`catalog.py:753`), a call site
+        `_pi_auth_signature` never touches. Structural proof, through the real decision
+        function (`probe_inventory`'s `pairs=` fresh lane, never cached): forcing
+        `_pi_auth_signature` to a FIXED non-empty value -- exactly the shape the
+        pre-repair bug always produced even with an EMPTY key-set -- never changes
+        whether the pi/openai-codex pair is returned; only flipping
+        `pi_auth_provider_keys()` itself does. This is the guarantee the repair task
+        explicitly requires: an empty `_pi_auth_signature()` can only ever cost a cache
+        miss, never fabricate or suppress a decision."""
+        from routing_core import catalog as cat
+        def fake_run(argv, **kwargs):
+            if argv[:2] == ("pnpm", "dlx"):
+                return types.SimpleNamespace(returncode=0, stdout="provider model\nopenai-codex gpt-5.6-luna\n", stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run):
+            # No credentials: the pair is absent, REGARDLESS of what the signature says
+            # -- even a forced non-empty stub pretending to be a real signature.
+            with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset()), \
+                 mock.patch.object(cat, "_pi_auth_signature", return_value="forced-nonempty-pretending-to-be-real"):
+                no_creds = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+            self.assertNotIn(("pi", "openai-codex"), no_creds)
+            # Credentials present: the pair IS returned, regardless of the signature.
+            with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"openai-codex"})), \
+                 mock.patch.object(cat, "_pi_auth_signature", return_value=""):
+                with_creds = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+            self.assertEqual(with_creds[("pi", "openai-codex")], {"gpt-5.6-luna"})
+
+    def test_adr0043_ac07_binary_signature_covers_opencode_codex_and_claude(self):
+        """Generalizes the pre-existing opencode-only binary signature (ADR-0034 AC-08)
+        to `codex`/`claude` too -- a binary swap (mtime change) must move the signature,
+        and an unresolvable binary must fail closed to a fixed per-name sentinel."""
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "codex"; path.write_text("#!/bin/sh\n"); path.chmod(0o755)
+            with mock.patch.object(cat.shutil, "which", side_effect=lambda name: str(path) if name == "codex" else None):
+                present = cat._binary_signature("codex")
+                self.assertNotEqual(present, "codex:absent")
+                older = os.stat(path)
+                os.utime(path, (older.st_atime, older.st_mtime + 5))
+                bumped = cat._binary_signature("codex")
+                self.assertNotEqual(present, bumped)
+                self.assertEqual(cat._binary_signature("claude"), "claude:absent")
+
+    def test_adr0043_ac07_cache_key_folds_every_runtime_signature(self):
+        """`_cache_key` is a SINGLE hash covering the whole probe-cache document (every
+        runtime's pairs at once) -- a change in ANY one of the six new signatures must
+        move the overall key, exactly like the pre-existing opencode-only binary
+        signature already did."""
+        from routing_core import catalog as cat
+        base = cat._cache_key(self.config)
+        with mock.patch.object(cat, "_codex_auth_signature", return_value="different-codex"):
+            self.assertNotEqual(cat._cache_key(self.config), base)
+        with mock.patch.object(cat, "_claude_code_auth_signature", return_value="different-claude"):
+            self.assertNotEqual(cat._cache_key(self.config), base)
+        with mock.patch.object(cat, "_pi_auth_signature", return_value="different-pi"):
+            self.assertNotEqual(cat._cache_key(self.config), base)
+        # Confirms _binary_signature is actually invoked for all THREE binaries, not
+        # merely that mocking it changes the result (a name-blind mock could pass even
+        # if `_cache_key` only ever called it for "opencode", the pre-existing call).
+        calls = []
+        original = cat._binary_signature
+        def spy(name):
+            calls.append(name)
+            return original(name)
+        with mock.patch.object(cat, "_binary_signature", side_effect=spy):
+            cat._cache_key(self.config)
+        self.assertEqual(sorted(calls), ["claude", "codex", "opencode"])
+        with mock.patch.object(cat, "_binary_signature", side_effect=lambda name: f"{name}:forced-different"):
+            self.assertNotEqual(cat._cache_key(self.config), base)
+
+    def test_adr0043_ac07_cache_key_never_spawns_a_subprocess_for_the_new_signatures(self):
+        """Trap #2 (context pack): AC-07 adds six new stat/local-read signatures to
+        `_cache_key` without a single new subprocess -- the ONE subprocess the whole
+        cache-key computation ever pays is `_live_opencode_auth_signature`, called by the
+        CALLER (`probe_inventory`) and passed in as `auth_signature`, never invoked from
+        `_cache_key` itself (the no-argument call below never touches it)."""
+        from routing_core import catalog as cat
+        def fail(*a, **k):
+            raise AssertionError("no subprocess may run while computing _cache_key")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fail):
+            cat._cache_key(self.config)  # must not raise
+
+    def test_adr0043_ac07_ac08_codex_refresh_keeps_the_cache_warm_and_logout_invalidates_it_via_probe_inventory(self):
+        """End-to-end AC-08 property proof, through `probe_inventory` itself (never a
+        real `codex logout` -- the credential file is deleted directly, same discipline
+        the task instructions require): a refresh keeps the cache warm (codex is never
+        reprobed); a logout misses the cache on the VERY NEXT call, still well inside
+        PROBE_CACHE_TTL (300s) -- unlike before this package, where only opencode's
+        credential change was ever visible before the TTL expired."""
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            home = Path(td) / "home"; (home / ".codex").mkdir(parents=True)
+            auth = home / ".codex" / "auth.json"
+            auth.write_text(json.dumps({"tokens": {"account_id": "acct_1", "access_token": "before"}}))
+            cache_root = Path(td) / "root"; cache_root.mkdir(mode=0o700)
+            old_path = os.environ["PATH"]; os.environ["PATH"] = f"{bins}:{old_path}"
+            try:
+                with mock.patch.object(cat.Path, "home", return_value=home):
+                    cold = cat.probe_inventory(self.config, cache_root=cache_root, now=1000.0)
+                    self.assertIn(("codex", "openai-codex"), cold)
+                    auth.write_text(json.dumps({"tokens": {"account_id": "acct_1", "access_token": "AFTER"}}))
+                    log.write_text("")
+                    warm = cat.probe_inventory(self.config, cache_root=cache_root, now=1001.0)
+                    self.assertEqual(warm, cold)
+                    self.assertNotIn("bin/codex", log.read_text())
+                    auth.unlink()
+                    log.write_text("")
+                    cat.probe_inventory(self.config, cache_root=cache_root, now=1002.0)
+                    self.assertIn("bin/codex", log.read_text())
+            finally:
+                os.environ["PATH"] = old_path
+
+    def test_adr0043_ac09_credential_signatures_fail_closed_on_symlink_and_corrupt_or_foreign_shaped_json(self):
+        """Same discipline as `test_pi_auth_provider_keys_reads_names_only_and_fails_closed`
+        above, extended to the two new credential readers: a symlink is never followed,
+        and corrupt/foreign-shaped JSON never raises -- always the empty signature.
+
+        P3-SEC-001 repair (022 PKG-3): before this repair, every case below that is a
+        JSON OBJECT (never a top-level list) sailed straight past `_read_credential_json`
+        (which only rejects non-dict TOP-LEVEL shapes) and reached the hashing step with
+        a missing/mistyped nested field silently defaulting to a placeholder (`""`/
+        `"None"`) that still got folded into a real-looking, non-empty hash -- fail-open.
+        This test previously only exercised top-level LISTS (`["not", "a", "dict"]`),
+        never an incomplete or mistyped OBJECT, so it stayed green while the fail-open
+        gap it claimed to cover was live; the cases below close that gap: an empty
+        object, a wrong-typed nested field, and a partially-populated object, for BOTH
+        codex and claude-code. A fully-valid shape is asserted non-empty at the end so
+        the new validation doesn't over-trigger and fail-close everything."""
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td)
+            (home / ".codex").mkdir(); (home / ".claude").mkdir()
+            codex_auth = home / ".codex" / "auth.json"
+            claude_creds = home / ".claude" / ".credentials.json"
+            with mock.patch.object(cat.Path, "home", return_value=home):
+                self.assertEqual(cat._codex_auth_signature(), "")
+                self.assertEqual(cat._claude_code_auth_signature(), "")
+                real = home / "real-secret.json"
+                real.write_text(json.dumps({"tokens": {"account_id": "x"}}))
+                codex_auth.symlink_to(real)
+                self.assertEqual(cat._codex_auth_signature(), "")
+                codex_auth.unlink()
+                codex_auth.write_text("not json at all")
+                claude_creds.write_text("not json at all")
+                self.assertEqual(cat._codex_auth_signature(), "")
+                self.assertEqual(cat._claude_code_auth_signature(), "")
+                codex_auth.write_text(json.dumps(["not", "a", "dict"]))
+                claude_creds.write_text(json.dumps(["not", "a", "dict"]))
+                self.assertEqual(cat._codex_auth_signature(), "")
+                self.assertEqual(cat._claude_code_auth_signature(), "")
+                # P3-SEC-001: a JSON OBJECT that is entirely empty -- the exact shape the
+                # orchestrator reproduced live (`{}` / `{"claudeAiOauth": {}}`).
+                codex_auth.write_text(json.dumps({}))
+                claude_creds.write_text(json.dumps({"claudeAiOauth": {}}))
+                self.assertEqual(cat._codex_auth_signature(), "")
+                self.assertEqual(cat._claude_code_auth_signature(), "")
+                # P3-SEC-001: nested field present but the WRONG TYPE.
+                codex_auth.write_text(json.dumps({"tokens": ["not", "a", "dict"]}))
+                claude_creds.write_text(json.dumps(
+                    {"claudeAiOauth": {"scopes": "not-a-list", "subscriptionType": "max", "rateLimitTier": "t"}}))
+                self.assertEqual(cat._codex_auth_signature(), "")
+                self.assertEqual(cat._claude_code_auth_signature(), "")
+                codex_auth.write_text(json.dumps({"tokens": {"account_id": 123}}))
+                self.assertEqual(cat._codex_auth_signature(), "")
+                # P3-SEC-001: PARTIALLY populated object -- one required field missing.
+                codex_auth.write_text(json.dumps({"tokens": {}}))  # account_id key absent
+                claude_creds.write_text(json.dumps(
+                    {"claudeAiOauth": {"scopes": ["a"], "subscriptionType": "max"}}))  # rateLimitTier absent
+                self.assertEqual(cat._codex_auth_signature(), "")
+                self.assertEqual(cat._claude_code_auth_signature(), "")
+                # Control: a fully-valid shape must still produce a real, non-empty
+                # signature -- the new checks reject only bad shapes, never good ones.
+                codex_auth.write_text(json.dumps({"tokens": {"account_id": "acct_x"}, "OPENAI_API_KEY": "k"}))
+                claude_creds.write_text(json.dumps(
+                    {"claudeAiOauth": {"scopes": ["a"], "subscriptionType": "max", "rateLimitTier": "t"}}))
+                self.assertTrue(cat._codex_auth_signature())
+                self.assertTrue(cat._claude_code_auth_signature())
+
+    def test_adr0043_ac09_cache_schema_version_bump_invalidates_old_cache_documents(self):
+        """AC-09: bumping `_CACHE_SCHEMA_VERSION` must change `_cache_key`'s output, and a
+        cache document written and keyed under the OLD version must never read back as
+        valid once the constant has moved -- there was no test for this before this
+        package (context pack: "hoy no existe ninguno")."""
+        from routing_core import catalog as cat
+        # ADR-0043 AC-09: the bump actually happened (2 -> 3) -- this literal pins that a
+        # future change reverting it (or forgetting a NEW bump when the key semantics
+        # move again) is caught here, not only by the relative comparison below.
+        self.assertEqual(cat._CACHE_SCHEMA_VERSION, 3)
+        with mock.patch.object(cat, "_CACHE_SCHEMA_VERSION", cat._CACHE_SCHEMA_VERSION - 1):
+            old_key = cat._cache_key(self.config)
+        new_key = cat._cache_key(self.config)
+        self.assertNotEqual(old_key, new_key)
+        with tempfile.TemporaryDirectory() as td:
+            cache_root = Path(td) / "root"; cache_root.mkdir(mode=0o700)
+            doc = {"key": old_key, "at": 1000.0, "pairs": {}}
+            path = cache_root / "probe-cache.json"; path.write_text(json.dumps(doc)); path.chmod(0o600)
+            self.assertIsNone(cat._read_probe_cache(cache_root, new_key, 1000.5, self.config))
+
+    def test_adr0043_ac10_prune_legacy_probe_cache_removes_only_the_validated_sibling_file(self):
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "legacy"; root.mkdir(mode=0o700)
+            legacy = root / "probe-cache.json"
+            legacy.write_text(json.dumps({"key": "x", "at": 1.0, "pairs": {}}))
+            os.chmod(legacy, 0o600)
+            sibling = root / "config.toml"; sibling.write_text("untouched = true\n")
+            self.assertTrue(cat.prune_legacy_probe_cache(root))
+            self.assertFalse(legacy.exists())
+            self.assertTrue(sibling.exists())  # never touches anything else in the directory
+            self.assertTrue(root.exists())  # never removes the directory itself
+            self.assertFalse(cat.prune_legacy_probe_cache(root))  # idempotent no-op
+
+    def test_adr0043_ac10_prune_legacy_probe_cache_never_crosses_a_symlink_or_a_wrong_mode_directory(self):
+        """Same `_validate_cache_dir`/file-validation discipline as `_write_probe_cache`
+        (`test_probe_cache_ignores_unvalidated_directory` above) -- mirrored exactly for
+        the pruning path, in both directions (a symlinked/wrong-mode directory, and a
+        symlinked file inside an otherwise-valid one)."""
+        from routing_core import catalog as cat
+        with tempfile.TemporaryDirectory() as td:
+            real = Path(td) / "real"; real.mkdir(mode=0o700)
+            (real / "probe-cache.json").write_text("{}"); os.chmod(real / "probe-cache.json", 0o600)
+            link = Path(td) / "link"; link.symlink_to(real)
+            self.assertFalse(cat.prune_legacy_probe_cache(link))
+            self.assertTrue((real / "probe-cache.json").exists())
+            wrong_mode = Path(td) / "wrong"; wrong_mode.mkdir(mode=0o755)
+            (wrong_mode / "probe-cache.json").write_text("{}"); os.chmod(wrong_mode / "probe-cache.json", 0o600)
+            self.assertFalse(cat.prune_legacy_probe_cache(wrong_mode))
+            self.assertTrue((wrong_mode / "probe-cache.json").exists())
+            valid = Path(td) / "valid"; valid.mkdir(mode=0o700)
+            target = Path(td) / "target-secret.json"; target.write_text("{}")
+            (valid / "probe-cache.json").symlink_to(target)
+            self.assertFalse(cat.prune_legacy_probe_cache(valid))
+            self.assertTrue(target.exists())
+
+    def test_adr0043_ac10_probe_cache_root_follows_the_routing_test_root_seam_not_state_dir(self):
+        import set_agents_app as app
+        with tempfile.TemporaryDirectory() as td:
+            routing_root = Path(td) / "routing-root"
+            with mock.patch.object(app, "ROUTING_TEST_ROOT", str(routing_root)):
+                self.assertEqual(app._probe_cache_root(), routing_root)
+
+    def test_adr0043_ac10_cmd_route_doctor_uses_the_single_root_and_prunes_the_legacy_file(self):
+        """AC-10 closure criterion: `--route-doctor` reports on the SAME cache root the
+        decider actually uses -- the legacy `STATE_DIR` root it used to inspect is only
+        ever touched here to prune the stale sibling file (`_validate_cache_dir`
+        discipline, same as `_write_probe_cache`)."""
+        import set_agents_app as app
+        with tempfile.TemporaryDirectory() as td:
+            legacy_state = Path(td) / "legacy-state"; legacy_state.mkdir(mode=0o700)
+            legacy_cache = legacy_state / "probe-cache.json"
+            legacy_cache.write_text(json.dumps({"key": "stale", "at": 1.0, "pairs": {}}))
+            os.chmod(legacy_cache, 0o600)
+            routing_root = Path(td) / "routing-root"
+            captured = {}
+            def fake_route_doctor(config, cache_root=None, **kwargs):
+                captured["cache_root"] = cache_root
+                return {"providers": [], "cache": {"used": False, "reason": "CACHE_ROOT_ABSENT"}}
+            with mock.patch.object(app, "STATE_DIR", legacy_state), \
+                 mock.patch.object(app, "ROUTING_TEST_ROOT", str(routing_root)), \
+                 mock.patch("routing_core.catalog.route_doctor", side_effect=fake_route_doctor):
+                self.assertEqual(app.cmd_route_doctor(), 0)
+            self.assertEqual(captured["cache_root"], routing_root)
+            self.assertFalse(legacy_cache.exists())
+
+    def test_adr0043_ac10_cmd_doctor_all_uses_the_single_root_and_prunes_the_legacy_file(self):
+        import set_agents_app as app
+        with tempfile.TemporaryDirectory() as td:
+            legacy_state = Path(td) / "legacy-state"; legacy_state.mkdir(mode=0o700)
+            legacy_cache = legacy_state / "probe-cache.json"
+            legacy_cache.write_text(json.dumps({"key": "stale", "at": 1.0, "pairs": {}}))
+            os.chmod(legacy_cache, 0o600)
+            routing_root = Path(td) / "routing-root"
+            captured = {}
+            def fake_probe_inventory(config, cache_root=None, **kwargs):
+                captured["cache_root"] = cache_root
+                return {}
+            with mock.patch.object(app, "STATE_DIR", legacy_state), \
+                 mock.patch.object(app, "ROUTING_TEST_ROOT", str(routing_root)), \
+                 mock.patch("routing_core.catalog.probe_inventory", side_effect=fake_probe_inventory):
+                self.assertEqual(app.cmd_doctor_all(), 0)
+            self.assertEqual(captured["cache_root"], routing_root)
+            self.assertFalse(legacy_cache.exists())
+
+    def test_adr0043_ac10_models_config_probe_cache_root_is_the_single_store_root_not_state_dir(self):
+        root = models_config._probe_cache_root()
+        self.assertTrue(str(root).endswith("/routing-v2"))
+        self.assertNotEqual(root, Path.home() / ".local/state/set-agentes")
+
+    def test_adr0043_ac10_no_call_site_still_passes_the_legacy_state_dir_shaped_root(self):
+        """Source-grep tripwire, same style as test_adr0034_ac02_... above: a future edit
+        reintroducing `cache_root=STATE_DIR` (or the equivalent bare `Path.home() /
+        ".local/state/set-agentes"` literal in models_config.py) would silently reopen
+        the two-caches defect this whole package exists to close."""
+        app_source = (ROOT / "ai/scripts/set_agents_app.py").read_text()
+        self.assertNotIn("cache_root=STATE_DIR", app_source)
+        self.assertEqual(app_source.count("cache_root=_probe_cache_root()"), 4)
+        mc_source = (ROOT / "ai/scripts/models_config.py").read_text()
+        self.assertNotIn('Path.home() / ".local/state/set-agentes"', mc_source)
+        self.assertEqual(mc_source.count("cache_root=_probe_cache_root()"), 2)
 
     # --------------------------------------------------- ADR-0034 (019 PKG-1, AC-02..09)
 
@@ -4001,6 +4854,71 @@ class RoutingTests(unittest.TestCase):
         # derivation intersects against the audited provider set and drops it.
         bogus_inventory = {("opencode", "github-copilot"): {"some-copilot-model"}}
         self.assertEqual(routing_catalog.resolve_discovered_providers(config, bogus_inventory), ())
+
+    # ------------------------------------------------- ADR-0042 (022 PKG-1): single provider
+    # registry -- `provider_registry.PROVIDERS` is now the one source every provider-keyed
+    # table below derives from, replacing six independently hand-edited literal copies.
+
+    def test_adr0042_ac01_ac02_all_seven_provider_tables_are_byte_identical_to_the_pre_refactor_literals(self):
+        # AC-02 characterization: every literal pasted here is the EXACT pre-ADR-0042 value
+        # (copied from the removed literals, not imported from provider_registry or derived
+        # in this test) -- proves the refactor changed plumbing, never values. Order matters
+        # only for the tuple (AC-01's provider-registry insertion order contract); the dicts
+        # and the set compare by value, so their literal order below is not significant.
+        self.assertEqual(list(provider_registry.PROVIDERS),
+                         ["openai-codex", "anthropic", "opencode-zen", "opencode-go"])
+        self.assertEqual(routing_catalog._OPENCODE_PROVIDER_KEYS, {
+            "openai-codex": "openai", "anthropic": "anthropic",
+            "opencode-zen": "opencode zen", "opencode-go": "opencode go",
+        })
+        self.assertEqual(routing_catalog._OPENCODE_CLI_IDS, {
+            "openai-codex": "openai", "anthropic": "anthropic",
+            "opencode-zen": "opencode", "opencode-go": "opencode-go",
+        })
+        self.assertEqual(routing_catalog.PROVIDER_BILLING_KIND, {
+            "openai-codex": "subscription", "anthropic": "subscription",
+            "opencode-go": "subscription", "opencode-zen": "metered",
+        })
+        # AC-01's fifth symbol: the key map that used to live INLINE inside
+        # `_configured_models` (a local dict literal, unreachable from outside the function)
+        # is now the module-level `_CATALOG_KEYS`, itself derived from `PROVIDERS`.
+        self.assertEqual(routing_catalog._CATALOG_KEYS, {
+            "openai-codex": "codex", "anthropic": "claude",
+            "opencode-zen": "opencode_zen", "opencode-go": "opencode_go",
+        })
+        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+                         {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+                         ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
+
+    def test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source(self):
+        # AC-01b: before this ADR, the ONLY assertion touching `_MODEL_PREFERENCE_PROVIDERS`
+        # lived at test_adr0034_ac09_write_cli_validates_pins_against_the_effective_set_
+        # not_just_the_constant (below, :3965 pre-refactor line count) -- inside a
+        # `mock.patch` block whose real purpose is testing the live-probe degrade path, and
+        # it compared against ANOTHER hardcoded literal, never against the audited source.
+        # That test is untouched by this package (still passes, proven by the full-suite
+        # gate) and still is not the guard -- THIS is the guard: two independent
+        # cross-checks against the real source, neither of them a second copy-pasted tuple.
+        #
+        # Cross-check 1: same pattern as test_adr0034_ac10_discoverable_providers_lockstep_
+        # guard above (which only ever covered DISCOVERABLE_PROVIDERS, never this tuple,
+        # despite set_agents_app.py's own comment claiming otherwise pre-ADR-0042) --
+        # membership against `_PAIR_COMMANDS`'s own audited provider set.
+        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
+        self.assertEqual(set(set_agents_app._MODEL_PREFERENCE_PROVIDERS), pair_providers)
+        # Cross-check 2 (P1 repair, finding F01): comparing against `tuple(provider_
+        # registry.PROVIDERS)` directly, as this test did before the repair, WAS the
+        # false-green this package exists to close -- both sides re-derive from the SAME
+        # dict, so renaming, adding, removing, or reordering a `PROVIDERS` entry moves them
+        # together and the assertion stays green no matter what. The independent check is a
+        # hand-pinned literal of the audited universe instead, deliberately NOT imported or
+        # derived from `provider_registry`: a TEST is allowed to hardcode the universe it
+        # audits (that is its job -- fail noisily the moment someone changes it, on purpose
+        # or not); only PRODUCTION code must never hand-maintain a second copy. Do not "fix"
+        # this by deriving the literal below from PROVIDERS again.
+        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+                          ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
 
     # --------------------------------------------- 014-model-preference-policy (AC-01..09)
 

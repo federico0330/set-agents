@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-12T21:09:06+00:00
+Actualizado: 2026-08-13T13:40:43+00:00
 
 ## Features
 
@@ -26,6 +26,8 @@ Actualizado: 2026-08-12T21:09:06+00:00
 | 019-harness-evolution | feature | DONE | P5-tools-discovery (accepted) | 5/5 | 14/12 | 1/2 | 0 | - | - | 2026-08-12T02:43:19+00:00 transition |
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
+| 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
+| 026-orquestador-elige-modelo | scoped | PACKAGE_PLANNING | P2-modelo-por-instancia (planned) | 0/2 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T13:38:43+00:00 create-package |
 
 ## Quick-fixes recientes
 
@@ -37,63 +39,63 @@ Actualizado: 2026-08-12T21:09:06+00:00
 
 ## Bitácora (últimos 15)
 
-[2026-08-12T21:09:05+00:00] done
-Cliente: La feature 021 quedo cerrada. El control que decia verificar que los archivos generados estaban al dia ahora los verifica de verdad, y cuando el harness trabaja varios minutos se nota en vez de parecer colgado.
-Ingeniería: 021 DONE. 2 paquetes, ADR-0041. build.sh --check pasa de no comparar nada a comparar los 4 arboles con perfil go-zen fijo; heartbeat-run.py mas la doctrina imperativa en spawn-prompt y punteros en los skills del ejecutor. Suite 970 -> 979. Los gates finales se corrieron CON heartbeat-run.py y emitio 4 latidos en 489s.
+[2026-08-13T12:31:26+00:00] P5-altas-y-bajas-automaticas · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un revisor de otro proveedor confirma que el harness no se inventa proveedores y que dice la verdad sobre lo que midio.
+Ingeniería: Writer claude-code/anthropic/opus (run1_12758dae; murio por error de API tras escribir codigo y tests, los gates los corrio el orquestador: 1065 OK, VERIFY_PASS). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_7513f638, independence_verified=true. Asignacion acotada a 3 puntos + mordida, con prohibicion explicita de leer spec/evidencias: el primer reviewer de P4 murio consumido leyendo.
 
-[2026-08-12T20:21:56+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
-Cliente: Segunda mitad de la verificacion independiente.
-Ingeniería: Parte B: AC-07 (donde vive la doctrina y si propaga de verdad), AC-09 (el test y su mordida), residuos del antipatron, y la pregunta de si AC-07 promete mas de lo que entrega dado que la doctrina la carga el que REDACTA y no el que ejecuta. Sin suite completa.
+[2026-08-13T09:14:38+00:00] P5-altas-y-bajas-automaticas · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que activar una suscripcion alcance para poder usarla, y darla de baja se note, sin tocar nada.
+Ingeniería: P5 de 022 (AC-16..19), ultimo paquete. Evidencia en vivo: github copilot figura authenticated=true detected_unlistable=true models_listable=0; openai-codex lista 6 modelos y su inferencia devolvio token vencido (listable != usable); ollama declarado con 3 modelos y endpoint muerto (curl 000). La heuristica espacio->guion es trampa: el CLI id de opencode-zen es 'opencode'. AC-19 toca las TRES supe…
 
-[2026-08-12T20:21:56+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
-Cliente: Primera mitad de la verificacion independiente, en dos partes chicas porque la version completa murio dos veces.
-Ingeniería: Review PARTIDO tras dos muertes por stall del encargo completo (decision registrada en slug sexto-stall-segunda-muerte-del-mismo-encargo, Federico eligio la opcion a). Parte A: AC-06 heartbeat-run.py y sus bordes, mas AC-08. Sin suite completa. Misma decision de routing para las dos mitades.
+[2026-08-13T09:07:14+00:00] P4-proveedores-del-usuario · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un revisor de otro proveedor confirma que quitar un proveedor funciona y que la limpieza no te borra nada tuyo.
+Ingeniería: Writer claude-code/anthropic/opus (run1_f193bfbd). Reviewer codex/openai-codex/gpt-5.6-terra, independence_verified=true. Se le pide dictaminar tambien el desvio de alcance a provider_registry.py que el implementer flageo solo.
 
-[2026-08-12T18:07:34+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
-Cliente: Ultima verificacion independiente antes de cerrar esta feature.
-Ingeniería: package-reviewer sobre 021/P2: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-luna. Re-decidido con risk=medium tras un primer decide con risk=low que devolvia haiku: el paquete agrega un script ejecutable que corren los agentes y doctrina que propaga a los 4 arboles, no es low. El paquete se completo en DOS instancias: la primera murio por limite de sesion dej…
+[2026-08-13T07:11:14+00:00] P4-proveedores-del-usuario · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que puedas agregar y sobre todo QUITAR proveedores desde la aplicacion, sin que el proximo install te los reponga.
+Ingeniería: P4 de 022 (AC-11..15). Medicion clave del pack: el bloque ollama del opencode.json del usuario es BYTE-IDENTICO al que envia Global/_shared/opencode.json:5-23, o sea no lo agrego el; y el endpoint esta muerto (curl 000). El caso real es quitar lo que el harness impuso, no lo que el usuario agrego. AC-13 renderiza el bloque desde el registro; AC-14 extiende la poda de archivos a subarboles JSON y …
 
-[2026-08-12T15:59:43+00:00] P2-gates-que-no-callan · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
-Cliente: Ultimo tramo de esta feature: que cuando el harness este trabajando varios minutos, se note, en vez de parecer colgado.
-Ingeniería: P2 de 021 (AC-06..09). Causa raiz CORREGIDA: no es buffering del escritor sino que tail -N sin -f no puede emitir hasta EOF; stdbuf NO lo arregla, verificado. AC-09 es prevencion hacia adelante, no correccion: el patron no esta en ningun archivo versionado (grep da cero en Global/_canonical y en los context packs), vivia en texto efimero de spawn. Patron de grep ya fijado en la spec: barra-vertic…
+[2026-08-13T06:21:25+00:00] P3-liveness-real · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Ultima verificacion independiente antes de dar por bueno el paquete.
+Ingeniería: Reparador claude-code/anthropic/opus (run1_ccfef5c2). Delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_686d1590, independence_verified=true. Es el segundo y ultimo ciclo de review del presupuesto.
 
-[2026-08-12T14:28:51+00:00] P1-check-que-verifica · package-reviewer · started · modelo anthropic/sonnet · effort medium
-Cliente: Un revisor independiente comprueba que el control arreglado detecta de verdad, y que no rompio el instalador ni el cambio de modelos.
-Ingeniería: package-reviewer sobre 021/P1: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol. Eje critico: el implementer TOCO setup_models.py, que el context pack no listaba en owned_paths, porque encontro que la nota del orquestador ('sigue funcionando sin tocarlo') era falsa. Hay que validar el hallazgo, el arreglo y la ampliacion de alcance.
+[2026-08-13T05:44:21+00:00] P3-liveness-real · repair-agent · started · modelo anthropic/opus · effort medium
+Cliente: Cerrar el ultimo agujero del mismo tipo: un archivo de credenciales con forma rara que el harness daba por bueno.
+Ingeniería: P3-F03 critical: pi_auth_provider_keys acepta {'openai-codex': []} y hasta {'proveedor-inventado': {...}}, devolviendo keyset y firma no vacios. Ultimo ciclo de review disponible (1 de 2 consumido). Se pide ademas barrida sistematica: toda funcion que lea credenciales valida forma, todo test que diga cubrir 'foreign shape' cubre objetos.
 
-[2026-08-12T13:35:29+00:00] P1-check-que-verifica · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
-Cliente: Arreglar el control que decia verificar que los archivos generados estaban al dia y en realidad no verificaba nada.
-Ingeniería: P1 de 021 (AC-01..05): --check compara el STAGING contra los 4 arboles con --profile go-zen FIJO (decision de Federico: con perfil local rompe install.sh:370 y setup_models.py). Reusa el diff de verify.sh:26-28, no el de --diff que lleva || true. AC-04 se resuelve por ORDENAMIENTO, sin tocar los 17 call sites.
+[2026-08-13T05:37:36+00:00] P3-liveness-real · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un tercer revisor confirma que los dos agujeros de seguridad quedaron cerrados y no se abrio otro.
+Ingeniería: Delta acotado a catalog.py (firmas) y tests/test_routing.py. Reparador claude-code/anthropic/opus; delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_2eeb028a, independence_verified=true.
 
-[2026-08-12T11:19:21+00:00] done
-Cliente: La feature 020 quedo cerrada. El informe de la manana ahora abre con lo que necesita tu decision, y la documentacion de modulos tiene un comando que contrasta sus referencias contra el codigo real.
-Ingeniería: 020 DONE. 2 paquetes, ADR-0040, suite 943 -> 970. P1: predicado compartido de feature viva; el digest, el hub y cmd_status dejaron de esconder lo bloqueado. P2: check_anchors.py y el comando check-anchors, con cobertura declarada honestamente (12/38 con chequeo semantico, margen de falso negativo 10-25% por ancla). Deuda de 019 sobre las anclas derivadas: cerrada.
+[2026-08-13T05:02:20+00:00] P3-liveness-real · repair-agent · started · modelo anthropic/opus · effort medium
+Cliente: Cerrar dos agujeros: cuando el archivo de credencial esta roto o ausente, el harness lo daba por bueno en vez de volver a preguntar.
+Ingeniería: P3-F01 critical: un JSON objeto con forma invalida ({} en codex, {claudeAiOauth:{}} en claude) produce firma NO vacia; y el test que dice cubrir 'foreign-shaped JSON' solo prueba listas. P3-F02 high: pi_auth_provider_keys no comprueba st_uid propio y _pi_auth_signature hashea el conjunto vacio con la version, asi que archivo ausente o symlink dan firma no vacia. Ambos reproducidos por el orquesta…
 
-[2026-08-12T05:49:58+00:00] P2-anclas-verificables · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
-Cliente: El primer intento murio por infraestructura sin escribir nada. Se relanza una vez.
-Ingeniería: Relanzamiento unico de P2. Mitigacion: escribir evidencia en el primer minuto y guardar a disco por tramo. Si vuelve a morir, se parte en dos encargos mas chicos en vez de un tercer intento completo.
+[2026-08-13T04:43:38+00:00] P3-liveness-real · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un revisor de otro proveedor audita que leer las credenciales para detectar altas y bajas no filtre nada.
+Ingeniería: Writer claude-code/anthropic/opus (run1_b2ca9919). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_1b7703d7, independence_verified=true. Se le pide ademas dictaminar si el diseno de la firma aguanta aunque el supuesto de no-rotacion resultara falso, porque la captura A/B esta pendiente de un refresh natural.
 
-[2026-08-12T05:36:28+00:00] P2-anclas-verificables · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
-Cliente: Ultimo tramo: que la documentacion de modulos no pueda decir que algo esta en una linea donde ya no esta.
-Ingeniería: P2 de 020 (AC-06..11): gramatica de dos formas de ancla con resolucion por basename acotada a los paths del modulo, comando check-anchors read-only con rc distinto de cero, verificacion semantica acotada a simbolo en backticks adyacente, enganche never-raises en sync-notes, y correccion de las anclas rotas de hoy.
+[2026-08-13T03:41:24+00:00] P3-liveness-real · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que dar de alta o de baja una suscripcion se note en la decision siguiente, no cinco minutos despues.
+Ingeniería: P3 de 022 (AC-07..10), clase security: lee archivos de credencial. Firma por runtime, todo stat/lectura local -- hoy _live_opencode_auth_signature:378 cuesta un SUBPROCESO por composicion y no hay que multiplicarlo por cuatro. Trampa medida y ausente de la spec: ~/.claude/.credentials.json contiene TAMBIEN mcpOAuth (token de Vercel), asi que hashear el archivo o su mtime rota en cada refresh de M…
 
-[2026-08-12T04:10:42+00:00] P1-digest-no-esconde · package-reviewer · started · modelo anthropic/sonnet · effort medium
-Cliente: Un revisor independiente audita el arreglo del informe matinal antes de darlo por bueno.
-Ingeniería: package-reviewer sobre 020/P1: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-sol. Eje especial: el implementer MODIFICO un fixture de test preexistente (final_state 'done' -> 'DONE'); hay que verificar que el invariante sigue probado y no que se ajusto el test para que pase.
+[2026-08-13T03:35:39+00:00] P2-techo-catalogo-tri-estado · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un revisor de otro proveedor de IA confirma que el cambio hace lo que dice y no abrio una puerta de mas.
+Ingeniería: Writer claude-code/anthropic/opus (run1_d8520988). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_0cbd3fc5, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida.
 
-[2026-08-12T03:00:02+00:00] P1-digest-no-esconde · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
-Cliente: Arranca el arreglo del informe matinal: que las cosas trabadas esperandote aparezcan primero en vez de desaparecer.
-Ingeniería: P1 de 020 (AC-01..05, AC-12): un predicado compartido de feature viva reemplaza las dos copias mal escritas (cli_reporting.py:194 y _hub_body), seccion Necesita tu decision con dias desde el ultimo blocker sin resolver, marca de estancada con las bloqueadas exentas, blocked_days/stale_days en cmd_status, y tests que fallan en rojo contra el codigo de hoy.
+[2026-08-13T02:14:54+00:00] P2-techo-catalogo-tri-estado · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que agregar un proveedor de IA nuevo deje de exigir editar un archivo de configuracion a mano.
+Ingeniería: P2 de 022 (AC-04..06). _configured_models -> resolve_ceiling con tres estados, consumido por los TRES sitios que hoy divergen: _probe_pairs:487-489 (el 'if not allowed: continue' que es el defecto), _read_probe_cache:429 (re-intersecta al leer; en auto una interseccion ingenua deja el cache siempre vacio) y build_snapshot:652-653 (que ademas tiene la lista de proveedores hardcodeada, alcance cedi…
 
-[2026-08-12T02:43:33+00:00] done
-Cliente: La feature 019 quedo cerrada: los cinco paquetes aceptados, integrados y con los gates globales en verde. El harness ahora adopta solo los proveedores que configuras, prefiere lo que ya pagas, te explica que cambio en tu forma de pensar el sistema, resuelve antes de preguntarte, y te pide permiso para sumar herramientas en vez de frenarse.
-Ingeniería: 019 DONE. 5/5 paquetes accepted, 6 module_impacts, ADRs 0034-0038 mas 0039 (arreglo del motor de estado autorizado aparte). Suite 815 -> 917 (+102), VERIFY_PASS, CHECK_PASS + SELF_SCAFFOLD_SYNC_OK files=2, git diff --check limpio. Deuda explicita registrada: las anclas file:line sembradas en docs/modules/ derivaron dentro de la misma feature (set_agents_app.py:2510 corrida +742 lineas) -- la desv…
+[2026-08-13T01:56:40+00:00] P1-registro-de-proveedores · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un tercer revisor confirma que el arreglo de los dos controles realmente funciona y no rompio nada.
+Ingeniería: Delta acotado a tests/test_routing.py (unico archivo tocado por el repair). Reparador fue claude-code/anthropic/opus; delta reviewer en codex/openai-codex/gpt-5.6-terra, dec1_c4cd7f80, independence_verified=true.
 
-[2026-08-12T02:06:32+00:00] P5-tools-discovery · integrator · started · modelo openai-codex/gpt-5.6-sol · effort balanced
-Cliente: Ultimo paso: comprobar que las cinco partes funcionan juntas y no solo por separado.
-Ingeniería: integrator sobre 019: los 5 paquetes accepted, los 5 con module_impacts registrados (el gate de INTEGRATION que construyo P3 ya paso). Verifica los criterios de cierre (a)-(f) de la seccion 3 de la spec, corre los gates globales y consolida la evidencia de entrega.
+[2026-08-13T01:27:32+00:00] P1-registro-de-proveedores · repair-agent · started · modelo anthropic/opus · effort medium
+Cliente: Arreglar dos controles automaticos que decian estar cuidando el codigo y en realidad no cuidaban nada.
+Ingeniería: P1-F01 (critical): la guarda AC-01b compara valores rederivados de la misma fuente. P1-F02 (high): el refactor volvio tautologica la guarda preexistente de ADR-0034 AC-10, que antes cruzaba dos tablas independientes. Ambas verificadas upheld por el orquestador con una mutacion unica del registro. Writer original y repair son ambos opus/anthropic; la independencia aplica al reviewer, no al reparad…
 
-[2026-08-12T01:32:09+00:00] P5-tools-discovery · delta-reviewer · started · modelo anthropic/opus · effort medium
-Cliente: Verificacion final independiente del ultimo paquete.
-Ingeniería: delta-reviewer ronda 4 sobre P5. Alcance: NEW-03 (forma nativa completa del spec mcp) y NEW-04 (transcripcion corregida). El orquestador ya re-verifico las 8 variantes en vivo. Contramedidas vigentes por decisions-log slug cuarta-verificacion-fabricada-y-patron-del-hermano: auditoria al azar en TODAS las rondas, y atacar la clase, no el ejemplo.
+[2026-08-13T01:03:16+00:00] P1-registro-de-proveedores · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Una segunda opinion, hecha por otro proveedor de IA distinto del que escribio el codigo, que revisa que el cambio no haya roto nada ni prometido de mas.
+Ingeniería: Writer fue claude-code/anthropic/opus (run1_370bfc8a). Independencia por PROVEEDOR distinto (service.py:353 la exige dura): reviewer en opencode/openai-codex/gpt-5.6-terra, decision dec1_4ac1490e, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida por la leccion de los ocho stalls.
 

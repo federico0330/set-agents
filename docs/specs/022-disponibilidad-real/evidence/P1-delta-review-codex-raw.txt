@@ -1,0 +1,1498 @@
+Reading additional input from stdin...
+OpenAI Codex v0.147.0
+--------
+workdir: /home/federico/SET-AGENTES
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: none
+session id: 019ff8d5-fadc-7183-be77-ae0570d17f0a
+--------
+user
+Actua como delta-reviewer independiente en /home/federico/SET-AGENTES. HACE LA REVISION VOS MISMO:
+no delegues, no spawnees subagentes. Sos read-only sobre el codigo de produccion.
+
+Contexto: el paquete 022/P1 introdujo ai/scripts/provider_registry.py con un PROVIDERS unico del que
+derivan siete simbolos. Un review encontro DOS hallazgos, ambos verificados, y un repair los cerro.
+Vos revisas SOLO la reparacion. No re-revises el paquete entero.
+
+El delta es UN SOLO ARCHIVO: tests/test_routing.py.
+Mira exactamente que cambio ahi: `git diff tests/test_routing.py`
+
+Los dos hallazgos que el repair dice haber cerrado:
+- P1-F01 (critical): test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+  pasaba en VERDE con el registro roto. Comparaba valores rederivados de la misma fuente.
+- P1-F02 (high): test_adr0034_ac10_discoverable_providers_lockstep_guard tambien pasaba en VERDE.
+  El refactor lo habia vuelto tautologico (los dos lados derivaban de PROVIDERS).
+
+Revisa EXACTAMENTE estos tres puntos. Nada mas.
+
+PUNTO 1 - Las dos guardas detectan de verdad?
+Aplica mutaciones a ai/scripts/provider_registry.py (copia con `cp` a /tmp primero, muta, corre,
+restaura con `cp`; NO uses git checkout/restore/stash). Proba al menos DOS formas distintas de romper
+el registro (por ejemplo renombrar una clave, y quitar un proveedor entero). Las dos guardas tienen
+que ponerse ROJAS en ambos casos. Pega el rojo literal y el verde tras restaurar.
+Si alguna pasa en verde con el registro roto, es hallazgo critical.
+
+PUNTO 2 - El arreglo es honesto o es cosmetico?
+El repair uso literales escritos a mano dentro de los tests. Eso es legitimo en un test (su trabajo es
+fallar cuando alguien cambia el universo sin querer) pero seria un defecto en codigo de produccion.
+Verifica: quedo algun literal nuevo en CODIGO DE PRODUCCION (ai/scripts/**)? `git diff` deberia mostrar
+que el unico archivo tocado es tests/test_routing.py. Confirmalo.
+Y el docstring de test_adr0034_ac10_... : sigue afirmando algo que el test no hace? Leelo y decidi.
+
+PUNTO 3 - Regresion.
+El repair no debe haber debilitado, salteado ni borrado ningun test. Confirma con
+`git diff --numstat tests/test_routing.py` que no hay lineas borradas mas alla de las que el propio
+arreglo reescribe, y revisa que no haya aparecido ningun skip/xfail nuevo.
+
+REGLAS:
+- Cada bloque que pegues es literal, o marcado como recortado. Si no lo corriste, escribi "sin verificar".
+- Comandos largos: `ai/scripts/heartbeat-run.py --interval 20 -- <comando>`. NUNCA pipees a `tail`.
+- `pytest` NO esta instalado. Usa `python3 -m unittest tests.test_routing.RoutingTests.<nombre> -v`.
+- No corras la suite entera salvo que un hallazgo lo exija.
+
+FORMATO DE SALIDA (al final de todo, texto plano):
+VEREDICTO: approved | revision_required
+Por cada hallazgo: ID / SEVERIDAD / DONDE (file:line) / QUE / PRUEBA (comando y salida literal).
+Si no hay hallazgos, decilo explicitamente y mostra igual la evidencia de los tres puntos.
+codex
+Voy a hacer una revisión delta, estrictamente de solo lectura sobre el código productivo; usaré `request-triage` para encuadrar el pedido y `audit-diff` para contrastar exclusivamente la reparación. Las mutaciones temporarias requeridas las haré sobre una copia/restauración explícita del archivo, como indicaste.
+exec
+/bin/bash -lc "sed -n '1,240p' /home/federico/.codex/skills/request-triage/SKILL.md && sed -n '1,260p' /home/federico/.codex/skills/audit-diff/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: request-triage
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (consult/analysis, feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator
+---
+
+# Request Triage
+
+## When to use
+At the very start of EVERY user request, before any delegation. Classify the request, decide the mode, ask
+what you must, then run the matching flow. Do not dive into the SDD pipeline reflexively — that is exactly the
+failure this skill exists to prevent (applying the heavy flow to a problem that needed a fast, clever fix).
+
+## Step 0 — intake (always, before delegating)
+1. Restate the request in one line and name the **mode** you are choosing + why.
+2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
+   original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
+   scoping doubt one of those already answers is resolved with `log-decision`, not asked.
+3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+   questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
+   cart".
+4. Only then delegate the first action of the chosen mode.
+
+## The five modes
+
+### 0. Consult / analysis — thinking together, no pipeline (check this FIRST)
+Triggers: "qué opinás", "cómo encararías", "analizame esta idea", comparisons, design questions — any request
+where the user wants analysis or a recommendation, not a code change. This is a first-class mode, not a
+misclassified feature.
+Flow: NO `init`, NO state file, NO pipeline. Delegate in parallel (these spawns are allowed and cheap):
+- `brainstormer` — 3-6 genuinely different options with tradeoffs,
+- `architect` — read-only pass over the three axes (relational vs non-relational vs vector store, API Gateway,
+  deploy platform) plus design patterns / clean-architecture shape; NO ADR unless the user asks,
+- `security-auditor` — design-level threat sketch, only when the idea touches auth/money/PII/external input.
+Then SYNTHESIZE yourself into ONE multi-lens analysis: data model, architecture/patterns, security,
+algorithms/complexity — ending with a recommendation plus runner-up. Close by asking: "¿Lo convierto en spec
+(feature) o en scoped?". A consult NEVER starts the pipeline on its own; if durable learning surfaced,
+delegate a `memory-scribe` note to the domain knowledge.
+
+### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
+Triggers — full SDD is chosen ONLY when at least one of these holds; otherwise drop to scoped-feature (if a
+concrete risk signal is present) or quick-fix (the default lane):
+- a net-new system or module (not an addition to established infrastructure),
+- genuinely multi-package work (several coherent packages with dependencies),
+- the request touches one of the three architecture axes (data store type, API Gateway, deploy platform)
+  with no ADR covering it.
+Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
+expect? where centralized vs decentralized? what must be secure day one? and name these three axes
+explicitly, not generically — **does persistence need vector/semantic search or does relational cover it?
+does this need an API Gateway or is it a monolith with one client? where does it deploy and why (Vercel/PaaS
+vs VPS/IaaS vs managed)?** Then the rigorous
+**SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
+Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
+validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
+integration → judge → release → memory. Tests do NOT approve implementation; the independent package reviewer
+does. This order is mandatory in feature mode; the three lanes below are the only
+exceptions (scoped-feature / quick-fix / incident).
+
+### 2. Scoped-feature — for bounded work that shows a concrete risk signal
+Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
+present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
+multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
+change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
+the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
+Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
+decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
+consolidated package review over the complete package diff** → `security-auditor` when the package
+touches that surface → regression tests → `adversarial-judge` → release → memory.
+What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
+reviewing the complete relevant package/diff once, then delta-reviewing repairs. Escalate to feature mode only
+when one of feature mode's explicit triggers appears (net-new system, multi-package, uncovered architecture
+axis) — "this feels big" is a reason to scope the package better, not to escalate.
+
+### 3. Quick-fix — the DEFAULT for small and medium bounded work
+Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the write-side half of
+the same 1-3 number `orchestrator.md`'s "Direct-read vs. delegated-explore threshold" (ADR-0020) uses for the
+read side — the two are kept as one cross-referenced constant, not two independent numbers. This is the default lane: most
+day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
+`gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
+to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
+or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
+`python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
+— quick-fixes with no trace are how the development thread gets lost.
+
+### 4. Incident / break-glass — production is broken NOW
+Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
+prod user needs a password reset and there is no forgot-password flow → a one-shot `psql` script, done).
+Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual change to `debugger`/`implementer`
+(you still never implement yourself). MANDATORY afterward — never skip: (a) write down exactly what was done,
+(b) open a follow-up task to do it properly, (c) delegate a memory note. Break-glass is a conscious, logged
+exception to the rigor default — not a licence to abandon it.
+
+Ambiguous which mode? Ask. Otherwise pick the LIGHTEST mode that covers the risk actually observed in the
+request and the code — not the hypothetical risk. Escalate only when you find a concrete signal from the
+lists above, and name that signal in the narration. Downgrading is equally legitimate: if mid-scoped the
+planner or implementer establishes the change is smaller than assumed (no signal actually present), degrade
+to quick-fix and record why with `log-decision` — escalation is not a one-way ratchet.
+
+## Physical budgets per mode (enforced by the state CLI, not by prose)
+
+The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
+`feature-state.py init` via `--mode`:
+
+| Mode | `--mode` | Spawns/package | Deep review cycles | Gate failures |
+|---|---|---|---|---|
+| Feature / SDD | `feature` (opt-in) | 12 | 2 | 3 |
+| Scoped-feature | `scoped` (default) | 8 | 2 | 3 |
+| Quick-fix | `quick-fix` | 4 | 1 | 2 |
+| Incident | `incident` | 6 | 1 | 2 |
+
+Two physical waivers keep light modes light without prose exceptions:
+- `record-repair --skip-delta` skips the delta review ONLY when every repaired finding is ≤ medium severity
+  and the repair touched ≤ 3 files (the CLI rejects it otherwise, and the waiver is recorded in the event).
+- `create-package --runtime-surface false` (planner declaration) lets a package with no observable runtime
+  surface become accept-ready after testing, without spawning `app-runner`/`runtime-verifier`. Default is
+  `true` — fail-safe.
+
+`record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
+than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,
+logged decision), do not fight the budget.
+
+## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
+Before delegating in ANY mode, check the request against the three named axes above: **data store type
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. The
+check fires on EVIDENCE, not plausibility: the request or the files it names concretely require one of these
+axes (a new kind of persistence, a new external entry point, a deploy change) AND no existing ADR covers it.
+When it fires, do not implement directly — escalate to at least `scoped-feature` with an architecture
+checkpoint (`architect` loads `system-design-decisions`, proposes options, and the orchestrator asks the user
+per its Question policy) before any code is written. This applies even to a request that looks like a
+quick-fix on its surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store
+decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
+ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
+hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+**Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+Vercel", "store it in Supabase"), that axis is DECIDED — record it with `log-decision` and proceed without
+asking; `architect` writes the formal ADR afterwards. The red-flag question is only for an axis the user
+left genuinely open.
+
+## Waking the dormant agents (concrete triggers, not "by risk")
+These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in
+the plan or the diff (the concrete files/paths the package owns: auth/, payments/, migrations/, ui
+components, .env-adjacent config), not the topic of the request in the abstract; `package-planner` justifies
+each entry in `required_reviewers` with the paths that demand it:
+- **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
+  covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
+- **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).
+- **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
+- **queries / lists / transactions / migrations** → covered by `package-reviewer`'s own data-integrity/
+  scalability checklist (already mandatory, no separate agent).
+
+**Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
+when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before
+`adversarial-judge` is mandatory.
+
+## Hard logic → hosted implementer (never the local leaf)
+Concurrency, atomic transactions, money/financial rules, and security-critical logic must NOT be implemented by
+the local leaf model (the cheap 8B) — a weak first draft on exactly this logic triggers more strong-auditor
+rework than it saves. When a task touches these, pin implementation to a **hosted** model (e.g. `openai/gpt-5.4`)
+rather than the local `implementer`. Route such implementation deliberately from the package plan. The
+local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then reviews.
+
+## Output of triage
+State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
+incident mode, also name the follow-up task you will open once the fire is out.
+
+The first delegation is announced with the dual-register narration block from `orchestrator.md`
+(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
+parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
+since a consult has no feature state file.
+---
+name: audit-diff
+description: Read-only diff audit against spec/package/acceptance — scope control, test integrity, edge cases, and a golden catalog of cheap-but-compounding mistakes. Load for focused audits or package review support.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator, package-reviewer, security-auditor, adversarial-judge
+---
+
+# Audit Diff
+
+## Posture — you supervise a cheaper implementer
+You review the work of a faster, cheaper implementer that WILL make the mistakes below. Assume it did. Walk the
+whole catalog every time, even when the code compiles and the tests pass — "it runs" is not "it's correct". Your
+job is to catch the small, cheap-to-fix failures that quietly become debt and vulnerabilities.
+
+## When to use
+After package implementation and gates, before a package is accepted; also for focused checkpoints.
+
+## Inputs
+`git diff`, approved spec, package/task scope, acceptance criteria, verification output, project rules.
+
+## Procedure
+1. Read the task and acceptance criteria FIRST — you audit the implementation against the spec/design/acceptance,
+   NOT against a passing test suite. This is the guardrail: does the code actually return what the spec expects?
+2. Inspect the diff in context, not files in isolation.
+3. Scope control: no opportunistic refactors, no unrelated churn.
+4. Test integrity — local validations are expected during package implementation; end-stage regression tests are
+   checked once they exist after package convergence. Judge correctness against the spec/package contract, not a
+   green suite alone.
+5. Failure paths and edge cases covered.
+6. **Walk the golden failure catalog below** — for anything the diff touches.
+7. Produce ONLY actionable findings.
+
+## Golden failure catalog (the cheap mistakes a fast implementer makes)
+Each is a blocking problem when present, even if the app runs. Load the linked skill for the full checklist.
+1. **Pagination in memory / none** — `ToListAsync()` then `Skip/Take` in app code. Fix: `Skip/Take` + `CountAsync`
+   in SQL, `AsNoTracking`, return `{data,total,page,pageSize}`. → `performance-scalability`.
+2. **Non-atomic multi-write** — several `SaveChanges`/commits for writes that must succeed together. Fix: ONE
+   `BeginTransaction/Commit/Rollback`. → `db-integrity`.
+3. **Concurrency that never fires** — `Version++` after `SaveChanges` (dead code). Fix: atomic conditional
+   `UPDATE ... WHERE Id=@id AND Version=@read`; 0 rows affected ⇒ conflict. → `db-integrity`.
+4. **Wrong error status** — conflict returns 500 + stack trace, or every exception collapses to a generic 400/409.
+   Fix: typed domain exceptions (Conflict→409, NotFound→404) mapped in ONE global middleware; never leak stack in
+   prod. → `error-handling-http`.
+5. **Unaudited failed attempt** — the audit `AddAsync` sits inside the rolled-back transaction / has no
+   `SaveChanges`, so failures vanish. Fix: record the failed attempt in its OWN unit of work + `SaveChanges`.
+   → `db-integrity`.
+6. **Data antipatterns** — `DateTime.Now` in business logic (use `UtcNow`); N+1 (use `Include`/projection);
+   missing `AsNoTracking` on read-only queries; magic numbers (use named `const`/config). → `performance-scalability`.
+7. **Frontend error UX** — native `alert()` instead of the app's toast; no state refresh after a 409 (stale view).
+   Fix: app notification + reload the affected state; centralize status→message mapping. → `frontend-error-ux`.
+8. **Secrets / repo hygiene** — committed connection strings/secrets; tracked `bin/`, `obj/`, `*.user`,
+   `appsettings.Development.json`; dead scaffolding (`Class1.cs`, `WeatherForecast.cs`); commented-out blocks.
+   Fix: `.gitignore` + `git rm -r --cached`. → `secrets-hygiene`.
+9. **SOLID / clean architecture (cross-cutting)** — god-functions, duplicated logic, presentation mixed with
+   data/business logic, dependencies pointing outward, missing an obvious pattern. → `clean-architecture`.
+
+## Anti-deferral rule (the reason things slip through)
+A cheap-to-fix structural failure (pagination, `AsNoTracking`, N+1, broken SOLID, missing pattern, non-atomic
+transaction, wrong status code, unaudited failure) is a finding to **fix now**, NOT to wave through as
+"acceptable for V1" or "not blocking". You may exclude something ONLY if an acceptance criterion explicitly puts
+it out of scope — and even then you record it as a finding with that justification, never a silent pass. When in
+doubt, it is a finding: it is cheaper to fix now than to let it become a vulnerability.
+
+## Nits vs. findings
+Ignore cosmetic nits (formatting, name bikeshedding, subjective style). The catalog items are NOT nits — they are
+must-fix. A finding IS a blocking problem (1); no findings = `AUDIT_PASS` (0). Do not grade severity.
+
+## Finding schema
+```
+- id: AUD-001
+  file: path/to/file.ext:line
+  evidence: exact code/behavior
+  impact: why it blocks (debt/vulnerability it becomes)
+  minimal_fix: smallest safe change
+  verification: command/test/check that proves the fix
+```
+
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).
+
+## Rule
+Never patch code here. Never approve on the implementer's word. Vague comments are not findings.
+
+codex
+Modo elegido: auditoría focalizada de reparación. El alcance está definido por vos: un único diff de pruebas y tres verificaciones concretas, sin volver a auditar el paquete.
+exec
+/bin/bash -lc "git diff -- tests/test_routing.py
+git diff --numstat -- tests/test_routing.py
+git diff --name-only
+git status --short
+rg -n -A 20 -B 5 'test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source|test_adr0034_ac10_discoverable_providers_lockstep_guard' tests/test_routing.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+diff --git i/tests/test_routing.py w/tests/test_routing.py
+index 68e76da..f4032ff 100644
+--- i/tests/test_routing.py
++++ w/tests/test_routing.py
+@@ -20,6 +20,7 @@ ROOT=Path(__file__).resolve().parents[1]
+ sys.path.insert(0,str(ROOT/"ai/scripts"))
+ import claude_code_spawn
+ import models_config
++import provider_registry
+ import routing
+ import set_agents_app
+ import set_agents_spawn
+@@ -3189,13 +3190,30 @@ class RoutingTests(unittest.TestCase):
+         self.assertEqual(result[("opencode", "opencode-zen")], {"kimi-k2.7-code"})  # glm-5.2 dropped, never invented
+ 
+     def test_adr0034_ac10_discoverable_providers_lockstep_guard(self):
+-        # ADR-0034 (019 PKG-1, AC-10): DISCOVERABLE_PROVIDERS must equal exactly the
+-        # provider half of _PAIR_COMMANDS -- the guard that keeps `github-copilot` (M-1,
+-        # unlistable) and a duplicate `openai` catalog provider (M-2, already covered by
+-        # `openai-codex`) from ever being addable to the "auto"-adopted universe without
+-        # this test failing loudly first.
++        # ADR-0034 (019 PKG-1, AC-10). Pre-ADR-0042, DISCOVERABLE_PROVIDERS and
++        # _PAIR_COMMANDS were two INDEPENDENTLY hand-maintained tables and the cross-check
++        # below was, by itself, the whole guard. Since ADR-0042 (022 PKG-1) both sides
++        # derive from the SAME source now (`provider_registry.PROVIDERS`:
++        # DISCOVERABLE_PROVIDERS directly, `_PAIR_COMMANDS`'s opencode half transitively
++        # via `_OPENCODE_CLI_IDS`) -- so that cross-check ALONE no longer catches a broken
++        # registry: renaming, adding, removing, or reordering a `PROVIDERS` entry moves
++        # both sides together and it stays green (P1 repair, finding F02; it does not test
++        # `github-copilot`/duplicate-`openai` exclusion by itself anymore). The cross-check
++        # is kept below -- it still catches the two modules' derivations disagreeing with
++        # EACH OTHER, a real bug class distinct from a broken registry -- but the guard
++        # against `github-copilot` (M-1, unlistable) and a duplicate `openai` catalog
++        # provider (M-2, already covered by `openai-codex`) ever silently becoming
++        # discoverable is now the hand-pinned literal below. That literal is deliberately
++        # NOT imported or derived from `provider_registry.PROVIDERS`: a TEST is allowed to
++        # hardcode the universe it audits (that is its job -- fail noisily the moment
++        # someone changes the registry, on purpose or not); only PRODUCTION code must never
++        # hand-maintain a second copy. Do not "fix" this by deriving the literal from
++        # PROVIDERS again -- that silently rebuilds the exact false-green this test exists
++        # to prevent.
+         pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
+         self.assertEqual(models_config.DISCOVERABLE_PROVIDERS, pair_providers)
++        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
++                          {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+         self.assertNotIn("github-copilot", models_config.DISCOVERABLE_PROVIDERS)
+         self.assertNotIn("openai", models_config.DISCOVERABLE_PROVIDERS)
+ 
+@@ -4002,6 +4020,71 @@ class RoutingTests(unittest.TestCase):
+         bogus_inventory = {("opencode", "github-copilot"): {"some-copilot-model"}}
+         self.assertEqual(routing_catalog.resolve_discovered_providers(config, bogus_inventory), ())
+ 
++    # ------------------------------------------------- ADR-0042 (022 PKG-1): single provider
++    # registry -- `provider_registry.PROVIDERS` is now the one source every provider-keyed
++    # table below derives from, replacing six independently hand-edited literal copies.
++
++    def test_adr0042_ac01_ac02_all_seven_provider_tables_are_byte_identical_to_the_pre_refactor_literals(self):
++        # AC-02 characterization: every literal pasted here is the EXACT pre-ADR-0042 value
++        # (copied from the removed literals, not imported from provider_registry or derived
++        # in this test) -- proves the refactor changed plumbing, never values. Order matters
++        # only for the tuple (AC-01's provider-registry insertion order contract); the dicts
++        # and the set compare by value, so their literal order below is not significant.
++        self.assertEqual(list(provider_registry.PROVIDERS),
++                         ["openai-codex", "anthropic", "opencode-zen", "opencode-go"])
++        self.assertEqual(routing_catalog._OPENCODE_PROVIDER_KEYS, {
++            "openai-codex": "openai", "anthropic": "anthropic",
++            "opencode-zen": "opencode zen", "opencode-go": "opencode go",
++        })
++        self.assertEqual(routing_catalog._OPENCODE_CLI_IDS, {
++            "openai-codex": "openai", "anthropic": "anthropic",
++            "opencode-zen": "opencode", "opencode-go": "opencode-go",
++        })
++        self.assertEqual(routing_catalog.PROVIDER_BILLING_KIND, {
++            "openai-codex": "subscription", "anthropic": "subscription",
++            "opencode-go": "subscription", "opencode-zen": "metered",
++        })
++        # AC-01's fifth symbol: the key map that used to live INLINE inside
++        # `_configured_models` (a local dict literal, unreachable from outside the function)
++        # is now the module-level `_CATALOG_KEYS`, itself derived from `PROVIDERS`.
++        self.assertEqual(routing_catalog._CATALOG_KEYS, {
++            "openai-codex": "codex", "anthropic": "claude",
++            "opencode-zen": "opencode_zen", "opencode-go": "opencode_go",
++        })
++        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
++                         {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
++        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
++                         ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
++
++    def test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source(self):
++        # AC-01b: before this ADR, the ONLY assertion touching `_MODEL_PREFERENCE_PROVIDERS`
++        # lived at test_adr0034_ac09_write_cli_validates_pins_against_the_effective_set_
++        # not_just_the_constant (below, :3965 pre-refactor line count) -- inside a
++        # `mock.patch` block whose real purpose is testing the live-probe degrade path, and
++        # it compared against ANOTHER hardcoded literal, never against the audited source.
++        # That test is untouched by this package (still passes, proven by the full-suite
++        # gate) and still is not the guard -- THIS is the guard: two independent
++        # cross-checks against the real source, neither of them a second copy-pasted tuple.
++        #
++        # Cross-check 1: same pattern as test_adr0034_ac10_discoverable_providers_lockstep_
++        # guard above (which only ever covered DISCOVERABLE_PROVIDERS, never this tuple,
++        # despite set_agents_app.py's own comment claiming otherwise pre-ADR-0042) --
++        # membership against `_PAIR_COMMANDS`'s own audited provider set.
++        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
++        self.assertEqual(set(set_agents_app._MODEL_PREFERENCE_PROVIDERS), pair_providers)
++        # Cross-check 2 (P1 repair, finding F01): comparing against `tuple(provider_
++        # registry.PROVIDERS)` directly, as this test did before the repair, WAS the
++        # false-green this package exists to close -- both sides re-derive from the SAME
++        # dict, so renaming, adding, removing, or reordering a `PROVIDERS` entry moves them
++        # together and the assertion stays green no matter what. The independent check is a
++        # hand-pinned literal of the audited universe instead, deliberately NOT imported or
++        # derived from `provider_registry`: a TEST is allowed to hardcode the universe it
++        # audits (that is its job -- fail noisily the moment someone changes it, on purpose
++        # or not); only PRODUCTION code must never hand-maintain a second copy. Do not "fix"
++        # this by deriving the literal below from PROVIDERS again.
++        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
++                          ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
++
+     # --------------------------------------------- 014-model-preference-policy (AC-01..09)
+ 
+     _MP_TIERED_ROLES = frozenset({"debugger", "delta-reviewer", "finding-verifier",
+88	5	tests/test_routing.py
+ai/scripts/models_config.py
+ai/scripts/routing_core/catalog.py
+ai/scripts/set_agents_app.py
+ai/state/STATUS.md
+ai/state/decisions-log.jsonl
+docs/adr/README.md
+docs/notas/00 - Proyecto.md
+docs/specs/022-disponibilidad-real/spec.md
+tests/test_routing.py
+ M ai/scripts/models_config.py
+ M ai/scripts/routing_core/catalog.py
+ M ai/scripts/set_agents_app.py
+ M ai/state/STATUS.md
+ M ai/state/decisions-log.jsonl
+ M docs/adr/README.md
+ M "docs/notas/00 - Proyecto.md"
+ M docs/specs/022-disponibilidad-real/spec.md
+ M tests/test_routing.py
+?? ai/scripts/provider_registry.py
+?? ai/state/features/022-disponibilidad-real.json
+?? docs/adr/0042-provider-registry-single-source.md
+?? "docs/notas/decisiones/2026-08-13 el-probe-dice-vivo-y-la-inferencia-dice-token-vencido.md"
+?? "docs/notas/decisiones/2026-08-13 ruteo-nombra-el-runtime-que-realmente-ejecuta.md"
+?? docs/notas/features/022-disponibilidad-real.md
+?? docs/notas/features/022-disponibilidad-real/
+?? docs/specs/022-disponibilidad-real/bitacora.md
+?? docs/specs/022-disponibilidad-real/context/
+?? docs/specs/022-disponibilidad-real/evidence/
+3187-            return types.SimpleNamespace(returncode=0, stdout="opencode/kimi-k2.7-code\nopencode/glm-5.2\n", stderr="")
+3188-        with mock.patch.object(routing_catalog.subprocess, "run", side_effect=fake_run):
+3189-            result = routing_catalog.probe_inventory(narrow, cache_root=None, pairs=[("opencode", "opencode-zen")])
+3190-        self.assertEqual(result[("opencode", "opencode-zen")], {"kimi-k2.7-code"})  # glm-5.2 dropped, never invented
+3191-
+3192:    def test_adr0034_ac10_discoverable_providers_lockstep_guard(self):
+3193-        # ADR-0034 (019 PKG-1, AC-10). Pre-ADR-0042, DISCOVERABLE_PROVIDERS and
+3194-        # _PAIR_COMMANDS were two INDEPENDENTLY hand-maintained tables and the cross-check
+3195-        # below was, by itself, the whole guard. Since ADR-0042 (022 PKG-1) both sides
+3196-        # derive from the SAME source now (`provider_registry.PROVIDERS`:
+3197-        # DISCOVERABLE_PROVIDERS directly, `_PAIR_COMMANDS`'s opencode half transitively
+3198-        # via `_OPENCODE_CLI_IDS`) -- so that cross-check ALONE no longer catches a broken
+3199-        # registry: renaming, adding, removing, or reordering a `PROVIDERS` entry moves
+3200-        # both sides together and it stays green (P1 repair, finding F02; it does not test
+3201-        # `github-copilot`/duplicate-`openai` exclusion by itself anymore). The cross-check
+3202-        # is kept below -- it still catches the two modules' derivations disagreeing with
+3203-        # EACH OTHER, a real bug class distinct from a broken registry -- but the guard
+3204-        # against `github-copilot` (M-1, unlistable) and a duplicate `openai` catalog
+3205-        # provider (M-2, already covered by `openai-codex`) ever silently becoming
+3206-        # discoverable is now the hand-pinned literal below. That literal is deliberately
+3207-        # NOT imported or derived from `provider_registry.PROVIDERS`: a TEST is allowed to
+3208-        # hardcode the universe it audits (that is its job -- fail noisily the moment
+3209-        # someone changes the registry, on purpose or not); only PRODUCTION code must never
+3210-        # hand-maintain a second copy. Do not "fix" this by deriving the literal from
+3211-        # PROVIDERS again -- that silently rebuilds the exact false-green this test exists
+3212-        # to prevent.
+--
+4054-        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+4055-                         {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+4056-        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+4057-                         ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
+4058-
+4059:    def test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source(self):
+4060-        # AC-01b: before this ADR, the ONLY assertion touching `_MODEL_PREFERENCE_PROVIDERS`
+4061-        # lived at test_adr0034_ac09_write_cli_validates_pins_against_the_effective_set_
+4062-        # not_just_the_constant (below, :3965 pre-refactor line count) -- inside a
+4063-        # `mock.patch` block whose real purpose is testing the live-probe degrade path, and
+4064-        # it compared against ANOTHER hardcoded literal, never against the audited source.
+4065-        # That test is untouched by this package (still passes, proven by the full-suite
+4066-        # gate) and still is not the guard -- THIS is the guard: two independent
+4067-        # cross-checks against the real source, neither of them a second copy-pasted tuple.
+4068-        #
+4069-        # Cross-check 1: same pattern as test_adr0034_ac10_discoverable_providers_lockstep_
+4070-        # guard above (which only ever covered DISCOVERABLE_PROVIDERS, never this tuple,
+4071-        # despite set_agents_app.py's own comment claiming otherwise pre-ADR-0042) --
+4072-        # membership against `_PAIR_COMMANDS`'s own audited provider set.
+4073-        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
+4074-        self.assertEqual(set(set_agents_app._MODEL_PREFERENCE_PROVIDERS), pair_providers)
+4075-        # Cross-check 2 (P1 repair, finding F01): comparing against `tuple(provider_
+4076-        # registry.PROVIDERS)` directly, as this test did before the repair, WAS the
+4077-        # false-green this package exists to close -- both sides re-derive from the SAME
+4078-        # dict, so renaming, adding, removing, or reordering a `PROVIDERS` entry moves them
+4079-        # together and the assertion stays green no matter what. The independent check is a
+
+exec
+/bin/bash -lc "sed -n '1,220p' ai/scripts/provider_registry.py
+python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v
+git diff -- ai/scripts
+rg -n '\\b(skip|xfail)\\b' tests/test_routing.py
+git log --oneline --decorate -12" in /home/federico/SET-AGENTES
+ succeeded in 191ms:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+OK
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+diff --git i/ai/scripts/models_config.py w/ai/scripts/models_config.py
+index 4df6cd6..f758247 100644
+--- i/ai/scripts/models_config.py
++++ w/ai/scripts/models_config.py
+@@ -16,6 +16,15 @@ import os
+ import tempfile
+ from pathlib import Path
+ 
++# ADR-0042 (022 PKG-1): the single provider registry. Deliberately NOT a `routing_core`
++# import -- `provider_registry.py` has zero dependencies of its own (no `routing_core`, no
++# `models_config`), so importing it here at module scope costs nothing, unlike
++# `routing_core.catalog` (see `detect_subscriptions`/`auto_profile` below, both of which
++# still lazily import that ONE module for a real reason: any `routing_core` submodule
++# import runs `routing_core/__init__.py`, which loads `service.py`/`store.py` -- sqlite3,
++# subprocess -- at import time).
++import provider_registry
++
+ ROOT = Path(__file__).resolve().parents[2]
+ LANES = ("go-zen", "zen", "local")
+ PERMISSION_PROFILES = ("guarded", "yolo")
+@@ -38,7 +47,12 @@ ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
+ # tier/family inferred). Distinct from ROUTING_PROVIDERS on purpose — the curated
+ # allowlist stays closed (immutable contract "probeable, never routable, by 012 alone");
+ # this is the separate, opt-in surface that makes a discovered model routable.
+-DISCOVERABLE_PROVIDERS = {"openai-codex", "anthropic", "opencode-zen", "opencode-go"}
++# ADR-0042 (022 PKG-1): derives from the single `provider_registry.PROVIDERS` registry now,
++# same four members as the pre-ADR-0042 literal. Order-insensitive on purpose (a `set`) --
++# `set_agents_app._MODEL_PREFERENCE_PROVIDERS` is the ORDERED sibling table, and it derives
++# from `provider_registry.PROVIDERS` directly rather than from this set, because a tuple
++# built from a set has no deterministic order across runs.
++DISCOVERABLE_PROVIDERS = set(provider_registry.PROVIDERS)
+ ROUTING_DEFAULTS = {
+     "enabled_providers": ["openai-codex", "anthropic"], "xhigh_benchmarked": False,
+     # ADR-0034 (019 PKG-1): "auto" is the new default -- discovered_providers derives
+diff --git i/ai/scripts/routing_core/catalog.py w/ai/scripts/routing_core/catalog.py
+index 2b784f1..16f990a 100644
+--- i/ai/scripts/routing_core/catalog.py
++++ w/ai/scripts/routing_core/catalog.py
+@@ -11,6 +11,13 @@ import time
+ import tomllib
+ from pathlib import Path
+ from .domain import CatalogSnapshot, RoutingError, StaticRoute, _sorted_strings
++# ADR-0042 (022 PKG-1): the single provider registry every provider-keyed table in this file
++# derives from. Deliberately a plain top-level import, not a relative `.` one -- the module
++# lives OUTSIDE `routing_core` on purpose (see its own docstring and ADR-0042's "Dónde puede
++# vivir PROVIDERS" section): it has zero dependencies of its own, so importing it here costs
++# nothing this package's other two consumers (`models_config.py`, `set_agents_app.py`) don't
++# already pay to import it too.
++from provider_registry import PROVIDERS
+ 
+ # ADR-0006 (AM-2): probe cache is a filtering-only optimization. TTL bounds staleness;
+ # the invalidation key covers uid and the canonical catalog/routing config.
+@@ -107,14 +114,19 @@ def canonical_model(provider: str, model: str) -> str:
+     return CANONICAL_MODEL.get((provider, model), model)
+ 
+ 
++# ADR-0042 (022 PKG-1): both maps below DERIVE from the single `PROVIDERS` registry now
++# (`provider_registry.py`) -- before this ADR they were two independently hand-edited
++# literals, one of six provider-keyed tables that had to move in lockstep by hand across
++# this file, `models_config.py`, and `set_agents_app.py`. Values are unchanged from the
++# pre-ADR-0042 literals (PKG-1 AC-02 characterization test pins this).
++#
+ # Catalog provider -> credential display text `_parse_opencode_auth` yields (map 1 of 2,
+ # 012 AC-02). Used ONLY at the credential-set membership check. For the two pre-existing
+ # pairs this string happens to coincide with the CLI argument below; for opencode-zen/
+ # opencode-go it does not ("opencode zen"/"opencode go", two-token display text, vs the
+ # single-token CLI ids in _OPENCODE_CLI_IDS) — re-measured live against `opencode auth
+ # list --pure` (docs/specs/012-discovered-inventory/spec.md AC-02).
+-_OPENCODE_PROVIDER_KEYS = {"openai-codex": "openai", "anthropic": "anthropic",
+-                           "opencode-zen": "opencode zen", "opencode-go": "opencode go"}
++_OPENCODE_PROVIDER_KEYS = {provider: spec.opencode_auth_key for provider, spec in PROVIDERS.items()}
+ # Catalog provider -> CLI argument for `opencode models <id>` AND the `<id>/<model>` line
+ # prefix `_parse_opencode_models` strips (map 2 of 2, 012 AC-02). Independently
+ # addressable from _OPENCODE_PROVIDER_KEYS above: using the CLI-id value at the
+@@ -122,8 +134,7 @@ _OPENCODE_PROVIDER_KEYS = {"openai-codex": "openai", "anthropic": "anthropic",
+ # single-token string and report the pair absent on every machine (the defect this
+ # two-map split fixes; PI_MODEL_MAP is explicitly the wrong precedent here — it
+ # translates a model name within one already-matched provider, a different axis).
+-_OPENCODE_CLI_IDS = {"openai-codex": "openai", "anthropic": "anthropic",
+-                     "opencode-zen": "opencode", "opencode-go": "opencode-go"}
++_OPENCODE_CLI_IDS = {provider: spec.opencode_cli_id for provider, spec in PROVIDERS.items()}
+ # ADR-0034 (019 PKG-1) re-measurement, live, 2026-08-10 (opencode 1.18.14): `opencode
+ # auth list --pure` shows 4 real credentials -- `opencode-go`, `openai`, `github-copilot`,
+ # `opencode` (auth.json keys). `github-copilot` is authenticated but `opencode models
+@@ -169,8 +180,8 @@ _PAIR_COMMANDS = {
+ # Code OAuth), `opencode-go` stays subscription, `opencode-zen` stays the sole metered
+ # entry. This is the day `billing_rank` (below) starts reading it -- the previous "no
+ # weighting/selection logic reads this map yet" note is retired.
+-PROVIDER_BILLING_KIND = {"openai-codex": "subscription", "anthropic": "subscription",
+-                         "opencode-go": "subscription", "opencode-zen": "metered"}
++# ADR-0042 (022 PKG-1): derives from `PROVIDERS` now, same values as the pre-ADR-0042 literal.
++PROVIDER_BILLING_KIND = {provider: spec.billing_kind for provider, spec in PROVIDERS.items()}
+ # ADR-0035 AC-12: the FREE-model convention is the `-free` suffix -- the exact same
+ # pattern `inference._FAST_HINTS` already treats as a signal, never a second, competing
+ # definition of "free" invented here.
+@@ -197,23 +208,32 @@ def allowed_probe(runtime: str, provider: str) -> tuple[tuple[str, ...], ...] |
+     return _PAIR_COMMANDS.get((runtime, provider))
+ 
+ 
++# ADR-0042 (022 PKG-1): provider -> `[catalog]` TOML key, derived from `PROVIDERS` (same
++# values as the pre-ADR-0042 inline literal `_configured_models` used to carry). Site (2) of
++# the five-site lockstep `_configured_models` documents below -- the other four sites (the
++# `[catalog]` table itself, `build_snapshot`'s own comprehension, and the two
++# `models_config.py` sites) are a DIFFERENT, wider concern (012 AC-04: whether a TOML key
++# exists and round-trips through `load_config`/`emit` at all) and are out of this package's
++# scope -- only this key map derives from the single provider registry.
++_CATALOG_KEYS = {provider: spec.catalog_key for provider, spec in PROVIDERS.items()}
++
++
+ def _configured_models(config: dict, provider: str) -> set[str]:
+     # 012 AC-04: same five-site lockstep as the pre-existing two providers (corrected
+     # 012 repair F-04: the original comment undercounted "three sites" — this package
+     # added two more in models_config.py) — this key map is site (2) of 5 that must move
+-    # together with: (1) models.toml's [catalog] table itself; (2) this key map; (3)
+-    # build_snapshot's own `configured_models` comprehension (catalog.py, below); (4)
+-    # models_config.load_config's optional-key validation loop for the same two TOML
+-    # keys; (5) models_config.emit's preservation loop for the same two keys (without
+-    # which a future `./setup-models.sh` write would silently drop the allowlist). Sites
+-    # (4)/(5) exist because [catalog] has no closed-schema check the way [routing]/
+-    # [permissions] do — an allowlist key present in the TOML but absent from both
+-    # models_config.py sites is read here (fine) but never survives a re-emit (data
+-    # loss). Extending only site (1) leaves the other providers' allowlists unreachable
+-    # from code; extending only (1)-(3) without (4)/(5) leaves them reachable but
+-    # silently unpersisted on the next wizard run.
+-    key = {"openai-codex": "codex", "anthropic": "claude",
+-           "opencode-zen": "opencode_zen", "opencode-go": "opencode_go"}.get(provider)
++    # together with: (1) models.toml's [catalog] table itself; (2) this key map (now
++    # `_CATALOG_KEYS` above, ADR-0042); (3) build_snapshot's own `configured_models`
++    # comprehension (catalog.py, below); (4) models_config.load_config's optional-key
++    # validation loop for the same two TOML keys; (5) models_config.emit's preservation
++    # loop for the same two keys (without which a future `./setup-models.sh` write would
++    # silently drop the allowlist). Sites (4)/(5) exist because [catalog] has no
++    # closed-schema check the way [routing]/[permissions] do — an allowlist key present in
++    # the TOML but absent from both models_config.py sites is read here (fine) but never
++    # survives a re-emit (data loss). Extending only site (1) leaves the other providers'
++    # allowlists unreachable from code; extending only (1)-(3) without (4)/(5) leaves them
++    # reachable but silently unpersisted on the next wizard run.
++    key = _CATALOG_KEYS.get(provider)
+     models = config.get("catalog", {}).get(key, ()) if key else ()
+     if not isinstance(models, (list, tuple)):
+         return set()
+diff --git i/ai/scripts/set_agents_app.py w/ai/scripts/set_agents_app.py
+index 33cac42..8714593 100644
+--- i/ai/scripts/set_agents_app.py
++++ w/ai/scripts/set_agents_app.py
+@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ sys.modules.setdefault("set_agents_app", sys.modules[__name__])
+ import coord_policy
+ import models_config
++import provider_registry
+ import routing
+ import set_agents_spawn
+ import tui
+@@ -89,9 +90,20 @@ def _project_root_or_harness() -> Path:
+ MODEL_PREFERENCE_PATH = STATE_DIR / "model-preference.toml"
+ 
+ # The closed, four-provider universe `_PAIR_COMMANDS` already probes
+-# (`routing_core/catalog.py:133-140`) -- defined independently here, never importing or
+-# referencing the catalog module's own billing-kind classification table (AC-06 non-goal).
+-_MODEL_PREFERENCE_PROVIDERS = ("openai-codex", "anthropic", "opencode-zen", "opencode-go")
++# (`routing_core/catalog.py:165-172`). ADR-0042 (022 PKG-1) supersedes this table's own
++# ORIGINAL "defined independently here, never importing" framing -- that framing was wider
++# than the reason it named: the AC-06 non-goal it cites (014-model-preference-policy,
++# test_ac06_no_provider_billing_kind_reference_in_new_code) is specifically about never
++# letting the catalog module's own billing-kind classification table decide provider
++# membership here, and that narrower non-goal still holds -- this tuple's derivation below
++# never reads that table (nor even names it -- see the test above, unchanged by this
++# package). What changed is provider IDENTITY: this tuple now derives from the single
++# `provider_registry.PROVIDERS` registry every provider-keyed table in the harness shares,
++# instead of being a second hand-maintained copy of the same four provider ids. Order is a
++# real contract (surfaces in pin/preference validation errors) --
++# `tuple(provider_registry.PROVIDERS)`, never `tuple(models_config.DISCOVERABLE_PROVIDERS)`,
++# because that sibling table is an unordered `set`.
++_MODEL_PREFERENCE_PROVIDERS = tuple(provider_registry.PROVIDERS)
+ _MODEL_PREFERENCE_CLASSES = ("decision", "grunt", "build")
+ # AC-02's inertness note: the six roles with real, live effect today (`### Honest scope`,
+ # spec) -- every other in-scope role, and the whole `decision` class, is genuinely inert.
+@@ -112,7 +124,9 @@ def _model_preference_die(message):
+ 
+ def _effective_preference_providers():
+     """ADR-0034 (AC-09): the base audited set (`_MODEL_PREFERENCE_PROVIDERS`, unchanged
+-    -- byte-identical to `models_config.DISCOVERABLE_PROVIDERS`) UNION whatever the
++    -- same VALUES as `models_config.DISCOVERABLE_PROVIDERS`, both derived from the single
++    `provider_registry.PROVIDERS` registry since ADR-0042; the two differ in TYPE on
++    purpose, ordered tuple vs. unordered set, never in membership) UNION whatever the
+     CURRENT effective snapshot reports as routable, when that snapshot is cheaply
+     resolvable -- a live probe, never network/credential material. Deliberately never
+     called from `load_model_preference`/`load_model_pin` (the boot path, `_read_model_
+@@ -129,7 +143,10 @@ def _effective_preference_providers():
+     which today it structurally cannot: every provider it can produce comes from
+     `routing_core.catalog._PAIR_COMMANDS`'s own audited provider set, and that set is
+     pinned equal to `models_config.DISCOVERABLE_PROVIDERS` (== `_MODEL_PREFERENCE_
+-    PROVIDERS`, AC-10's lockstep test). So the probe below is skipped whenever the
++    PROVIDERS`, guarded for real since ADR-0042 -- both are derived from
++    `provider_registry.PROVIDERS`, and `test_adr0042_ac01b_...` in tests/test_routing.py
++    compares this tuple against `_PAIR_COMMANDS`'s own provider set directly, never a
++    second hardcoded literal). So the probe below is skipped whenever the
+     base set already covers `DISCOVERABLE_PROVIDERS` -- a cheap, exact short-circuit
+     that avoids paying a subprocess probe (each `_PAIR_COMMANDS` entry can block up to
+     20s) on every `--model-pin-set`/`--model-preference-set` call for a union that
+3342:        via an explicit, visibly-reasoned skip -- never a silent skip, never a false pass.
+3996:        # short-circuit must skip the probe entirely on this (today's real) branch.
+4002:        # again -- proving the short-circuit is a real conditional, not a permanent skip.
+4903:    # token (e.g. `--dangerously-skip-permissions` passed as a "model") all composed
+4918:        bad_modes = ("bypassPermissions", "plan", "default", "--dangerously-skip-permissions", "acceptedits")
+4933:        # `--dangerously-skip-permissions`) is silently accepted by argv as a literal
+4936:            claude_code_spawn.compose_argv("implementer", "--dangerously-skip-permissions",
+b119ca7 (HEAD -> main) 021: gates que no mienten ni callan (ADR-0041) + spec de 022
+3c50d9f harness: features 019 y 020 completas, arreglo del motor de estado (0039) y --check que verifica (0041, en review)
+76b50a7 (origin/main, origin/HEAD) narración+routing: bloque de fin de turno informativo (ADR-0033) y pin pi 0.84.0
+920181f routing: materializacion por spawn en opencode/codex + pins de modelo (ADR-0032) y observabilidad por spawn (ADR-0031)
+d66bf0f routing: effort dinamico donde el runtime lo soporta (ADR-0030 ext) -- pi --thinking
+93c62b3 ui/docs: la tabla del wizard se declara DEFAULTS CURADOS (fallback) + tests ADR-0030
+5565f5e routing: decide siempre (ADR-0030) -- una decision por spawn para los 28 roles, materializada por lane
+8e457ec docs: menu nuevo (Estado general, selector de harness, Modelos compacto), --harness pi, sin numeros viejos
+cf06349 ui/herramientas: panel con metodo de instalacion y nota por CLI en el header del picker
+4c1877b ui/modelos: panel compacto en el wizard (fin de la avalancha) + tri-estado + proveedores descubiertos
+7dea531 ui/menu: Estado general al frente + selector de harness en Instalar/Reparar + panel renderer
+9b8ce51 ui/lanes: el lane opencode se deriva del probe -- fuera use-go-zen.sh/use-zen.sh/use-local.sh
+
+codex
+Ya confirmé el verde de ambas pruebas en el registro intacto. Ahora voy a ejecutar las dos mutaciones temporarias solicitadas —renombrar una clave y eliminar un proveedor—, correr ambas guardas por separado y restaurar desde `/tmp` después de cada una.
+exec
+/bin/bash -lc 'cp ai/scripts/provider_registry.py /tmp/provider_registry.py.delta-review-original' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/provider_registry.py
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..83359ac9c7035a18d4e36ec114f6d456833671e1
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,7 +63,7 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
++    "opencode-go-broken": ProviderSpec(
+         opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+         billing_kind="subscription", catalog_key="opencode_go",
+     ),
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..83359ac9c7035a18d4e36ec114f6d456833671e1
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,7 +63,7 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
++    "opencode-go-broken": ProviderSpec(
+         opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+         billing_kind="subscription", catalog_key="opencode_go",
+     ),
+
+exec
+/bin/bash -lc 'ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v' in /home/federico/SET-AGENTES
+ exited 1 in 259ms:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... FAIL
+
+======================================================================
+FAIL: test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 4085, in test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+    self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go-broken') != ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+First differing element 3:
+'opencode-go-broken'
+'opencode-go'
+
+- ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go-broken')
+?                                                           -------
+
++ ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... FAIL
+
+======================================================================
+FAIL: test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 3215, in test_adr0034_ac10_discoverable_providers_lockstep_guard
+    self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the first set but not the second:
+'opencode-go-broken'
+Items in the second set but not the first:
+'opencode-go'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..83359ac9c7035a18d4e36ec114f6d456833671e1
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,7 +63,7 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
++    "opencode-go-broken": ProviderSpec(
+         opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+         billing_kind="subscription", catalog_key="opencode_go",
+     ),
+
+exec
+/bin/bash -lc 'cp /tmp/provider_registry.py.delta-review-original ai/scripts/provider_registry.py
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v' in /home/federico/SET-AGENTES
+ succeeded in 254ms:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..83359ac9c7035a18d4e36ec114f6d456833671e1
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,7 +63,7 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
++    "opencode-go-broken": ProviderSpec(
+         opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+         billing_kind="subscription", catalog_key="opencode_go",
+     ),
+
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/provider_registry.py
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..a55c761c62ff7522383eefee39b613f8395b985b
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,8 +63,4 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
+-        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+-        billing_kind="subscription", catalog_key="opencode_go",
+-    ),
+ }
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..a55c761c62ff7522383eefee39b613f8395b985b
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,8 +63,4 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
+-        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+-        billing_kind="subscription", catalog_key="opencode_go",
+-    ),
+ }
+
+exec
+/bin/bash -lc 'ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v' in /home/federico/SET-AGENTES
+ exited 1 in 257ms:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... FAIL
+
+======================================================================
+FAIL: test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 4085, in test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+    self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('openai-codex', 'anthropic', 'opencode-zen') != ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+Second tuple contains 1 additional elements.
+First extra element 3:
+'opencode-go'
+
+- ('openai-codex', 'anthropic', 'opencode-zen')
++ ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+?                                             +++++++++++++++
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... FAIL
+
+======================================================================
+FAIL: test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 3215, in test_adr0034_ac10_discoverable_providers_lockstep_guard
+    self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the second set but not the first:
+'opencode-go'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..a55c761c62ff7522383eefee39b613f8395b985b
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,8 +63,4 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
+-        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+-        billing_kind="subscription", catalog_key="opencode_go",
+-    ),
+ }
+
+exec
+/bin/bash -lc 'cp /tmp/provider_registry.py.delta-review-original ai/scripts/provider_registry.py
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v
+git diff -- ai/scripts/provider_registry.py' in /home/federico/SET-AGENTES
+ succeeded in 258ms:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..a55c761c62ff7522383eefee39b613f8395b985b
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,8 +63,4 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
+-        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+-        billing_kind="subscription", catalog_key="opencode_go",
+-    ),
+ }
+
+codex
+Las dos guardas se pusieron rojas con ambas roturas y volvieron a verde tras cada restauración. Sigo con la integridad del diff: separaré el delta de reparación (la prueba) de los cambios preexistentes del paquete que siguen sin commitear en el árbol de trabajo.
+exec
+/bin/bash -lc "cmp -s ai/scripts/provider_registry.py /tmp/provider_registry.py.delta-review-original && echo 'RESTORACION: provider_registry.py coincide byte a byte con la copia original'
+git diff --numstat -- tests/test_routing.py
+git diff --check -- tests/test_routing.py
+git diff --unified=0 -- tests/test_routing.py
+nl -ba tests/test_routing.py | sed -n '3192,3220p'
+nl -ba tests/test_routing.py | sed -n '4059,4088p'
+git diff --name-only -- tests/test_routing.py
+git diff --name-only -- ai/scripts
+git status --short -- ai/scripts tests/test_routing.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+RESTORACION: provider_registry.py coincide byte a byte con la copia original
+88	5	tests/test_routing.py
+diff --git i/tests/test_routing.py w/tests/test_routing.py
+index 68e76da..f4032ff 100644
+--- i/tests/test_routing.py
++++ w/tests/test_routing.py
+@@ -22,0 +23 @@ import models_config
++import provider_registry
+@@ -3192,5 +3193,20 @@ class RoutingTests(unittest.TestCase):
+-        # ADR-0034 (019 PKG-1, AC-10): DISCOVERABLE_PROVIDERS must equal exactly the
+-        # provider half of _PAIR_COMMANDS -- the guard that keeps `github-copilot` (M-1,
+-        # unlistable) and a duplicate `openai` catalog provider (M-2, already covered by
+-        # `openai-codex`) from ever being addable to the "auto"-adopted universe without
+-        # this test failing loudly first.
++        # ADR-0034 (019 PKG-1, AC-10). Pre-ADR-0042, DISCOVERABLE_PROVIDERS and
++        # _PAIR_COMMANDS were two INDEPENDENTLY hand-maintained tables and the cross-check
++        # below was, by itself, the whole guard. Since ADR-0042 (022 PKG-1) both sides
++        # derive from the SAME source now (`provider_registry.PROVIDERS`:
++        # DISCOVERABLE_PROVIDERS directly, `_PAIR_COMMANDS`'s opencode half transitively
++        # via `_OPENCODE_CLI_IDS`) -- so that cross-check ALONE no longer catches a broken
++        # registry: renaming, adding, removing, or reordering a `PROVIDERS` entry moves
++        # both sides together and it stays green (P1 repair, finding F02; it does not test
++        # `github-copilot`/duplicate-`openai` exclusion by itself anymore). The cross-check
++        # is kept below -- it still catches the two modules' derivations disagreeing with
++        # EACH OTHER, a real bug class distinct from a broken registry -- but the guard
++        # against `github-copilot` (M-1, unlistable) and a duplicate `openai` catalog
++        # provider (M-2, already covered by `openai-codex`) ever silently becoming
++        # discoverable is now the hand-pinned literal below. That literal is deliberately
++        # NOT imported or derived from `provider_registry.PROVIDERS`: a TEST is allowed to
++        # hardcode the universe it audits (that is its job -- fail noisily the moment
++        # someone changes the registry, on purpose or not); only PRODUCTION code must never
++        # hand-maintain a second copy. Do not "fix" this by deriving the literal from
++        # PROVIDERS again -- that silently rebuilds the exact false-green this test exists
++        # to prevent.
+@@ -3198,0 +3215,2 @@ class RoutingTests(unittest.TestCase):
++        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
++                          {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+@@ -4004,0 +4023,65 @@ class RoutingTests(unittest.TestCase):
++    # ------------------------------------------------- ADR-0042 (022 PKG-1): single provider
++    # registry -- `provider_registry.PROVIDERS` is now the one source every provider-keyed
++    # table below derives from, replacing six independently hand-edited literal copies.
++
++    def test_adr0042_ac01_ac02_all_seven_provider_tables_are_byte_identical_to_the_pre_refactor_literals(self):
++        # AC-02 characterization: every literal pasted here is the EXACT pre-ADR-0042 value
++        # (copied from the removed literals, not imported from provider_registry or derived
++        # in this test) -- proves the refactor changed plumbing, never values. Order matters
++        # only for the tuple (AC-01's provider-registry insertion order contract); the dicts
++        # and the set compare by value, so their literal order below is not significant.
++        self.assertEqual(list(provider_registry.PROVIDERS),
++                         ["openai-codex", "anthropic", "opencode-zen", "opencode-go"])
++        self.assertEqual(routing_catalog._OPENCODE_PROVIDER_KEYS, {
++            "openai-codex": "openai", "anthropic": "anthropic",
++            "opencode-zen": "opencode zen", "opencode-go": "opencode go",
++        })
++        self.assertEqual(routing_catalog._OPENCODE_CLI_IDS, {
++            "openai-codex": "openai", "anthropic": "anthropic",
++            "opencode-zen": "opencode", "opencode-go": "opencode-go",
++        })
++        self.assertEqual(routing_catalog.PROVIDER_BILLING_KIND, {
++            "openai-codex": "subscription", "anthropic": "subscription",
++            "opencode-go": "subscription", "opencode-zen": "metered",
++        })
++        # AC-01's fifth symbol: the key map that used to live INLINE inside
++        # `_configured_models` (a local dict literal, unreachable from outside the function)
++        # is now the module-level `_CATALOG_KEYS`, itself derived from `PROVIDERS`.
++        self.assertEqual(routing_catalog._CATALOG_KEYS, {
++            "openai-codex": "codex", "anthropic": "claude",
++            "opencode-zen": "opencode_zen", "opencode-go": "opencode_go",
++        })
++        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
++                         {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
++        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
++                         ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
++
++    def test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source(self):
++        # AC-01b: before this ADR, the ONLY assertion touching `_MODEL_PREFERENCE_PROVIDERS`
++        # lived at test_adr0034_ac09_write_cli_validates_pins_against_the_effective_set_
++        # not_just_the_constant (below, :3965 pre-refactor line count) -- inside a
++        # `mock.patch` block whose real purpose is testing the live-probe degrade path, and
++        # it compared against ANOTHER hardcoded literal, never against the audited source.
++        # That test is untouched by this package (still passes, proven by the full-suite
++        # gate) and still is not the guard -- THIS is the guard: two independent
++        # cross-checks against the real source, neither of them a second copy-pasted tuple.
++        #
++        # Cross-check 1: same pattern as test_adr0034_ac10_discoverable_providers_lockstep_
++        # guard above (which only ever covered DISCOVERABLE_PROVIDERS, never this tuple,
++        # despite set_agents_app.py's own comment claiming otherwise pre-ADR-0042) --
++        # membership against `_PAIR_COMMANDS`'s own audited provider set.
++        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
++        self.assertEqual(set(set_agents_app._MODEL_PREFERENCE_PROVIDERS), pair_providers)
++        # Cross-check 2 (P1 repair, finding F01): comparing against `tuple(provider_
++        # registry.PROVIDERS)` directly, as this test did before the repair, WAS the
++        # false-green this package exists to close -- both sides re-derive from the SAME
++        # dict, so renaming, adding, removing, or reordering a `PROVIDERS` entry moves them
++        # together and the assertion stays green no matter what. The independent check is a
++        # hand-pinned literal of the audited universe instead, deliberately NOT imported or
++        # derived from `provider_registry`: a TEST is allowed to hardcode the universe it
++        # audits (that is its job -- fail noisily the moment someone changes it, on purpose
++        # or not); only PRODUCTION code must never hand-maintain a second copy. Do not "fix"
++        # this by deriving the literal below from PROVIDERS again.
++        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
++                          ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
++
+  3192	    def test_adr0034_ac10_discoverable_providers_lockstep_guard(self):
+  3193	        # ADR-0034 (019 PKG-1, AC-10). Pre-ADR-0042, DISCOVERABLE_PROVIDERS and
+  3194	        # _PAIR_COMMANDS were two INDEPENDENTLY hand-maintained tables and the cross-check
+  3195	        # below was, by itself, the whole guard. Since ADR-0042 (022 PKG-1) both sides
+  3196	        # derive from the SAME source now (`provider_registry.PROVIDERS`:
+  3197	        # DISCOVERABLE_PROVIDERS directly, `_PAIR_COMMANDS`'s opencode half transitively
+  3198	        # via `_OPENCODE_CLI_IDS`) -- so that cross-check ALONE no longer catches a broken
+  3199	        # registry: renaming, adding, removing, or reordering a `PROVIDERS` entry moves
+  3200	        # both sides together and it stays green (P1 repair, finding F02; it does not test
+  3201	        # `github-copilot`/duplicate-`openai` exclusion by itself anymore). The cross-check
+  3202	        # is kept below -- it still catches the two modules' derivations disagreeing with
+  3203	        # EACH OTHER, a real bug class distinct from a broken registry -- but the guard
+  3204	        # against `github-copilot` (M-1, unlistable) and a duplicate `openai` catalog
+  3205	        # provider (M-2, already covered by `openai-codex`) ever silently becoming
+  3206	        # discoverable is now the hand-pinned literal below. That literal is deliberately
+  3207	        # NOT imported or derived from `provider_registry.PROVIDERS`: a TEST is allowed to
+  3208	        # hardcode the universe it audits (that is its job -- fail noisily the moment
+  3209	        # someone changes the registry, on purpose or not); only PRODUCTION code must never
+  3210	        # hand-maintain a second copy. Do not "fix" this by deriving the literal from
+  3211	        # PROVIDERS again -- that silently rebuilds the exact false-green this test exists
+  3212	        # to prevent.
+  3213	        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
+  3214	        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS, pair_providers)
+  3215	        self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+  3216	                          {"openai-codex", "anthropic", "opencode-zen", "opencode-go"})
+  3217	        self.assertNotIn("github-copilot", models_config.DISCOVERABLE_PROVIDERS)
+  3218	        self.assertNotIn("openai", models_config.DISCOVERABLE_PROVIDERS)
+  3219	
+  3220	    def test_ac05_new_providers_are_probeable_not_routable_today(self):
+  4059	    def test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source(self):
+  4060	        # AC-01b: before this ADR, the ONLY assertion touching `_MODEL_PREFERENCE_PROVIDERS`
+  4061	        # lived at test_adr0034_ac09_write_cli_validates_pins_against_the_effective_set_
+  4062	        # not_just_the_constant (below, :3965 pre-refactor line count) -- inside a
+  4063	        # `mock.patch` block whose real purpose is testing the live-probe degrade path, and
+  4064	        # it compared against ANOTHER hardcoded literal, never against the audited source.
+  4065	        # That test is untouched by this package (still passes, proven by the full-suite
+  4066	        # gate) and still is not the guard -- THIS is the guard: two independent
+  4067	        # cross-checks against the real source, neither of them a second copy-pasted tuple.
+  4068	        #
+  4069	        # Cross-check 1: same pattern as test_adr0034_ac10_discoverable_providers_lockstep_
+  4070	        # guard above (which only ever covered DISCOVERABLE_PROVIDERS, never this tuple,
+  4071	        # despite set_agents_app.py's own comment claiming otherwise pre-ADR-0042) --
+  4072	        # membership against `_PAIR_COMMANDS`'s own audited provider set.
+  4073	        pair_providers = {provider for _, provider in routing_catalog._PAIR_COMMANDS}
+  4074	        self.assertEqual(set(set_agents_app._MODEL_PREFERENCE_PROVIDERS), pair_providers)
+  4075	        # Cross-check 2 (P1 repair, finding F01): comparing against `tuple(provider_
+  4076	        # registry.PROVIDERS)` directly, as this test did before the repair, WAS the
+  4077	        # false-green this package exists to close -- both sides re-derive from the SAME
+  4078	        # dict, so renaming, adding, removing, or reordering a `PROVIDERS` entry moves them
+  4079	        # together and the assertion stays green no matter what. The independent check is a
+  4080	        # hand-pinned literal of the audited universe instead, deliberately NOT imported or
+  4081	        # derived from `provider_registry`: a TEST is allowed to hardcode the universe it
+  4082	        # audits (that is its job -- fail noisily the moment someone changes it, on purpose
+  4083	        # or not); only PRODUCTION code must never hand-maintain a second copy. Do not "fix"
+  4084	        # this by deriving the literal below from PROVIDERS again.
+  4085	        self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+  4086	                          ("openai-codex", "anthropic", "opencode-zen", "opencode-go"))
+  4087	
+  4088	    # --------------------------------------------- 014-model-preference-policy (AC-01..09)
+tests/test_routing.py
+ai/scripts/models_config.py
+ai/scripts/routing_core/catalog.py
+ai/scripts/set_agents_app.py
+ M ai/scripts/models_config.py
+ M ai/scripts/routing_core/catalog.py
+ M ai/scripts/set_agents_app.py
+ M tests/test_routing.py
+?? ai/scripts/provider_registry.py
+
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..a55c761c62ff7522383eefee39b613f8395b985b
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,8 +63,4 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
+-        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+-        billing_kind="subscription", catalog_key="opencode_go",
+-    ),
+ }
+
+codex
+VEREDICTO: approved
+
+No hay hallazgos.
+
+PUNTO 1 — guardas reales
+
+Mutación 1: renombré `opencode-go` a `opencode-go-broken` en `ai/scripts/provider_registry.py`, tras copiar el original a `/tmp`.
+
+Comando:
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v
+
+Salida literal:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... FAIL
+
+======================================================================
+FAIL: test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 4085, in test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+    self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+AssertionError: Tuples differ: ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go-broken') != ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... FAIL
+
+======================================================================
+FAIL: test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 3215, in test_adr0034_ac10_discoverable_providers_lockstep_guard
+    self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+AssertionError: Items in the first set but not the second:
+'opencode-go-broken'
+Items in the second set but not the first:
+'opencode-go'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+Mutación 2: quité por completo `opencode-go` del registro.
+
+Salida literal:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... FAIL
+
+======================================================================
+FAIL: test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 4085, in test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+    self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+AssertionError: Tuples differ: ('openai-codex', 'anthropic', 'opencode-zen') != ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... FAIL
+
+======================================================================
+FAIL: test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 3215, in test_adr0034_ac10_discoverable_providers_lockstep_guard
+    self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+AssertionError: Items in the second set but not the first:
+'opencode-go'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+Luego de cada restauración con cp, ambas volvieron a verde. Salida literal:
+
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+La restauración quedó verificada byte a byte:
+RESTORACION: provider_registry.py coincide byte a byte con la copia original
+
+PUNTO 2 — honestidad del arreglo
+
+El literal nuevo está únicamente en `tests/test_routing.py`; es un oráculo independiente legítimo. El delta inspeccionado es ese archivo.
+
+El árbol de trabajo completo sí conserva cambios de producción de P1 sin commitear respecto de HEAD:
+ai/scripts/models_config.py
+ai/scripts/routing_core/catalog.py
+ai/scripts/set_agents_app.py
+ai/scripts/provider_registry.py
+
+No forman parte del delta de reparación indicado y no se alteraron durante esta revisión. No hay literal productivo añadido por la reparación.
+
+El docstring de `test_adr0034_ac10_discoverable_providers_lockstep_guard` en `tests/test_routing.py:3193` es honesto: explica que el chequeo contra `_PAIR_COMMANDS` ya no detecta una rotura del registro por sí solo, conserva ese chequeo para divergencias entre derivaciones y atribuye la detección del universo roto al literal independiente de `tests/test_routing.py:3215`. Eso coincide con las dos mutaciones ejecutadas.
+
+PUNTO 3 — regresión
+
+Comando:
+git diff --numstat -- tests/test_routing.py
+
+Salida literal:
+88	5	tests/test_routing.py
+
+Las 5 líneas borradas son el comentario previo de AC-10, reescrito por un comentario más preciso; no se borró ni salteó ningún test. El diff no agrega `skip` ni `xfail`; las apariciones existentes de esas palabras están en comentarios o argumentos de prueba preexistentes. Las dos guardas siguen presentes y ahora tienen una aserción literal adicional cada una.
+diff --git a/ai/scripts/provider_registry.py b/ai/scripts/provider_registry.py
+index 243b51d08813ac080b48a8c182913e975209cf1e..a55c761c62ff7522383eefee39b613f8395b985b
+--- a/ai/scripts/provider_registry.py
++++ b/ai/scripts/provider_registry.py
+@@ -63,8 +63,4 @@
+         opencode_auth_key="opencode zen", opencode_cli_id="opencode",
+         billing_kind="metered", catalog_key="opencode_zen",
+     ),
+-    "opencode-go": ProviderSpec(
+-        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+-        billing_kind="subscription", catalog_key="opencode_go",
+-    ),
+ }
+
+tokens used
+48.889
+VEREDICTO: approved
+
+No hay hallazgos.
+
+PUNTO 1 — guardas reales
+
+Mutación 1: renombré `opencode-go` a `opencode-go-broken` en `ai/scripts/provider_registry.py`, tras copiar el original a `/tmp`.
+
+Comando:
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source -v
+ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard -v
+
+Salida literal:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... FAIL
+
+======================================================================
+FAIL: test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 4085, in test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+    self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+AssertionError: Tuples differ: ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go-broken') != ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... FAIL
+
+======================================================================
+FAIL: test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 3215, in test_adr0034_ac10_discoverable_providers_lockstep_guard
+    self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+AssertionError: Items in the first set but not the second:
+'opencode-go-broken'
+Items in the second set but not the first:
+'opencode-go'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+Mutación 2: quité por completo `opencode-go` del registro.
+
+Salida literal:
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... FAIL
+
+======================================================================
+FAIL: test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 4085, in test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source
+    self.assertEqual(set_agents_app._MODEL_PREFERENCE_PROVIDERS,
+AssertionError: Tuples differ: ('openai-codex', 'anthropic', 'opencode-zen') != ('openai-codex', 'anthropic', 'opencode-zen', 'opencode-go')
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... FAIL
+
+======================================================================
+FAIL: test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 3215, in test_adr0034_ac10_discoverable_providers_lockstep_guard
+    self.assertEqual(models_config.DISCOVERABLE_PROVIDERS,
+AssertionError: Items in the second set but not the first:
+'opencode-go'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+Luego de cada restauración con cp, ambas volvieron a verde. Salida literal:
+
+test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source (tests.test_routing.RoutingTests.test_adr0042_ac01b_model_preference_providers_is_guarded_against_the_real_source) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+test_adr0034_ac10_discoverable_providers_lockstep_guard (tests.test_routing.RoutingTests.test_adr0034_ac10_discoverable_providers_lockstep_guard) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+La restauración quedó verificada byte a byte:
+RESTORACION: provider_registry.py coincide byte a byte con la copia original
+
+PUNTO 2 — honestidad del arreglo
+
+El literal nuevo está únicamente en `tests/test_routing.py`; es un oráculo independiente legítimo. El delta inspeccionado es ese archivo.
+
+El árbol de trabajo completo sí conserva cambios de producción de P1 sin commitear respecto de HEAD:
+ai/scripts/models_config.py
+ai/scripts/routing_core/catalog.py
+ai/scripts/set_agents_app.py
+ai/scripts/provider_registry.py
+
+No forman parte del delta de reparación indicado y no se alteraron durante esta revisión. No hay literal productivo añadido por la reparación.
+
+El docstring de `test_adr0034_ac10_discoverable_providers_lockstep_guard` en `tests/test_routing.py:3193` es honesto: explica que el chequeo contra `_PAIR_COMMANDS` ya no detecta una rotura del registro por sí solo, conserva ese chequeo para divergencias entre derivaciones y atribuye la detección del universo roto al literal independiente de `tests/test_routing.py:3215`. Eso coincide con las dos mutaciones ejecutadas.
+
+PUNTO 3 — regresión
+
+Comando:
+git diff --numstat -- tests/test_routing.py
+
+Salida literal:
+88	5	tests/test_routing.py
+
+Las 5 líneas borradas son el comentario previo de AC-10, reescrito por un comentario más preciso; no se borró ni salteó ningún test. El diff no agrega `skip` ni `xfail`; las apariciones existentes de esas palabras están en comentarios o argumentos de prueba preexistentes. Las dos guardas siguen presentes y ahora tienen una aserción literal adicional cada una.

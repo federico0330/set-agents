@@ -16,6 +16,15 @@ import os
 import tempfile
 from pathlib import Path
 
+# ADR-0042 (022 PKG-1): the single provider registry. Deliberately NOT a `routing_core`
+# import -- `provider_registry.py` has zero dependencies of its own (no `routing_core`, no
+# `models_config`), so importing it here at module scope costs nothing, unlike
+# `routing_core.catalog` (see `detect_subscriptions`/`auto_profile` below, both of which
+# still lazily import that ONE module for a real reason: any `routing_core` submodule
+# import runs `routing_core/__init__.py`, which loads `service.py`/`store.py` -- sqlite3,
+# subprocess -- at import time).
+import provider_registry
+
 ROOT = Path(__file__).resolve().parents[2]
 LANES = ("go-zen", "zen", "local")
 PERMISSION_PROFILES = ("guarded", "yolo")
@@ -38,7 +47,12 @@ ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
 # tier/family inferred). Distinct from ROUTING_PROVIDERS on purpose — the curated
 # allowlist stays closed (immutable contract "probeable, never routable, by 012 alone");
 # this is the separate, opt-in surface that makes a discovered model routable.
-DISCOVERABLE_PROVIDERS = {"openai-codex", "anthropic", "opencode-zen", "opencode-go"}
+# ADR-0042 (022 PKG-1): derives from the single `provider_registry.PROVIDERS` registry now,
+# same four members as the pre-ADR-0042 literal. Order-insensitive on purpose (a `set`) --
+# `set_agents_app._MODEL_PREFERENCE_PROVIDERS` is the ORDERED sibling table, and it derives
+# from `provider_registry.PROVIDERS` directly rather than from this set, because a tuple
+# built from a set has no deterministic order across runs.
+DISCOVERABLE_PROVIDERS = set(provider_registry.PROVIDERS)
 ROUTING_DEFAULTS = {
     "enabled_providers": ["openai-codex", "anthropic"], "xhigh_benchmarked": False,
     # ADR-0034 (019 PKG-1): "auto" is the new default -- discovered_providers derives
@@ -134,16 +148,23 @@ def load_config(models_path=None):
         values = config["catalog"].get(key)
         if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
             die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
-    # 012 discovered-inventory AC-04: optional declared allowlist ceiling for the two
-    # probeable-only OpenCode-lane providers (routing_core/catalog.py consumes these via
-    # _configured_models; absent entirely is valid — a repo with neither subscription
-    # simply never populates them, and probe_inventory then finds nothing configured).
+    # ADR-0042 (022 PKG-2, AC-04): tri-state declared allowlist ceiling for the two
+    # probeable-only OpenCode-lane providers (routing_core/catalog.py's `resolve_ceiling`
+    # is the sole consumer). Three shapes, all valid: the key ABSENT means "auto" — no
+    # ceiling, the live probe result routes as-is; `[]` means "veto" — curated, explicit
+    # "never route this provider" (the case this loop used to reject with `die`, before
+    # this package: absence and an explicit empty veto were indistinguishable garbage
+    # here, which is exactly why routing_core/catalog.py's old `_configured_models`
+    # collapsed both to the same `set()`); a non-empty list of unique strings means
+    # "curated" — the audited ceiling, unchanged from before this package.
     for key in ("opencode_zen", "opencode_go"):
         values = config["catalog"].get(key)
-        if values is not None and (not isinstance(values, list) or not values
-                                    or not all(isinstance(item, str) and item for item in values)
-                                    or len(values) != len(set(values))):
-            die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
+        if values is None:
+            continue  # "auto" -- resolve_ceiling reads the absence at routing time
+        if (not isinstance(values, list)
+                or not all(isinstance(item, str) and item for item in values)
+                or len(values) != len(set(values))):
+            die(f"models.toml: [catalog].{key} must be a list of unique non-empty strings ([] is a valid veto)")
     small = config["session"].get("opencode_small_model")
     if not isinstance(small, dict) or set(small) != set(LANES):
         die("models.toml: [session].opencode_small_model must cover exactly the lanes " + ", ".join(LANES))
@@ -247,6 +268,19 @@ _PROVIDER_SUBSCRIPTION = {
 }
 
 
+def _probe_cache_root() -> Path:
+    """ADR-0043 (022 PKG-3, AC-10): the single root `RoutingService`'s own composition
+    creates/validates via `RoutingStore.ensure_cache_root()` (routing_core/service.py)
+    -- never the second, `STATE_DIR`-shaped literal this used to duplicate. Lazy import
+    (same "no routing_core dependency at module load" discipline the two callers below
+    already document). `RoutingStore.root` is a pure attribute (no I/O at
+    construction), so this costs nothing beyond the `Path.home() / ...` literal it
+    replaces; the private-directory validation (and any creation) stays inside
+    `probe_inventory`/`_validate_cache_dir`, unchanged by this package."""
+    from routing_core.store import RoutingStore
+    return RoutingStore().root
+
+
 def detect_subscriptions(config):
     """Probe-backed subscription detection (ADR-0029): which subscriptions this
     machine can actually use, derived from authenticated pairs. Lazy import (no
@@ -255,8 +289,7 @@ def detect_subscriptions(config):
     Never reads or returns credential material."""
     try:
         from routing_core.catalog import probe_inventory
-        state = Path.home() / ".local/state/set-agentes"
-        inventory = probe_inventory(config, cache_root=state)
+        inventory = probe_inventory(config, cache_root=_probe_cache_root())
     except Exception:
         return None
     return {
@@ -274,8 +307,7 @@ def auto_profile(config=None):
     try:
         from routing_core.catalog import probe_inventory
         cfg = config if config is not None else load_config()
-        state = Path.home() / ".local/state/set-agentes"
-        inventory = probe_inventory(cfg, cache_root=state)
+        inventory = probe_inventory(cfg, cache_root=_probe_cache_root())
     except Exception:
         return None
     live = {provider for (_, provider), models in inventory.items() if models}

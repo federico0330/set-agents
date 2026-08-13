@@ -1,0 +1,2222 @@
+Reading additional input from stdin...
+OpenAI Codex v0.147.0
+--------
+workdir: /home/federico/SET-AGENTES
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: none
+session id: 019ffa62-c806-7ef2-9e1c-f19b65610dcc
+--------
+user
+Sos package-reviewer independiente en /home/federico/SET-AGENTES. Read-only sobre codigo de produccion.
+HACE LA REVISION VOS MISMO: no delegues, no spawnees subagentes.
+
+REGLA ABSOLUTA: el usuario duerme y necesita sus CLIs a la manana. NUNCA escribas en ~/.config/opencode/,
+~/.claude, ~/.codex, ~/.pi ni ~/.local/share/opencode. NUNCA corras ./build.sh --install ni install.py
+apuntando al HOME real. Fixtures y --home de prueba, siempre.
+
+NO LEAS TODO. Vas directo a estos archivos y nada mas:
+- ai/scripts/install.py (funciones de render y poda de subarboles JSON)
+- ai/scripts/provider_registry.py (desde el separador '# ===== 022 PKG-4' hacia abajo)
+- tests/test_provider_registry.py
+No leas el spec ni el context pack ni la evidencia del implementer: no los necesitas para lo que te pido.
+
+Contexto en tres lineas: antes, el bloque `provider` de opencode.json estaba hardcodeado en
+Global/_shared/opencode.json y deep_merge solo agregaba, asi que si el usuario borraba un provider el
+proximo install se lo reponia. P4 lo hace renderizar desde un registro (providers.toml) y agrega poda de
+subarboles JSON. Vos verificas TRES cosas, con fixtures, y nada mas.
+
+PUNTO 1 - Quitar funciona de verdad?
+Con fixture y --home de prueba: instala, quita un provider, volve a instalar, verifica que NO vuelve.
+Pega la salida literal de los tres pasos. Si vuelve, hallazgo critical.
+
+PUNTO 2 - La poda NO borra lo ajeno?
+Fixture con DOS providers: uno del harness (en el manifiesto) y uno agregado a mano por el usuario (NO
+en el manifiesto). Corre un install que pode el del harness. El del usuario tiene que sobrevivir BYTE A
+BYTE, con todos sus modelos y opciones. Si la poda toca una clave que el harness no puso, critical.
+
+PUNTO 3 - MORDIDA sobre el test de la poda.
+En esta feature ya aparecieron CUATRO tests que decian cubrir algo que no miraban, todos verdes con la
+fuente rota. Toma el test de tests/test_provider_registry.py que dice proteger el provider ajeno, rompe
+lo que dice proteger (cp a /tmp, muta, corre dirigido, restaura con cp; NO uses git checkout/restore/
+stash) y confirma que se pone ROJO. Pega rojo y verde literales. Si pasa en verde con el codigo roto,
+es hallazgo critical.
+
+REGLAS:
+- Cada bloque literal, o marcado como recortado. Si no lo corriste, "sin verificar".
+- `pytest` NO esta instalado: `python3 -m unittest tests.test_provider_registry.<Clase>.<test> -v`.
+- NO corras la suite entera. Solo tests dirigidos.
+- Se breve en el razonamiento y rapido en llegar a las mediciones. Lo que importa es la evidencia.
+
+FORMATO DE SALIDA (al final, texto plano):
+VEREDICTO: approved | revision_required
+Por cada hallazgo: ID / SEVERIDAD / DONDE (file:line) / QUE / PRUEBA (comando y salida literal).
+Si no hay hallazgos, decilo explicitamente y mostra igual la evidencia de los tres puntos.
+codex
+Voy a revisar únicamente los tres archivos indicados y ejecutar pruebas dirigidas con un HOME temporal; no voy a tocar configuraciones reales ni instalar nada.
+exec
+/bin/bash -lc "sed -n '1,280p' /home/federico/.codex/skills/package-review/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: package-review
+description: Deep independent review of a complete package diff against approved spec, package criteria, gates, integration behavior, and relevant risk surfaces.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: package-reviewer, delta-reviewer, adversarial-judge
+---
+
+# Package Review
+
+## Inputs
+Approved spec/version, package plan, diff, gate results, assumptions, and known risks.
+
+## Checks
+- Correctness against covered acceptance criteria.
+- Integration with existing contracts.
+- Architecture and maintainability with real impact.
+- Security/data/performance surfaces when touched.
+- Failure paths and edge cases.
+- Test gaps that would leave accepted behavior unprotected.
+
+## Cadence
+One deep review per integrated package. A second pass is focused on repair delta. Full re-review only when repair
+changes architecture, public contracts, or risk surface substantially.
+
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).
+
+exec
+/bin/bash -lc "sed -n '1,220p' /home/federico/.codex/skills/structured-findings/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: structured-findings
+description: Standard finding format for package reviews, delta reviews, security/performance audits, and repair evidence.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: package-reviewer, delta-reviewer, security-auditor, finding-verifier, repair-agent
+---
+
+# Structured Findings
+
+## Finding
+Required fields:
+- `id`
+- `severity`: `critical|high|medium|low`
+- `category`: `correctness|security|data-integrity|scalability|readability|resilience|testing|integration`
+  (`data-integrity` reconciles a pre-existing naming drift with this same field's `stability` spelling —
+  `package-reviewer.md`'s own data-integrity checklist was always the enforced one; `readability`/`resilience`
+  are new, added alongside the checklists of the same name — ADR-0021)
+- `acceptance_criterion`
+- `file`, `line`
+- `evidence`
+- `reproduction`
+- `required_outcome`
+- `suggested_scope`
+
+## Verdict (finding-verifier only)
+A finding leaves the open set three ways: repaired (`closed`), explicitly accepted as won't-fix (`accepted`),
+or refuted before repair (`refuted`). A verdict has:
+- `id` — the finding it judges
+- `verdict`: `upheld|refuted`
+- `reason` — required for `refuted`
+- `evidence` — required for `refuted`: the `file:line` that contradicts the finding, the command run and its
+  actual output, or the acceptance criterion that sanctions the behaviour
+
+A refutation carries the same evidentiary burden the finding did. Without both `reason` and `evidence` it is
+not a refutation and the finding stands. When in doubt, `upheld` — killing a real defect is worse than one
+unnecessary repair. A refuted finding is never deleted; it keeps its verdict in the package record.
+
+## Rules
+- Findings are concrete and blocking for the reviewed scope.
+- No style-only findings.
+- Return all detectable findings in one report.
+- If blocked by missing input, return `blocked` with the exact missing artifact.
+
+exec
+/bin/bash -lc "sed -n '1,240p' /home/federico/.codex/skills/request-triage/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: request-triage
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (consult/analysis, feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator
+---
+
+# Request Triage
+
+## When to use
+At the very start of EVERY user request, before any delegation. Classify the request, decide the mode, ask
+what you must, then run the matching flow. Do not dive into the SDD pipeline reflexively — that is exactly the
+failure this skill exists to prevent (applying the heavy flow to a problem that needed a fast, clever fix).
+
+## Step 0 — intake (always, before delegating)
+1. Restate the request in one line and name the **mode** you are choosing + why.
+2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
+   original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
+   scoping doubt one of those already answers is resolved with `log-decision`, not asked.
+3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+   questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
+   cart".
+4. Only then delegate the first action of the chosen mode.
+
+## The five modes
+
+### 0. Consult / analysis — thinking together, no pipeline (check this FIRST)
+Triggers: "qué opinás", "cómo encararías", "analizame esta idea", comparisons, design questions — any request
+where the user wants analysis or a recommendation, not a code change. This is a first-class mode, not a
+misclassified feature.
+Flow: NO `init`, NO state file, NO pipeline. Delegate in parallel (these spawns are allowed and cheap):
+- `brainstormer` — 3-6 genuinely different options with tradeoffs,
+- `architect` — read-only pass over the three axes (relational vs non-relational vs vector store, API Gateway,
+  deploy platform) plus design patterns / clean-architecture shape; NO ADR unless the user asks,
+- `security-auditor` — design-level threat sketch, only when the idea touches auth/money/PII/external input.
+Then SYNTHESIZE yourself into ONE multi-lens analysis: data model, architecture/patterns, security,
+algorithms/complexity — ending with a recommendation plus runner-up. Close by asking: "¿Lo convierto en spec
+(feature) o en scoped?". A consult NEVER starts the pipeline on its own; if durable learning surfaced,
+delegate a `memory-scribe` note to the domain knowledge.
+
+### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
+Triggers — full SDD is chosen ONLY when at least one of these holds; otherwise drop to scoped-feature (if a
+concrete risk signal is present) or quick-fix (the default lane):
+- a net-new system or module (not an addition to established infrastructure),
+- genuinely multi-package work (several coherent packages with dependencies),
+- the request touches one of the three architecture axes (data store type, API Gateway, deploy platform)
+  with no ADR covering it.
+Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
+expect? where centralized vs decentralized? what must be secure day one? and name these three axes
+explicitly, not generically — **does persistence need vector/semantic search or does relational cover it?
+does this need an API Gateway or is it a monolith with one client? where does it deploy and why (Vercel/PaaS
+vs VPS/IaaS vs managed)?** Then the rigorous
+**SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
+Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
+validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
+integration → judge → release → memory. Tests do NOT approve implementation; the independent package reviewer
+does. This order is mandatory in feature mode; the three lanes below are the only
+exceptions (scoped-feature / quick-fix / incident).
+
+### 2. Scoped-feature — for bounded work that shows a concrete risk signal
+Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
+present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
+multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
+change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
+the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
+Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
+decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
+consolidated package review over the complete package diff** → `security-auditor` when the package
+touches that surface → regression tests → `adversarial-judge` → release → memory.
+What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
+reviewing the complete relevant package/diff once, then delta-reviewing repairs. Escalate to feature mode only
+when one of feature mode's explicit triggers appears (net-new system, multi-package, uncovered architecture
+axis) — "this feels big" is a reason to scope the package better, not to escalate.
+
+### 3. Quick-fix — the DEFAULT for small and medium bounded work
+Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the write-side half of
+the same 1-3 number `orchestrator.md`'s "Direct-read vs. delegated-explore threshold" (ADR-0020) uses for the
+read side — the two are kept as one cross-referenced constant, not two independent numbers. This is the default lane: most
+day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
+`gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
+to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
+or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
+`python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
+— quick-fixes with no trace are how the development thread gets lost.
+
+### 4. Incident / break-glass — production is broken NOW
+Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
+prod user needs a password reset and there is no forgot-password flow → a one-shot `psql` script, done).
+Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual change to `debugger`/`implementer`
+(you still never implement yourself). MANDATORY afterward — never skip: (a) write down exactly what was done,
+(b) open a follow-up task to do it properly, (c) delegate a memory note. Break-glass is a conscious, logged
+exception to the rigor default — not a licence to abandon it.
+
+Ambiguous which mode? Ask. Otherwise pick the LIGHTEST mode that covers the risk actually observed in the
+request and the code — not the hypothetical risk. Escalate only when you find a concrete signal from the
+lists above, and name that signal in the narration. Downgrading is equally legitimate: if mid-scoped the
+planner or implementer establishes the change is smaller than assumed (no signal actually present), degrade
+to quick-fix and record why with `log-decision` — escalation is not a one-way ratchet.
+
+## Physical budgets per mode (enforced by the state CLI, not by prose)
+
+The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
+`feature-state.py init` via `--mode`:
+
+| Mode | `--mode` | Spawns/package | Deep review cycles | Gate failures |
+|---|---|---|---|---|
+| Feature / SDD | `feature` (opt-in) | 12 | 2 | 3 |
+| Scoped-feature | `scoped` (default) | 8 | 2 | 3 |
+| Quick-fix | `quick-fix` | 4 | 1 | 2 |
+| Incident | `incident` | 6 | 1 | 2 |
+
+Two physical waivers keep light modes light without prose exceptions:
+- `record-repair --skip-delta` skips the delta review ONLY when every repaired finding is ≤ medium severity
+  and the repair touched ≤ 3 files (the CLI rejects it otherwise, and the waiver is recorded in the event).
+- `create-package --runtime-surface false` (planner declaration) lets a package with no observable runtime
+  surface become accept-ready after testing, without spawning `app-runner`/`runtime-verifier`. Default is
+  `true` — fail-safe.
+
+`record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
+than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,
+logged decision), do not fight the budget.
+
+## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
+Before delegating in ANY mode, check the request against the three named axes above: **data store type
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. The
+check fires on EVIDENCE, not plausibility: the request or the files it names concretely require one of these
+axes (a new kind of persistence, a new external entry point, a deploy change) AND no existing ADR covers it.
+When it fires, do not implement directly — escalate to at least `scoped-feature` with an architecture
+checkpoint (`architect` loads `system-design-decisions`, proposes options, and the orchestrator asks the user
+per its Question policy) before any code is written. This applies even to a request that looks like a
+quick-fix on its surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store
+decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
+ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
+hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+**Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+Vercel", "store it in Supabase"), that axis is DECIDED — record it with `log-decision` and proceed without
+asking; `architect` writes the formal ADR afterwards. The red-flag question is only for an axis the user
+left genuinely open.
+
+## Waking the dormant agents (concrete triggers, not "by risk")
+These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in
+the plan or the diff (the concrete files/paths the package owns: auth/, payments/, migrations/, ui
+components, .env-adjacent config), not the topic of the request in the abstract; `package-planner` justifies
+each entry in `required_reviewers` with the paths that demand it:
+- **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
+  covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
+- **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).
+- **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
+- **queries / lists / transactions / migrations** → covered by `package-reviewer`'s own data-integrity/
+  scalability checklist (already mandatory, no separate agent).
+
+**Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
+when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before
+`adversarial-judge` is mandatory.
+
+## Hard logic → hosted implementer (never the local leaf)
+Concurrency, atomic transactions, money/financial rules, and security-critical logic must NOT be implemented by
+the local leaf model (the cheap 8B) — a weak first draft on exactly this logic triggers more strong-auditor
+rework than it saves. When a task touches these, pin implementation to a **hosted** model (e.g. `openai/gpt-5.4`)
+rather than the local `implementer`. Route such implementation deliberately from the package plan. The
+local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then reviews.
+
+## Output of triage
+State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
+incident mode, also name the follow-up task you will open once the fire is out.
+
+The first delegation is announced with the dual-register narration block from `orchestrator.md`
+(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
+parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
+since a consult has no feature state file.
+
+codex
+Aplico la guía de revisión independiente para concentrar la auditoría en comportamiento observable y calidad de las pruebas; la triage clasifica esto como revisión acotada, sin cambios de producto ni necesidad de más alcance.
+exec
+/bin/bash -lc 'rg -n -C 4 "def |render|prun|subtree|json" ai/scripts/install.py' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+3-
+4-import argparse
+5-import datetime as dt
+6-import difflib
+7:import json
+8-import os
+9-import re
+10-import subprocess
+11-import shutil
+--
+35-}
+36-selected = set(args.target or all_targets)
+37-targets = {name: path for name, path in all_targets.items() if name in selected}
+38-SPECIAL = {
+39:    ("opencode", "opencode.json"),
+40:    ("claude-code", "settings.overlay.json"),
+41-    ("codex", "config.snippet.toml"),
+42-}
+43-STATE_DIR = home / ".local/state/set-agentes"
+44:# Record of the per-file targets this installer wrote last run, so a later run can prune
+45-# files it USED to manage but no longer produces (e.g. a renamed skill/agent). Only paths
+46-# recorded here are ever deleted — user-created files are never touched.
+47:MANIFEST = STATE_DIR / "managed-files.json"
+48:# 022 PKG-4 (AC-11/AC-13/AC-15): the single source `opencode.json`'s `provider` object
+49:# renders FROM, same private STATE_DIR as MANIFEST above.
+50-PROVIDERS_TOML = STATE_DIR / provider_registry.PROVIDERS_TOML_NAME
+51:# AC-14: MANIFEST's own file-level orphan-pruning discipline, extended to JSON
+52:# SUBTREES -- `{"opencode.json": ["<provider id>", ...]}`, the provider ids THIS
+53-# installer wrote under `provider.*` last run. Deliberately a SEPARATE file from
+54-# MANIFEST (never a mixed-shape entry in that flat file-path list): `previous_targets()`
+55-# below builds real filesystem `Path`s straight out of MANIFEST's entries, and a
+56:# subtree pointer is not a path -- keeping the two apart means a JSON-subtree id can
+57-# never be misread as a file to unlink.
+58:JSON_MANIFEST = STATE_DIR / "managed-json-paths.json"
+59-# Populated by `apply_provider_registry` (called from `effective_specials()`, which runs
+60-# unconditionally, including under --preview) when `providers.toml` doesn't exist yet --
+61-# the freshly bootstrapped (AC-15 migration-or-seed) content to persist for real, but
+62-# ONLY from the commit section below, after every smoke check passes (same "compute
+--
+65-# --preview exits before the commit section is reached).
+66-_PENDING_PROVIDERS_BOOTSTRAP = []
+67-
+68-
+69:def deep_merge(base, overlay):
+70-    result = dict(base)
+71-    for key, value in overlay.items():
+72-        if isinstance(value, dict) and isinstance(result.get(key), dict):
+73-            result[key] = deep_merge(result[key], value)
+--
+80-PLACEHOLDER = b"__SET_AGENTS_ROOT__"
+81-_UNSAFE_ROOT = re.compile(r"[;|<>`&$\"'\\\\*?\[\]\r\n\x00-\x1f\x7f-\x9f]")
+82-
+83-
+84:def validate_repo_root():
+85-    """Reject paths which cannot be represented safely in installed policy files."""
+86-    root = str(REPO_ROOT)
+87-    match = _UNSAFE_ROOT.search(root)
+88-    if match:
+--
+95-        )
+96-        raise SystemExit(2)
+97-
+98-
+99:def substitute_root(data: bytes, *, json_escaped: bool = False) -> bytes:
+100-    """Bake HARNESS_HOME into an installed artifact without decoding its bytes."""
+101:    replacement = json.dumps(str(REPO_ROOT))[1:].encode("utf-8") if json_escaped else str(REPO_ROOT).encode("utf-8")
+102:    # json.dumps()[1:] is deliberately wrong for an ordinary string; retain only its
+103-    # interior, matching the historical JSON merge replacement exactly.
+104:    if json_escaped:
+105:        replacement = json.dumps(str(REPO_ROOT))[1:-1].encode("utf-8")
+106-    return data.replace(PLACEHOLDER, replacement)
+107-
+108-
+109:def merged_json(current, overlay, union_lists=False):
+110:    base = json.loads(current.read_text()) if current.exists() else {}
+111:    update = json.loads(overlay.read_text())
+112-    result = deep_merge(base, update)
+113-    if union_lists:
+114-        for key, value in update.items():
+115-            if isinstance(value, list):
+116-                result[key] = sorted(set(base.get(key, [])) | set(value))
+117-    # Tracked templates stay machine-independent; the live config gets this repo's
+118-    # root, JSON-escaped so a clone path with quotes/backslashes can't break the file.
+119:    return substitute_root((json.dumps(result, indent=2) + "\n").encode(), json_escaped=True).decode()
+120-
+121-
+122:def managed_files():
+123-    result = []
+124-    for harness, target in targets.items():
+125-        for relative in (staging / harness / "managed-files.txt").read_text().splitlines():
+126-            if not relative or (harness, relative) in SPECIAL or relative == "managed-files.txt":
+--
+129-            result.append((source, target / relative))
+130-    return result
+131-
+132-
+133:def _previous_provider_ids():
+134-    """The provider ids `JSON_MANIFEST` says THIS installer wrote under `provider.*`
+135:    last run — the only ids AC-14's prune step is ever allowed to delete."""
+136-    if not JSON_MANIFEST.exists():
+137-        return set()
+138-    try:
+139:        stored = json.loads(JSON_MANIFEST.read_text())
+140:    except (OSError, json.JSONDecodeError):
+141-        return set()
+142:    return set(stored.get("opencode.json", []))
+143-
+144-
+145:def apply_provider_registry(content, target):
+146:    """AC-13/AC-14: `opencode.json`'s `provider` object, rendered FROM `providers.toml`
+147-    instead of the merge's passive pass-through (the overlay no longer carries a
+148:    `provider` key at all since `Global/_shared/opencode.json` stopped hardcoding one —
+149-    `deep_merge` alone would just leave whatever the live file already has completely
+150-    untouched, which is correct for ids nobody manages but wrong for the ones the
+151-    registry says should now exist, be updated, or be gone).
+152-
+153-    id-by-id, using the SAME manifest-diff discipline `previous_targets()`/`orphans`
+154:    already use for whole files, extended to a JSON subtree (AC-14): an id THIS
+155-    installer wrote last run (`JSON_MANIFEST`) that the registry no longer has is safe
+156-    to delete — we know we own it. Every id currently in the registry is written
+157-    (added or overwritten; the registry is the single source of truth for the ids it
+158-    tracks). Any OTHER live key — one this installer never recorded writing, e.g. a
+159:    block the user hand-added straight into `opencode.json` outside `set-agents`
+160-    entirely — is never touched, added, or removed; it is not even read for comparison,
+161-    only left exactly as `deep_merge` already found it.
+162-    """
+163:    doc = json.loads(content)
+164-    live_block = doc.get("provider")
+165-    if not isinstance(live_block, dict):
+166-        live_block = {}
+167-    entries, bootstrap_text = provider_registry.load_or_bootstrap(PROVIDERS_TOML, live_block)
+--
+173-        block.pop(provider_id, None)
+174-    for provider_id, entry in entries.items():
+175-        block[provider_id] = entry.spec
+176-    doc["provider"] = block
+177:    rendered = (json.dumps(doc, indent=2) + "\n").encode()
+178-    # Idempotent re-substitution: `content` already had the placeholder resolved by
+179:    # `merged_json`'s own call below; a provider spec is never expected to carry it, but
+180-    # this costs nothing and stays correct if one someday does.
+181:    return substitute_root(rendered, json_escaped=True).decode()
+182-
+183-
+184:def effective_specials():
+185-    result = []
+186-    if "opencode" in targets:
+187:        oc = targets["opencode"] / "opencode.json"
+188:        result.append((apply_provider_registry(merged_json(oc, staging / "opencode/opencode.json"), oc), oc))
+189-    if "claude-code" in targets:
+190:        cc = targets["claude-code"] / "settings.json"
+191:        result.append((merged_json(cc, staging / "claude-code/settings.overlay.json", union_lists=True), cc))
+192-    if "codex" in targets:
+193-        cx = targets["codex"] / "config.toml"
+194-        result.append((merge_codex(cx), cx))
+195-    return result
+196-
+197-
+198:def legacy_prompt_bytes(relative):
+199-    repo = Path(__file__).resolve().parents[2]
+200-
+201:    def git_show(ref):
+202-        result = subprocess.run(
+203-            ["git", "show", f"{ref}:{relative.as_posix()}"],
+204-            cwd=repo,
+205-            text=False,
+--
+226-        return None
+227-    return git_show(f"{commit}^")
+228-
+229-
+230:def roster_codex_orchestrator():
+231-    """Session-level model/effort for Codex come from the orchestrator area in models.toml."""
+232-    import models_config
+233-
+234-    return models_config.codex_orchestrator()
+235-
+236-
+237:def merge_codex(current):
+238-    text = current.read_text() if current.exists() else ""
+239-    lines = text.splitlines()
+240-
+241:    def set_top_key(key, value):
+242-        end = next((i for i, line in enumerate(lines) if line.startswith("[")), len(lines))
+243-        pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
+244-        for index in range(end):
+245-            if pattern.match(lines[index]):
+246-                lines[index] = f"{key} = {value}"
+247-                return
+248-        lines.insert(0, f"{key} = {value}")
+249-
+250:    def set_key(section, key, value):
+251-        header = f"[{section}]"
+252-        try:
+253-            start = lines.index(header)
+254-        except ValueError:
+--
+276-            set_key(section, "enabled", "false")
+277-    return "\n".join(lines).rstrip() + "\n"
+278-
+279-
+280:def atomic_write(path, content, mode=None):
+281-    path.parent.mkdir(parents=True, exist_ok=True)
+282-    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+283-    try:
+284-        with os.fdopen(fd, "wb") as handle:
+--
+290-        if os.path.exists(temp_name):
+291-            os.unlink(temp_name)
+292-
+293-
+294:def previous_targets():
+295:    """Absolute paths this installer wrote on the last run — the only files eligible for pruning."""
+296-    if not MANIFEST.exists():
+297-        return []
+298-    try:
+299:        stored = json.loads(MANIFEST.read_text())
+300:    except (OSError, json.JSONDecodeError):
+301-        return []
+302-    roots = set(all_targets.values())
+303-    selected_roots = set(targets.values())
+304-    result = []
+305-    for relative in stored:
+306-        candidate = home / relative
+307:        # Hard safety fence: never prune anything outside a managed harness root.
+308-        if any(root in candidate.parents for root in roots) and any(root in candidate.parents for root in selected_roots):
+309-            result.append(candidate)
+310-    return result
+311-
+312-
+313:def prune_empty_dirs(directory):
+314:    """Remove now-empty directories left by a pruned file, stopping at the harness roots."""
+315-    roots = set(targets.values())
+316-    current = directory
+317-    while current not in roots and current != home and current.is_dir():
+318-        try:
+--
+406-    for target in orphans:
+407-        before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
+408-        if before:
+409-            changes += 1
+410:            print("".join(difflib.unified_diff(before, [], fromfile=str(target), tofile=str(target) + " (prune orphan)")), end="")
+411-    if legacy_conflicts:
+412-        print("LEGACY_CONFLICTS=" + ",".join(sorted(legacy_conflicts)))
+413-    print(f"MANAGED_DIFF_FILES={changes}")
+414-    raise SystemExit(0)
+--
+431-        destination.parent.mkdir(parents=True, exist_ok=True)
+432-        shutil.copy2(target, destination)
+433-    else:
+434-        missing.append(str(relative))
+435:(backup / "missing.json").write_text(json.dumps(missing, indent=2))
+436-
+437-
+438:def rollback():
+439-    for target in affected:
+440-        relative = target.relative_to(home)
+441-        saved = backup / relative
+442-        if saved.exists():
+--
+455-            path.unlink()
+456-    for path in orphans:
+457-        if path.exists():
+458-            path.unlink()
+459:        prune_empty_dirs(path.parent)
+460-    if orphans:
+461-        print("PRUNED_ORPHANS=" + ",".join(sorted(str(p.relative_to(home)) for p in orphans)))
+462-    if legacy_conflicts:
+463-        print("LEGACY_CONFLICTS=" + ",".join(sorted(legacy_conflicts)))
+464-
+465-    if "opencode" in targets:
+466:        oc = json.loads((targets["opencode"] / "opencode.json").read_text())
+467-        # Only the managed servers must land disabled; user-added MCPs are theirs to run.
+468-        if any(item.get("enabled") for name, item in oc.get("mcp", {}).items() if name in MANAGED_MCP):
+469-            raise RuntimeError("OpenCode MCP smoke check failed")
+470-    if "claude-code" in targets:
+471:        cc = json.loads((targets["claude-code"] / "settings.json").read_text())
+472-        if cc.get("enabledPlugins", {}).get("engram@engram") is not False:
+473-            raise RuntimeError("Claude Engram smoke check failed")
+474-    if "codex" in targets:
+475-        for path in (targets["codex"] / "agents").glob("*.toml"):
+--
+487-        raise RuntimeError("Installed managed file retains SET_AGENTS_ROOT placeholder")
+488-    if os.environ.get("SET_AGENTS_FORCE_SMOKE_FAIL") == "1":
+489-        raise RuntimeError("forced smoke failure")
+490-    # Only after every smoke check passes: record what we manage now, so the next run can
+491:    # prune whatever we stop producing. A rolled-back install never reaches here.
+492-    STATE_DIR.mkdir(parents=True, exist_ok=True)
+493-    preserved = []
+494-    selected_roots = set(targets.values())
+495-    if MANIFEST.exists():
+496-        try:
+497:            for relative in json.loads(MANIFEST.read_text()):
+498-                candidate = home / relative
+499-                if not any(root in candidate.parents for root in selected_roots):
+500-                    preserved.append(relative)
+501:        except (OSError, json.JSONDecodeError):
+502-            preserved = []
+503-    managed = set(preserved) | {str(t.relative_to(home)) for t in new_targets}
+504:    atomic_write(MANIFEST, json.dumps(sorted(managed), indent=2) + "\n")
+505-    # 022 PKG-4 (AC-11/AC-15): persist a freshly-bootstrapped `providers.toml` only now
+506-    # that every smoke check passed — a rolled-back install must never leave a registry
+507-    # file behind that the failed run itself invented.
+508-    for bootstrap_path, bootstrap_text in _PENDING_PROVIDERS_BOOTSTRAP:
+509-        atomic_write(bootstrap_path, bootstrap_text)
+510:    # AC-14: record which provider ids THIS run rendered, so the NEXT run's
+511-    # `_previous_provider_ids()` can tell "ours, now gone from the registry — safe to
+512:    # prune" apart from "never ours — never touch". Re-reads `providers.toml` (now
+513-    # guaranteed to exist, pre-existing or just bootstrapped above) rather than
+514-    # threading `entries` out of `apply_provider_registry`, the same "recompute the
+515-    # small thing instead of plumbing state through" choice `previous_targets()` itself
+516-    # makes for MANIFEST.
+517-    if "opencode" in targets:
+518:        json_manifest_data = {}
+519-        if JSON_MANIFEST.exists():
+520-            try:
+521:                json_manifest_data = json.loads(JSON_MANIFEST.read_text())
+522:            except (OSError, json.JSONDecodeError):
+523:                json_manifest_data = {}
+524:        json_manifest_data["opencode.json"] = sorted(provider_registry.parse_providers_toml(PROVIDERS_TOML))
+525:        atomic_write(JSON_MANIFEST, json.dumps(json_manifest_data, indent=2) + "\n")
+526-    # Scope record: which harness trees THIS machine manages, so check-drift.sh can
+527-    # compare only what was actually installed (a claude-only machine must not read
+528-    # the never-installed opencode/codex trees as drift). Merged, not replaced: a
+529-    # later `--target` run extends the scope, it never silently narrows it.
+530:    scope_path = STATE_DIR / "install-targets.json"
+531-    scope = set(targets)
+532-    if scope_path.exists():
+533-        try:
+534:            scope |= set(json.loads(scope_path.read_text()))
+535:        except (OSError, json.JSONDecodeError):
+536-            pass
+537-    if not args.target:
+538-        scope = set(all_targets)
+539:    atomic_write(scope_path, json.dumps(sorted(scope)) + "\n")
+540-except Exception:
+541-    rollback()
+542-    print(f"INSTALL_ROLLED_BACK backup={backup}")
+543-    raise
+
+exec
+/bin/bash -lc 'rg -n -C 5 "foreign|external|provider|prun|remove|unmanaged" tests/test_provider_registry.py' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+1:"""022 PKG-4 (proveedores-del-usuario, AC-11..15): the `providers.toml` registry
+2:(`ai/scripts/provider_registry.py`), its `--provider-list|add|remove|verify` CLI
+3-(`ai/scripts/set_agents_app.py`), and `install.py`'s render-from-registry + JSON-subtree
+4:prune (AC-13/AC-14).
+5-
+6-Every subprocess test below runs with `HOME` pointed at a `tempfile.TemporaryDirectory`
+7-(never the real machine's `~/.config/opencode` or `~/.local/state/set-agentes` — the repo
+8-harness rule this whole package exists under). `./build.sh --output <staging>` is run
+9-fresh per test that needs a real staged tree, exactly like
+--
+22-from unittest import mock
+23-
+24-ROOT = Path(__file__).resolve().parents[1]
+25-sys.path.insert(0, str(ROOT / "ai/scripts"))
+26-
+27:import provider_registry as pr  # noqa: E402
+28-import set_agents_app as app  # noqa: E402
+29-
+30-
+31-def run(*args, env=None, check=True, cwd=ROOT):
+32-    return subprocess.run(
+--
+45-    (home / ".config/opencode").mkdir(parents=True, exist_ok=True)
+46-    (home / ".codex").mkdir(parents=True, exist_ok=True)
+47-    return home
+48-
+49-
+50:def live_provider_block(home):
+51-    doc = json.loads((home / ".config/opencode/opencode.json").read_text())
+52:    return doc.get("provider")
+53-
+54-
+55:# --------------------------------------------------------------- provider_registry.py
+56-
+57-
+58-class ParseSerializeRoundTripTests(unittest.TestCase):
+59-    def test_round_trip_preserves_origin_and_arbitrary_spec_shape(self):
+60-        entries = {
+--
+64-                spec={"npm": "x", "name": 'quote " and \\ backslash and \n newline',
+65-                      "options": {"baseURL": "http://x/v1"}, "models": {"m": {"name": "M"}}},
+66-            ),
+67-        }
+68-        with tempfile.TemporaryDirectory() as td:
+69:            path = Path(td) / "providers.toml"
+70:            path.write_text(pr.serialize_providers_toml(entries))
+71:            back = pr.parse_providers_toml(path)
+72-        self.assertEqual(back, entries)
+73-
+74-    def test_absent_file_is_the_unbiased_empty_default(self):
+75:        self.assertEqual(pr.parse_providers_toml(Path("/nonexistent/providers.toml")), {})
+76-
+77-    def test_fails_closed_on_unknown_origin_not_silent_default(self):
+78-        with tempfile.TemporaryDirectory() as td:
+79:            path = Path(td) / "providers.toml"
+80-            path.write_text('[x]\norigin = "bogus"\nspec = "{}"\n')
+81-            with self.assertRaises(pr.ProvidersRegistryError):
+82:                pr.parse_providers_toml(path)
+83-
+84-    def test_fails_closed_on_spec_not_valid_json(self):
+85-        with tempfile.TemporaryDirectory() as td:
+86:            path = Path(td) / "providers.toml"
+87-            path.write_text('[x]\norigin = "user"\nspec = "not json{"\n')
+88-            with self.assertRaises(pr.ProvidersRegistryError):
+89:                pr.parse_providers_toml(path)
+90-
+91-    def test_fails_closed_on_malformed_toml(self):
+92-        with tempfile.TemporaryDirectory() as td:
+93:            path = Path(td) / "providers.toml"
+94-            path.write_text("[x\nnot valid toml")
+95-            with self.assertRaises(pr.ProvidersRegistryError):
+96:                pr.parse_providers_toml(path)
+97-
+98-
+99-class SeedOrMigrateTests(unittest.TestCase):
+100-    """AC-15: the migration comparison is against the harness's own VALUE, never an
+101-    id/name heuristic (022 context pack, P4)."""
+--
+129-
+130-
+131-class LoadOrBootstrapTests(unittest.TestCase):
+132-    def test_existing_file_returns_none_bootstrap_text(self):
+133-        with tempfile.TemporaryDirectory() as td:
+134:            path = Path(td) / "providers.toml"
+135:            path.write_text(pr.serialize_providers_toml({"x": pr.ProviderEntry(origin="user", spec={"npm": "a", "name": "b", "options": {"baseURL": "http://x"}, "models": {"m": {"name": "M"}}})}))
+136-            entries, bootstrap = pr.load_or_bootstrap(path, {})
+137-            self.assertIsNone(bootstrap)
+138-            self.assertEqual(set(entries), {"x"})
+139-
+140-    def test_absent_file_returns_computed_bootstrap_text_not_yet_written(self):
+141-        with tempfile.TemporaryDirectory() as td:
+142:            path = Path(td) / "providers.toml"
+143-            entries, bootstrap = pr.load_or_bootstrap(path, {})
+144-            self.assertIsNotNone(bootstrap)
+145-            self.assertFalse(path.exists(), "load_or_bootstrap must never write by itself")
+146-            self.assertEqual(set(entries), set(pr.HARNESS_PROVIDER_SEED))
+147-
+--
+154-    real HOME (PROVIDERS_TOML_PATH is patched explicitly per test, independent of
+155-    STATE_DIR/HOME)."""
+156-
+157-    def _run_with_registry(self, func, *a, **kw):
+158-        with tempfile.TemporaryDirectory() as td:
+159:            path = Path(td) / "providers.toml"
+160-            with mock.patch.object(app, "PROVIDERS_TOML_PATH", path):
+161-                out = []
+162-                with mock.patch("builtins.print", side_effect=lambda *args, **_: out.append(" ".join(map(str, args)))):
+163-                    rc = func(*a, **kw)
+164:                return rc, out, (pr.parse_providers_toml(path) if path.exists() else {})
+165-
+166-    def test_list_on_empty_registry_prints_none(self):
+167:        rc, out, _ = self._run_with_registry(app.cmd_provider_list)
+168-        self.assertEqual(rc, 0)
+169-        self.assertTrue(out[0].startswith("PROVIDER_NONE"))
+170-
+171-    def test_add_builds_spec_from_structured_flags_never_raw_json(self):
+172-        rc, out, entries = self._run_with_registry(
+173:            app.cmd_provider_add, "lmstudio", "http://localhost:1234/v1",
+174-            npm=None, label=None, models=["llama-3:Llama 3", "phi-4"],
+175-        )
+176-        self.assertEqual(rc, 0)
+177-        self.assertIn("PROVIDER_ADDED id=lmstudio origin=user models=2", out[0])
+178-        self.assertEqual(entries["lmstudio"].origin, "user")
+--
+180-        self.assertEqual(entries["lmstudio"].spec["options"]["baseURL"], "http://localhost:1234/v1")
+181-        self.assertEqual(entries["lmstudio"].spec["models"], {"llama-3": {"name": "Llama 3"}, "phi-4": {"name": "phi-4"}})
+182-
+183-    def test_add_rejects_an_id_that_shadows_the_routing_registry(self):
+184-        rc, out, entries = self._run_with_registry(
+185:            app.cmd_provider_add, "anthropic", "http://x/v1", npm=None, label=None, models=["m"],
+186-        )
+187-        self.assertEqual(rc, 2)
+188-        self.assertIn("PROVIDER_RESERVED", out[0])
+189-        self.assertEqual(entries, {}, "a rejected add must never write")
+190-
+191-    def test_add_requires_at_least_one_model(self):
+192-        rc, out, entries = self._run_with_registry(
+193:            app.cmd_provider_add, "lmstudio", "http://x/v1", npm=None, label=None, models=(),
+194-        )
+195-        self.assertEqual(rc, 2)
+196-        self.assertEqual(entries, {})
+197-
+198-    def test_add_rejects_a_non_http_base_url(self):
+199-        rc, out, entries = self._run_with_registry(
+200:            app.cmd_provider_add, "lmstudio", "not-a-url", npm=None, label=None, models=["m"],
+201-        )
+202-        self.assertEqual(rc, 2)
+203-        self.assertEqual(entries, {})
+204-
+205:    def test_remove_unknown_id_is_rejected_not_silently_ok(self):
+206:        rc, out, _ = self._run_with_registry(app.cmd_provider_remove, "nope")
+207-        self.assertEqual(rc, 2)
+208-        self.assertIn("PROVIDER_UNKNOWN", out[0])
+209-
+210-    def test_verify_reports_missing_fields_only_declared_surface_no_network(self):
+211-        with tempfile.TemporaryDirectory() as td:
+212:            path = Path(td) / "providers.toml"
+213-            broken = {"broken": pr.ProviderEntry(origin="user", spec={"npm": "x", "name": "n", "options": {}, "models": {}})}
+214:            path.write_text(pr.serialize_providers_toml(broken))
+215-            with mock.patch.object(app, "PROVIDERS_TOML_PATH", path):
+216-                out = []
+217-                with mock.patch("builtins.print", side_effect=lambda *args, **_: out.append(" ".join(map(str, args)))):
+218:                    rc = app.cmd_provider_verify(None)
+219-        self.assertEqual(rc, 1)
+220-        self.assertIn("shape=invalid", out[0])
+221-        self.assertIn("options.baseURL", out[0])
+222-        self.assertIn("models", out[0])
+223-
+224-
+225-class ProviderCliSubprocessTests(unittest.TestCase):
+226-    """A real `set_agents_app.py` invocation, HOME sandboxed — proves the CLI is wired
+227-    end to end through argparse, not just the underlying functions."""
+228-
+229:    def test_add_list_remove_round_trip_via_real_argv(self):
+230-        with tempfile.TemporaryDirectory() as td:
+231-            home = make_home(td)
+232:            added = run("python3", "ai/scripts/set_agents_app.py", "--provider-add", "lmstudio",
+233-                        "--base-url", "http://localhost:1234/v1", "--model", "m1:Model One",
+234-                        env={"HOME": str(home)})
+235-            self.assertIn("PROVIDER_ADDED", added.stdout)
+236:            listed = run("python3", "ai/scripts/set_agents_app.py", "--provider-list", env={"HOME": str(home)})
+237-            self.assertIn("PROVIDER lmstudio origin=user", listed.stdout)
+238:            removed = run("python3", "ai/scripts/set_agents_app.py", "--provider-remove", "lmstudio", env={"HOME": str(home)})
+239:            self.assertIn("PROVIDER_REMOVED id=lmstudio origin=user", removed.stdout)
+240:            listed_after = run("python3", "ai/scripts/set_agents_app.py", "--provider-list", env={"HOME": str(home)})
+241-            self.assertIn("PROVIDER_NONE", listed_after.stdout)
+242-
+243-
+244-# --------------------------------------------------------------- install.py (AC-13/14/15)
+245-
+246-
+247-class InstallProviderRenderTests(unittest.TestCase):
+248:    def test_global_shared_opencode_json_no_longer_hardcodes_a_provider_block(self):
+249-        """AC-13's own premise: the render must come from the registry because the
+250-        overlay literally doesn't carry one anymore."""
+251-        doc = json.loads((ROOT / "Global/_shared/opencode.json").read_text())
+252:        self.assertNotIn("provider", doc)
+253-
+254-    def test_fresh_install_seeds_the_registry_and_renders_ollama(self):
+255-        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+256-            home = make_home(td)
+257-            build_staging(staging)
+258-            result = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+259-            self.assertIn("INSTALL_PASS", result.stdout)
+260:            registry = pr.parse_providers_toml(home / ".local/state/set-agentes/providers.toml")
+261-            self.assertEqual(registry["ollama"].origin, "harness")
+262:            block = live_provider_block(home)
+263-            self.assertEqual(set(block), {"ollama"})
+264-            self.assertEqual(block["ollama"], pr.HARNESS_PROVIDER_SEED["ollama"])
+265-
+266-    def test_preview_never_writes_the_registry(self):
+267-        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+268-            home = make_home(td)
+269-            build_staging(staging)
+270-            run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode", "--preview")
+271:            self.assertFalse((home / ".local/state/set-agentes/providers.toml").exists())
+272-
+273:    def test_removed_provider_does_not_come_back_on_a_later_install(self):
+274:        """AC-13's core claim, measured, not argued: remove via the CLI, install again,
+275-        confirm the block is gone from the LIVE opencode.json -- exactly the failure
+276-        `deep_merge` used to reintroduce every run before this package."""
+277-        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+278-            home = make_home(td)
+279-            build_staging(staging)
+280-            run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+281:            self.assertIn("ollama", live_provider_block(home))
+282:            removed = run("python3", "ai/scripts/set_agents_app.py", "--provider-remove", "ollama", env={"HOME": str(home)})
+283:            self.assertIn("PROVIDER_REMOVED", removed.stdout)
+284:            # Still present right after removal -- removal only touches providers.toml,
+285-            # never opencode.json directly (documented CLI contract).
+286:            self.assertIn("ollama", live_provider_block(home))
+287-            second = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+288-            self.assertIn("INSTALL_PASS", second.stdout)
+289:            self.assertNotIn("ollama", live_provider_block(home) or {})
+290-            # A THIRD install must not resurrect it either -- the registry file, once it
+291:            # exists (even having had an entry removed), is authoritative forever.
+292-            third = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+293-            self.assertIn("INSTALL_PASS", third.stdout)
+294:            self.assertNotIn("ollama", live_provider_block(home) or {})
+295-
+296:    def test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one(self):
+297:        """AC-14's OBLIGATORY test. There is no real user-owned provider on any measured
+298-        machine today (context pack, P4) -- this is a FIXTURE by construction, stated
+299-        here rather than implied: it simulates a block the user added by editing
+300-        opencode.json directly, outside `set-agents` entirely (never registered, never
+301-        in the JSON-subtree manifest)."""
+302-        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+303-            home = make_home(td)
+304-            build_staging(staging)
+305-            oc_path = home / ".config/opencode/opencode.json"
+306-            oc_path.write_text(json.dumps({
+307-                "$schema": "https://opencode.ai/config.json",
+308:                "provider": {
+309-                    "ollama": dict(pr.HARNESS_PROVIDER_SEED["ollama"]),
+310-                    "byhand": {"npm": "@ai-sdk/openai-compatible", "name": "My hand-added LLM",
+311-                               "options": {"baseURL": "http://localhost:9999/v1"},
+312-                               "models": {"whatever": {"name": "Whatever"}}},
+313-                },
+314-            }))
+315-            state = home / ".local/state/set-agentes"
+316-            state.mkdir(parents=True)
+317:            (state / "providers.toml").write_text(pr.serialize_providers_toml(
+318-                {"ollama": pr.ProviderEntry(origin="harness", spec=dict(pr.HARNESS_PROVIDER_SEED["ollama"]))}
+319-            ))
+320-            (state / "managed-json-paths.json").write_text(json.dumps({"opencode.json": ["ollama"]}))
+321-            # Prune ollama from the registry -- "byhand" was never registered at all.
+322:            (state / "providers.toml").write_text(pr.serialize_providers_toml({}))
+323:            before_byhand = live_provider_block(home)["byhand"]
+324-            result = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+325-            self.assertIn("INSTALL_PASS", result.stdout)
+326:            block = live_provider_block(home)
+327:            self.assertNotIn("ollama", block, "the registered-then-removed id must be pruned")
+328-            self.assertIn("byhand", block, "an id the harness never registered must never be touched")
+329-            self.assertEqual(block["byhand"], before_byhand, "must survive BYTE-IDENTICAL, not just present")
+330-
+331-    def test_migration_from_a_live_file_distinguishes_harness_legacy_from_user(self):
+332-        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+333-            home = make_home(td)
+334-            build_staging(staging)
+335-            oc_path = home / ".config/opencode/opencode.json"
+336-            oc_path.write_text(json.dumps({
+337-                "$schema": "https://opencode.ai/config.json",
+338:                "provider": {
+339-                    "ollama": dict(pr.HARNESS_PROVIDER_SEED["ollama"]),  # byte-identical
+340-                    "lmstudio": {"npm": "@ai-sdk/openai-compatible", "name": "LM Studio",
+341-                                 "options": {"baseURL": "http://localhost:1234/v1"},
+342-                                 "models": {"foo": {"name": "Foo"}}},
+343-                },
+344-            }))
+345-            run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+346:            registry = pr.parse_providers_toml(home / ".local/state/set-agentes/providers.toml")
+347-            self.assertEqual(registry["ollama"].origin, "harness-legacy")
+348-            self.assertEqual(registry["lmstudio"].origin, "user")
+349-
+350-    def test_migration_of_an_edited_same_id_block_is_user_never_harness_legacy(self):
+351-        """The comparison is by VALUE, never by id -- 022 context pack's explicit
+--
+355-            home = make_home(td)
+356-            build_staging(staging)
+357-            edited = dict(pr.HARNESS_PROVIDER_SEED["ollama"])
+358-            edited["name"] = "Ollama (edited by Federico)"
+359-            (home / ".config/opencode/opencode.json").write_text(json.dumps({
+360:                "$schema": "https://opencode.ai/config.json", "provider": {"ollama": edited},
+361-            }))
+362-            run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+363:            registry = pr.parse_providers_toml(home / ".local/state/set-agentes/providers.toml")
+364-            self.assertEqual(registry["ollama"].origin, "user")
+365-
+366-
+367-if __name__ == "__main__":
+368-    unittest.main()
+
+exec
+/bin/bash -lc 'rg -n -C 3 "''^# ===== 022 PKG-4|def |provider|render|prun" ai/scripts/provider_registry.py' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+1:"""ADR-0042 (022 PKG-1): the single audited provider registry.
+2-
+3-`PROVIDERS` is the ONE source `routing_core/catalog.py`, `models_config.py`, and
+4:`set_agents_app.py` derive their provider-keyed tables from -- before this module existed,
+5:those three files hand-maintained SIX independently-editable copies of the same four-provider
+6-universe (`_OPENCODE_PROVIDER_KEYS`, `_OPENCODE_CLI_IDS`, `PROVIDER_BILLING_KIND`, the key map
+7-inside `_configured_models`, `DISCOVERABLE_PROVIDERS`, `_MODEL_PREFERENCE_PROVIDERS`), synced
+8:only by human discipline. Adding a provider now means adding one `ProviderSpec` row here.
+9-
+10-Deliberately outside the `routing_core` package and importing NEITHER `routing_core` NOR
+11-`models_config`: `routing_core/__init__.py` unconditionally imports `.service`/`.store`
+--
+31-
+32-@dataclasses.dataclass(frozen=True)
+33-class ProviderSpec:
+34:    """One audited provider's identity across every axis this registry replaces.
+35-
+36-    `opencode_auth_key`: the credential display text `opencode auth list --pure` prints for
+37:    this provider (map 1 of 2, 012 AC-02) -- used ONLY at the credential-set membership check.
+38-    `opencode_cli_id`: the CLI argument for `opencode models <id>` AND the `<id>/<model>` line
+39-    prefix `_parse_opencode_models` strips (map 2 of 2) -- independently addressable from
+40-    `opencode_auth_key` (012 AC-02: the two coincide for `openai-codex`/`anthropic` but diverge
+41:    for the OpenCode-lane providers).
+42-    `billing_kind`: `"subscription"` or `"metered"` (012 AC-08 / ADR-0035), curated per
+43:    provider, never a `routes.v1.toml` row field.
+44:    `catalog_key`: the `[catalog]` table key in `models.toml` that curates this provider's
+45-    model allowlist (012 AC-04).
+46-    """
+47-
+--
+77-#
+78-# A SECOND, INDEPENDENT registry in this same neutral module -- NOT the routing-identity
+79-# axis above (`PROVIDERS`, `ollama` never joins it: never probed, never routed, never
+80:# part of `_PAIR_COMMANDS`). This one is the OpenCode `provider.*` JSON-block registry:
+81-# arbitrary local/custom model endpoints a user points OpenCode at directly (today:
+82:# Ollama). Lives on disk at `~/.local/state/set-agentes/providers.toml`, the exact
+83-# atomic-write/private-`STATE_DIR` sibling-file precedent `set_agents_app.
+84-# MODEL_PREFERENCE_PATH` already established (`set_agents_app.py:106`). ADR-0042 is
+85-# extended (not superseded) to name the three origins an entry can carry going forward
+86-# (`harness`, `discovered`, `user`) plus the one-time migration label AC-15 needs
+87-# (`harness-legacy`) for a block this module can prove pre-dates the registry.
+88:PROVIDERS_TOML_NAME = "providers.toml"
+89-PROVIDER_ORIGINS = ("harness", "harness-legacy", "discovered", "user")
+90-
+91-# The one block the harness itself used to hardcode straight into
+--
+114-
+115-@dataclasses.dataclass(frozen=True)
+116-class ProviderEntry:
+117:    """One `providers.toml` row: `origin` (one of `PROVIDER_ORIGINS`) plus `spec`, the
+118:    exact JSON object that lands verbatim at `opencode.json["provider"][provider_id]`
+119:    (AC-13: install.py renders this dict, never re-derives or reshapes it)."""
+120-
+121-    origin: str
+122-    spec: dict
+123-
+124-
+125-class ProvidersRegistryError(ValueError):
+126:    """Fail-closed: a malformed `providers.toml` never degrades to a silently-empty
+127-    registry -- same discipline `set_agents_app.ModelPreferenceError` already applies to
+128-    the sibling `model-preference.toml` file."""
+129-
+130-
+131:def _die(path, message):
+132-    raise ProvidersRegistryError(f"{path}: {message}")
+133-
+134-
+135-_BARE_TOML_KEY = re.compile(r"[A-Za-z0-9_-]+")
+136-
+137-
+138:def _toml_string(value: str) -> str:
+139-    """A TOML basic string is, character for character, a JSON string for every value
+140-    this module ever writes: `json.dumps` and TOML's basic-string grammar agree on the
+141-    exact same escape set (`\\", \\\\, \\n, \\t, \\r, \\b, \\f, \\uXXXX`) and `json.dumps`
+--
+147-    return json.dumps(value)
+148-
+149-
+150:def _toml_key(key: str) -> str:
+151-    # Bare TOML keys allow only [A-Za-z0-9_-]; every id observed in the wild so far
+152-    # already matches, but a future user-chosen id might not (spaces, dots, colons) --
+153-    # quote it like any other TOML basic string instead of assuming.
+154-    return key if _BARE_TOML_KEY.fullmatch(key) else _toml_string(key)
+155-
+156-
+157:def parse_providers_toml(path) -> dict[str, ProviderEntry]:
+158-    """Fail-closed parse. An absent file is the unbiased empty default (same shape
+159-    `_read_model_preference_raw` uses for its own sibling file) -- callers that need to
+160-    bootstrap on absence do so explicitly via `seed_or_migrate`, never here."""
+--
+169-    except tomllib.TOMLDecodeError as exc:
+170-        _die(path, f"invalid TOML ({exc})")
+171-    entries = {}
+172:    for provider_id, table in doc.items():
+173-        if not isinstance(table, dict) or set(table) != {"origin", "spec"}:
+174:            _die(path, f"[{provider_id}] must have exactly 'origin' and 'spec'")
+175-        origin = table["origin"]
+176-        if origin not in PROVIDER_ORIGINS:
+177:            _die(path, f"[{provider_id}].origin unknown: {origin!r}")
+178-        spec_raw = table["spec"]
+179-        if not isinstance(spec_raw, str):
+180:            _die(path, f"[{provider_id}].spec must be a string")
+181-        try:
+182-            spec = json.loads(spec_raw)
+183-        except json.JSONDecodeError as exc:
+184:            _die(path, f"[{provider_id}].spec is not valid JSON ({exc})")
+185-        if not isinstance(spec, dict):
+186:            _die(path, f"[{provider_id}].spec must decode to a JSON object")
+187:        entries[provider_id] = ProviderEntry(origin=origin, spec=spec)
+188-    return entries
+189-
+190-
+191:def serialize_providers_toml(entries: dict[str, ProviderEntry]) -> str:
+192-    """The small, purpose-built, fixed-shape emitter this schema's own closure makes
+193-    safe -- exactly two keys per table, `origin` a closed-vocabulary string and `spec` an
+194-    opaque JSON-encoded string (see `_toml_string`). Sorted by id for a stable,
+195-    diffable file, same as `_serialize_model_preference` sorts its own tables."""
+196-    lines = []
+197:    for provider_id in sorted(entries):
+198:        entry = entries[provider_id]
+199:        lines.append(f"[{_toml_key(provider_id)}]")
+200-        lines.append(f"origin = {_toml_string(entry.origin)}")
+201-        lines.append(f"spec = {_toml_string(json.dumps(entry.spec, sort_keys=True))}")
+202-        lines.append("")
+203-    return ("\n".join(lines).rstrip("\n") + "\n") if entries else ""
+204-
+205-
+206:def _normalize_spec(spec: dict) -> dict:
+207-    """Round-trips `spec` through the exact same `sort_keys=True` JSON encoding
+208:    `serialize_providers_toml` uses for storage, so a freshly bootstrapped entry (this
+209:    call) and one read back later via `parse_providers_toml` (which necessarily gets
+210:    the STORED, sort_keys=True key order back) render byte-for-byte identical JSON into
+211-    `opencode.json`. Without this, the very next `install.py --preview` after a fresh
+212:    bootstrap reports the provider block as 'changed' purely from key-order churn
+213-    (`dict` equality ignores order, `json.dumps` does not) -- caught live by `check-
+214-    drift.sh`/`tests/test_harness.py::test_check_drift_detects_stale_and_clean_install`
+215-    during this package's own gate run, not invented after the fact."""
+216-    return json.loads(json.dumps(spec, sort_keys=True))
+217-
+218-
+219:def seed_or_migrate(live_provider_block: dict) -> dict[str, ProviderEntry]:
+220:    """AC-15: the ONE-TIME bootstrap content for a machine with no `providers.toml` yet
+221-    (callers only invoke this when the file is confirmed absent -- an existing file,
+222-    even an empty one, is authoritative forever after and is never reseeded; that is
+223:    what makes `--provider-remove` stick across future installs).
+224-
+225:    `live_provider_block` is the CURRENT on-disk `provider` object under the live
+226-    `opencode.json` (or `{}`/absent on a brand-new machine with no prior install).
+227-
+228-    - Non-empty: every id present is registered -- 'a nadie le desaparece nada' -- each
+--
+236-      about which entries are found equal, only the key order later written to disk.
+237-    - Empty (nothing to migrate): every `HARNESS_PROVIDER_SEED` entry is registered
+238-      fresh as `origin=harness`, so a brand-new machine keeps today's default behaviour
+239:      (Ollama pre-declared) until the user explicitly runs `--provider-remove`.
+240-    """
+241:    if not live_provider_block:
+242:        return {provider_id: ProviderEntry(origin="harness", spec=_normalize_spec(spec))
+243:                for provider_id, spec in HARNESS_PROVIDER_SEED.items()}
+244-    entries = {}
+245:    for provider_id, spec in live_provider_block.items():
+246:        seed = HARNESS_PROVIDER_SEED.get(provider_id)
+247-        origin = "harness-legacy" if seed is not None and spec == seed else "user"
+248:        entries[provider_id] = ProviderEntry(origin=origin, spec=_normalize_spec(spec))
+249-    return entries
+250-
+251-
+252:def load_or_bootstrap(path, live_provider_block: dict) -> tuple[dict[str, ProviderEntry], str | None]:
+253-    """The one entry point both `install.py` and `set_agents_app.py` share to resolve
+254-    the CURRENT registry content. Returns `(entries, bootstrap_text)`:
+255:    - `path` already exists: `(parse_providers_toml(path), None)` -- nothing new to
+256-      persist, `bootstrap_text` is `None` so a caller never mistakes "already there" for
+257-      "must write".
+258:    - `path` absent: `(seed_or_migrate(live_provider_block), <serialized text>)` --
+259-      freshly computed, not yet persisted. `install.py` defers the actual write until
+260-      after its own smoke checks pass (same discipline as its `MANIFEST` write); a
+261-      direct CLI caller with no transaction to protect may write it immediately.
+262-    """
+263-    if path.exists():
+264:        return parse_providers_toml(path), None
+265:    entries = seed_or_migrate(live_provider_block)
+266:    return entries, serialize_providers_toml(entries)
+
+exec
+/bin/bash -lc "rg -n '"'^# ===== 022 PKG-4'"' ai/scripts/provider_registry.py; sed -n '70,300p' ai/scripts/provider_registry.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+        opencode_auth_key="opencode go", opencode_cli_id="opencode-go",
+        billing_kind="subscription", catalog_key="opencode_go",
+    ),
+}
+
+
+# ================================================================= 022 PKG-4 (AC-11..15)
+#
+# A SECOND, INDEPENDENT registry in this same neutral module -- NOT the routing-identity
+# axis above (`PROVIDERS`, `ollama` never joins it: never probed, never routed, never
+# part of `_PAIR_COMMANDS`). This one is the OpenCode `provider.*` JSON-block registry:
+# arbitrary local/custom model endpoints a user points OpenCode at directly (today:
+# Ollama). Lives on disk at `~/.local/state/set-agentes/providers.toml`, the exact
+# atomic-write/private-`STATE_DIR` sibling-file precedent `set_agents_app.
+# MODEL_PREFERENCE_PATH` already established (`set_agents_app.py:106`). ADR-0042 is
+# extended (not superseded) to name the three origins an entry can carry going forward
+# (`harness`, `discovered`, `user`) plus the one-time migration label AC-15 needs
+# (`harness-legacy`) for a block this module can prove pre-dates the registry.
+PROVIDERS_TOML_NAME = "providers.toml"
+PROVIDER_ORIGINS = ("harness", "harness-legacy", "discovered", "user")
+
+# The one block the harness itself used to hardcode straight into
+# `Global/_shared/opencode.json` (AC-13: no longer hardcoded there -- this dict is now
+# its only home). Used ONLY for two things: (a) seeding a brand-new machine's registry
+# on first bootstrap (no live `opencode.json` to read at all), so a fresh install keeps
+# today's default behaviour until the user explicitly removes it; and (b) as the
+# comparison VALUE `seed_or_migrate` uses to tell a live block that is still
+# byte-identical to what the harness always sent (`origin=harness-legacy`) apart from one
+# the user has since edited, or added under an id the harness never shipped
+# (`origin=user`) -- structural VALUE equality, never an id/name heuristic (022 context
+# pack, P4: "escribí la comparación, no una heurística por nombre").
+HARNESS_PROVIDER_SEED: dict[str, dict] = {
+    "ollama": {
+        "npm": "@ai-sdk/openai-compatible",
+        "name": "Ollama (local)",
+        "options": {"baseURL": "http://localhost:11434/v1"},
+        "models": {
+            "qwen2.5-coder:7b-instruct-q5_K_M": {"name": "Qwen2.5 Coder 7B Q5 (local, code)"},
+            "qwen2.5-coder:7b": {"name": "Qwen2.5 Coder 7B Q4 (local, code)"},
+            "llama3.1:8b": {"name": "Llama 3.1 8B (local, general)"},
+        },
+    },
+}
+
+
+@dataclasses.dataclass(frozen=True)
+class ProviderEntry:
+    """One `providers.toml` row: `origin` (one of `PROVIDER_ORIGINS`) plus `spec`, the
+    exact JSON object that lands verbatim at `opencode.json["provider"][provider_id]`
+    (AC-13: install.py renders this dict, never re-derives or reshapes it)."""
+
+    origin: str
+    spec: dict
+
+
+class ProvidersRegistryError(ValueError):
+    """Fail-closed: a malformed `providers.toml` never degrades to a silently-empty
+    registry -- same discipline `set_agents_app.ModelPreferenceError` already applies to
+    the sibling `model-preference.toml` file."""
+
+
+def _die(path, message):
+    raise ProvidersRegistryError(f"{path}: {message}")
+
+
+_BARE_TOML_KEY = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def _toml_string(value: str) -> str:
+    """A TOML basic string is, character for character, a JSON string for every value
+    this module ever writes: `json.dumps` and TOML's basic-string grammar agree on the
+    exact same escape set (`\\", \\\\, \\n, \\t, \\r, \\b, \\f, \\uXXXX`) and `json.dumps`
+    (ensure_ascii=True, the default) never emits a raw non-ASCII byte or a literal control
+    character outside that set. So `json.dumps` doubles as this module's ENTIRE
+    TOML-string-escaping routine -- not a general nested-TOML writer, the same
+    closed-schema discipline `set_agents_app._serialize_model_preference` already
+    documents for its own sibling file (ADR-0018 R2-F-04)."""
+    return json.dumps(value)
+
+
+def _toml_key(key: str) -> str:
+    # Bare TOML keys allow only [A-Za-z0-9_-]; every id observed in the wild so far
+    # already matches, but a future user-chosen id might not (spaces, dots, colons) --
+    # quote it like any other TOML basic string instead of assuming.
+    return key if _BARE_TOML_KEY.fullmatch(key) else _toml_string(key)
+
+
+def parse_providers_toml(path) -> dict[str, ProviderEntry]:
+    """Fail-closed parse. An absent file is the unbiased empty default (same shape
+    `_read_model_preference_raw` uses for its own sibling file) -- callers that need to
+    bootstrap on absence do so explicitly via `seed_or_migrate`, never here."""
+    try:
+        raw = path.read_text()
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        _die(path, str(exc))
+    try:
+        doc = tomllib.loads(raw)
+    except tomllib.TOMLDecodeError as exc:
+        _die(path, f"invalid TOML ({exc})")
+    entries = {}
+    for provider_id, table in doc.items():
+        if not isinstance(table, dict) or set(table) != {"origin", "spec"}:
+            _die(path, f"[{provider_id}] must have exactly 'origin' and 'spec'")
+        origin = table["origin"]
+        if origin not in PROVIDER_ORIGINS:
+            _die(path, f"[{provider_id}].origin unknown: {origin!r}")
+        spec_raw = table["spec"]
+        if not isinstance(spec_raw, str):
+            _die(path, f"[{provider_id}].spec must be a string")
+        try:
+            spec = json.loads(spec_raw)
+        except json.JSONDecodeError as exc:
+            _die(path, f"[{provider_id}].spec is not valid JSON ({exc})")
+        if not isinstance(spec, dict):
+            _die(path, f"[{provider_id}].spec must decode to a JSON object")
+        entries[provider_id] = ProviderEntry(origin=origin, spec=spec)
+    return entries
+
+
+def serialize_providers_toml(entries: dict[str, ProviderEntry]) -> str:
+    """The small, purpose-built, fixed-shape emitter this schema's own closure makes
+    safe -- exactly two keys per table, `origin` a closed-vocabulary string and `spec` an
+    opaque JSON-encoded string (see `_toml_string`). Sorted by id for a stable,
+    diffable file, same as `_serialize_model_preference` sorts its own tables."""
+    lines = []
+    for provider_id in sorted(entries):
+        entry = entries[provider_id]
+        lines.append(f"[{_toml_key(provider_id)}]")
+        lines.append(f"origin = {_toml_string(entry.origin)}")
+        lines.append(f"spec = {_toml_string(json.dumps(entry.spec, sort_keys=True))}")
+        lines.append("")
+    return ("\n".join(lines).rstrip("\n") + "\n") if entries else ""
+
+
+def _normalize_spec(spec: dict) -> dict:
+    """Round-trips `spec` through the exact same `sort_keys=True` JSON encoding
+    `serialize_providers_toml` uses for storage, so a freshly bootstrapped entry (this
+    call) and one read back later via `parse_providers_toml` (which necessarily gets
+    the STORED, sort_keys=True key order back) render byte-for-byte identical JSON into
+    `opencode.json`. Without this, the very next `install.py --preview` after a fresh
+    bootstrap reports the provider block as 'changed' purely from key-order churn
+    (`dict` equality ignores order, `json.dumps` does not) -- caught live by `check-
+    drift.sh`/`tests/test_harness.py::test_check_drift_detects_stale_and_clean_install`
+    during this package's own gate run, not invented after the fact."""
+    return json.loads(json.dumps(spec, sort_keys=True))
+
+
+def seed_or_migrate(live_provider_block: dict) -> dict[str, ProviderEntry]:
+    """AC-15: the ONE-TIME bootstrap content for a machine with no `providers.toml` yet
+    (callers only invoke this when the file is confirmed absent -- an existing file,
+    even an empty one, is authoritative forever after and is never reseeded; that is
+    what makes `--provider-remove` stick across future installs).
+
+    `live_provider_block` is the CURRENT on-disk `provider` object under the live
+    `opencode.json` (or `{}`/absent on a brand-new machine with no prior install).
+
+    - Non-empty: every id present is registered -- 'a nadie le desaparece nada' -- each
+      tagged `harness-legacy` when its value is STRUCTURALLY EQUAL to the matching
+      `HARNESS_PROVIDER_SEED` entry (the harness's own past content, byte-for-byte) or
+      `user` otherwise (an id the harness never shipped, OR one it did ship but whose
+      live value has since diverged -- the user edited it by hand). Never an id/name
+      heuristic: `ollama` with a value the user changed is `user`, not `harness-legacy`.
+      The comparison itself runs on the ORIGINAL (pre-normalization) values -- dict
+      equality already ignores key order, so `_normalize_spec` below changes nothing
+      about which entries are found equal, only the key order later written to disk.
+    - Empty (nothing to migrate): every `HARNESS_PROVIDER_SEED` entry is registered
+      fresh as `origin=harness`, so a brand-new machine keeps today's default behaviour
+      (Ollama pre-declared) until the user explicitly runs `--provider-remove`.
+    """
+    if not live_provider_block:
+        return {provider_id: ProviderEntry(origin="harness", spec=_normalize_spec(spec))
+                for provider_id, spec in HARNESS_PROVIDER_SEED.items()}
+    entries = {}
+    for provider_id, spec in live_provider_block.items():
+        seed = HARNESS_PROVIDER_SEED.get(provider_id)
+        origin = "harness-legacy" if seed is not None and spec == seed else "user"
+        entries[provider_id] = ProviderEntry(origin=origin, spec=_normalize_spec(spec))
+    return entries
+
+
+def load_or_bootstrap(path, live_provider_block: dict) -> tuple[dict[str, ProviderEntry], str | None]:
+    """The one entry point both `install.py` and `set_agents_app.py` share to resolve
+    the CURRENT registry content. Returns `(entries, bootstrap_text)`:
+    - `path` already exists: `(parse_providers_toml(path), None)` -- nothing new to
+      persist, `bootstrap_text` is `None` so a caller never mistakes "already there" for
+      "must write".
+    - `path` absent: `(seed_or_migrate(live_provider_block), <serialized text>)` --
+      freshly computed, not yet persisted. `install.py` defers the actual write until
+      after its own smoke checks pass (same discipline as its `MANIFEST` write); a
+      direct CLI caller with no transaction to protect may write it immediately.
+    """
+    if path.exists():
+        return parse_providers_toml(path), None
+    entries = seed_or_migrate(live_provider_block)
+    return entries, serialize_providers_toml(entries)
+
+exec
+/bin/bash -lc "sed -n '1,55p' tests/test_provider_registry.py && sed -n '244,335p' tests/test_provider_registry.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+"""022 PKG-4 (proveedores-del-usuario, AC-11..15): the `providers.toml` registry
+(`ai/scripts/provider_registry.py`), its `--provider-list|add|remove|verify` CLI
+(`ai/scripts/set_agents_app.py`), and `install.py`'s render-from-registry + JSON-subtree
+prune (AC-13/AC-14).
+
+Every subprocess test below runs with `HOME` pointed at a `tempfile.TemporaryDirectory`
+(never the real machine's `~/.config/opencode` or `~/.local/state/set-agentes` — the repo
+harness rule this whole package exists under). `./build.sh --output <staging>` is run
+fresh per test that needs a real staged tree, exactly like
+`tests/test_harness.py::test_managed_install_preserves_unrelated_and_rolls_back` already
+does for the rest of the installer.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import tomllib
+import unittest
+from pathlib import Path
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "ai/scripts"))
+
+import provider_registry as pr  # noqa: E402
+import set_agents_app as app  # noqa: E402
+
+
+def run(*args, env=None, check=True, cwd=ROOT):
+    return subprocess.run(
+        args, cwd=cwd, env={**os.environ, **(env or {})},
+        text=True, capture_output=True, check=check,
+    )
+
+
+def build_staging(staging_dir):
+    run("./build.sh", "--output", staging_dir)
+
+
+def make_home(td):
+    home = Path(td)
+    (home / ".claude").mkdir(parents=True, exist_ok=True)
+    (home / ".config/opencode").mkdir(parents=True, exist_ok=True)
+    (home / ".codex").mkdir(parents=True, exist_ok=True)
+    return home
+
+
+def live_provider_block(home):
+    doc = json.loads((home / ".config/opencode/opencode.json").read_text())
+    return doc.get("provider")
+
+
+# --------------------------------------------------------------- provider_registry.py
+# --------------------------------------------------------------- install.py (AC-13/14/15)
+
+
+class InstallProviderRenderTests(unittest.TestCase):
+    def test_global_shared_opencode_json_no_longer_hardcodes_a_provider_block(self):
+        """AC-13's own premise: the render must come from the registry because the
+        overlay literally doesn't carry one anymore."""
+        doc = json.loads((ROOT / "Global/_shared/opencode.json").read_text())
+        self.assertNotIn("provider", doc)
+
+    def test_fresh_install_seeds_the_registry_and_renders_ollama(self):
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+            home = make_home(td)
+            build_staging(staging)
+            result = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+            self.assertIn("INSTALL_PASS", result.stdout)
+            registry = pr.parse_providers_toml(home / ".local/state/set-agentes/providers.toml")
+            self.assertEqual(registry["ollama"].origin, "harness")
+            block = live_provider_block(home)
+            self.assertEqual(set(block), {"ollama"})
+            self.assertEqual(block["ollama"], pr.HARNESS_PROVIDER_SEED["ollama"])
+
+    def test_preview_never_writes_the_registry(self):
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+            home = make_home(td)
+            build_staging(staging)
+            run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode", "--preview")
+            self.assertFalse((home / ".local/state/set-agentes/providers.toml").exists())
+
+    def test_removed_provider_does_not_come_back_on_a_later_install(self):
+        """AC-13's core claim, measured, not argued: remove via the CLI, install again,
+        confirm the block is gone from the LIVE opencode.json -- exactly the failure
+        `deep_merge` used to reintroduce every run before this package."""
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+            home = make_home(td)
+            build_staging(staging)
+            run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+            self.assertIn("ollama", live_provider_block(home))
+            removed = run("python3", "ai/scripts/set_agents_app.py", "--provider-remove", "ollama", env={"HOME": str(home)})
+            self.assertIn("PROVIDER_REMOVED", removed.stdout)
+            # Still present right after removal -- removal only touches providers.toml,
+            # never opencode.json directly (documented CLI contract).
+            self.assertIn("ollama", live_provider_block(home))
+            second = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+            self.assertIn("INSTALL_PASS", second.stdout)
+            self.assertNotIn("ollama", live_provider_block(home) or {})
+            # A THIRD install must not resurrect it either -- the registry file, once it
+            # exists (even having had an entry removed), is authoritative forever.
+            third = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+            self.assertIn("INSTALL_PASS", third.stdout)
+            self.assertNotIn("ollama", live_provider_block(home) or {})
+
+    def test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one(self):
+        """AC-14's OBLIGATORY test. There is no real user-owned provider on any measured
+        machine today (context pack, P4) -- this is a FIXTURE by construction, stated
+        here rather than implied: it simulates a block the user added by editing
+        opencode.json directly, outside `set-agents` entirely (never registered, never
+        in the JSON-subtree manifest)."""
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+            home = make_home(td)
+            build_staging(staging)
+            oc_path = home / ".config/opencode/opencode.json"
+            oc_path.write_text(json.dumps({
+                "$schema": "https://opencode.ai/config.json",
+                "provider": {
+                    "ollama": dict(pr.HARNESS_PROVIDER_SEED["ollama"]),
+                    "byhand": {"npm": "@ai-sdk/openai-compatible", "name": "My hand-added LLM",
+                               "options": {"baseURL": "http://localhost:9999/v1"},
+                               "models": {"whatever": {"name": "Whatever"}}},
+                },
+            }))
+            state = home / ".local/state/set-agentes"
+            state.mkdir(parents=True)
+            (state / "providers.toml").write_text(pr.serialize_providers_toml(
+                {"ollama": pr.ProviderEntry(origin="harness", spec=dict(pr.HARNESS_PROVIDER_SEED["ollama"]))}
+            ))
+            (state / "managed-json-paths.json").write_text(json.dumps({"opencode.json": ["ollama"]}))
+            # Prune ollama from the registry -- "byhand" was never registered at all.
+            (state / "providers.toml").write_text(pr.serialize_providers_toml({}))
+            before_byhand = live_provider_block(home)["byhand"]
+            result = run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
+            self.assertIn("INSTALL_PASS", result.stdout)
+            block = live_provider_block(home)
+            self.assertNotIn("ollama", block, "the registered-then-removed id must be pruned")
+            self.assertIn("byhand", block, "an id the harness never registered must never be touched")
+            self.assertEqual(block["byhand"], before_byhand, "must survive BYTE-IDENTICAL, not just present")
+
+    def test_migration_from_a_live_file_distinguishes_harness_legacy_from_user(self):
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging:
+            home = make_home(td)
+            build_staging(staging)
+            oc_path = home / ".config/opencode/opencode.json"
+
+exec
+/bin/bash -lc "sed -n '1,190p' ai/scripts/install.py && sed -n '440,545p' ai/scripts/install.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+#!/usr/bin/env python3
+"""Managed, backed-up global installation with rollback on smoke failure."""
+
+import argparse
+import datetime as dt
+import difflib
+import json
+import os
+import re
+import subprocess
+import shutil
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from models_config import MANAGED_MCP
+import provider_registry
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--staging", required=True)
+parser.add_argument("--home", required=True)
+parser.add_argument("--target", action="append", choices=("opencode", "claude-code", "codex", "pi"))
+parser.add_argument("--preview", action="store_true")
+args = parser.parse_args()
+
+staging = Path(args.staging)
+home = Path(args.home)
+all_targets = {
+    "opencode": home / ".config/opencode",
+    "claude-code": home / ".claude",
+    "codex": home / ".codex",
+    "pi": home / ".pi/agent",
+}
+selected = set(args.target or all_targets)
+targets = {name: path for name, path in all_targets.items() if name in selected}
+SPECIAL = {
+    ("opencode", "opencode.json"),
+    ("claude-code", "settings.overlay.json"),
+    ("codex", "config.snippet.toml"),
+}
+STATE_DIR = home / ".local/state/set-agentes"
+# Record of the per-file targets this installer wrote last run, so a later run can prune
+# files it USED to manage but no longer produces (e.g. a renamed skill/agent). Only paths
+# recorded here are ever deleted — user-created files are never touched.
+MANIFEST = STATE_DIR / "managed-files.json"
+# 022 PKG-4 (AC-11/AC-13/AC-15): the single source `opencode.json`'s `provider` object
+# renders FROM, same private STATE_DIR as MANIFEST above.
+PROVIDERS_TOML = STATE_DIR / provider_registry.PROVIDERS_TOML_NAME
+# AC-14: MANIFEST's own file-level orphan-pruning discipline, extended to JSON
+# SUBTREES -- `{"opencode.json": ["<provider id>", ...]}`, the provider ids THIS
+# installer wrote under `provider.*` last run. Deliberately a SEPARATE file from
+# MANIFEST (never a mixed-shape entry in that flat file-path list): `previous_targets()`
+# below builds real filesystem `Path`s straight out of MANIFEST's entries, and a
+# subtree pointer is not a path -- keeping the two apart means a JSON-subtree id can
+# never be misread as a file to unlink.
+JSON_MANIFEST = STATE_DIR / "managed-json-paths.json"
+# Populated by `apply_provider_registry` (called from `effective_specials()`, which runs
+# unconditionally, including under --preview) when `providers.toml` doesn't exist yet --
+# the freshly bootstrapped (AC-15 migration-or-seed) content to persist for real, but
+# ONLY from the commit section below, after every smoke check passes (same "compute
+# early, write only on the success path" discipline MANIFEST's own write already uses).
+# A --preview run computes this list too (harmless: it's simply never consulted, since
+# --preview exits before the commit section is reached).
+_PENDING_PROVIDERS_BOOTSTRAP = []
+
+
+def deep_merge(base, overlay):
+    result = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PLACEHOLDER = b"__SET_AGENTS_ROOT__"
+_UNSAFE_ROOT = re.compile(r"[;|<>`&$\"'\\\\*?\[\]\r\n\x00-\x1f\x7f-\x9f]")
+
+
+def validate_repo_root():
+    """Reject paths which cannot be represented safely in installed policy files."""
+    root = str(REPO_ROOT)
+    match = _UNSAFE_ROOT.search(root)
+    if match:
+        char = match.group(0)
+        print(
+            f"INSTALL_ABORTED_UNSAFE_ROOT root={root} offending={char!r}@offset={match.start()}\n"
+            "  The harness path must not contain shell, quoting, or glob metacharacters.\n"
+            "  Move or rename the clone (a SPACE is fine) and re-run ./build.sh --install.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+
+def substitute_root(data: bytes, *, json_escaped: bool = False) -> bytes:
+    """Bake HARNESS_HOME into an installed artifact without decoding its bytes."""
+    replacement = json.dumps(str(REPO_ROOT))[1:].encode("utf-8") if json_escaped else str(REPO_ROOT).encode("utf-8")
+    # json.dumps()[1:] is deliberately wrong for an ordinary string; retain only its
+    # interior, matching the historical JSON merge replacement exactly.
+    if json_escaped:
+        replacement = json.dumps(str(REPO_ROOT))[1:-1].encode("utf-8")
+    return data.replace(PLACEHOLDER, replacement)
+
+
+def merged_json(current, overlay, union_lists=False):
+    base = json.loads(current.read_text()) if current.exists() else {}
+    update = json.loads(overlay.read_text())
+    result = deep_merge(base, update)
+    if union_lists:
+        for key, value in update.items():
+            if isinstance(value, list):
+                result[key] = sorted(set(base.get(key, [])) | set(value))
+    # Tracked templates stay machine-independent; the live config gets this repo's
+    # root, JSON-escaped so a clone path with quotes/backslashes can't break the file.
+    return substitute_root((json.dumps(result, indent=2) + "\n").encode(), json_escaped=True).decode()
+
+
+def managed_files():
+    result = []
+    for harness, target in targets.items():
+        for relative in (staging / harness / "managed-files.txt").read_text().splitlines():
+            if not relative or (harness, relative) in SPECIAL or relative == "managed-files.txt":
+                continue
+            source = staging / harness / relative
+            result.append((source, target / relative))
+    return result
+
+
+def _previous_provider_ids():
+    """The provider ids `JSON_MANIFEST` says THIS installer wrote under `provider.*`
+    last run — the only ids AC-14's prune step is ever allowed to delete."""
+    if not JSON_MANIFEST.exists():
+        return set()
+    try:
+        stored = json.loads(JSON_MANIFEST.read_text())
+    except (OSError, json.JSONDecodeError):
+        return set()
+    return set(stored.get("opencode.json", []))
+
+
+def apply_provider_registry(content, target):
+    """AC-13/AC-14: `opencode.json`'s `provider` object, rendered FROM `providers.toml`
+    instead of the merge's passive pass-through (the overlay no longer carries a
+    `provider` key at all since `Global/_shared/opencode.json` stopped hardcoding one —
+    `deep_merge` alone would just leave whatever the live file already has completely
+    untouched, which is correct for ids nobody manages but wrong for the ones the
+    registry says should now exist, be updated, or be gone).
+
+    id-by-id, using the SAME manifest-diff discipline `previous_targets()`/`orphans`
+    already use for whole files, extended to a JSON subtree (AC-14): an id THIS
+    installer wrote last run (`JSON_MANIFEST`) that the registry no longer has is safe
+    to delete — we know we own it. Every id currently in the registry is written
+    (added or overwritten; the registry is the single source of truth for the ids it
+    tracks). Any OTHER live key — one this installer never recorded writing, e.g. a
+    block the user hand-added straight into `opencode.json` outside `set-agents`
+    entirely — is never touched, added, or removed; it is not even read for comparison,
+    only left exactly as `deep_merge` already found it.
+    """
+    doc = json.loads(content)
+    live_block = doc.get("provider")
+    if not isinstance(live_block, dict):
+        live_block = {}
+    entries, bootstrap_text = provider_registry.load_or_bootstrap(PROVIDERS_TOML, live_block)
+    if bootstrap_text is not None:
+        _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+    orphan_ids = _previous_provider_ids() - set(entries)
+    block = dict(live_block)
+    for provider_id in orphan_ids:
+        block.pop(provider_id, None)
+    for provider_id, entry in entries.items():
+        block[provider_id] = entry.spec
+    doc["provider"] = block
+    rendered = (json.dumps(doc, indent=2) + "\n").encode()
+    # Idempotent re-substitution: `content` already had the placeholder resolved by
+    # `merged_json`'s own call below; a provider spec is never expected to carry it, but
+    # this costs nothing and stays correct if one someday does.
+    return substitute_root(rendered, json_escaped=True).decode()
+
+
+def effective_specials():
+    result = []
+    if "opencode" in targets:
+        oc = targets["opencode"] / "opencode.json"
+        result.append((apply_provider_registry(merged_json(oc, staging / "opencode/opencode.json"), oc), oc))
+    if "claude-code" in targets:
+        cc = targets["claude-code"] / "settings.json"
+        relative = target.relative_to(home)
+        saved = backup / relative
+        if saved.exists():
+            atomic_write(target, saved.read_bytes(), saved.stat().st_mode & 0o777)
+        elif target.exists():
+            target.unlink()
+
+
+try:
+    for source, target in files:
+        atomic_write(target, substitute_root(source.read_bytes()), source.stat().st_mode & 0o777)
+    for content, target in specials:
+        atomic_write(target, content)
+    for path in legacy:
+        if path.exists():
+            path.unlink()
+    for path in orphans:
+        if path.exists():
+            path.unlink()
+        prune_empty_dirs(path.parent)
+    if orphans:
+        print("PRUNED_ORPHANS=" + ",".join(sorted(str(p.relative_to(home)) for p in orphans)))
+    if legacy_conflicts:
+        print("LEGACY_CONFLICTS=" + ",".join(sorted(legacy_conflicts)))
+
+    if "opencode" in targets:
+        oc = json.loads((targets["opencode"] / "opencode.json").read_text())
+        # Only the managed servers must land disabled; user-added MCPs are theirs to run.
+        if any(item.get("enabled") for name, item in oc.get("mcp", {}).items() if name in MANAGED_MCP):
+            raise RuntimeError("OpenCode MCP smoke check failed")
+    if "claude-code" in targets:
+        cc = json.loads((targets["claude-code"] / "settings.json").read_text())
+        if cc.get("enabledPlugins", {}).get("engram@engram") is not False:
+            raise RuntimeError("Claude Engram smoke check failed")
+    if "codex" in targets:
+        for path in (targets["codex"] / "agents").glob("*.toml"):
+            tomllib.loads(path.read_text())
+        codex_config = tomllib.loads((targets["codex"] / "config.toml").read_text())
+        if codex_config.get("features", {}).get("multi_agent") is not True or codex_config.get("agents", {}).get("max_depth") != 1:
+            raise RuntimeError("Codex multi-agent smoke check failed")
+        session_model, session_effort = roster_codex_orchestrator()
+        if codex_config.get("model") != session_model or codex_config.get("model_reasoning_effort") != session_effort:
+            raise RuntimeError("Codex session model smoke check failed")
+        for name in ("engram", "context7", "playwright", "brave-cdp"):
+            if codex_config.get("mcp_servers", {}).get(name, {}).get("enabled", False) is not False:
+                raise RuntimeError(f"Codex {name} MCP smoke check failed")
+    if any(PLACEHOLDER in path.read_bytes() for _, path in files if path.exists()):
+        raise RuntimeError("Installed managed file retains SET_AGENTS_ROOT placeholder")
+    if os.environ.get("SET_AGENTS_FORCE_SMOKE_FAIL") == "1":
+        raise RuntimeError("forced smoke failure")
+    # Only after every smoke check passes: record what we manage now, so the next run can
+    # prune whatever we stop producing. A rolled-back install never reaches here.
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    preserved = []
+    selected_roots = set(targets.values())
+    if MANIFEST.exists():
+        try:
+            for relative in json.loads(MANIFEST.read_text()):
+                candidate = home / relative
+                if not any(root in candidate.parents for root in selected_roots):
+                    preserved.append(relative)
+        except (OSError, json.JSONDecodeError):
+            preserved = []
+    managed = set(preserved) | {str(t.relative_to(home)) for t in new_targets}
+    atomic_write(MANIFEST, json.dumps(sorted(managed), indent=2) + "\n")
+    # 022 PKG-4 (AC-11/AC-15): persist a freshly-bootstrapped `providers.toml` only now
+    # that every smoke check passed — a rolled-back install must never leave a registry
+    # file behind that the failed run itself invented.
+    for bootstrap_path, bootstrap_text in _PENDING_PROVIDERS_BOOTSTRAP:
+        atomic_write(bootstrap_path, bootstrap_text)
+    # AC-14: record which provider ids THIS run rendered, so the NEXT run's
+    # `_previous_provider_ids()` can tell "ours, now gone from the registry — safe to
+    # prune" apart from "never ours — never touch". Re-reads `providers.toml` (now
+    # guaranteed to exist, pre-existing or just bootstrapped above) rather than
+    # threading `entries` out of `apply_provider_registry`, the same "recompute the
+    # small thing instead of plumbing state through" choice `previous_targets()` itself
+    # makes for MANIFEST.
+    if "opencode" in targets:
+        json_manifest_data = {}
+        if JSON_MANIFEST.exists():
+            try:
+                json_manifest_data = json.loads(JSON_MANIFEST.read_text())
+            except (OSError, json.JSONDecodeError):
+                json_manifest_data = {}
+        json_manifest_data["opencode.json"] = sorted(provider_registry.parse_providers_toml(PROVIDERS_TOML))
+        atomic_write(JSON_MANIFEST, json.dumps(json_manifest_data, indent=2) + "\n")
+    # Scope record: which harness trees THIS machine manages, so check-drift.sh can
+    # compare only what was actually installed (a claude-only machine must not read
+    # the never-installed opencode/codex trees as drift). Merged, not replaced: a
+    # later `--target` run extends the scope, it never silently narrows it.
+    scope_path = STATE_DIR / "install-targets.json"
+    scope = set(targets)
+    if scope_path.exists():
+        try:
+            scope |= set(json.loads(scope_path.read_text()))
+        except (OSError, json.JSONDecodeError):
+            pass
+    if not args.target:
+        scope = set(all_targets)
+    atomic_write(scope_path, json.dumps(sorted(scope)) + "\n")
+except Exception:
+    rollback()
+    print(f"INSTALL_ROLLED_BACK backup={backup}")
+    raise
+
+print(f"INSTALL_PASS backup={backup}")
+
+codex
+Primera medición: preparo un staging y HOME efímeros. La secuencia usa el CLI de baja entre dos instalaciones y luego inspecciona el JSON resultante.
+exec
+/bin/bash -lc 'review_tmp=$(mktemp -d /tmp/pkg4-review-XXXXXX)
+home="$review_tmp/home"
+staging="$review_tmp/staging"
+mkdir -p "$home/.config/opencode" "$home/.claude" "$home/.codex"
+./build.sh --output "$staging" >/dev/null
+printf '"'%s\\n' '=== 1 install ==='
+python3 ai/scripts/install.py --staging \""'$staging" --home "$home" --target opencode
+printf '"'%s\\n' '=== 2 remove ==='
+HOME=\""'$home" python3 ai/scripts/set_agents_app.py --provider-remove ollama
+printf '"'%s\\n' '=== 3 reinstall + verify ==='
+python3 ai/scripts/install.py --staging \""'$staging" --home "$home" --target opencode
+HOME="$home" python3 -c '"'import json, os; p=os.path.join(os.environ[\"HOME\"], \".config/opencode/opencode.json\"); d=json.load(open(p)); print(\"VERIFY_PROVIDER_KEYS=\" + \",\".join(sorted(d.get(\"provider\", {})))); assert \"ollama\" not in d.get(\"provider\", {}); print(\"VERIFY_OLLAMA_ABSENT=PASS\")'
+printf 'REVIEW_TMP=%s\\n' \""'$review_tmp"' in /home/federico/SET-AGENTES
+ succeeded in 371ms:
+=== 1 install ===
+INSTALL_PASS backup=/tmp/pkg4-review-dOcfNM/home/.local/state/set-agentes/backups/20260813T061058_234930
+=== 2 remove ===
+PROVIDER_REMOVED id=ollama origin=harness — corré './build.sh --install' para que se refleje en opencode.json
+=== 3 reinstall + verify ===
+INSTALL_PASS backup=/tmp/pkg4-review-dOcfNM/home/.local/state/set-agentes/backups/20260813T061058_439998
+VERIFY_PROVIDER_KEYS=
+VERIFY_OLLAMA_ABSENT=PASS
+REVIEW_TMP=/tmp/pkg4-review-dOcfNM
+
+codex
+Segunda medición: construyo un JSON con `ollama` marcado como administrado y `byhand` ajeno al manifiesto. Comparo el fragmento textual del proveedor ajeno antes y después de la poda.
+exec
+/bin/bash -lc 'review_tmp=$(mktemp -d /tmp/pkg4-foreign-XXXXXX)
+home="$review_tmp/home"
+staging="$review_tmp/staging"
+mkdir -p "$home/.config/opencode" "$home/.claude" "$home/.codex" "$home/.local/state/set-agentes"
+./build.sh --output "$staging" >/dev/null
+HOME="$home" python3 - <<'"'PY'
+import hashlib, json, os, re
+from pathlib import Path
+home = Path(os.environ['HOME'])
+foreign = {
+  'npm': '@ai-sdk/openai-compatible',
+  'name': 'My hand-added LLM',
+  'options': {'baseURL': 'http://localhost:9999/v1', 'headers': {'X-Trace': 'keep-this-exactly'}, 'timeout': 47000},
+  'models': {'whatever': {'name': 'Whatever', 'reasoning': True}, 'other': {'name': 'Other', 'limit': 8192}},
+}
+managed = {'npm': '@ai-sdk/openai-compatible', 'name': 'Harness Ollama', 'options': {'baseURL': 'http://localhost:11434/v1'}, 'models': {'m': {'name': 'M'}}}
+doc = {'"'$schema'"': 'https://opencode.ai/config.json', 'provider': {'ollama': managed, 'byhand': foreign}}
+p = home / '.config/opencode/opencode.json'
+p.write_text(json.dumps(doc, indent=2) + '\\n')
+(home / '.local/state/set-agentes/providers.toml').write_text('')
+(home / '.local/state/set-agentes/managed-json-paths.json').write_text(json.dumps({'opencode.json': ['ollama']}) + '\\n')
+def snippet(raw):
+    m = re.search(r'(?ms)"'^    "byhand": '"\\{\\n.*?"'^    '"\\}', raw)
+    assert m, 'foreign snippet missing'
+    return m.group(0).encode()
+before = snippet(p.read_text())
+(home / 'before-byhand.bin').write_bytes(before)
+print('FOREIGN_BEFORE_BEGIN')
+print(before.decode())
+print('FOREIGN_BEFORE_END')
+print('FOREIGN_BEFORE_SHA256=' + hashlib.sha256(before).hexdigest())
+PY
+printf '%s\\n' '=== install prunes harness provider ==='
+python3 ai/scripts/install.py --staging \""'$staging" --home "$home" --target opencode
+HOME="$home" python3 - <<'"'PY'
+import hashlib, json, os, re
+from pathlib import Path
+home = Path(os.environ['HOME'])
+p = home / '.config/opencode/opencode.json'
+raw = p.read_text()
+m = re.search(r'(?ms)"'^    "byhand": '"\\{\\n.*?"'^    '"\\}', raw)
+assert m, 'foreign snippet missing after install'
+after = m.group(0).encode()
+before = (home / 'before-byhand.bin').read_bytes()
+doc = json.loads(raw)
+assert 'ollama' not in doc.get('provider', {}), doc['provider']
+assert before == after, 'foreign provider bytes changed'
+print('FOREIGN_AFTER_BEGIN')
+print(after.decode())
+print('FOREIGN_AFTER_END')
+print('FOREIGN_AFTER_SHA256=' + hashlib.sha256(after).hexdigest())
+print('VERIFY_HARNESS_PRUNED=PASS')
+print('VERIFY_FOREIGN_BYTE_IDENTICAL=PASS')
+PY
+printf 'REVIEW_TMP=%s\\n' \""'$review_tmp"' in /home/federico/SET-AGENTES
+ succeeded in 185ms:
+FOREIGN_BEFORE_BEGIN
+    "byhand": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "My hand-added LLM",
+      "options": {
+        "baseURL": "http://localhost:9999/v1",
+        "headers": {
+          "X-Trace": "keep-this-exactly"
+        },
+        "timeout": 47000
+      },
+      "models": {
+        "whatever": {
+          "name": "Whatever",
+          "reasoning": true
+        },
+        "other": {
+          "name": "Other",
+          "limit": 8192
+        }
+      }
+    }
+FOREIGN_BEFORE_END
+FOREIGN_BEFORE_SHA256=4e26ed0a1b20e04d32b0eb1df9154a3906d03ed22422d37a68f8f57a4bdcc2a9
+=== install prunes harness provider ===
+INSTALL_PASS backup=/tmp/pkg4-foreign-zukFAk/home/.local/state/set-agentes/backups/20260813T061139_703980
+FOREIGN_AFTER_BEGIN
+    "byhand": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "My hand-added LLM",
+      "options": {
+        "baseURL": "http://localhost:9999/v1",
+        "headers": {
+          "X-Trace": "keep-this-exactly"
+        },
+        "timeout": 47000
+      },
+      "models": {
+        "whatever": {
+          "name": "Whatever",
+          "reasoning": true
+        },
+        "other": {
+          "name": "Other",
+          "limit": 8192
+        }
+      }
+    }
+FOREIGN_AFTER_END
+FOREIGN_AFTER_SHA256=4e26ed0a1b20e04d32b0eb1df9154a3906d03ed22422d37a68f8f57a4bdcc2a9
+VERIFY_HARNESS_PRUNED=PASS
+VERIFY_FOREIGN_BYTE_IDENTICAL=PASS
+REVIEW_TMP=/tmp/pkg4-foreign-zukFAk
+
+codex
+Ahora hago la prueba de mordida solicitada: respaldo `install.py` en `/tmp`, fuerzo la poda a vaciar todo el bloque `provider`, corro exclusivamente el test protector, y restauro el archivo con `cp` antes de comprobarlo verde.
+exec
+/bin/bash -lc 'cp ai/scripts/install.py /tmp/pkg4-install.py.pre-bite
+sha256sum ai/scripts/install.py /tmp/pkg4-install.py.pre-bite' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+bca6ceec3ae9b40b7d046e9bb1216383942a5ba49bd7c9ecab68a42e8b1f48bd  ai/scripts/install.py
+bca6ceec3ae9b40b7d046e9bb1216383942a5ba49bd7c9ecab68a42e8b1f48bd  /tmp/pkg4-install.py.pre-bite
+
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/install.py
+diff --git a/ai/scripts/install.py b/ai/scripts/install.py
+index 2022e43da27c215b692b03f79fea130e285ec973..76cc2d717a3e15d9ee5492677d29c1ff2f70f31f
+--- a/ai/scripts/install.py
++++ b/ai/scripts/install.py
+@@ -168,7 +168,9 @@
+     if bootstrap_text is not None:
+         _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+     orphan_ids = _previous_provider_ids() - set(entries)
+-    block = dict(live_block)
++    # REVIEW BITE: deliberately discard unregistered providers to prove the
++    # foreign-provider regression test detects the safety regression.
++    block = {}
+     for provider_id in orphan_ids:
+         block.pop(provider_id, None)
+     for provider_id, entry in entries.items():
+
+diff --git a/ai/scripts/install.py b/ai/scripts/install.py
+index 2022e43da27c215b692b03f79fea130e285ec973..76cc2d717a3e15d9ee5492677d29c1ff2f70f31f
+--- a/ai/scripts/install.py
++++ b/ai/scripts/install.py
+@@ -168,7 +168,9 @@
+     if bootstrap_text is not None:
+         _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+     orphan_ids = _previous_provider_ids() - set(entries)
+-    block = dict(live_block)
++    # REVIEW BITE: deliberately discard unregistered providers to prove the
++    # foreign-provider regression test detects the safety regression.
++    block = {}
+     for provider_id in orphan_ids:
+         block.pop(provider_id, None)
+     for provider_id, entry in entries.items():
+
+exec
+/bin/bash -lc 'set +e
+python3 -m unittest tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one -v
+rc=$?
+printf '"'EXIT_CODE=%s\\n' \""'$rc"
+exit 0' in /home/federico/SET-AGENTES
+ succeeded in 287ms:
+test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one (tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one)
+AC-14's OBLIGATORY test. There is no real user-owned provider on any measured ... FAIL
+
+======================================================================
+FAIL: test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one (tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one)
+AC-14's OBLIGATORY test. There is no real user-owned provider on any measured
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_provider_registry.py", line 328, in test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one
+    self.assertIn("byhand", block, "an id the harness never registered must never be touched")
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'byhand' not found in {} : an id the harness never registered must never be touched
+
+----------------------------------------------------------------------
+Ran 1 test in 0.248s
+
+FAILED (failures=1)
+EXIT_CODE=1
+
+diff --git a/ai/scripts/install.py b/ai/scripts/install.py
+index 2022e43da27c215b692b03f79fea130e285ec973..76cc2d717a3e15d9ee5492677d29c1ff2f70f31f
+--- a/ai/scripts/install.py
++++ b/ai/scripts/install.py
+@@ -168,7 +168,9 @@
+     if bootstrap_text is not None:
+         _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+     orphan_ids = _previous_provider_ids() - set(entries)
+-    block = dict(live_block)
++    # REVIEW BITE: deliberately discard unregistered providers to prove the
++    # foreign-provider regression test detects the safety regression.
++    block = {}
+     for provider_id in orphan_ids:
+         block.pop(provider_id, None)
+     for provider_id, entry in entries.items():
+
+exec
+/bin/bash -lc 'cp /tmp/pkg4-install.py.pre-bite ai/scripts/install.py
+sha256sum ai/scripts/install.py /tmp/pkg4-install.py.pre-bite
+python3 -m unittest tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one -v' in /home/federico/SET-AGENTES
+ succeeded in 288ms:
+test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one (tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one)
+AC-14's OBLIGATORY test. There is no real user-owned provider on any measured ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.248s
+
+OK
+
+diff --git a/ai/scripts/install.py b/ai/scripts/install.py
+index 2022e43da27c215b692b03f79fea130e285ec973..76cc2d717a3e15d9ee5492677d29c1ff2f70f31f
+--- a/ai/scripts/install.py
++++ b/ai/scripts/install.py
+@@ -168,7 +168,9 @@
+     if bootstrap_text is not None:
+         _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+     orphan_ids = _previous_provider_ids() - set(entries)
+-    block = dict(live_block)
++    # REVIEW BITE: deliberately discard unregistered providers to prove the
++    # foreign-provider regression test detects the safety regression.
++    block = {}
+     for provider_id in orphan_ids:
+         block.pop(provider_id, None)
+     for provider_id, entry in entries.items():
+
+codex
+VEREDICTO: approved
+
+No hay hallazgos.
+
+PUNTO 1 — quitar y reinstalar
+
+Comandos ejecutados:
+python3 ai/scripts/install.py --staging "$staging" --home "$home" --target opencode
+HOME="$home" python3 ai/scripts/set_agents_app.py --provider-remove ollama
+python3 ai/scripts/install.py --staging "$staging" --home "$home" --target opencode
+
+SALIDA LITERAL:
+=== 1 install ===
+INSTALL_PASS backup=/tmp/pkg4-review-dOcfNM/home/.local/state/set-agentes/backups/20260813T061058_234930
+=== 2 remove ===
+PROVIDER_REMOVED id=ollama origin=harness — corré './build.sh --install' para que se refleje en opencode.json
+=== 3 reinstall + verify ===
+INSTALL_PASS backup=/tmp/pkg4-review-dOcfNM/home/.local/state/set-agentes/backups/20260813T061058_439998
+VERIFY_PROVIDER_KEYS=
+VERIFY_OLLAMA_ABSENT=PASS
+
+PUNTO 2 — poda sin tocar provider ajeno
+
+Fixture: `ollama` en `managed-json-paths.json`; `byhand` sólo en `opencode.json`, con dos modelos y opciones anidadas. Registro vacío para podar `ollama`.
+
+Comando ejecutado:
+python3 ai/scripts/install.py --staging "$staging" --home "$home" --target opencode
+
+SALIDA LITERAL:
+FOREIGN_BEFORE_SHA256=4e26ed0a1b20e04d32b0eb1df9154a3906d03ed22422d37a68f8f57a4bdcc2a9
+=== install prunes harness provider ===
+INSTALL_PASS backup=/tmp/pkg4-foreign-zukFAk/home/.local/state/set-agentes/backups/20260813T061139_703980
+FOREIGN_AFTER_SHA256=4e26ed0a1b20e04d32b0eb1df9154a3906d03ed22422d37a68f8f57a4bdcc2a9
+VERIFY_HARNESS_PRUNED=PASS
+VERIFY_FOREIGN_BYTE_IDENTICAL=PASS
+
+El fragmento `byhand`, incluyendo `options.headers`, `timeout` y ambos modelos, fue idéntico byte a byte antes y después.
+
+PUNTO 3 — mordida del test de provider ajeno
+
+Respaldo y restauración:
+cp ai/scripts/install.py /tmp/pkg4-install.py.pre-bite
+cp /tmp/pkg4-install.py.pre-bite ai/scripts/install.py
+
+Mutación temporal aplicada: `block = {}` en lugar de copiar `live_block`, para borrar también el provider ajeno.
+
+Comando dirigido:
+python3 -m unittest tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one -v
+
+SALIDA LITERAL ROJA:
+FAIL: test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one
+AssertionError: 'byhand' not found in {} : an id the harness never registered must never be touched
+
+Ran 1 test in 0.248s
+
+FAILED (failures=1)
+EXIT_CODE=1
+
+SALIDA LITERAL VERDE, tras restaurar con `cp`:
+bca6ceec3ae9b40b7d046e9bb1216383942a5ba49bd7c9ecab68a42e8b1f48bd  ai/scripts/install.py
+bca6ceec3ae9b40b7d046e9bb1216383942a5ba49bd7c9ecab68a42e8b1f48bd  /tmp/pkg4-install.py.pre-bite
+test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one (...) ... ok
+
+Ran 1 test in 0.248s
+
+OK
+diff --git a/ai/scripts/install.py b/ai/scripts/install.py
+index 2022e43da27c215b692b03f79fea130e285ec973..76cc2d717a3e15d9ee5492677d29c1ff2f70f31f
+--- a/ai/scripts/install.py
++++ b/ai/scripts/install.py
+@@ -168,7 +168,9 @@
+     if bootstrap_text is not None:
+         _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+     orphan_ids = _previous_provider_ids() - set(entries)
+-    block = dict(live_block)
++    # REVIEW BITE: deliberately discard unregistered providers to prove the
++    # foreign-provider regression test detects the safety regression.
++    block = {}
+     for provider_id in orphan_ids:
+         block.pop(provider_id, None)
+     for provider_id, entry in entries.items():
+
+tokens used
+56.244
+VEREDICTO: approved
+
+No hay hallazgos.
+
+PUNTO 1 — quitar y reinstalar
+
+Comandos ejecutados:
+python3 ai/scripts/install.py --staging "$staging" --home "$home" --target opencode
+HOME="$home" python3 ai/scripts/set_agents_app.py --provider-remove ollama
+python3 ai/scripts/install.py --staging "$staging" --home "$home" --target opencode
+
+SALIDA LITERAL:
+=== 1 install ===
+INSTALL_PASS backup=/tmp/pkg4-review-dOcfNM/home/.local/state/set-agentes/backups/20260813T061058_234930
+=== 2 remove ===
+PROVIDER_REMOVED id=ollama origin=harness — corré './build.sh --install' para que se refleje en opencode.json
+=== 3 reinstall + verify ===
+INSTALL_PASS backup=/tmp/pkg4-review-dOcfNM/home/.local/state/set-agentes/backups/20260813T061058_439998
+VERIFY_PROVIDER_KEYS=
+VERIFY_OLLAMA_ABSENT=PASS
+
+PUNTO 2 — poda sin tocar provider ajeno
+
+Fixture: `ollama` en `managed-json-paths.json`; `byhand` sólo en `opencode.json`, con dos modelos y opciones anidadas. Registro vacío para podar `ollama`.
+
+Comando ejecutado:
+python3 ai/scripts/install.py --staging "$staging" --home "$home" --target opencode
+
+SALIDA LITERAL:
+FOREIGN_BEFORE_SHA256=4e26ed0a1b20e04d32b0eb1df9154a3906d03ed22422d37a68f8f57a4bdcc2a9
+=== install prunes harness provider ===
+INSTALL_PASS backup=/tmp/pkg4-foreign-zukFAk/home/.local/state/set-agentes/backups/20260813T061139_703980
+FOREIGN_AFTER_SHA256=4e26ed0a1b20e04d32b0eb1df9154a3906d03ed22422d37a68f8f57a4bdcc2a9
+VERIFY_HARNESS_PRUNED=PASS
+VERIFY_FOREIGN_BYTE_IDENTICAL=PASS
+
+El fragmento `byhand`, incluyendo `options.headers`, `timeout` y ambos modelos, fue idéntico byte a byte antes y después.
+
+PUNTO 3 — mordida del test de provider ajeno
+
+Respaldo y restauración:
+cp ai/scripts/install.py /tmp/pkg4-install.py.pre-bite
+cp /tmp/pkg4-install.py.pre-bite ai/scripts/install.py
+
+Mutación temporal aplicada: `block = {}` en lugar de copiar `live_block`, para borrar también el provider ajeno.
+
+Comando dirigido:
+python3 -m unittest tests.test_provider_registry.InstallProviderRenderTests.test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one -v
+
+SALIDA LITERAL ROJA:
+FAIL: test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one
+AssertionError: 'byhand' not found in {} : an id the harness never registered must never be touched
+
+Ran 1 test in 0.248s
+
+FAILED (failures=1)
+EXIT_CODE=1
+
+SALIDA LITERAL VERDE, tras restaurar con `cp`:
+bca6ceec3ae9b40b7d046e9bb1216383942a5ba49bd7c9ecab68a42e8b1f48bd  ai/scripts/install.py
+bca6ceec3ae9b40b7d046e9bb1216383942a5ba49bd7c9ecab68a42e8b1f48bd  /tmp/pkg4-install.py.pre-bite
+test_a_hand_added_foreign_provider_survives_an_install_that_prunes_a_different_one (...) ... ok
+
+Ran 1 test in 0.248s
+
+OK

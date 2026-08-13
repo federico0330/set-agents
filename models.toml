@@ -13,16 +13,32 @@ zen = true
 claude = ["fable", "haiku", "opus", "sonnet"]
 codex = ["gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]
 codex_effort = ["high", "low", "medium", "xhigh"]
-# 012 discovered-inventory AC-04: declared allowlist ceiling for the two new probeable
-# OpenCode-lane pairs (routing_core/catalog.py's `_PAIR_COMMANDS`, AC-01) — bare model ids
-# (no provider prefix, same convention as claude/codex above), re-measured live 2026-08-10
-# against `opencode models opencode --pure` (60 ids) / `opencode models opencode-go --pure`
-# (18 ids). ADR-0034 opened `[routing].discovered_providers = "auto"`, which derives its
-# candidate set from the live probe intersected against exactly this ceiling
-# (`catalog._configured_models`) — so this allowlist is the audited ceiling from which
-# "auto" may route, never a wider universe (`resolve_discovered_providers` cannot exceed
-# it). The curated path stays closed regardless: neither provider is in
-# `routes.v1.toml`, `[routing].enabled_providers`, or `models_config.ROUTING_PROVIDERS`.
+# ADR-0042 (022 PKG-2, AC-04): tri-state declared ceiling for the two OpenCode-lane
+# providers (routing_core/catalog.py's `resolve_ceiling`, consumed by `_probe_pairs`,
+# `_read_probe_cache`, and `build_snapshot` alike) — bare model ids (no provider prefix,
+# same convention as claude/codex above). Three shapes, all valid TOML for this key:
+#   - present as a non-empty list (today's state, both keys below): "curated" — the
+#     audited ceiling every probed/routed model for that provider must be a member of.
+#   - ABSENT entirely: "auto" — no ceiling; whatever the live probe reports for that
+#     provider routes as-is, unfiltered. (Removing a key below, not emptying it, opts a
+#     provider INTO auto.)
+#   - present as `[]`: "veto" — curated, explicit "never route this provider", even if
+#     the live probe would otherwise show it authenticated with real models.
+# `claude`/`codex`/`codex_effort` above do NOT get this tri-state — they stay mandatory,
+# non-empty lists (`models_config.load_config` dies otherwise); only `opencode_zen`/
+# `opencode_go` (and any future provider with no dedicated key at all) are tri-state.
+# Re-measured live 2026-08-12 against `opencode models opencode --pure` (61 ids) /
+# `opencode models opencode-go --pure` (18 ids); this allowlist curates 60 of the 61
+# zen ids (a one-id snapshot drift, not a defect). ADR-0034's `[routing].
+# discovered_providers = "auto"` is a SEPARATE axis from this ceiling: it derives its
+# candidate PROVIDER set from the live probe intersected against the audited pair table,
+# while THIS ceiling bounds which MODELS of an already-candidate provider are curated
+# (when curated) or left unfiltered (when auto/absent) — `resolve_discovered_providers`
+# can never exceed either. The curated `routes.v1.toml` path stays closed regardless of
+# this ceiling's state: neither OpenCode-lane provider is in `routes.v1.toml`,
+# `[routing].enabled_providers`, or `models_config.ROUTING_PROVIDERS` — a curated row
+# that named one anyway would fail `CATALOG_CEILING_REQUIRED` unless this ceiling were
+# "curated" for it (AC-06).
 opencode_zen = ["big-pickle", "claude-fable-5", "claude-haiku-4-5", "claude-opus-4-5", "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-4", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-sonnet-5", "deepseek-v4-flash", "deepseek-v4-flash-free", "deepseek-v4-pro", "gemini-3-flash", "gemini-3.1-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "glm-5", "glm-5.1", "glm-5.2", "gpt-5", "gpt-5-codex", "gpt-5-nano", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini", "gpt-5.2", "gpt-5.2-codex", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-pro", "gpt-5.5", "gpt-5.5-pro", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "grok-4.5", "grok-build-0.1", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "laguna-s-2.1-free", "ling-3.0-tiny-free", "longcat-2.0-free", "mimo-v2.5-free", "minimax-m2.5", "minimax-m2.7", "minimax-m3", "nemotron-3-ultra-free", "north-mini-code-free", "qwen3.5-plus", "qwen3.6-plus"]
 opencode_go = ["deepseek-v4-flash", "deepseek-v4-pro", "glm-5.1", "glm-5.2", "gpt-5.6-luna", "grok-4.5", "hy3", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "mimo-v2.5", "mimo-v2.5-pro", "minimax-m2.7", "minimax-m3", "qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-max"]
 

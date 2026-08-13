@@ -2,26 +2,6 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/deepseek-v4-pro",
   "default_agent": "orchestrator",
-  "provider": {
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (local)",
-      "options": {
-        "baseURL": "http://localhost:11434/v1"
-      },
-      "models": {
-        "qwen2.5-coder:7b-instruct-q5_K_M": {
-          "name": "Qwen2.5 Coder 7B Q5 (local, code)"
-        },
-        "qwen2.5-coder:7b": {
-          "name": "Qwen2.5 Coder 7B Q4 (local, code)"
-        },
-        "llama3.1:8b": {
-          "name": "Llama 3.1 8B (local, general)"
-        }
-      }
-    }
-  },
   "share": "disabled",
   "autoupdate": "notify",
   "permission": {

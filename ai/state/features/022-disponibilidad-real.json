@@ -1,0 +1,3842 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12",
+    "AC-13",
+    "AC-14",
+    "AC-15",
+    "AC-16",
+    "AC-17",
+    "AC-18",
+    "AC-19"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-12T22:52:09+00:00",
+    "hash": "a72d851a33178a06ac8914c4d92a97a5d457d0d9912c16944bf15d5e02584eb8",
+    "path": "docs/specs/022-disponibilidad-real/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 12,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "P5-altas-y-bajas-automaticas",
+  "feature_id": "022-disponibilidad-real",
+  "final_state": "DONE",
+  "global_gates": [
+    {
+      "at": "2026-08-13T13:40:42+00:00",
+      "evidence": "Corrida del orquestador sobre el arbol integrado completo de 022: Ran 1065 tests in 735.334s, OK (skipped=3), GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=4, BUILD_CHECK_PASS, VERIFY_PASS. Base al abrir la feature: 979 tests. Cierre: 1065 (+86).",
+      "name": "verify-sh",
+      "required": true,
+      "status": "pass"
+    }
+  ],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (plan A->B->C aprobado 2026-08-12; pedido literal sobre altas y bajas de proveedores sin configuracion)",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/022-disponibilidad-real/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T21:09:48+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "amend-spec",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "approved_by": "federico (tres decisiones tomadas 2026-08-12) + spec-challenger independiente",
+        "new_hash": "a72d851a33178a06ac8914c4d92a97a5d457d0d9912c16944bf15d5e02584eb8",
+        "reason": "Enmendada tras el challenge (revision_required, 3 bloqueantes + 2 importantes). F1 -> DECISION DE FEDERICO: el tri-estado aplica solo a opencode_zen, opencode_go y proveedores futuros sin key; claude y codex siguen obligatorios porque models_config.py:130-136 los exige con die, load_roles los indexa sin fallback, y son los unicos con filas curadas, asi que en auto dispararian CATALOG_CEILING_REQUIRED en cada fila. codex_effort sale de la redaccion: es una lista de efforts, no un techo. Y del precedente de subscriptions se toma la FORMA, no el WARN-y-seguir. F2 -> DECISION DE FEDERICO: se acepta y documenta el limite estructural de claude-code, cuyo archivo de credenciales no tiene campo de identidad de cuenta (codex si tiene account_id): la firma detecta presencia y ausencia pero no swap de cuenta del mismo plan. No se hashea el refreshToken. Y se agrega el supuesto a validar con captura A/B real de que scopes y subscriptionType no rotan en un refresh. F3 -> DECISION DE FEDERICO: la siembra registra TODO lo que haya bajo provider.*, lo del harness como harness-legacy y lo del usuario como origin=user, para que sea administrable desde el primer arranque. F4: AC-01 suma el SEXTO duplicado (_MODEL_PREFERENCE_PROVIDERS en set_agents_app.py:94) que la primera version no nombraba, con la advertencia de que su test lo compara contra otro literal hardcodeado en vez de contra la fuente real. F5: AC-19 se extiende a las TRES superficies, incluido el panel del primer item del menu."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-12T22:52:09+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "PROVIDERS registry del que se derivan las seis tablas, incluida _MODEL_PREFERENCE_PROVIDERS (AC-01)",
+          "Arreglar el test que compara un literal contra otro literal en vez de contra la fuente (AC-01)",
+          "Test de caracterizacion byte-identico: este paquete no cambia comportamiento (AC-02)",
+          "ADR-0042 corrigiendo la afirmacion de ADR-0034:124-126 con la medicion (AC-03)"
+        ]
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-12T22:52:39+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "resolve_ceiling tri-estado acotado a zen y go, consumido por los tres sitios (AC-04)",
+          "Las cuatro capas que impiden que entre cualquier cosa, cada una con su test (AC-05)",
+          "CATALOG_CEILING_REQUIRED nombrado en vez del generico (AC-06)"
+        ]
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-12T22:52:40+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Firma de credencial por runtime en la clave de cache, todo stat local (AC-07)",
+          "Las dos propiedades: refresh no invalida, logout si -- cada una con su test (AC-08)",
+          "Validar con captura A/B real que los campos de claude no rotan en un refresh (AC-08)",
+          "Disciplina de la firma y bump de _CACHE_SCHEMA_VERSION con test (AC-09)",
+          "Una sola cache en la raiz del store, la legada podada con validaciones (AC-10)"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-12T22:52:40+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "providers.toml en STATE_DIR con origin por entrada (AC-11)",
+          "Comandos --provider-list add remove verify (AC-12)",
+          "El bloque provider de opencode.json pasa a renderizarse (AC-13)",
+          "Poda por manifiesto extendida a subarboles JSON, sin tocar lo que el harness no puso (AC-14)",
+          "Siembra migratoria que registra TODO, lo del usuario como origin=user (AC-15)"
+        ]
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-12T22:52:40+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Verificacion empirica del CLI id: se acepta solo si el CLI contesto bien (AC-16)",
+          "La baja simetrica y automatica; el registro es memoria, no autorizacion (AC-17)",
+          "--provider-verify para modelos que ya no responden, nunca dentro de route() (AC-18)",
+          "listed_by_provider vs usable_after_ceiling en las TRES superficies (AC-19)"
+        ]
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-12T22:52:40+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:10:21+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:10:42+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Unificar la lista de proveedores de IA que hoy esta repetida en siete lugares del codigo, para que sumar uno nuevo sea una linea y no siete.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Implementar ADR-0042: un unico registro PROVIDERS del que se derivan las tablas de proveedores",
+        "role": "implementer",
+        "route_id": "run1_370bfc8a921ec1d0b3007c22e063908a",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P1 de 022 (AC-01..03). Deriva _OPENCODE_PROVIDER_KEYS, _OPENCODE_CLI_IDS, _PAIR_COMMANDS, PROVIDER_BILLING_KIND, el key map de _configured_models, DISCOVERABLE_PROVIDERS y _MODEL_PREFERENCE_PROVIDERS de un PROVIDERS unico. Refactor puro: AC-02 exige caracterizacion byte-identica. Trampas medidas: el lockstep real existe en test_routing.py:3191-3200 y hay que preservarlo; _MODEL_PREFERENCE_PROVIDERS no tiene guarda (solo :3965, un literal dentro de un mock ajeno); set_agents_app.py:90-94 tiene un no-goal explicito de no derivar, que ADR-0042 debe superseder; y models_config.py:250-251 evita a proposito depender de routing_core en load time, asi que donde vive PROVIDERS es la decision de diseno."
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:13:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "PROVIDERS registry del que se derivan las seis tablas, incluida _MODEL_PREFERENCE_PROVIDERS (AC-01)",
+        "validations": [
+          "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Arreglar el test que compara un literal contra otro literal en vez de contra la fuente (AC-01)",
+        "validations": [
+          "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Test de caracterizacion byte-identico: este paquete no cambia comportamiento (AC-02)",
+        "validations": [
+          "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "ADR-0042 corrigiendo la afirmacion de ADR-0034:124-126 con la medicion (AC-03)",
+        "validations": [
+          "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:34+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:34+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:34+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:34+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T00:59:34+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:00:17+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:00:17+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Una segunda opinion, hecha por otro proveedor de IA distinto del que escribio el codigo, que revisa que el cambio no haya roto nada ni prometido de mas.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Review independiente de P1: derivacion real, contrato de orden, honestidad del ADR y mordida de la guarda nueva",
+        "role": "package-reviewer",
+        "route_id": "dec1_4ac1490e0de390cde859378cf5ec0c4d",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Writer fue claude-code/anthropic/opus (run1_370bfc8a). Independencia por PROVEEDOR distinto (service.py:353 la exige dura): reviewer en opencode/openai-codex/gpt-5.6-terra, decision dec1_4ac1490e, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida por la leccion de los ocho stalls."
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:03:16+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "verdict": "repair_required"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:25:58+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 2
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:26:53+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Arreglar dos controles automaticos que decian estar cuidando el codigo y en realidad no cuidaban nada.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Reparacion consolidada de P1-F01 y P1-F02: dos guardas que pasan en verde con el registro roto",
+        "role": "repair-agent",
+        "route_id": "run1_ff614065d37db6f73429ef94f1053673",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "P1-F01 (critical): la guarda AC-01b compara valores rederivados de la misma fuente. P1-F02 (high): el refactor volvio tautologica la guarda preexistente de ADR-0034 AC-10, que antes cruzaba dos tablas independientes. Ambas verificadas upheld por el orquestador con una mutacion unica del registro. Writer original y repair son ambos opus/anthropic; la independencia aplica al reviewer, no al reparador."
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:27:32+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P1-F01",
+          "P1-F02"
+        ]
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:55:30+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un tercer revisor confirma que el arreglo de los dos controles realmente funciona y no rompio nada.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Delta review de la reparacion de P1-F01 y P1-F02",
+        "role": "delta-reviewer",
+        "route_id": "dec1_c4cd7f80460411b7d4270983cfcdf7ea",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "Delta acotado a tests/test_routing.py (unico archivo tocado por el repair). Reparador fue claude-code/anthropic/opus; delta reviewer en codex/openai-codex/gpt-5.6-terra, dec1_c4cd7f80, independence_verified=true."
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T01:56:40+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:00:15+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:01:26+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:01:26+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:01:33+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:02:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:02:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:02:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:02:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T02:02:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:11+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:18+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:18+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que agregar un proveedor de IA nuevo deje de exigir editar un archivo de configuracion a mano.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Implementar el techo [catalog] tri-estado: lista = techo curado, [] = veto, ausente = auto",
+        "role": "implementer",
+        "route_id": "run1_d8520988c6deaa8594f6fca8c700890f",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P2 de 022 (AC-04..06). _configured_models -> resolve_ceiling con tres estados, consumido por los TRES sitios que hoy divergen: _probe_pairs:487-489 (el 'if not allowed: continue' que es el defecto), _read_probe_cache:429 (re-intersecta al leer; en auto una interseccion ingenua deja el cache siempre vacio) y build_snapshot:652-653 (que ademas tiene la lista de proveedores hardcodeada, alcance cedido por el reviewer de P1). Medicion del pack: la clave AUSENTE ya es valida en models_config.py:156-160 y emit ya la round-trippea; lo que falta es que catalog.py distinga ausente de vacia, y que models_config acepte []. Tri-estado SOLO para opencode_zen y opencode_go; claude/codex/codex_effort siguen obligatorias."
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T02:14:54+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "resolve_ceiling tri-estado acotado a zen y go, consumido por los tres sitios (AC-04)",
+        "validations": [
+          "unittest discover -s tests: 990 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Las cuatro capas que impiden que entre cualquier cosa, cada una con su test (AC-05)",
+        "validations": [
+          "unittest discover -s tests: 990 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "CATALOG_CEILING_REQUIRED nombrado en vez del generico (AC-06)",
+        "validations": [
+          "unittest discover -s tests: 990 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:38+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:34:39+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor de otro proveedor de IA confirma que el cambio hace lo que dice y no abrio una puerta de mas.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Review independiente de P2: tri-estado real, las cuatro capas, el error nombrado y el cache en auto",
+        "role": "package-reviewer",
+        "route_id": "dec1_0cbd3fc5548c9fa21a03ea3316d3a9a0",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Writer claude-code/anthropic/opus (run1_d8520988). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_0cbd3fc5, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida."
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:35:39+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:39:38+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:39:38+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:39:38+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:39:38+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:40:21+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:40:21+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T03:40:21+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:36+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:36+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:36+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:40:37+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que dar de alta o de baja una suscripcion se note en la decision siguiente, no cinco minutos despues.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Implementar liveness real: firma de credencial por runtime en la clave de cache, y una sola cache",
+        "role": "implementer",
+        "route_id": "run1_b2ca9919d72a9e94b1d918258278aae8",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P3 de 022 (AC-07..10), clase security: lee archivos de credencial. Firma por runtime, todo stat/lectura local -- hoy _live_opencode_auth_signature:378 cuesta un SUBPROCESO por composicion y no hay que multiplicarlo por cuatro. Trampa medida y ausente de la spec: ~/.claude/.credentials.json contiene TAMBIEN mcpOAuth (token de Vercel), asi que hashear el archivo o su mtime rota en cada refresh de MCP. Confirmado que codex tiene tokens.account_id y claude no tiene identidad de cuenta. Dos caches divergentes confirmadas en disco (1579 y 1845 bytes, un minuto de diferencia)."
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T03:41:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Firma de credencial por runtime en la clave de cache, todo stat local (AC-07)",
+        "validations": [
+          "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Las dos propiedades: refresh no invalida, logout si -- cada una con su test (AC-08)",
+        "validations": [
+          "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Disciplina de la firma y bump de _CACHE_SCHEMA_VERSION con test (AC-09)",
+        "validations": [
+          "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Una sola cache en la raiz del store, la legada podada con validaciones (AC-10)",
+        "validations": [
+          "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:46+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:41:46+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "client": "Un revisor de otro proveedor audita que leer las credenciales para detectar altas y bajas no filtre nada.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Review independiente de P3, clase security: filtracion, la trampa del mcpOAuth, las dos propiedades y los subprocesos",
+        "role": "package-reviewer",
+        "route_id": "dec1_1b7703d7fd206d4b0ea5ccffa15f1c71",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Writer claude-code/anthropic/opus (run1_b2ca9919). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_1b7703d7, independence_verified=true. Se le pide ademas dictaminar si el diseno de la firma aguanta aunque el supuesto de no-rotacion resultara falso, porque la captura A/B esta pendiente de un refresh natural."
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T04:43:38+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:00:56+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Validar con captura A/B real que los campos de claude no rotan en un refresh (AC-08)",
+        "validations": [
+          "PARCIAL Y DECLARADO ASI, no cerrado. Metodo cambiado por seguridad: se OBSERVA un refresh natural en vez de forzarlo, porque forzarlo puede rotar el refresh_token del usuario del lado del servidor y el usuario duerme y depende de esas credenciales manana. HECHO: snapshot A tomado (hashes POR CAMPO, nunca valores) de ~/.claude/.credentials.json y ~/.codex/auth.json; medido que claudeAiOauth.expiresAt vence a las 04:57 (195 min), asi que el refresh natural ocurre dentro de esta misma noche; verificado que a esa hora ningun campo habia cambiado todavia. PENDIENTE: snapshot B y la comparacion. COMPROMISO REGISTRADO en la nota de decision captura-ab-del-refresh-se-observa-no-se-fuerza: si B muestra que scopes, subscriptionType o rateLimitTier rotan, la firma de claude-code esta mal disenada y P3 SE REABRE. El diseno es robusto a esa incertidumbre por construccion -no lee campos rotantes- pero eso es un argumento, no una medicion, y asi queda escrito."
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:00:57+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:00:57+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:00:57+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 2,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:01:22+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 2
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:01:22+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Cerrar dos agujeros: cuando el archivo de credencial esta roto o ausente, el harness lo daba por bueno en vez de volver a preguntar.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Reparacion consolidada de P3-F01 (critical) y P3-F02 (high): fail-open en las firmas de credencial",
+        "role": "repair-agent",
+        "route_id": "run1_a9a7445cbce472688bae8ec45917d0f2",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "P3-F01 critical: un JSON objeto con forma invalida ({} en codex, {claudeAiOauth:{}} en claude) produce firma NO vacia; y el test que dice cubrir 'foreign-shaped JSON' solo prueba listas. P3-F02 high: pi_auth_provider_keys no comprueba st_uid propio y _pi_auth_signature hashea el conjunto vacio con la version, asi que archivo ausente o symlink dan firma no vacia. Ambos reproducidos por el orquestador con HOME de fixture."
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:02:20+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P3-F01",
+          "P3-F02"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:36:49+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un tercer revisor confirma que los dos agujeros de seguridad quedaron cerrados y no se abrio otro.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Delta review de la reparacion de P3-F01 y P3-F02",
+        "role": "delta-reviewer",
+        "route_id": "dec1_2eeb028ad4d02cd7141f3dd0381cc24e",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "Delta acotado a catalog.py (firmas) y tests/test_routing.py. Reparador claude-code/anthropic/opus; delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_2eeb028a, independence_verified=true."
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:37:36+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "repair_required"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:43:39+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 1
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:43:39+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Cerrar el ultimo agujero del mismo tipo: un archivo de credenciales con forma rara que el harness daba por bueno.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Segunda reparacion de P3: P3-F03, la cuarta guarda falsa-verde de la feature",
+        "role": "repair-agent",
+        "route_id": "run1_ccfef5c2dfb198444c20a5671ea4a1a9",
+        "spawn_id": "SPAWN-005",
+        "spawns": 5,
+        "tech": "P3-F03 critical: pi_auth_provider_keys acepta {'openai-codex': []} y hasta {'proveedor-inventado': {...}}, devolviendo keyset y firma no vacios. Ultimo ciclo de review disponible (1 de 2 consumido). Se pide ademas barrida sistematica: toda funcion que lea credenciales valida forma, todo test que diga cubrir 'foreign shape' cubre objetos."
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T05:44:21+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "P3-F03"
+        ]
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T06:20:02+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Ultima verificacion independiente antes de dar por bueno el paquete.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Delta review final de P3: cierre de P3-F03, ultimo ciclo disponible",
+        "role": "delta-reviewer",
+        "route_id": "dec1_686d159010ad27a477ce1f70d2ac5975",
+        "spawn_id": "SPAWN-006",
+        "spawns": 6,
+        "tech": "Reparador claude-code/anthropic/opus (run1_ccfef5c2). Delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_686d1590, independence_verified=true. Es el segundo y ultimo ciclo de review del presupuesto."
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T06:21:25+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T06:44:13+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T07:06:58+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T07:06:58+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T07:06:58+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:08:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que puedas agregar y sobre todo QUITAR proveedores desde la aplicacion, sin que el proximo install te los reponga.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Administrar proveedores propios desde set-agents, sin editar JSON, y que quitar funcione de verdad",
+        "role": "implementer",
+        "route_id": "run1_f193bfbdbee43aeee46473235a70b1b8",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P4 de 022 (AC-11..15). Medicion clave del pack: el bloque ollama del opencode.json del usuario es BYTE-IDENTICO al que envia Global/_shared/opencode.json:5-23, o sea no lo agrego el; y el endpoint esta muerto (curl 000). El caso real es quitar lo que el harness impuso, no lo que el usuario agrego. AC-13 renderiza el bloque desde el registro; AC-14 extiende la poda de archivos a subarboles JSON y es el riesgo del paquete."
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T07:11:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "providers.toml en STATE_DIR con origin por entrada (AC-11)",
+        "validations": [
+          "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Comandos --provider-list add remove verify (AC-12)",
+        "validations": [
+          "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "El bloque provider de opencode.json pasa a renderizarse (AC-13)",
+        "validations": [
+          "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Poda por manifiesto extendida a subarboles JSON, sin tocar lo que el harness no puso (AC-14)",
+        "validations": [
+          "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Siembra migratoria que registra TODO, lo del usuario como origin=user (AC-15)",
+        "validations": [
+          "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+        ]
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:14+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:39+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:40+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:40+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:40+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:40+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:40+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:06:40+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor de otro proveedor confirma que quitar un proveedor funciona y que la limpieza no te borra nada tuyo.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Review independiente de P4: que quitar funcione, que la poda no borre lo ajeno, y el desvio de alcance",
+        "role": "package-reviewer",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Writer claude-code/anthropic/opus (run1_f193bfbd). Reviewer codex/openai-codex/gpt-5.6-terra, independence_verified=true. Se le pide dictaminar tambien el desvio de alcance a provider_registry.py que el implementer flageo solo."
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:07:14+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:13:35+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:13:35+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:13:35+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T09:13:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:02+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:03+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:04+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que activar una suscripcion alcance para poder usarla, y darla de baja se note, sin tocar nada.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Altas y bajas automaticas: verificacion empirica del CLI id, baja simetrica, --provider-verify y las tres superficies",
+        "role": "implementer",
+        "route_id": "run1_12758daeb52b60685e0f17bd7c39cd40",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "P5 de 022 (AC-16..19), ultimo paquete. Evidencia en vivo: github copilot figura authenticated=true detected_unlistable=true models_listable=0; openai-codex lista 6 modelos y su inferencia devolvio token vencido (listable != usable); ollama declarado con 3 modelos y endpoint muerto (curl 000). La heuristica espacio->guion es trampa: el CLI id de opencode-zen es 'opencode'. AC-19 toca las TRES superficies, incluida _estado_general_lines que es el primer item del menu."
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T09:14:38+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Verificacion empirica del CLI id: se acepta solo si el CLI contesto bien (AC-16)",
+        "validations": [
+          "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "La baja simetrica y automatica; el registro es memoria, no autorizacion (AC-17)",
+        "validations": [
+          "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "--provider-verify para modelos que ya no responden, nunca dentro de route() (AC-18)",
+        "validations": [
+          "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "listed_by_provider vs usable_after_ceiling en las TRES superficies (AC-19)",
+        "validations": [
+          "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:13+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:13+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:14+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:14+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:14+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:14+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:29+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:30:29+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor de otro proveedor confirma que el harness no se inventa proveedores y que dice la verdad sobre lo que midio.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Review independiente de P5: verificacion empirica fail-closed, liveness honesta y las tres superficies",
+        "role": "package-reviewer",
+        "route_id": "dec1_7513f638ac3053cecd70fd11a0788c70",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Writer claude-code/anthropic/opus (run1_12758dae; murio por error de API tras escribir codigo y tests, los gates los corrio el orquestador: 1065 OK, VERIFY_PASS). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_7513f638, independence_verified=true. Asignacion acotada a 3 puntos + mordida, con prohibicion explicita de leer spec/evidencias: el primer reviewer de P4 murio consumido leyendo."
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:31:26+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:52:59+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:53:00+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:53:00+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T12:53:00+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "P1-registro-de-proveedores",
+      "timestamp": "2026-08-13T13:39:34+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "timestamp": "2026-08-13T13:39:34+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "P3-liveness-real",
+      "timestamp": "2026-08-13T13:39:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "module": "generacion-arboles"
+      },
+      "package_id": "P4-proveedores-del-usuario",
+      "timestamp": "2026-08-13T13:39:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "timestamp": "2026-08-13T13:39:35+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:39:35+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:39:57+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:39:57+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:39:57+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:39:57+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:40:42+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T13:40:43+00:00",
+      "to": "DONE"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 3,
+    "human_questions_after_approval": 0,
+    "package_reviews": 5,
+    "repair_batches": 3,
+    "task_deep_reviews": 0,
+    "verifications": 3
+  },
+  "mode": "feature",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado del harness, lo reescribe feature-state.py en cada mutacion; no es trabajo del paquete.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log de decisiones, lo escribe log-decision del propio orquestador.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice de ADRs: indexar ADR-0042 es requisito de AC-03. owned_paths declara 'docs/adr' pero el chequeo no lo trata como prefijo.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada por feature-state.py entre marcadores notas:auto; machine-owned.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/022-disponibilidad-real/spec.md",
+          "reason": "Enmendada por amend-spec ANTES de que el paquete arrancara, no por el paquete.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 4,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 1
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": "docs/specs/022-disponibilidad-real/context/P1-registro-de-proveedores.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-13T02:00:15+00:00",
+          "closed_findings": [
+            "P1-F01",
+            "P1-F02"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Delta reviewer independiente en codex/openai-codex/gpt-5.6-terra (dec1_c4cd7f80, independence_verified=true, proveedor distinto del reparador anthropic/opus). VEREDICTO approved, sin hallazgos. Evidencia cruda: docs/specs/022-disponibilidad-real/evidence/P1-delta-review-codex-raw.txt. Punto 1: dos mutaciones independientes de provider_registry.py ponen en ROJO las dos guardas, verde tras restaurar, restauracion verificada byte a byte. Punto 2: el unico literal nuevo esta en tests/test_routing.py, ninguno en produccion; el docstring de AC-10 quedo honesto. Punto 3: git diff --numstat = 88/5, las 5 borradas son comentario reescrito, ningun test borrado ni saltado, ningun skip/xfail nuevo. El orquestador reprodujo las dos mordidas por su cuenta antes de este delta.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [],
+      "diff_ref": "working-tree @ b119ca7 (022/P1: ai/scripts/provider_registry.py nuevo, routing_core/catalog.py:20,117-137,183-184,211-218,236, models_config.py:20-26,50-55, set_agents_app.py:33,101-106,128,147, tests/test_routing.py +60/-0 (2 tests nuevos), docs/adr/0042-provider-registry-single-source.md nuevo + README:49)",
+      "findings": [
+        {
+          "detail": "El reviewer independiente (codex/openai-codex/gpt-5.6-terra, dec1_e6990410) muto opencode-go a opencode-go-broken en provider_registry.py y el test AC-01b quedo VERDE. Compara solo valores que se rederivan de la misma fuente, que es exactamente el defecto que este paquete existia para eliminar, ahora reescrito. Verificacion del orquestador con la misma mutacion: AC-01b OK (verde), AC-02 caracterizacion FAILED (rojo), lockstep ADR-0034 AC-10 OK (verde). O sea SI hay red -la de AC-02- asi que el riesgo real es menor que 'sin guarda'; pero la guarda que el context pack pidio explicitamente comparar contra la fuente real no cumple su funcion.",
+          "id": "P1-F01",
+          "location": "tests/test_routing.py:4056-4063",
+          "repair_attempts": 1,
+          "required": "Que la guarda AC-01b tenga una expectativa independiente y estable del universo y el orden esperado, y que una mordida del registro la ponga en rojo. Pegar el rojo y el verde.",
+          "severity": "critical",
+          "status": "closed",
+          "title": "La guarda AC-01b es tautologica: pasa en verde con un PROVIDERS roto",
+          "verified_at": "2026-08-13T01:26:53+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "test_adr0034_ac10_discoverable_providers_lockstep_guard comparaba DISCOVERABLE_PROVIDERS contra el conjunto de proveedores de _PAIR_COMMANDS: dos tablas mantenidas de forma independiente. Despues de ADR-0042 los dos lados derivan de provider_registry.PROVIDERS, asi que la comparacion es contra si misma. Medido por el orquestador con la mutacion opencode-go -> opencode-go-broken: el test queda VERDE. Su docstring sigue afirmando que es 'the guard that keeps github-copilot y un openai duplicado from ever being addable... without this test failing loudly first', lo cual ya no es cierto. El paquete ADEMAS de agregar una guarda debil, debilito una que funcionaba, y el reviewer no lo nombro. No se pide revertir el refactor: se pide que la guarda vuelva a probar algo.",
+          "id": "P1-F02",
+          "location": "tests/test_routing.py:3191-3200",
+          "repair_attempts": 1,
+          "required": "Que el test recupere poder de deteccion: una expectativa independiente del universo esperado (los cuatro proveedores auditados por nombre) o un cruce contra algo que no derive de PROVIDERS. Y corregir su docstring para que no afirme lo que no hace. Mordida obligatoria en las dos direcciones.",
+          "severity": "high",
+          "status": "closed",
+          "title": "El refactor volvio tautologica una guarda preexistente: ADR-0034 AC-10 ya no cruza nada",
+          "verified_at": "2026-08-13T01:26:53+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-13T00:59:34+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T00:59:34+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T00:59:34+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T00:59:34+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T13:39:34+00:00",
+          "cambio": "Las siete tablas de proveedores pasan a derivarse de provider_registry.PROVIDERS",
+          "feature_id": "022-disponibilidad-real",
+          "modelo_mental": "Sumar un proveedor es UNA fila en PROVIDERS, no seis entradas en lockstep manual repartidas en tres archivos",
+          "module": "routing",
+          "package_id": "P1-registro-de-proveedores"
+        }
+      ],
+      "objective": "Un unico registro del que se derivan las seis tablas de proveedores que hoy estan en lockstep manual",
+      "owned_paths": [
+        "ai/scripts/routing_core/catalog.py",
+        "ai/scripts/models_config.py",
+        "ai/scripts/set_agents_app.py",
+        "tests/test_routing.py",
+        "docs/adr"
+      ],
+      "package_id": "P1-registro-de-proveedores",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repair_entry": "review",
+      "repairs": [
+        {
+          "at": "2026-08-13T01:55:30+00:00",
+          "changed_files": [
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "P1-F01",
+            "P1-F02"
+          ],
+          "verification": [
+            "Mordida verificada por el ORQUESTADOR, no por el reparador, con dos mutaciones independientes de ai/scripts/provider_registry.py y restauracion por cp (RESTAURADO OK por diff). (A) renombrar opencode-go -> opencode-go-broken: AC-01b FAILED, lockstep ADR-0034 AC-10 FAILED, caracterizacion AC-02 FAILED. (B) quitar el proveedor opencode-zen entero: los mismos tres FAILED. Antes de la reparacion, con la mutacion (A), AC-01b y el lockstep pasaban en VERDE. Gates del reparador: suite 981 OK / 3 skips, VERIFY_PASS, GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS, git diff --check limpio."
+          ]
+        }
+      ],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T01:25:58+00:00",
+          "evidence": "docs/specs/022-disponibilidad-real/evidence/P1-review-codex-raw.txt (salida cruda del reviewer, 295KB). Reviewer independiente en codex/openai-codex/gpt-5.6-terra, decision dec1_e6990410a61821257bc5f66ba0a4f409, independence_verified=true, proveedor distinto del writer (anthropic/opus). DEGRADACION A REGISTRAR: el rol no se pudo despachar por nombre -en opencode todos los roles del harness son subagent y solo orchestrator es primary; en codex se despacho con el prompt del rol embebido, no con el agente del rol. Ademas el router eligio primero opencode/openai-codex y la ejecucion fallo con 'authentication token is expired' pese a que el probe de listado daba el par como vivo (ver nota de decision el-probe-dice-vivo-y-la-inferencia-dice-token-vencido). Puntos 1, 2 y 3 del review: sin hallazgo, con argumento y pruebas. P1-F02 lo agrego el orquestador al verificar P1-F01, no el reviewer.",
+          "findings": [
+            "P1-F01",
+            "P1-F02"
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T02:01:26+00:00",
+          "browser": "",
+          "checks": [
+            "route-doctor resuelve los 5 proveedores a traves de _OPENCODE_CLI_IDS, _OPENCODE_PROVIDER_KEYS y PROVIDER_BILLING_KIND derivados",
+            "route-decide devuelve decisiones validas post-refactor en los tres runtimes usados (claude-code, opencode, codex)",
+            "El billing derivado sigue clasificando bien: opencode-zen metered, los otros tres subscription"
+          ],
+          "evidence": "Superficie de runtime = las tablas derivadas consumidas por el ruteo real, no un navegador. Salida literal de 'set_agents_app.py --route-doctor' post-refactor: anthropic/opencode authenticated=false billing=subscription; openai-codex authenticated=true models_listable=6 billing=subscription; opencode-go authenticated=true models_listable=18 billing=subscription; opencode-zen authenticated=true models_listable=58 billing=metered; 'github copilot' detected_unlistable=true billing=unknown. Los cuatro billing derivados coinciden con los literales pre-refactor. Ademas, durante esta misma sesion se tomaron seis decisiones de ruteo reales post-refactor (implementer, reviewer x2, repair, delta x1 mas una abandonada) en claude-code, opencode y codex, todas con context_ok=true y las de review con independence_verified=true. OBSERVACION registrada aparte: openai-codex figura authenticated=true con 6 modelos listables y sin embargo su inferencia por opencode devolvio 'authentication token is expired' -- ver la nota de decision el-probe-dice-vivo-y-la-inferencia-dice-token-vencido; es insumo de P3, no un defecto de P1.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-13T00:13:18+00:00",
+          "client": "Unificar la lista de proveedores de IA que hoy esta repetida en siete lugares del codigo, para que sumar uno nuevo sea una linea y no siete.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Implementar ADR-0042: un unico registro PROVIDERS del que se derivan las tablas de proveedores",
+          "role": "implementer",
+          "route_id": "run1_370bfc8a921ec1d0b3007c22e063908a",
+          "spawn_id": "SPAWN-001",
+          "tech": "P1 de 022 (AC-01..03). Deriva _OPENCODE_PROVIDER_KEYS, _OPENCODE_CLI_IDS, _PAIR_COMMANDS, PROVIDER_BILLING_KIND, el key map de _configured_models, DISCOVERABLE_PROVIDERS y _MODEL_PREFERENCE_PROVIDERS de un PROVIDERS unico. Refactor puro: AC-02 exige caracterizacion byte-identica. Trampas medidas: el lockstep real existe en test_routing.py:3191-3200 y hay que preservarlo; _MODEL_PREFERENCE_PROVIDERS no tiene guarda (solo :3965, un literal dentro de un mock ajeno); set_agents_app.py:90-94 tiene un no-goal explicito de no derivar, que ADR-0042 debe superseder; y models_config.py:250-251 evita a proposito depender de routing_core en load time, asi que donde vive PROVIDERS es la decision de diseno."
+        },
+        {
+          "at": "2026-08-13T01:03:16+00:00",
+          "client": "Una segunda opinion, hecha por otro proveedor de IA distinto del que escribio el codigo, que revisa que el cambio no haya roto nada ni prometido de mas.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Review independiente de P1: derivacion real, contrato de orden, honestidad del ADR y mordida de la guarda nueva",
+          "role": "package-reviewer",
+          "route_id": "dec1_4ac1490e0de390cde859378cf5ec0c4d",
+          "spawn_id": "SPAWN-002",
+          "tech": "Writer fue claude-code/anthropic/opus (run1_370bfc8a). Independencia por PROVEEDOR distinto (service.py:353 la exige dura): reviewer en opencode/openai-codex/gpt-5.6-terra, decision dec1_4ac1490e, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida por la leccion de los ocho stalls."
+        },
+        {
+          "at": "2026-08-13T01:27:32+00:00",
+          "client": "Arreglar dos controles automaticos que decian estar cuidando el codigo y en realidad no cuidaban nada.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Reparacion consolidada de P1-F01 y P1-F02: dos guardas que pasan en verde con el registro roto",
+          "role": "repair-agent",
+          "route_id": "run1_ff614065d37db6f73429ef94f1053673",
+          "spawn_id": "SPAWN-003",
+          "tech": "P1-F01 (critical): la guarda AC-01b compara valores rederivados de la misma fuente. P1-F02 (high): el refactor volvio tautologica la guarda preexistente de ADR-0034 AC-10, que antes cruzaba dos tablas independientes. Ambas verificadas upheld por el orquestador con una mutacion unica del registro. Writer original y repair son ambos opus/anthropic; la independencia aplica al reviewer, no al reparador."
+        },
+        {
+          "at": "2026-08-13T01:56:40+00:00",
+          "client": "Un tercer revisor confirma que el arreglo de los dos controles realmente funciona y no rompio nada.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Delta review de la reparacion de P1-F01 y P1-F02",
+          "role": "delta-reviewer",
+          "route_id": "dec1_c4cd7f80460411b7d4270983cfcdf7ea",
+          "spawn_id": "SPAWN-004",
+          "tech": "Delta acotado a tests/test_routing.py (unico archivo tocado por el repair). Reparador fue claude-code/anthropic/opus; delta reviewer en codex/openai-codex/gpt-5.6-terra, dec1_c4cd7f80, independence_verified=true."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "PROVIDERS registry del que se derivan las seis tablas, incluida _MODEL_PREFERENCE_PROVIDERS (AC-01)",
+          "local_validations": [
+            "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Arreglar el test que compara un literal contra otro literal en vez de contra la fuente (AC-01)",
+          "local_validations": [
+            "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Test de caracterizacion byte-identico: este paquete no cambia comportamiento (AC-02)",
+          "local_validations": [
+            "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "ADR-0042 corrigiendo la afirmacion de ADR-0034:124-126 con la medicion (AC-03)",
+          "local_validations": [
+            "unittest discover -s tests: 981 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-13T02:01:26+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "981 OK / 3 skips, cero failures, corrido por el orquestador ademas del implementer y del reparador. Base 979 (cierre de 021) -> 981: dos tests nuevos (AC-01b guarda contra la fuente, AC-02 caracterizacion byte-identica). Diff de tests: 88 insertions / 5 deletions; las 5 borradas son un comentario reescrito, verificado por el delta reviewer. Ningun test relajado, saltado ni borrado. Los dos tests nuevos y las dos guardas reparadas fueron MORDIDOS de forma independiente por tres actores distintos: el reparador, el orquestador (dos mutaciones: renombrar clave y quitar proveedor) y el delta reviewer (byte a byte tras restaurar). Antes de la reparacion, dos de las tres guardas pasaban en VERDE con el registro roto.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-13T01:26:53+00:00",
+          "evidence": "Verificacion del orquestador, mutacion unica opencode-go -> opencode-go-broken en ai/scripts/provider_registry.py, revertida con cp (RESTAURADO OK por diff). Literal por test dirigido: test_adr0042_ac01b_... -> OK (verde con el registro roto); test_adr0042_ac01_ac02_all_seven_provider_tables_are_byte_identical... -> FAILED (failures=1); test_adr0034_ac10_discoverable_providers_lockstep_guard -> OK (verde con el registro roto). P1-F01 upheld con matiz: AC-02 si atrapa el registro roto, asi que no es 'sin red'. P1-F02 upheld: el refactor volvio tautologica una guarda que funcionaba.",
+          "refuted": [],
+          "upheld": [
+            "P1-F01",
+            "P1-F02"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-04",
+        "AC-05",
+        "AC-06"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/models_config.py",
+          "reason": "Identificado ANTES de implementar, al preparar el context pack: [catalog].opencode_zen/go ya aceptan la clave AUSENTE (:156-160) pero una lista VACIA muere; el veto de AC-04 exige aceptar []. owned_paths se fijo en create-package sin esa medicion y el CLI no permite editarlo.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0042-provider-registry-single-source.md",
+          "reason": "AC-04 extiende ADR-0042, que la spec asigna al registro + techo tri-estado + tres origenes. No se crea un ADR nuevo.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado del harness, lo reescribe feature-state.py en cada mutacion.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log de decisiones del propio orquestador.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada entre marcadores notas:auto; machine-owned.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/set_agents_app.py",
+          "reason": "Atribuible a P1, no a P2. El --baseline es b119ca7 para los cinco paquetes de 022 porque todavia no hay commit intermedio, asi que check-owned-paths no puede separar el diff por paquete. El alcance real de P2 lo verifico el orquestador diffeando contra un backup tomado al cierre de P1: P2 toco catalog.py, models_config.py, tests/test_routing.py, models.toml y ADR-0042, y dejo set_agents_app.py y provider_registry.py SIN CAMBIOS.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Atribuible a P1, no a P2. El --baseline es b119ca7 para los cinco paquetes de 022 porque todavia no hay commit intermedio, asi que check-owned-paths no puede separar el diff por paquete. El alcance real de P2 lo verifico el orquestador diffeando contra un backup tomado al cierre de P1: P2 toco catalog.py, models_config.py, tests/test_routing.py, models.toml y ADR-0042, y dejo set_agents_app.py y provider_registry.py SIN CAMBIOS.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/022-disponibilidad-real/spec.md",
+          "reason": "Atribuible a P1, no a P2. El --baseline es b119ca7 para los cinco paquetes de 022 porque todavia no hay commit intermedio, asi que check-owned-paths no puede separar el diff por paquete. El alcance real de P2 lo verifico el orquestador diffeando contra un backup tomado al cierre de P1: P2 toco catalog.py, models_config.py, tests/test_routing.py, models.toml y ADR-0042, y dejo set_agents_app.py y provider_registry.py SIN CAMBIOS.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 0,
+        "spawns": 2,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": "docs/specs/022-disponibilidad-real/context/P2-techo-catalogo-tri-estado.md",
+      "delta_reviews": [],
+      "dependencies": [
+        "P1-registro-de-proveedores"
+      ],
+      "diff_ref": "working-tree @ b119ca7 (022/P2: catalog.py resolve_ceiling:221-274 + 3 consumidores + cap + CATALOG_CEILING_REQUIRED, models_config.py:160-167 acepta [], models.toml comentario [catalog], tests/test_routing.py 9 tests, docs/adr/0042 extendido)",
+      "findings": [],
+      "gates": [
+        {
+          "at": "2026-08-13T03:34:39+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T03:34:39+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T03:34:39+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T03:34:39+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T13:39:34+00:00",
+          "cambio": "[catalog].opencode_zen/go pasa a tri-estado: lista = techo, [] = veto, ausente = auto",
+          "feature_id": "022-disponibilidad-real",
+          "modelo_mental": "Un proveedor sin clave en [catalog] ya no se saltea entero: se probea. Configurar dejo de ser obligatorio",
+          "module": "routing",
+          "package_id": "P2-techo-catalogo-tri-estado"
+        }
+      ],
+      "objective": "Que [catalog] deje de ser requisito de configuracion, sin abrir la puerta a que entre cualquier cosa",
+      "owned_paths": [
+        "ai/scripts/routing_core/catalog.py",
+        "models.toml",
+        "tests/test_routing.py"
+      ],
+      "package_id": "P2-techo-catalogo-tri-estado",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T03:39:38+00:00",
+          "evidence": "docs/specs/022-disponibilidad-real/evidence/P2-review-codex-raw.txt (crudo, 441KB). Reviewer independiente codex/openai-codex/gpt-5.6-terra, dec1_0cbd3fc5, independence_verified=true, proveedor distinto del writer (anthropic/opus). VEREDICTO approved, sin hallazgos en los cuatro puntos. Punto 1: los tres consumidores usan resolve_ceiling; _read_probe_cache conserva entradas auto sin intersectar (CACHE_AUTO no vacio, literal); build_snapshot construye desde PROVIDERS, la tupla hardcodeada ya no esta; 9 tests nuevos en verde. Punto 2: las cuatro capas cubiertas; un proveedor auto no aporta ruta curada (CATALOG_CEILING_REQUIRED); borrar [catalog].claude de una copia en /tmp muere como exige la decision de Federico, con restauracion 'IDENTICAL - restored correctly'. Punto 3: AC-06 y clasificacion de errores verificados en las dos direcciones. Punto 4: mordidas sobre los tests nuevos. Integridad post-review verificada por el orquestador: catalog.py INTACTO contra backup. DEGRADACION: el rol se despacho con el prompt embebido, no con el agente del rol (en opencode todos los roles son subagent y solo orchestrator es primary).",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T03:39:38+00:00",
+          "browser": "",
+          "checks": [
+            "Un proveedor sin clave en [catalog] ya no se saltea: se probea",
+            "El cache en modo auto no queda permanentemente vacio",
+            "claude/codex/codex_effort siguen muriendo si faltan"
+          ],
+          "evidence": "Superficie de runtime = el filtrado del snapshot de ruteo. Verificado por el reviewer independiente con pruebas literales: CACHE_AUTO= {('opencode','opencode-zen'): {'review-live-only-model'}} (no vacio en auto); CURATED_AUTO_ERROR= RoutingError CATALOG_CEILING_REQUIRED; y borrar [catalog].claude de una copia en /tmp da 'models.toml: [catalog].claude must be a non-empty list of strings'. p50/p90 de build_effective_snapshot con el catalogo real (60 zen + 18 go, 300 corridas): 3.383/3.572 ms antes, 3.382/3.474 ms despues -- dentro del ruido, el cap de 80 no muerde hoy. Estres sintetico a 6x el cap: 3.58 ms con cap vs 15.81 ms sin cap, o sea el cap importa fuera del caso de hoy. El implementer lo reporto asi en vez de mostrar solo el numero favorable.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-13T02:14:54+00:00",
+          "client": "Que agregar un proveedor de IA nuevo deje de exigir editar un archivo de configuracion a mano.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Implementar el techo [catalog] tri-estado: lista = techo curado, [] = veto, ausente = auto",
+          "role": "implementer",
+          "route_id": "run1_d8520988c6deaa8594f6fca8c700890f",
+          "spawn_id": "SPAWN-001",
+          "tech": "P2 de 022 (AC-04..06). _configured_models -> resolve_ceiling con tres estados, consumido por los TRES sitios que hoy divergen: _probe_pairs:487-489 (el 'if not allowed: continue' que es el defecto), _read_probe_cache:429 (re-intersecta al leer; en auto una interseccion ingenua deja el cache siempre vacio) y build_snapshot:652-653 (que ademas tiene la lista de proveedores hardcodeada, alcance cedido por el reviewer de P1). Medicion del pack: la clave AUSENTE ya es valida en models_config.py:156-160 y emit ya la round-trippea; lo que falta es que catalog.py distinga ausente de vacia, y que models_config acepte []. Tri-estado SOLO para opencode_zen y opencode_go; claude/codex/codex_effort siguen obligatorias."
+        },
+        {
+          "at": "2026-08-13T03:35:39+00:00",
+          "client": "Un revisor de otro proveedor de IA confirma que el cambio hace lo que dice y no abrio una puerta de mas.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Review independiente de P2: tri-estado real, las cuatro capas, el error nombrado y el cache en auto",
+          "role": "package-reviewer",
+          "route_id": "dec1_0cbd3fc5548c9fa21a03ea3316d3a9a0",
+          "spawn_id": "SPAWN-002",
+          "tech": "Writer claude-code/anthropic/opus (run1_d8520988). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_0cbd3fc5, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "resolve_ceiling tri-estado acotado a zen y go, consumido por los tres sitios (AC-04)",
+          "local_validations": [
+            "unittest discover -s tests: 990 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Las cuatro capas que impiden que entre cualquier cosa, cada una con su test (AC-05)",
+          "local_validations": [
+            "unittest discover -s tests: 990 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "CATALOG_CEILING_REQUIRED nombrado en vez del generico (AC-06)",
+          "local_validations": [
+            "unittest discover -s tests: 990 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-13T03:39:38+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "990 OK / 3 skips, cero failures, corrido por el orquestador ademas del implementer. Base 981 (cierre de P1) -> 990: nueve tests nuevos (tri-estado puro, probe de proveedor sin clave, cache auto que no queda vacio, error nombrado, las cuatro capas, y models_config aceptando [] con round-trip). Diff de tests 282/11. El orquestador verifico poder de deteccion por su cuenta: revertir el tri-estado a dos estados (return ('auto', None) -> ('curated', set())) pone en ROJO los tres tests centrales; restaurado y confirmado por diff. El reviewer independiente mordio ademas otros dos.",
+          "status": "pass"
+        }
+      ],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-07",
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/routing_core/store.py",
+          "reason": "AC-10 unifica las dos caches en la raiz del store (store.py:293, ensure_cache_root:326). Identificado al preparar el context pack, antes de implementar; owned_paths se fijo en create-package sin ese detalle y el CLI no permite editarlo.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0043-que-prueba-un-probe.md",
+          "reason": "AC-09 exige ADR-0043: que prueba realmente un probe, el limite de claude-code y la declaracion de que pi descubre modelos, no credenciales.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indexar ADR-0043.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/provider_registry.py",
+          "reason": "Heredado de P1 en el diff compartido; P3 no lo toca.",
+          "status": "approved"
+        },
+        {
+          "path": "models.toml",
+          "reason": "Heredado de P2 en el diff compartido; P3 no lo toca.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0042-provider-registry-single-source.md",
+          "reason": "Heredado de P2 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado del harness, lo reescribe feature-state.py.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log de decisiones del orquestador.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada entre marcadores notas:auto.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/022-disponibilidad-real/spec.md",
+          "reason": "Enmendada antes de que arrancaran los paquetes.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 2,
+        "spawns": 6,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 2
+      },
+      "candidate_identity": null,
+      "complexity": "high",
+      "context_pack": "docs/specs/022-disponibilidad-real/context/P3-liveness-real.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-13T05:43:39+00:00",
+          "closed_findings": [],
+          "new_or_reopened_findings": [
+            "P3-F03"
+          ],
+          "reason": "Delta reviewer independiente codex/openai-codex/gpt-5.6-terra, dec1_2eeb028a, independence_verified=true. P3-F01 y P3-F02 quedaron cerrados y verificados, pero aparecio un hallazgo nuevo del mismo tipo. Credenciales reales del usuario intactas (hashes por campo identicos). Evidencia cruda: docs/specs/022-disponibilidad-real/evidence/P3-delta-review-codex-raw.txt.",
+          "requires_full_review": false,
+          "verdict": "repair_required"
+        },
+        {
+          "at": "2026-08-13T06:44:13+00:00",
+          "closed_findings": [
+            "P3-F03"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Delta reviewer independiente codex/openai-codex/gpt-5.6-terra, dec1_686d1590, independence_verified=true. P3-F03 CERRADO y verificado. Punto 1 del reviewer, literal: valor_lista, valor_string, valor_null, valor_numero, proveedor_no_auditado, top_level_lista y archivo_vacio -> todos keys=[] signature_empty=True; el caso legitimo intacto. El orquestador lo reprodujo por su cuenta con OCHO fixtures, incluido el MIXTO que conserva solo lo valido. Punto 2: el gate real se comporta bien en las dos direcciones (gate_legitimo devuelve el par, gate_invalido devuelve vacio). El reviewer reporto ademas P3-D01 (high) por el ORDEN entre el subproceso y el gate: verificado por el orquestador como PREEXISTENTE y deliberado -en b119ca7, antes de 022, el gate ya estaba despues, con un comentario que lo declara belt-and-suspenders- y fuera de AC-07..AC-10. Registrado en la nota de decision el-gate-de-pi-corre-despues-del-subproceso-preexistente, no cerrado en P3. Credenciales reales del usuario intactas tras cada agente con permiso de escritura.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
+      "dependencies": [
+        "P2-techo-catalogo-tri-estado"
+      ],
+      "diff_ref": "working-tree @ b119ca7 (022/P3: catalog.py firmas por runtime :366-384,408-479,506-533 + prune_legacy_probe_cache:620-651 + schema 2->3, set_agents_app.py:73-86 _probe_cache_root, models_config.py:271-280, tests/test_routing.py +16 tests, docs/adr/0043-que-prueba-un-probe.md nuevo + README)",
+      "findings": [
+        {
+          "detail": "AC-09 exige fail-closed: credencial ilegible o de forma ajena => firma vacia => cache miss => probe fresco. Medido por el reviewer independiente y REPRODUCIDO por el orquestador con un HOME de fixture: codex con {} -> firma vacia? False; claude con {\"claudeAiOauth\":{}} -> firma vacia? False. Y el test que dice cubrirlo (tests/test_routing.py:4086, ..._fail_closed_on_symlink_and_corrupt_or_foreign_shaped_json) queda VERDE porque solo prueba listas, no objetos sin los campos requeridos. Es la TERCERA vez en esta feature que aparece la misma forma: un control que informa OK sobre algo que no mira.",
+          "id": "P3-F01",
+          "location": "ai/scripts/routing_core/catalog.py:440-445,464-468",
+          "repair_attempts": 1,
+          "required": "Validar forma y tipos de los campos usados ANTES de hashear: cualquier ausencia o tipo invalido devuelve la cadena vacia. Y ampliar el test con objetos incompletos y tipos erroneos, con mordida en las dos direcciones.",
+          "severity": "critical",
+          "status": "closed",
+          "title": "Fail-open: un JSON de credencial con forma invalida pero objeto produce firma NO vacia",
+          "verified_at": "2026-08-13T05:01:22+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "pi_auth_provider_keys() no comprueba st_uid == os.getuid(), a diferencia de _read_credential_json que si lo hace ('credential reader rejects foreign uid= True' vs 'pi signature rejects foreign uid= False'). Y _pi_auth_signature() hashea el conjunto vacio junto con la version, asi que archivo ausente, symlink o fallo de lectura devuelven una firma NO vacia. Reproducido por el orquestador con un HOME de fixture sin ~/.pi: 'firma vacia? False'. Incumple el fail-closed que AC-09 exige para las firmas nuevas.",
+          "id": "P3-F02",
+          "location": "ai/scripts/routing_core/catalog.py:348-363,471-479",
+          "repair_attempts": 1,
+          "required": "Agregar la comprobacion de uid propio a pi_auth_provider_keys() y hacer que _pi_auth_signature() devuelva cadena vacia cuando no hay claves validas. Test de las dos direcciones.",
+          "severity": "high",
+          "status": "closed",
+          "title": "pi: no se verifica el uid del archivo de credencial y la ausencia no da firma vacia",
+          "verified_at": "2026-08-13T05:01:22+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "El delta reviewer lo encontro y el orquestador lo REPRODUJO. Con HOME de fixture: {'openai-codex': []} -> keyset {'openai-codex'}, firma vacia? False. Y peor, no reportado por el reviewer: {'proveedor-inventado': {...}} -> keyset {'proveedor-inventado'}, firma vacia? False -- la funcion no filtra a los proveedores auditados pese a que su docstring dice 'provider NAMES only'. Viola el fail-closed de AC-09. Es la CUARTA guarda de esta feature que dice cubrir 'foreign JSON shape' y solo prueba una lista de nivel superior, no la forma objeto invalida: dos en P1, una en P3 (el review) y esta. El prompt del repair advertia explicitamente de no escribir la cuarta.",
+          "id": "P3-F03",
+          "location": "ai/scripts/routing_core/catalog.py:369",
+          "repair_attempts": 1,
+          "required": "Validar y filtrar las entradas de pi: solo proveedores AUDITADOS (_PAIR_COMMANDS) y solo cuando su valor es un objeto. Un archivo sin ningun proveedor auditado valido devuelve conjunto y firma vacios. Regresion obligatoria para {'openai-codex': []}, para un objeto solo con proveedor no auditado, y para valores de tipo erroneo. Y hacer una barrida: TODA funcion que lea credenciales valida forma, y TODO test que diga cubrir 'foreign shape' cubre objetos, no solo listas.",
+          "severity": "critical",
+          "status": "closed",
+          "title": "CUARTA guarda falsa-verde: pi_auth_provider_keys acepta valores de forma invalida",
+          "verified_at": "2026-08-13T05:43:39+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-13T04:41:45+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T04:41:45+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T04:41:45+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T04:41:46+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T13:39:35+00:00",
+          "cambio": "Firma de credencial por runtime en la clave de cache y una sola cache en la raiz del store",
+          "feature_id": "022-disponibilidad-real",
+          "modelo_mental": "Dar de baja una credencial se nota en la decision siguiente, no hasta 300 s despues, y en los cuatro runtimes",
+          "module": "routing",
+          "package_id": "P3-liveness-real"
+        }
+      ],
+      "objective": "Que dar de baja una credencial se note en la decision siguiente, en los cuatro runtimes, y que haya una sola cache",
+      "owned_paths": [
+        "ai/scripts/routing_core/catalog.py",
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/models_config.py",
+        "tests/test_routing.py"
+      ],
+      "package_id": "P3-liveness-real",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repair_entry": "delta_review",
+      "repairs": [
+        {
+          "at": "2026-08-13T05:36:49+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/catalog.py",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "P3-F01",
+            "P3-F02"
+          ],
+          "verification": [
+            "Verificado por el ORQUESTADOR con HOME de fixture, no por el reparador. Los tres casos del hallazgo, ahora: codex {} -> firma vacia True; claude {claudeAiOauth:{}} -> True; pi ausente -> True (antes los tres daban False). Y DOS formas mas que invento el orquestador y que el reparador no habia probado: codex con account_id entero -> True; claude con scopes string en vez de lista -> True. El reparador ademas encontro que pi_auth_provider_keys lo usa tambien _probe_pairs (catalog.py:803), asi que la comprobacion de uid cierra el gate real de decision y no solo la clave de cache, y agrego un test de que la firma vacia de pi nunca cambia una decision, solo produce cache miss. Gates: 1007 OK / 3 skips, VERIFY_PASS, GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS, git diff --check limpio. Cinco mordidas rojo->verde con restauracion RESTORED_IDENTICAL por cp."
+          ]
+        },
+        {
+          "at": "2026-08-13T06:20:02+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/catalog.py",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "P3-F03"
+          ],
+          "verification": [
+            "Verificado por el ORQUESTADOR con ocho fixtures distintos, no por el reparador. Las seis formas invalidas dan conjunto vacio y firma vacia: lista como valor, proveedor no auditado, string como valor, null como valor, JSON top-level lista, archivo vacio. El caso MIXTO ({'openai-codex':{}, 'basura':[]}) filtra la basura y conserva lo valido -> {'openai-codex'}. El caso LEGITIMO ({'openai-codex':{...},'anthropic':{...}}) sigue dando los dos, sin cambio de comportamiento. El arreglo deriva 'audited' de _PAIR_COMMANDS, la misma fuente unica del archivo, sin inventar una tabla nueva. Barrida del reparador: solo pi_auth_provider_keys tenia el hueco; el test que mentia era test_pi_auth_provider_keys_reads_names_only_and_fails_closed (solo probaba una lista top-level); el de codex/claude ya cubria objetos invalidos de verdad. Gates: 1008 OK / 3 skips, VERIFY_PASS, GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS, git diff --check limpio."
+          ]
+        }
+      ],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T05:01:22+00:00",
+          "evidence": "docs/specs/022-disponibilidad-real/evidence/P3-review-codex-raw.txt. Reviewer independiente codex/openai-codex/gpt-5.6-terra, dec1_1b7703d7, independence_verified=true, proveedor distinto del writer (anthropic/opus). VEREDICTO revision_required, 2 hallazgos. LO QUE SI PASO: el escaneo de filtracion no encontro ningun fragmento de credencial en la salida de --route-doctor ni --route-decide, ni en el cache, la DB ni el log de decisiones, con HOME, estado y binarios sinteticos. Integridad verificada por el orquestador: las credenciales reales del usuario quedaron sin un solo cambio (hashes por campo identicos antes y despues del review). Los dos hallazgos fueron REPRODUCIDOS de forma independiente por el orquestador con un HOME de fixture.",
+          "findings": [
+            "P3-F01",
+            "P3-F02"
+          ],
+          "verdict": "repair_required"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T07:06:58+00:00",
+          "browser": "",
+          "checks": [
+            "Una credencial rota o ausente da firma vacia: cache miss y probe fresco, nunca se da por buena",
+            "Una credencial legitima no cambia de comportamiento: pi se sigue probeando igual",
+            "Las firmas nuevas no agregan ningun subproceso al camino de decision",
+            "Ninguna credencial real del usuario fue tocada en toda la noche"
+          ],
+          "evidence": "Superficie de runtime = la deteccion de altas y bajas de credenciales. El reviewer de seguridad escaneo la salida de --route-doctor y --route-decide, el cache, la DB y el log de decisiones con HOME y binarios sinteticos, buscando fragmentos de las credenciales fixture: no encontro ninguno. El orquestador verifico integridad con hashes POR CAMPO (nunca valores) de ~/.claude/.credentials.json y ~/.codex/auth.json despues de CADA agente que tuvo permiso de escritura -seis controles en la noche-: cero cambios en todos. PENDIENTE Y DECLARADO: la captura A/B de un refresh natural sigue esperando; claudeAiOauth.expiresAt vence 04:57 y a las 03:56 ningun campo habia rotado. Si al comparar rotan scopes, subscriptionType o rateLimitTier, P3 se reabre segun la nota de decision captura-ab-del-refresh-se-observa-no-se-fuerza.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-13T03:41:24+00:00",
+          "client": "Que dar de alta o de baja una suscripcion se note en la decision siguiente, no cinco minutos despues.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Implementar liveness real: firma de credencial por runtime en la clave de cache, y una sola cache",
+          "role": "implementer",
+          "route_id": "run1_b2ca9919d72a9e94b1d918258278aae8",
+          "spawn_id": "SPAWN-001",
+          "tech": "P3 de 022 (AC-07..10), clase security: lee archivos de credencial. Firma por runtime, todo stat/lectura local -- hoy _live_opencode_auth_signature:378 cuesta un SUBPROCESO por composicion y no hay que multiplicarlo por cuatro. Trampa medida y ausente de la spec: ~/.claude/.credentials.json contiene TAMBIEN mcpOAuth (token de Vercel), asi que hashear el archivo o su mtime rota en cada refresh de MCP. Confirmado que codex tiene tokens.account_id y claude no tiene identidad de cuenta. Dos caches divergentes confirmadas en disco (1579 y 1845 bytes, un minuto de diferencia)."
+        },
+        {
+          "at": "2026-08-13T04:43:38+00:00",
+          "client": "Un revisor de otro proveedor audita que leer las credenciales para detectar altas y bajas no filtre nada.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Review independiente de P3, clase security: filtracion, la trampa del mcpOAuth, las dos propiedades y los subprocesos",
+          "role": "package-reviewer",
+          "route_id": "dec1_1b7703d7fd206d4b0ea5ccffa15f1c71",
+          "spawn_id": "SPAWN-002",
+          "tech": "Writer claude-code/anthropic/opus (run1_b2ca9919). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_1b7703d7, independence_verified=true. Se le pide ademas dictaminar si el diseno de la firma aguanta aunque el supuesto de no-rotacion resultara falso, porque la captura A/B esta pendiente de un refresh natural."
+        },
+        {
+          "at": "2026-08-13T05:02:20+00:00",
+          "client": "Cerrar dos agujeros: cuando el archivo de credencial esta roto o ausente, el harness lo daba por bueno en vez de volver a preguntar.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Reparacion consolidada de P3-F01 (critical) y P3-F02 (high): fail-open en las firmas de credencial",
+          "role": "repair-agent",
+          "route_id": "run1_a9a7445cbce472688bae8ec45917d0f2",
+          "spawn_id": "SPAWN-003",
+          "tech": "P3-F01 critical: un JSON objeto con forma invalida ({} en codex, {claudeAiOauth:{}} en claude) produce firma NO vacia; y el test que dice cubrir 'foreign-shaped JSON' solo prueba listas. P3-F02 high: pi_auth_provider_keys no comprueba st_uid propio y _pi_auth_signature hashea el conjunto vacio con la version, asi que archivo ausente o symlink dan firma no vacia. Ambos reproducidos por el orquestador con HOME de fixture."
+        },
+        {
+          "at": "2026-08-13T05:37:36+00:00",
+          "client": "Un tercer revisor confirma que los dos agujeros de seguridad quedaron cerrados y no se abrio otro.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Delta review de la reparacion de P3-F01 y P3-F02",
+          "role": "delta-reviewer",
+          "route_id": "dec1_2eeb028ad4d02cd7141f3dd0381cc24e",
+          "spawn_id": "SPAWN-004",
+          "tech": "Delta acotado a catalog.py (firmas) y tests/test_routing.py. Reparador claude-code/anthropic/opus; delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_2eeb028a, independence_verified=true."
+        },
+        {
+          "at": "2026-08-13T05:44:21+00:00",
+          "client": "Cerrar el ultimo agujero del mismo tipo: un archivo de credenciales con forma rara que el harness daba por bueno.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Segunda reparacion de P3: P3-F03, la cuarta guarda falsa-verde de la feature",
+          "role": "repair-agent",
+          "route_id": "run1_ccfef5c2dfb198444c20a5671ea4a1a9",
+          "spawn_id": "SPAWN-005",
+          "tech": "P3-F03 critical: pi_auth_provider_keys acepta {'openai-codex': []} y hasta {'proveedor-inventado': {...}}, devolviendo keyset y firma no vacios. Ultimo ciclo de review disponible (1 de 2 consumido). Se pide ademas barrida sistematica: toda funcion que lea credenciales valida forma, todo test que diga cubrir 'foreign shape' cubre objetos."
+        },
+        {
+          "at": "2026-08-13T06:21:25+00:00",
+          "client": "Ultima verificacion independiente antes de dar por bueno el paquete.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Delta review final de P3: cierre de P3-F03, ultimo ciclo disponible",
+          "role": "delta-reviewer",
+          "route_id": "dec1_686d159010ad27a477ce1f70d2ac5975",
+          "spawn_id": "SPAWN-006",
+          "tech": "Reparador claude-code/anthropic/opus (run1_ccfef5c2). Delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_686d1590, independence_verified=true. Es el segundo y ultimo ciclo de review del presupuesto."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Firma de credencial por runtime en la clave de cache, todo stat local (AC-07)",
+          "local_validations": [
+            "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Las dos propiedades: refresh no invalida, logout si -- cada una con su test (AC-08)",
+          "local_validations": [
+            "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Validar con captura A/B real que los campos de claude no rotan en un refresh (AC-08)",
+          "local_validations": [
+            "PARCIAL Y DECLARADO ASI, no cerrado. Metodo cambiado por seguridad: se OBSERVA un refresh natural en vez de forzarlo, porque forzarlo puede rotar el refresh_token del usuario del lado del servidor y el usuario duerme y depende de esas credenciales manana. HECHO: snapshot A tomado (hashes POR CAMPO, nunca valores) de ~/.claude/.credentials.json y ~/.codex/auth.json; medido que claudeAiOauth.expiresAt vence a las 04:57 (195 min), asi que el refresh natural ocurre dentro de esta misma noche; verificado que a esa hora ningun campo habia cambiado todavia. PENDIENTE: snapshot B y la comparacion. COMPROMISO REGISTRADO en la nota de decision captura-ab-del-refresh-se-observa-no-se-fuerza: si B muestra que scopes, subscriptionType o rateLimitTier rotan, la firma de claude-code esta mal disenada y P3 SE REABRE. El diseno es robusto a esa incertidumbre por construccion -no lee campos rotantes- pero eso es un argumento, no una medicion, y asi queda escrito."
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Disciplina de la firma y bump de _CACHE_SCHEMA_VERSION con test (AC-09)",
+          "local_validations": [
+            "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Una sola cache en la raiz del store, la legada podada con validaciones (AC-10)",
+          "local_validations": [
+            "unittest discover -s tests: 1006 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-13T07:06:58+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1008 OK / 3 skips, cero failures, corrido por el orquestador tras las DOS reparaciones. Base 990 (cierre de P2) -> 1006 (16 tests de P3) -> 1007 (repair 1) -> 1008 (repair 2). Los tests de credenciales fueron mordidos por cuatro actores distintos: el implementer, el reviewer de seguridad, el reparador y el orquestador. El orquestador probo por su cuenta OCHO formas de romper el auth.json de pi (lista, string, null, numero, proveedor no auditado, JSON top-level lista, archivo vacio, y un caso MIXTO) mas dos del lado de codex/claude que el reparador no habia probado (account_id entero, scopes string): todas fail-closed, y el caso legitimo sin cambio.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-13T05:01:22+00:00",
+          "evidence": "Reproduccion independiente del orquestador, UNA sola corrida, HOME de fixture en scratchpad (jamas los archivos reales). Salida literal: 'P3-SEC-001 codex {} -> firma vacia? False'; 'P3-SEC-001 claude {claudeAiOauth:{}} -> firma vacia? False'; 'P3-SEC-002 pi (archivo AUSENTE) -> firma vacia? False'. Los tres deben dar firma vacia por AC-09 y dan firma NO vacia: fail-open. Confirmado ademas que tests/test_routing.py:4086 afirma en su propio docstring cubrir 'corrupt/foreign-shaped JSON' y solo ejercita listas.",
+          "refuted": [],
+          "upheld": [
+            "P3-F01",
+            "P3-F02"
+          ]
+        },
+        {
+          "at": "2026-08-13T05:43:39+00:00",
+          "evidence": "Reproduccion independiente del orquestador con HOME de fixture. Literal: {'openai-codex': []} -> keyset: {'openai-codex'} | firma vacia? False. Y un caso que el reviewer no reporto: {'proveedor-inventado': {'x':1}} -> keyset: {'proveedor-inventado'} | firma vacia? False. Los dos deben dar conjunto y firma vacios por AC-09.",
+          "refuted": [],
+          "upheld": [
+            "P3-F03"
+          ]
+        }
+      ]
+    },
+    {
+      "acceptance_criteria": [
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/install.py",
+          "reason": "AC-13/AC-14: renderizar el bloque provider en vez de hardcodearlo, y extender la poda de archivos a subarboles JSON. Identificado al preparar el context pack.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_shared/opencode.json",
+          "reason": "AC-13: dejar de enviar el bloque provider.ollama hardcodeado (lineas 5-23).",
+          "status": "approved"
+        },
+        {
+          "path": "Global/opencode/opencode.json",
+          "reason": "Regenerado por build.sh al cambiar _shared.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0042-provider-registry-single-source.md",
+          "reason": "AC-11 extiende 0042 con los tres origenes.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0043-que-prueba-un-probe.md",
+          "reason": "Heredado de P3 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice de ADRs.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/provider_registry.py",
+          "reason": "Heredado de P1 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/catalog.py",
+          "reason": "Heredado de P1/P2/P3 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/models_config.py",
+          "reason": "Heredado de P2/P3 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "models.toml",
+          "reason": "Heredado de P2 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado del harness, lo reescribe feature-state.py.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log de decisiones del orquestador.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada entre marcadores notas:auto.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/022-disponibilidad-real/spec.md",
+          "reason": "Enmendada antes de que arrancaran los paquetes.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/provider_registry.py",
+          "reason": "DESVIO DE ALCANCE FLAGEADO POR EL PROPIO IMPLEMENTER, no descubierto despues. Extendio el modulo con HARNESS_PROVIDER_SEED, seed_or_migrate y el serializador TOML, bajo un separador '# ===== 022 PKG-4', sin tocar PROVIDERS/ProviderSpec/resolve_ceiling de P1-P3. Justificacion: ADR-0042 Decision 1 dice que PROVIDERS vive en ese modulo, y la alternativa era duplicar la siembra en set_agents_app.py e install.py, que es el patron de lockstep manual que ADR-0042 existe para eliminar. Aprobado por el orquestador; el review independiente debe confirmarlo o pedir reubicacion.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 0,
+        "spawns": 2,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "high",
+      "context_pack": "docs/specs/022-disponibilidad-real/context/P4-proveedores-del-usuario.md",
+      "delta_reviews": [],
+      "dependencies": [
+        "P3-liveness-real"
+      ],
+      "diff_ref": "working-tree @ b119ca7 (022/P4: provider_registry.py extendido con HARNESS_PROVIDER_SEED/seed_or_migrate/serializador :76-253, install.py:58,133-183,212-214,508-525 render + poda de subarboles JSON, set_agents_app.py:2354-2482,3533-3543,3745-3752 comandos --provider-*, Global/_shared/opencode.json sin el bloque provider, tests/test_provider_registry.py nuevo 26 tests, ADR-0042 extendido)",
+      "findings": [],
+      "gates": [
+        {
+          "at": "2026-08-13T09:06:40+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T09:06:40+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T09:06:40+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T09:06:40+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T13:39:35+00:00",
+          "cambio": "El bloque provider de opencode.json se renderiza desde providers.toml en vez de estar hardcodeado en _shared",
+          "feature_id": "022-disponibilidad-real",
+          "modelo_mental": "Quitar un proveedor funciona: el install ya no lo repone. La poda pasa de archivos a subarboles JSON y jamas toca una clave ajena",
+          "module": "generacion-arboles",
+          "package_id": "P4-proveedores-del-usuario"
+        }
+      ],
+      "objective": "Administrar proveedores propios desde set-agents, sin editar JSON, y que quitar funcione de verdad",
+      "owned_paths": [
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/generate.py",
+        "ai/scripts/install.py",
+        "Global/_shared/opencode.json",
+        "tests"
+      ],
+      "package_id": "P4-proveedores-del-usuario",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T09:13:35+00:00",
+          "evidence": "docs/specs/022-disponibilidad-real/evidence/P4-review-codex-raw.txt. Reviewer independiente codex/openai-codex/gpt-5.6-terra, dec1_350519a1, independence_verified=true, proveedor distinto del writer (anthropic/opus). VEREDICTO approved, sin hallazgos. PUNTO 1, la promesa del paquete, MEDIDA: install -> --provider-remove ollama -> reinstall -> VERIFY_OLLAMA_ABSENT=PASS y VERIFY_PROVIDER_KEYS vacio. Antes, deep_merge lo reponia siempre. PUNTO 2: fixture con ollama en el manifiesto y byhand solo en opencode.json con dos modelos y opciones anidadas; el install poda ollama y byhand sobrevive con su sha256 intacto. PUNTO 3: mordida sobre el test de la poda, rojo confirmado y verde tras restaurar. NOTA DE PROCESO: el primer despacho del reviewer murio a los 428KB sin llegar a medir nada, consumido leyendo spec/context/evidencia; se relanzo UNA vez con alcance recortado a tres puntos y prohibicion explicita de leer esos documentos, y completo. Es la misma leccion de tamano de asignacion que la sesion venia acumulando. El desvio de alcance a provider_registry.py lo dictamino el orquestador con medicion propia (nota de decision desvio-de-alcance-de-p4-aprobado-con-medicion).",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T09:13:35+00:00",
+          "browser": "",
+          "checks": [
+            "Quitar un provider y reinstalar no lo repone",
+            "La poda no toca un provider que el harness no puso",
+            "Global/_shared/opencode.json ya no hardcodea el bloque provider"
+          ],
+          "evidence": "Superficie de runtime = el opencode.json que el install escribe. Verificado por el reviewer con fixtures: VERIFY_OLLAMA_ABSENT=PASS tras quitar y reinstalar; el provider ajeno 'byhand' sobrevive con sha256 identico a una poda. Verificado por el orquestador: 'provider' ya no existe en Global/_shared/opencode.json, y el ~/.config/opencode/opencode.json REAL del usuario quedo intacto durante todo el paquete (diff contra el backup previo).",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-13T07:11:14+00:00",
+          "client": "Que puedas agregar y sobre todo QUITAR proveedores desde la aplicacion, sin que el proximo install te los reponga.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Administrar proveedores propios desde set-agents, sin editar JSON, y que quitar funcione de verdad",
+          "role": "implementer",
+          "route_id": "run1_f193bfbdbee43aeee46473235a70b1b8",
+          "spawn_id": "SPAWN-001",
+          "tech": "P4 de 022 (AC-11..15). Medicion clave del pack: el bloque ollama del opencode.json del usuario es BYTE-IDENTICO al que envia Global/_shared/opencode.json:5-23, o sea no lo agrego el; y el endpoint esta muerto (curl 000). El caso real es quitar lo que el harness impuso, no lo que el usuario agrego. AC-13 renderiza el bloque desde el registro; AC-14 extiende la poda de archivos a subarboles JSON y es el riesgo del paquete."
+        },
+        {
+          "at": "2026-08-13T09:07:14+00:00",
+          "client": "Un revisor de otro proveedor confirma que quitar un proveedor funciona y que la limpieza no te borra nada tuyo.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Review independiente de P4: que quitar funcione, que la poda no borre lo ajeno, y el desvio de alcance",
+          "role": "package-reviewer",
+          "spawn_id": "SPAWN-002",
+          "tech": "Writer claude-code/anthropic/opus (run1_f193bfbd). Reviewer codex/openai-codex/gpt-5.6-terra, independence_verified=true. Se le pide dictaminar tambien el desvio de alcance a provider_registry.py que el implementer flageo solo."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "providers.toml en STATE_DIR con origin por entrada (AC-11)",
+          "local_validations": [
+            "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Comandos --provider-list add remove verify (AC-12)",
+          "local_validations": [
+            "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "El bloque provider de opencode.json pasa a renderizarse (AC-13)",
+          "local_validations": [
+            "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Poda por manifiesto extendida a subarboles JSON, sin tocar lo que el harness no puso (AC-14)",
+          "local_validations": [
+            "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "Siembra migratoria que registra TODO, lo del usuario como origin=user (AC-15)",
+          "local_validations": [
+            "unittest discover -s tests: 1034 OK / 3 skips; verify.sh: VERIFY_PASS; build.sh + --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS; git diff --check limpio"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-13T09:13:35+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1034 OK / 3 skips. Base 1008 (cierre de P3) -> 1034: 26 tests nuevos en tests/test_provider_registry.py. verify.sh encontro un bug REAL de no-idempotencia (orden de claves JSON entre la siembra en memoria y la relectura desde providers.toml) que hacia fallar check-drift.sh con DRIFT_DETECTED tras un install limpio; el implementer lo corrigio con _normalize_spec antes de reportar. Es el gate que en 021 no verificaba nada encontrando un defecto de verdad. El orquestador confirmo aparte que los cuatro tests de caracterizacion de P1 y P2 siguen verdes sin editarlos.",
+          "status": "pass"
+        }
+      ],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-19"
+      ],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/routing_core/catalog.py",
+          "reason": "AC-16/AC-17/AC-19: verificacion empirica y separacion listed_by_provider/usable_after_ceiling en route_doctor.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/set_agents_app.py",
+          "reason": "AC-18/AC-19: --provider-verify y las etiquetas en cmd_doctor_all y _estado_general_lines.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/provider_registry.py",
+          "reason": "Heredado de P1/P4 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/install.py",
+          "reason": "Heredado de P4 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/models_config.py",
+          "reason": "Heredado de P2/P3 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "models.toml",
+          "reason": "Heredado de P2 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/_shared/opencode.json",
+          "reason": "Heredado de P4 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/opencode/opencode.json",
+          "reason": "Heredado de P4, regenerado por build.sh.",
+          "status": "approved"
+        },
+        {
+          "path": "tests/test_routing.py",
+          "reason": "Heredado de P1/P2/P3 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "tests/test_provider_registry.py",
+          "reason": "Heredado de P4 en el diff compartido.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0043-que-prueba-un-probe.md",
+          "reason": "AC-16 extiende ADR-0043 con la verificacion empirica.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0042-provider-registry-single-source.md",
+          "reason": "Heredado de P1/P2/P4.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice de ADRs.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado del harness.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log de decisiones del orquestador.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada entre marcadores notas:auto.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/022-disponibilidad-real/spec.md",
+          "reason": "Enmendada antes de los paquetes.",
+          "status": "approved"
+        }
+      ],
+      "attempts": {
+        "deep_review_cycles": 1,
+        "repair_batches": 0,
+        "spawns": 2,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": "docs/specs/022-disponibilidad-real/context/P5-altas-y-bajas-automaticas.md",
+      "delta_reviews": [],
+      "dependencies": [
+        "P4-proveedores-del-usuario"
+      ],
+      "diff_ref": "working-tree @ b119ca7 (022/P5: catalog.py:1129-1230 verificacion empirica + listed_by_provider/usable_after_ceiling en route_doctor, set_agents_app.py:875-908 cmd_doctor_all y :2466-2520 cmd_provider_verify con liveness y --prune-dead, :3637 flag, tests/test_routing.py y tests/test_menu_ui.py, ADR-0043 extendido)",
+      "findings": [],
+      "gates": [
+        {
+          "at": "2026-08-13T13:39:57+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T13:39:57+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T13:39:57+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T13:39:57+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T13:39:35+00:00",
+          "cambio": "Verificacion empirica del CLI id, liveness real en --provider-verify y separacion listed/usable en tres superficies",
+          "feature_id": "022-disponibilidad-real",
+          "modelo_mental": "El harness adopta un proveedor nuevo solo si el CLI lo confirma, nunca por heuristica de nombre; y dice que midio en vez de insinuar mas",
+          "module": "routing",
+          "package_id": "P5-altas-y-bajas-automaticas"
+        }
+      ],
+      "objective": "Que activar una suscripcion alcance para usarla, y que darla de baja se note, sin tocar nada",
+      "owned_paths": [
+        "ai/scripts/routing_core/catalog.py",
+        "ai/scripts/set_agents_app.py",
+        "tests"
+      ],
+      "package_id": "P5-altas-y-bajas-automaticas",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T12:52:59+00:00",
+          "evidence": "Reviewer independiente codex/openai-codex/gpt-5.6-terra, dec1_7513f638, independence_verified=true. VEREDICTO approved, sin hallazgos. Punto 1, verificacion empirica fail-closed, literal: con stub que contesta bien -> ('opencode-zen', {'model-a'}); con los cuatro modos malos (error, wrong, nonzero, slow) -> None, None, None, None; y un proveedor desconocido solo se acepta tras respuesta valida -> ('my-new-vendor', 1, 0). El candidato equivocado de 'opencode zen' NO queda autorizado por heuristica. Punto 2: liveness alive|dead|unreachable distinguidos y --prune-dead nunca borra un unreachable. Punto 3: mordidas sobre dos tests nuevos, rojo y verde literales. NOTA: el implementer murio por error de API tras escribir codigo y tests; los gates los corrio el ORQUESTADOR (1065 OK / 3 skips, VERIFY_PASS, GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS) y la instancia se retomo solo para completar la evidencia, con instruccion explicita de no atribuirse gates ajenos. Al retomarla encontro un hueco de cobertura real -cmd_doctor_all y _estado_general_lines no tenian test del CONTENIDO de la linea con N distinto de M- y escribio los dos tests faltantes, con mordida.",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T12:53:00+00:00",
+          "browser": "",
+          "checks": [
+            "La verificacion empirica adopta un CLI id solo si el CLI contesta bien",
+            "Las tres superficies separan listed_by_provider de usable_after_ceiling",
+            "--prune-dead nunca borra un unreachable"
+          ],
+          "evidence": "Medicion en vivo del orquestador con --route-doctor tras conectar el usuario sus cuatro credenciales: opencode-go listed=18 usable=18 cli_id=opencode-go; opencode-zen listed=61 usable=58 cli_id=opencode; openai-codex listed=13 usable=6 cli_id=openai; github copilot listed=26 usable=0 cli_id=github-copilot detected_unlistable=true. El caso de Copilot es la prueba viva de AC-16: anoche daba Provider not found y listed=0, y a la manana el CLI contesto 26 modelos bien formados y el harness adopto el id SIN cambios de codigo. usable=0 es correcto: no es par auditado, se descubre pero no se rutea.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [
+        {
+          "at": "2026-08-13T09:14:38+00:00",
+          "client": "Que activar una suscripcion alcance para poder usarla, y darla de baja se note, sin tocar nada.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Altas y bajas automaticas: verificacion empirica del CLI id, baja simetrica, --provider-verify y las tres superficies",
+          "role": "implementer",
+          "route_id": "run1_12758daeb52b60685e0f17bd7c39cd40",
+          "spawn_id": "SPAWN-001",
+          "tech": "P5 de 022 (AC-16..19), ultimo paquete. Evidencia en vivo: github copilot figura authenticated=true detected_unlistable=true models_listable=0; openai-codex lista 6 modelos y su inferencia devolvio token vencido (listable != usable); ollama declarado con 3 modelos y endpoint muerto (curl 000). La heuristica espacio->guion es trampa: el CLI id de opencode-zen es 'opencode'. AC-19 toca las TRES superficies, incluida _estado_general_lines que es el primer item del menu."
+        },
+        {
+          "at": "2026-08-13T12:31:26+00:00",
+          "client": "Un revisor de otro proveedor confirma que el harness no se inventa proveedores y que dice la verdad sobre lo que midio.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Review independiente de P5: verificacion empirica fail-closed, liveness honesta y las tres superficies",
+          "role": "package-reviewer",
+          "route_id": "dec1_7513f638ac3053cecd70fd11a0788c70",
+          "spawn_id": "SPAWN-002",
+          "tech": "Writer claude-code/anthropic/opus (run1_12758dae; murio por error de API tras escribir codigo y tests, los gates los corrio el orquestador: 1065 OK, VERIFY_PASS). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_7513f638, independence_verified=true. Asignacion acotada a 3 puntos + mordida, con prohibicion explicita de leer spec/evidencias: el primer reviewer de P4 murio consumido leyendo."
+        }
+      ],
+      "status": "accepted",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Verificacion empirica del CLI id: se acepta solo si el CLI contesto bien (AC-16)",
+          "local_validations": [
+            "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "La baja simetrica y automatica; el registro es memoria, no autorizacion (AC-17)",
+          "local_validations": [
+            "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "--provider-verify para modelos que ya no responden, nunca dentro de route() (AC-18)",
+          "local_validations": [
+            "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
+        },
+        {
+          "blockers": [],
+          "id": "listed_by_provider vs usable_after_ceiling en las TRES superficies (AC-19)",
+          "local_validations": [
+            "unittest discover -s tests: 1065 OK / 3 skips (corrida del orquestador); verify.sh: VERIFY_PASS; build.sh --check: GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
+        }
+      ],
+      "testing": [
+        {
+          "at": "2026-08-13T12:53:00+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1065 OK / 3 skips, corrido dos veces por el orquestador (la segunda tras los dos tests que agrego la instancia retomada). Base 1034 (cierre de P4) -> 1065: 31 tests nuevos. Seis mordidas confirmadas con revert byte-identico.",
+          "status": "pass"
+        }
+      ],
+      "verifications": []
+    }
+  ],
+  "phase": "DONE",
+  "revision": 190,
+  "schema_version": 1,
+  "spec_amendments": [
+    {
+      "actor": "orchestrator",
+      "approved_by": "federico (tres decisiones tomadas 2026-08-12) + spec-challenger independiente",
+      "at": "2026-08-12T22:52:09+00:00",
+      "hash": "a72d851a33178a06ac8914c4d92a97a5d457d0d9912c16944bf15d5e02584eb8",
+      "old_hash": "eea3fd298efcf1a5ae1f4c86c98e1e7750c316f9b730e746f5c334f210b60c26",
+      "old_path": "docs/specs/022-disponibilidad-real/spec.md",
+      "path": "docs/specs/022-disponibilidad-real/spec.md",
+      "reason": "Enmendada tras el challenge (revision_required, 3 bloqueantes + 2 importantes). F1 -> DECISION DE FEDERICO: el tri-estado aplica solo a opencode_zen, opencode_go y proveedores futuros sin key; claude y codex siguen obligatorios porque models_config.py:130-136 los exige con die, load_roles los indexa sin fallback, y son los unicos con filas curadas, asi que en auto dispararian CATALOG_CEILING_REQUIRED en cada fila. codex_effort sale de la redaccion: es una lista de efforts, no un techo. Y del precedente de subscriptions se toma la FORMA, no el WARN-y-seguir. F2 -> DECISION DE FEDERICO: se acepta y documenta el limite estructural de claude-code, cuyo archivo de credenciales no tiene campo de identidad de cuenta (codex si tiene account_id): la firma detecta presencia y ausencia pero no swap de cuenta del mismo plan. No se hashea el refreshToken. Y se agrega el supuesto a validar con captura A/B real de que scopes y subscriptionType no rotan en un refresh. F3 -> DECISION DE FEDERICO: la siembra registra TODO lo que haya bajo provider.*, lo del harness como harness-legacy y lo del usuario como origin=user, para que sea administrable desde el primer arranque. F4: AC-01 suma el SEXTO duplicado (_MODEL_PREFERENCE_PROVIDERS en set_agents_app.py:94) que la primera version no nombraba, con la advertencia de que su test lo compara contra otro literal hardcodeado en vez de contra la fuente real. F5: AC-19 se extiende a las TRES superficies, incluido el panel del primer item del menu."
+    }
+  ],
+  "updated_at": "2026-08-13T13:40:43+00:00"
+}

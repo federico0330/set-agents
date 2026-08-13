@@ -20,6 +20,8 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.modules.setdefault("set_agents_app", sys.modules[__name__])
 import coord_policy
 import models_config
+import provider_registry
 import routing
 import set_agents_spawn
 import tui
@@ -69,6 +72,22 @@ def _routing_store():
             if ROUTING_TEST_ROOT else routing.RoutingStore(project_key=key))
 
 
+def _probe_cache_root() -> Path:
+    """ADR-0043 (022 PKG-3, AC-10): the ONE probe-cache root every reader in this file
+    resolves to now -- the same root `RoutingService`'s own composition creates/
+    validates via `RoutingStore.ensure_cache_root()` (routing_core/service.py:112-115),
+    never `STATE_DIR` directly (the legacy, divergent root `--route-doctor`/
+    `--doctor-all`/the 'Estado general' panel used to read while the decision path
+    already read/wrote `routing-v2/probe-cache.json` -- two caches confirmed diverging
+    live). `RoutingStore.root` is a PURE attribute (no I/O at construction, same
+    laziness `STATE_DIR` itself always had, respects the `ROUTING_TEST_ROOT` seam via
+    `_routing_store()` above) -- this function never creates or validates anything
+    itself; that stays exactly where it always lived, inside
+    `probe_inventory`/`_validate_cache_dir` (which never creates either, only
+    validates)."""
+    return _routing_store().root
+
+
 def _project_root_or_harness() -> Path:
     # Direct helper calls in legacy unit tests have no CLI resolution; production
     # routes always set PROJECT_ROOT in main before accessing project data.
@@ -89,9 +108,20 @@ def _project_root_or_harness() -> Path:
 MODEL_PREFERENCE_PATH = STATE_DIR / "model-preference.toml"
 
 # The closed, four-provider universe `_PAIR_COMMANDS` already probes
-# (`routing_core/catalog.py:133-140`) -- defined independently here, never importing or
-# referencing the catalog module's own billing-kind classification table (AC-06 non-goal).
-_MODEL_PREFERENCE_PROVIDERS = ("openai-codex", "anthropic", "opencode-zen", "opencode-go")
+# (`routing_core/catalog.py:165-172`). ADR-0042 (022 PKG-1) supersedes this table's own
+# ORIGINAL "defined independently here, never importing" framing -- that framing was wider
+# than the reason it named: the AC-06 non-goal it cites (014-model-preference-policy,
+# test_ac06_no_provider_billing_kind_reference_in_new_code) is specifically about never
+# letting the catalog module's own billing-kind classification table decide provider
+# membership here, and that narrower non-goal still holds -- this tuple's derivation below
+# never reads that table (nor even names it -- see the test above, unchanged by this
+# package). What changed is provider IDENTITY: this tuple now derives from the single
+# `provider_registry.PROVIDERS` registry every provider-keyed table in the harness shares,
+# instead of being a second hand-maintained copy of the same four provider ids. Order is a
+# real contract (surfaces in pin/preference validation errors) --
+# `tuple(provider_registry.PROVIDERS)`, never `tuple(models_config.DISCOVERABLE_PROVIDERS)`,
+# because that sibling table is an unordered `set`.
+_MODEL_PREFERENCE_PROVIDERS = tuple(provider_registry.PROVIDERS)
 _MODEL_PREFERENCE_CLASSES = ("decision", "grunt", "build")
 # AC-02's inertness note: the six roles with real, live effect today (`### Honest scope`,
 # spec) -- every other in-scope role, and the whole `decision` class, is genuinely inert.
@@ -112,7 +142,9 @@ def _model_preference_die(message):
 
 def _effective_preference_providers():
     """ADR-0034 (AC-09): the base audited set (`_MODEL_PREFERENCE_PROVIDERS`, unchanged
-    -- byte-identical to `models_config.DISCOVERABLE_PROVIDERS`) UNION whatever the
+    -- same VALUES as `models_config.DISCOVERABLE_PROVIDERS`, both derived from the single
+    `provider_registry.PROVIDERS` registry since ADR-0042; the two differ in TYPE on
+    purpose, ordered tuple vs. unordered set, never in membership) UNION whatever the
     CURRENT effective snapshot reports as routable, when that snapshot is cheaply
     resolvable -- a live probe, never network/credential material. Deliberately never
     called from `load_model_preference`/`load_model_pin` (the boot path, `_read_model_
@@ -129,7 +161,10 @@ def _effective_preference_providers():
     which today it structurally cannot: every provider it can produce comes from
     `routing_core.catalog._PAIR_COMMANDS`'s own audited provider set, and that set is
     pinned equal to `models_config.DISCOVERABLE_PROVIDERS` (== `_MODEL_PREFERENCE_
-    PROVIDERS`, AC-10's lockstep test). So the probe below is skipped whenever the
+    PROVIDERS`, guarded for real since ADR-0042 -- both are derived from
+    `provider_registry.PROVIDERS`, and `test_adr0042_ac01b_...` in tests/test_routing.py
+    compares this tuple against `_PAIR_COMMANDS`'s own provider set directly, never a
+    second hardcoded literal). So the probe below is skipped whenever the
     base set already covers `DISCOVERABLE_PROVIDERS` -- a cheap, exact short-circuit
     that avoids paying a subprocess probe (each `_PAIR_COMMANDS` entry can block up to
     20s) on every `--model-pin-set`/`--model-preference-set` call for a union that
@@ -141,7 +176,8 @@ def _effective_preference_providers():
     try:
         from routing_core.catalog import probe_inventory, resolve_discovered_providers
         config = models_config.load_config()
-        inventory = probe_inventory(config, cache_root=STATE_DIR)
+        # ADR-0043 (022 PKG-3, AC-10): the single store root, not the legacy STATE_DIR.
+        inventory = probe_inventory(config, cache_root=_probe_cache_root())
         live = resolve_discovered_providers(config, inventory)
     except Exception:
         return _MODEL_PREFERENCE_PROVIDERS
@@ -490,11 +526,19 @@ def cmd_routing_report(human=False):
 def cmd_route_doctor(human=False):
     """ADR-0035 (AC-15): read-only diagnostic -- same one-line envelope discipline as
     `--routing-report`/`--route-decide`, never opens a run, never writes the store or the
-    probe cache. Precedent: `cmd_routing_report` above."""
+    probe cache. Precedent: `cmd_routing_report` above.
+
+    ADR-0043 (022 PKG-3, AC-10): reports on the SAME cache root `--route-decide`
+    actually reads/writes now (`_probe_cache_root()`), not the legacy `STATE_DIR` one
+    -- this is the surface that used to inspect a file the decider never touched.
+    Best-effort prunes the stale legacy sibling on the way (same security discipline
+    as `_write_probe_cache`, `prune_legacy_probe_cache`); a failed prune never blocks
+    the diagnostic itself."""
     try:
-        from routing_core.catalog import route_doctor
+        from routing_core.catalog import prune_legacy_probe_cache, route_doctor
         config = models_config.load_config(ROOT / "models.toml")
-        report = route_doctor(config, cache_root=STATE_DIR)
+        prune_legacy_probe_cache(STATE_DIR)
+        report = route_doctor(config, cache_root=_probe_cache_root())
         _routing_output(routing.cli_envelope(True, "route-doctor", report, (), ()), human)
         return 0
     except models_config.ModelsError:
@@ -821,8 +865,20 @@ def _install_scope():
 def cmd_doctor_all():
     """017/AC-02: qué tiene esta máquina y qué va a usar el harness — harnesses
     instalados, scope de instalación, CLIs del catálogo, y proveedores/modelos
-    realmente autenticados (probe con cache; nunca imprime credenciales)."""
-    from routing_core.catalog import probe_inventory
+    realmente autenticados (probe con cache; nunca imprime credenciales).
+
+    ADR-0043 (022 PKG-3, AC-10): probes against the SAME cache root `--route-decide`
+    uses (`_probe_cache_root()`), never the legacy `STATE_DIR` one, and best-effort
+    prunes the stale legacy sibling on the way (same discipline as
+    `_write_probe_cache`).
+
+    AC-19 (022 PKG-5): `listed_by_provider` (raw, pre-ceiling) is reported alongside
+    `usable_after_ceiling` (post-ceiling, actually routable) -- the OLD `models=<N>` line
+    printed the ceiling-applied count under a name that read as "what the provider
+    exposes"; a provider that lists models the curated ceiling drops entirely used to be
+    invisible here (`if models:` on the ceiling-applied set alone), which is exactly the
+    "listado != usable" defect this AC exists to surface, not hide."""
+    from routing_core.catalog import prune_legacy_probe_cache, probe_listed_and_usable
     for harness, cli in (("claude-code", "claude"), ("opencode", "opencode"), ("codex", "codex")):
         print(f"HARNESS {harness} installed={'yes' if shutil.which(cli) else 'no'}")
     print(f"HARNESS pi installed={_pi_lane_state()}")
@@ -840,13 +896,16 @@ def cmd_doctor_all():
     except SystemExit:
         print("PROVIDERS_UNKNOWN models.toml inválido — corré ./build.sh --check")
         return 1
-    inventory = probe_inventory(config, cache_root=STATE_DIR)
-    pairs = {pair: models for pair, models in inventory.items() if models}
-    if not pairs:
+    prune_legacy_probe_cache(STATE_DIR)
+    listed, usable = probe_listed_and_usable(config, cache_root=_probe_cache_root())
+    all_pairs = sorted(set(listed) | set(usable))
+    if not all_pairs:
         print("PROVIDERS_NONE no se detectó ninguna suscripción activa (claude/codex/opencode/pi) — "
               "logueate en al menos una herramienta y volvé a correr set-agents --doctor-all")
-    for (runtime, provider), models in sorted(pairs.items()):
-        print(f"PROVIDER {provider} runtime={runtime} models={len(models)}")
+    for (runtime, provider) in all_pairs:
+        listed_n = len(listed.get((runtime, provider), set()))
+        usable_n = len(usable.get((runtime, provider), set()))
+        print(f"PROVIDER {provider} runtime={runtime} listed_by_provider={listed_n} usable_after_ceiling={usable_n}")
     return 0
 
 
@@ -2286,6 +2345,243 @@ def cmd_mcp_remove(name, harness=None):
     return 0
 
 
+# ----------------------------------------------------------- 022 PKG-4: providers (AC-11..14)
+#
+# `~/.local/state/set-agentes/providers.toml` (AC-11): the OpenCode `provider.*` JSON-block
+# registry, same private-STATE_DIR/atomic-write precedent as MODEL_PREFERENCE_PATH above,
+# same fail-closed discipline (`provider_registry.ProvidersRegistryError`, never a silent
+# empty-registry swallow). NOT the routing-identity `provider_registry.PROVIDERS` table:
+# these commands never write to it and never read it as a source of ids -- they only
+# CHECK a new id against it, to stop a user from shadowing a routed provider's own id
+# with an unrelated local/custom OpenCode block (AC-12).
+#
+# AC-13's render step lives in `install.py`, not here: these commands only ever touch
+# `providers.toml` (never `opencode.json` directly -- "sin tocar JSON a mano" is a promise
+# about the USER, not a ban on install.py's own render/prune step doing it on their
+# behalf at install time). A change here needs `./build.sh --install` (the same "Instalar
+# / Reparar" drift-repair entry point `cmd_status`/the menu already point at) to reach the
+# live file -- every command below says so explicitly, so "I removed it but opencode still
+# shows it" is never a silent surprise.
+PROVIDERS_TOML_PATH = STATE_DIR / provider_registry.PROVIDERS_TOML_NAME
+_PROVIDER_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+_PROVIDER_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+_INSTALL_HINT = "corré './build.sh --install' para que se refleje en opencode.json"
+
+
+def _load_providers_registry():
+    """Fail-closed load shared by every `--provider-*` command below -- a malformed
+    `providers.toml` (hand-edited, corrupted) never degrades to 'nothing registered'."""
+    try:
+        return provider_registry.parse_providers_toml(PROVIDERS_TOML_PATH)
+    except provider_registry.ProvidersRegistryError as exc:
+        print(f"providers.toml: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+
+
+def _provider_spec_summary(spec):
+    """`--provider-list`/`--provider-verify`'s one-line rendering of an arbitrary
+    provider spec dict -- tolerant of a spec that doesn't have the expected shape
+    (`?` per missing field), never a crash on a hand-migrated oddity."""
+    npm = spec.get("npm") if isinstance(spec, dict) else None
+    options = spec.get("options") if isinstance(spec, dict) else None
+    base_url = options.get("baseURL") if isinstance(options, dict) else None
+    models = spec.get("models") if isinstance(spec, dict) else None
+    model_count = len(models) if isinstance(models, dict) else "?"
+    return f"npm={npm or '?'} base_url={base_url or '?'} models={model_count}"
+
+
+def cmd_provider_list():
+    """AC-12 (read-only): every registered provider id, its origin, and a one-line
+    summary of its declared spec."""
+    entries = _load_providers_registry()
+    if not entries:
+        print("PROVIDER_NONE — nada registrado todavía (corré --provider-add, o instalá con "
+              "./build.sh --install para sembrar el registro desde lo que ya haya en opencode.json)")
+        return 0
+    for provider_id in sorted(entries):
+        entry = entries[provider_id]
+        print(f"PROVIDER {provider_id} origin={entry.origin} {_provider_spec_summary(entry.spec)}")
+    return 0
+
+
+def _provider_spec_shape_issues(spec):
+    """AC-12's `--provider-verify`: ONLY the declared surface (never liveness -- no HTTP
+    call, that's AC-18/P5's `GET {baseURL}/models`). Checks the minimal shape OpenCode's
+    own `provider.<id>` schema needs to be usable at all: a non-empty `npm` package, a
+    non-empty `options.baseURL`, and at least one declared model."""
+    issues = []
+    if not isinstance(spec, dict):
+        return ["spec is not an object"]
+    if not isinstance(spec.get("npm"), str) or not spec["npm"]:
+        issues.append("npm")
+    options = spec.get("options")
+    if not isinstance(options, dict) or not isinstance(options.get("baseURL"), str) or not options.get("baseURL"):
+        issues.append("options.baseURL")
+    models = spec.get("models")
+    if not isinstance(models, dict) or not models:
+        issues.append("models")
+    return issues
+
+
+_LIVENESS_TIMEOUT_SECONDS = 2.0
+# AC-18 (022 PKG-5): the literal spec text is "sólo providers user" -- the DEFAULT here
+# never widens past that, not re-litigable. `harness-legacy` is the P4 interaction named
+# explicitly in the context pack (ollama, after P4, is `origin=harness-legacy`, not
+# `user`): resolved with an EXPLICIT opt-in argument (`--include-legacy`), never
+# silently folded into the default set. A plain `--provider-verify` run therefore never
+# liveness-checks the real machine's dead Ollama block by design -- `--include-legacy`
+# is the documented path to it, not a second `--provider-remove`/`--provider-add`
+# round-trip.
+_LIVENESS_DEFAULT_ORIGINS = frozenset({"user"})
+_LIVENESS_WITH_LEGACY_ORIGINS = frozenset({"user", "harness-legacy"})
+
+
+def _provider_liveness(base_url, timeout: float = _LIVENESS_TIMEOUT_SECONDS) -> str:
+    """AC-18: `GET {base_url}/models`, timeout 2s. Three outcomes, never conflated
+    ("nunca 'no existe' cuando fue 'no contestó'"):
+
+    - `alive`: the server answered with SOME HTTP status, 2xx or not -- even a 401/404
+      still proves something is listening and speaking HTTP on that port.
+    - `dead`: the TCP connection was actively REFUSED -- nothing is listening at all,
+      the measured Ollama case (`curl` reports `000` for exactly this: the process is
+      not running, the port is closed).
+    - `unreachable`: a timeout, a DNS failure, or any other network-level surprise --
+      genuinely undetermined, NEVER reported as `dead`. A transient network hiccup must
+      never read as "this provider does not exist".
+    """
+    if not isinstance(base_url, str) or not base_url:
+        return "unreachable"
+    url = base_url.rstrip("/") + "/models"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, method="GET"), timeout=timeout):
+            return "alive"
+    except urllib.error.HTTPError:
+        return "alive"  # the server answered (even an error status): it is listening
+    except urllib.error.URLError as exc:
+        return "dead" if isinstance(exc.reason, ConnectionRefusedError) else "unreachable"
+    except (OSError, TimeoutError):
+        return "unreachable"
+
+
+def cmd_provider_verify(provider_id=None, include_legacy=False, prune_dead=False):
+    """AC-12 (declared-surface shape, unchanged) + AC-18/P5 (liveness): for every entry
+    that PASSES the shape check and whose origin is in scope (`user` by default, plus
+    `harness-legacy` with `include_legacy` -- see `_LIVENESS_DEFAULT_ORIGINS` above), a
+    real `GET {baseURL}/models` is now attempted (`_provider_liveness`) and reported as
+    `liveness=alive|dead|unreachable` with the measurement's own timestamp
+    (`at=<ISO-8601 UTC>`). A shape-invalid entry is never liveness-checked (no baseURL to
+    trust) -- same `continue` as before this package, no network call added there.
+
+    `prune_dead=True` (`--prune-dead`) removes every entry THIS RUN measured `dead` --
+    never `unreachable` (no evidence of absence) and never a shape-invalid entry (no
+    liveness was ever attempted for it) -- from `providers.toml`. Same
+    `_INSTALL_HINT`-gated, non-silent discipline as `--provider-remove`: takes effect at
+    the next `./build.sh --install`, and offering it is opt-in, never automatic on a
+    plain `--provider-verify`."""
+    full_registry = _load_providers_registry()  # AC-18: --prune-dead must never drop an
+    # entry this run did not even examine -- a single-`provider_id` verify narrows
+    # `entries` below for REPORTING only; pruning always writes back against the FULL
+    # registry with just the measured-dead ids removed, never the narrowed view.
+    entries = full_registry
+    if provider_id:
+        if provider_id not in entries:
+            print(f"PROVIDER_UNKNOWN {provider_id}")
+            return 2
+        entries = {provider_id: entries[provider_id]}
+    elif not entries:
+        print("PROVIDER_NONE")
+        return 0
+    liveness_origins = _LIVENESS_WITH_LEGACY_ORIGINS if include_legacy else _LIVENESS_DEFAULT_ORIGINS
+    ok = True
+    dead_ids = []
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    for pid in sorted(entries):
+        entry = entries[pid]
+        issues = _provider_spec_shape_issues(entry.spec)
+        if issues:
+            ok = False
+            print(f"PROVIDER_VERIFY {pid} origin={entry.origin} shape=invalid missing=" + ",".join(issues))
+            continue
+        line = f"PROVIDER_VERIFY {pid} origin={entry.origin} shape=ok"
+        if entry.origin in liveness_origins:
+            options = entry.spec.get("options") if isinstance(entry.spec, dict) else None
+            base_url = options.get("baseURL") if isinstance(options, dict) else None
+            state = _provider_liveness(base_url)
+            line += f" liveness={state} at={now}"
+            if state != "alive":
+                ok = False
+            if state == "dead":
+                dead_ids.append(pid)
+        print(line)
+    if prune_dead:
+        if not dead_ids:
+            print("PROVIDER_PRUNE_NONE — ningún provider midió dead en esta corrida")
+        else:
+            remaining = {pid: entry for pid, entry in full_registry.items() if pid not in dead_ids}
+            atomic_write(PROVIDERS_TOML_PATH, provider_registry.serialize_providers_toml(remaining))
+            print(f"PROVIDER_PRUNED ids={','.join(sorted(dead_ids))} — {_INSTALL_HINT}")
+    return 0 if ok else 1
+
+
+def cmd_provider_add(provider_id, base_url, npm=None, label=None, models=()):
+    """AC-12: builds an OpenCode-compatible `provider.<id>` block from structured flags
+    (never raw JSON typed anywhere) and upserts it into `providers.toml` as
+    `origin=user` -- re-adding an id that already exists (including a harness one the
+    user removed and wants back with their own settings) is an explicit user action,
+    so it always claims `user` origin going forward, superseding whatever origin the
+    entry had before."""
+    if not _PROVIDER_ID_RE.fullmatch(provider_id):
+        print(f"PROVIDER_INVALID id={provider_id!r} — usá letras/números/guiones, hasta 64 caracteres")
+        return 2
+    if provider_id in provider_registry.PROVIDERS:
+        print(f"PROVIDER_RESERVED {provider_id} — es un id de ruteo (provider_registry.PROVIDERS); "
+              f"elegí otro id para este provider local")
+        return 2
+    if not base_url or not (base_url.startswith("http://") or base_url.startswith("https://")):
+        print("PROVIDER_INVALID --base-url debe ser una URL http(s)")
+        return 2
+    if not models:
+        print("PROVIDER_INVALID --provider-add requiere al menos un --model ID[:nombre]")
+        return 2
+    model_specs = {}
+    for token in models:
+        model_id, _, display = token.partition(":")
+        if not _PROVIDER_MODEL_RE.fullmatch(model_id):
+            print(f"PROVIDER_INVALID --model {token!r} — el id de modelo es inválido")
+            return 2
+        model_specs[model_id] = {"name": display or model_id}
+    spec = {
+        "npm": npm or "@ai-sdk/openai-compatible",
+        "name": label or provider_id,
+        "options": {"baseURL": base_url},
+        "models": model_specs,
+    }
+    entries = dict(_load_providers_registry())
+    previous = entries.get(provider_id)
+    entries[provider_id] = provider_registry.ProviderEntry(origin="user", spec=spec)
+    atomic_write(PROVIDERS_TOML_PATH, provider_registry.serialize_providers_toml(entries))
+    verb = "PROVIDER_REPLACED" if previous is not None else "PROVIDER_ADDED"
+    prior_note = f" origin_previo={previous.origin}" if previous is not None else ""
+    print(f"{verb} id={provider_id} origin=user models={len(model_specs)}{prior_note} — {_INSTALL_HINT}")
+    return 0
+
+
+def cmd_provider_remove(provider_id):
+    """AC-12/AC-14: removes ONE row from the registry. `providers.toml` itself never
+    auto-removes anything ('a nadie le desaparece nada') -- this command IS the explicit
+    user action the registry's own no-goal defers to. Takes effect in the live
+    `opencode.json` only at the next `./build.sh --install` (AC-14's manifest-diff prune
+    step in `install.py`) -- this command never edits that file itself."""
+    entries = dict(_load_providers_registry())
+    if provider_id not in entries:
+        print(f"PROVIDER_UNKNOWN {provider_id}")
+        return 2
+    removed = entries.pop(provider_id)
+    atomic_write(PROVIDERS_TOML_PATH, provider_registry.serialize_providers_toml(entries))
+    print(f"PROVIDER_REMOVED id={provider_id} origin={removed.origin} — {_INSTALL_HINT}")
+    return 0
+
+
 # --------------------------------------------------------------------- vault
 # Company-level Obsidian vault: one graph per company/client. Default mode:
 # project notes live INSIDE each repo (docs/notas/, versioned, auto-rendered
@@ -3115,7 +3411,18 @@ def _estado_general_lines(data):
     """The '🩺 Estado general' panel: everything --doctor-all knows, formatted for
     humans — harnesses with version+auth, install scope, catalog CLIs, live
     providers. Reuses _status_data's rows (already probed) and the shared probe
-    cache; never prints credential material."""
+    cache; never prints credential material.
+
+    ADR-0043 (022 PKG-3, AC-10): this is the first-menu-item 'vidriera' surface —
+    probes against the SAME cache root `--route-decide` uses (`_probe_cache_root()`),
+    never the legacy `STATE_DIR` one, and best-effort prunes the stale legacy sibling
+    on the way (same discipline as `_write_probe_cache`).
+
+    AC-19 (022 PKG-5): THE surface this AC names explicitly as "la vidriera" -- what a
+    non-technical user checks to see "¿el harness ya ve mi suscripción nueva?" -- so the
+    `listado`/`usable` split lands here too, not only in `--route-doctor`. `listado` is
+    the raw, pre-ceiling count the provider's own CLI reports; `usable` is what survives
+    the curated ceiling and is therefore actually routable."""
     lines = ["Harnesses"]
     lines += table_lines([(cli, version, auth) for cli, version, auth in data["rows"]])
     lines += table_lines([("pi", {"yes": "instalado", "via-pnpm-dlx": "vía pnpm dlx",
@@ -3129,10 +3436,13 @@ def _estado_general_lines(data):
     lines.append("")
     lines.append("Proveedores autenticados (probe)")
     try:
-        from routing_core.catalog import probe_inventory
-        inventory = probe_inventory(models_config.load_config(), cache_root=STATE_DIR)
-        pairs = [(provider, runtime, f"{len(models)} modelos")
-                 for (runtime, provider), models in sorted(inventory.items()) if models]
+        from routing_core.catalog import prune_legacy_probe_cache, probe_listed_and_usable
+        prune_legacy_probe_cache(STATE_DIR)
+        listed, usable = probe_listed_and_usable(models_config.load_config(), cache_root=_probe_cache_root())
+        all_pairs = sorted(set(listed) | set(usable))
+        pairs = [(provider, runtime, f"listado={len(listed.get((runtime, provider), set()))} "
+                                     f"usable={len(usable.get((runtime, provider), set()))}")
+                 for (runtime, provider) in all_pairs]
         lines += table_lines(pairs) if pairs else ["  (ninguno — logueate en al menos una herramienta)"]
     except Exception:
         lines.append("  probe no disponible ahora (corré set-agents --doctor-all)")
@@ -3312,6 +3622,26 @@ def main():
     parser.add_argument("--mcp-remove", metavar="NAME")
     parser.add_argument("--mcp-on", metavar="NAME")
     parser.add_argument("--mcp-off", metavar="NAME")
+    # 022 PKG-4 (AC-11/AC-12): the `providers.toml` registry CLI -- list/add/remove/
+    # verify, never a raw JSON edit. `--provider-verify` alone (no ID) checks every
+    # registered entry; `--provider-verify ID` checks just one.
+    parser.add_argument("--provider-list", action="store_true", help="lista providers.toml (solo lectura)")
+    parser.add_argument("--provider-add", metavar="ID", help="agrega/reemplaza un provider local en providers.toml (con --base-url y --model, al menos uno)")
+    parser.add_argument("--provider-remove", metavar="ID", help="saca un provider de providers.toml")
+    parser.add_argument("--provider-verify", nargs="?", const="", metavar="ID",
+                        help="chequea la forma declarada de un provider (o de todos, sin ID) y, para origin=user "
+                             "(AC-18), liveness real: GET {baseURL}/models, 2s, alive|dead|unreachable")
+    parser.add_argument("--include-legacy", action="store_true",
+                        help="con --provider-verify: además de origin=user (AC-18), suma origin=harness-legacy -- "
+                             "el caso ollama post-P4 (--provider-remove es la otra salida documentada)")
+    parser.add_argument("--prune-dead", action="store_true",
+                        help="con --provider-verify: saca de providers.toml los providers que ESTA corrida midió "
+                             "dead (nunca unreachable) -- requiere ./build.sh --install para reflejarse")
+    parser.add_argument("--base-url", metavar="URL", help="con --provider-add: baseURL del endpoint OpenAI-compatible")
+    parser.add_argument("--npm", metavar="PACKAGE", help="con --provider-add: paquete npm del adaptador (default @ai-sdk/openai-compatible)")
+    parser.add_argument("--label", metavar="NAME", help="con --provider-add: nombre visible del provider (default: el ID)")
+    parser.add_argument("--model", action="append", metavar="ID[:NOMBRE]",
+                        help="con --provider-add: modelo declarado, repetible, al menos uno")
     parser.add_argument("--harness", choices=("opencode", "claude", "codex", "cursor", "gemini", "pi"))
     parser.add_argument("--doctor", action="store_true", help="chequeo redactado del harness (usar con --harness pi)")
     parser.add_argument("--doctor-all", action="store_true", help="qué detecta esta máquina: harnesses, CLIs y proveedores autenticados")
@@ -3514,6 +3844,14 @@ def main():
         return cmd_mcp_toggle(args.mcp_on, args.harness, True)
     if args.mcp_off:
         return cmd_mcp_toggle(args.mcp_off, args.harness, False)
+    if args.provider_list:
+        return cmd_provider_list()
+    if args.provider_add:
+        return cmd_provider_add(args.provider_add, args.base_url, npm=args.npm, label=args.label, models=args.model or ())
+    if args.provider_remove:
+        return cmd_provider_remove(args.provider_remove)
+    if args.provider_verify is not None:
+        return cmd_provider_verify(args.provider_verify or None, include_legacy=args.include_legacy, prune_dead=args.prune_dead)
     if args.plugins:
         return cmd_plugins()
     if args.plugin_on:

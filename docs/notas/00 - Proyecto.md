@@ -21,6 +21,8 @@
 - [[features/019-harness-evolution|019-harness-evolution]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/020-honest-dashboard|020-honest-dashboard]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
+- [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
+- [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `PACKAGE_PLANNING` · paquetes 0/2
 
 ## Qué falta
 
@@ -30,6 +32,8 @@
 - **010-spawn-provenance** → `PACKAGE_ACCEPTED` — P1-spawn-provenance: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
+- **026-orquestador-elige-modelo** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
+- **026-orquestador-elige-modelo** tareas pendientes en P2-modelo-por-instancia: Clave nueva en el conjunto cerrado del descriptor (AC-04), La preferencia entra DESPUES de las exclusiones, con test por barrera (AC-05), reason_code propio cuando el modelo pedido no es elegible (AC-06), Efimera: no escribe model-preference.toml ni altera el pin (AC-07)
 
 ## Quick-fixes recientes
 
@@ -41,21 +45,21 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-12 sexto-stall-segunda-muerte-del-mismo-encargo|HUMAN_DECISION_REQUIRED: sexto stall de la sesion y segunda muerte del review de P2]]
-- [[decisiones/2026-08-12 quinto-stall-corrige-el-patron-y-la-mitigacion|Quinto stall: el patron no era 'agentes mutadores' y nombrar la herramienta no alcanza]]
-- [[decisiones/2026-08-12 olvide-route-dispatched-en-el-relanzamiento|Cuarto desliz de bookkeeping del orquestador: omiti --route-dispatched en un relanzamiento]]
-- [[decisiones/2026-08-12 p2-murio-por-limite-de-sesion-con-trabajo-parcial|El implementer de P2 murio por limite de sesion con AC-06, 08 y 09 hechos y AC-07 pendiente]]
-- [[decisiones/2026-08-12 segunda-vez-owned-paths-con-adr-adivinado|Segunda vez que escribo owned_paths con un nombre de ADR que todavia no existe]]
-- [[decisiones/2026-08-12 commitear-un-paquete-en-review-es-guardar-no-aceptar|Commitear un paquete que esta en PACKAGE_REVIEW: guardar no es aceptar]]
-- [[decisiones/2026-08-12 correccion-setup-models-si-habia-que-tocarlo|CORRECCION: la nota que decia que setup_models.py seguia funcionando sin tocarlo era falsa]]
-- [[decisiones/2026-08-12 la-evidencia-de-build-check-de-019-y-020-no-probaba-drift|Los gates de 019 y 020 que citaban 'build.sh --check -> CHECK_PASS' como prueba de sin-drift no probaban eso]]
+- [[decisiones/2026-08-13 los-modulos-de-test-no-pasan-aislados-preexistente|Los modulos de test no pasan aislados, y es preexistente]]
+- [[decisiones/2026-08-13 el-coordinador-deja-de-ser-gpt-en-la-lane-opencode|El coordinador deja de ser GPT en la lane de opencode]]
+- [[decisiones/2026-08-13 copilot-aparecio-solo-durante-la-noche|Copilot paso de no listable a 26 modelos durante la noche, y el harness lo adopto solo]]
+- [[decisiones/2026-08-13 desvio-de-alcance-de-p4-aprobado-con-medicion|El desvio de alcance de P4 a provider_registry.py queda aprobado, medido]]
+- [[decisiones/2026-08-13 captura-ab-cerrada-el-refresh-natural-confirmo-el-diseno|Captura A/B cerrada: el refresh natural confirmo el diseno de la firma]]
+- [[decisiones/2026-08-13 el-gate-de-pi-corre-despues-del-subproceso-preexistente|El gate de credenciales de pi corre despues del subproceso, y es preexistente]]
+- [[decisiones/2026-08-13 captura-ab-del-refresh-se-observa-no-se-fuerza|La captura A/B del refresh se observa pasivamente en vez de forzarse]]
+- [[decisiones/2026-08-13 check-owned-paths-no-ve-archivos-nuevos|El control de alcance no ve los archivos nuevos: usa git diff, que solo lista trackeados]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-12T21:09:05+00:00_
+_Actualizado: 2026-08-13T13:40:43+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

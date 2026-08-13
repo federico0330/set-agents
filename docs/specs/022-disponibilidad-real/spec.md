@@ -59,16 +59,34 @@ Cinco, **serializados**: A2 y A3 tocan el mismo archivo y paralelizarlos garanti
 ### PKG-1 — `registro-de-proveedores`
 - **AC-01**: un único `PROVIDERS: dict[str, ProviderSpec]` del que se **derivan**
   `_PAIR_COMMANDS`, `_OPENCODE_PROVIDER_KEYS`, `_OPENCODE_CLI_IDS`, `PROVIDER_BILLING_KIND`,
-  `DISCOVERABLE_PROVIDERS` y el key-map de `_configured_models`. Sumar un proveedor pasa de
-  cinco entradas en lockstep manual a **una fila**.
+  `DISCOVERABLE_PROVIDERS`, el key-map de `_configured_models` y **`_MODEL_PREFERENCE_PROVIDERS`
+  (`set_agents_app.py:94`)** — el sexto duplicado, que la primera versión de esta spec no
+  nombraba (F4 del challenge). Sumar un proveedor pasa de **seis** entradas en lockstep manual
+  a **una fila**.
+  **Ojo con su test**: `tests/test_routing.py:3965` dice proteger ese literal pero lo compara
+  contra **otro literal hardcodeado idéntico**, no contra `DISCOVERABLE_PROVIDERS`. Y el
+  comentario de `set_agents_app.py:131-133` afirma lo contrario. Es exactamente el defecto que
+  este paquete existe para eliminar, disfrazado de guarda: el test tiene que comparar contra la
+  **fuente real**.
 - **AC-02**: test de caracterización — las tablas derivadas son **byte-idénticas** a los
   literales de hoy. Este paquete no cambia comportamiento.
 - **AC-03**: ADR-0042 corrige la afirmación de `ADR-0034:124-126` con la medición.
 
 ### PKG-2 — `techo-catalogo-tri-estado`
-- **AC-04**: `[catalog].<key>` pasa a tri-estado, con **el precedente exacto de
-  `[subscriptions]`** (`models_config.py:361-382`): lista = techo curado, `[]` = veto,
-  **ausente = auto**. `_configured_models` se reemplaza por
+- **AC-04**: el tri-estado aplica **solo a `opencode_zen`, `opencode_go` y a proveedores
+  futuros sin key dedicada** — decisión de Federico (2026-08-12), no re-litigable.
+  `[catalog].claude` y `[catalog].codex` **siguen siendo listas obligatorias no vacías**, como
+  hoy. Razón medida por el challenge (F1): `models_config.py:130-136` las exige con `die`,
+  `load_roles` (`:352-357`) las indexa sin fallback, y son las **únicas con filas curadas** en
+  `routes.v1.toml` — si pasaran a auto, cada fila curada existente dispararía el
+  `CATALOG_CEILING_REQUIRED` de AC-06. `[catalog].codex_effort` queda **explícitamente fuera**:
+  es una lista de efforts, no un techo de proveedor, y meterla en la redacción genérica
+  "`<key>`" fue un error de la primera versión.
+  Los tres estados: lista = techo curado, `[]` = veto, **ausente = auto**.
+  **Del precedente de `[subscriptions]` (`models_config.py:361-382`) se toma la FORMA, no el
+  manejo de error** (F1): allí "ausente" degrada a `WARN` y sigue, porque es validación de
+  build; acá alimenta el filtrado en vivo del snapshot de ruteo, y AC-06 exige que el caso malo
+  falle **fuerte y nombrado**. Importar la mansedumbre de subscriptions contradiría a AC-06. `_configured_models` se reemplaza por
   `resolve_ceiling(config, provider) -> ("curated", set) | ("auto", None) | ("veto", set())`,
   consumido por los **tres** sitios que hoy divergen: `_probe_pairs:467-469`,
   `_read_probe_cache:409` (que hoy re-intersecta y en modo auto dejaría el caché siempre vacío)
@@ -93,6 +111,17 @@ Cinco, **serializados**: A2 y A3 tocan el mismo archivo y paralelizarlos garanti
 - **AC-09**: la firma se compone de **presencia e identidad de credencial, nunca material y
   nunca campos que rotan**, hasheada, jamás logueada ni en el envelope — misma disciplina que
   `pi_auth_provider_keys`. Bump de `_CACHE_SCHEMA_VERSION` con su test: hoy no existe ninguno.
+  **Límite estructural de claude-code, aceptado por Federico y a documentar en ADR-0043** (F2):
+  `~/.claude/.credentials.json` **no tiene ningún campo de identidad de cuenta** — codex sí
+  (`tokens.account_id`), y los únicos campos no-rotantes de claude (`scopes`,
+  `subscriptionType`, `rateLimitTier`) no identifican una cuenta. Así que para claude-code la
+  firma detecta **presencia y ausencia** (logout, credencial borrada, archivo ausente) pero
+  **no** un cambio de una cuenta a otra del mismo plan sin pasar por logout. Detectarlo exigiría
+  hashear el `refreshToken`, que esta feature **no** hace. El límite se declara; no se disimula.
+  **Supuesto a validar temprano en este paquete, no de memoria** (F2): que `refreshToken`,
+  `scopes` y `subscriptionType` efectivamente no roten en un refresh normal. Captura A/B del
+  archivo antes y después de un refresh real; si rotan, la firma de claude-code hay que
+  rediseñarla.
 - **AC-10**: **una sola caché**, en la raíz del store (`store.py:326-334`), que ya tiene la
   disciplina de directorio privado y es la que usa la vía de decisión. Migran
   `set_agents_app.py:144,497,843,3133` y `models_config.py:258-259,277-278`. La legada se poda
@@ -111,9 +140,13 @@ Cinco, **serializados**: A2 y A3 tocan el mismo archivo y paralelizarlos garanti
   (`opencode.json#/provider/ollama`), y **jamás** toca una clave que el harness no puso. Test
   obligatorio: un provider agregado a mano por el usuario sobrevive intacto a un install que
   poda otro.
-- **AC-15**: siembra migratoria desde el `opencode.json` vivo, marcando lo del harness como
-  `origin=harness-legacy`. **A nadie le desaparece nada**; recién ahí `--provider-remove
-  ollama` tiene sentido.
+- **AC-15**: siembra migratoria desde el `opencode.json` vivo que registra **todo** lo que haya
+  bajo `provider.*` — decisión de Federico (F3): lo del harness como `origin=harness-legacy` y
+  **cualquier provider que el usuario haya agregado a mano como `origin=user`**. Desde el primer
+  arranque se puede listar, verificar y quitar desde `set-agents`, que es el pedido literal.
+  La alternativa —registrar solo lo que el harness reconoce— dejaba invisibles los providers
+  propios de quien ya tenía el harness instalado, que es el caso más probable.
+  **A nadie le desaparece nada**: el registro declara qué hay y de dónde vino, nunca borra.
 
 ### PKG-5 — `altas-y-bajas-automaticas`
 - **AC-16**: para cada credencial `detected_unlistable` que `route_doctor` ya reporta, se
@@ -129,9 +162,14 @@ Cinco, **serializados**: A2 y A3 tocan el mismo archivo y paralelizarlos garanti
   `alive | dead | unreachable` —nunca "no existe" cuando fue "no contestó"— con el timestamp de
   la medición, y ofrece `--prune-dead`. **Nunca** dentro de `route()`, **nunca** en la clave de
   caché, **nunca** en el spawn.
-- **AC-19**: `--route-doctor` pasa a reportar `listed_by_provider` **y** `usable_after_ceiling`
-  por separado. Hoy `models_listable` mezcla las dos y se lee como la primera: esa es la mentira
-  a corregir.
+- **AC-19**: la separación `listed_by_provider` / `usable_after_ceiling` va en **las tres
+  superficies que muestran "qué proveedores hay"**, no solo en `--route-doctor` (F5):
+  `route_doctor` (`catalog.py:714-793`), `cmd_doctor_all` (`set_agents_app.py:849`) y
+  **`_estado_general_lines` (`:3134`)**. Esa última es el panel del **primer ítem del menú**, o
+  sea la vidriera: es donde un usuario no técnico va a mirar "¿el harness ya ve mi suscripción
+  nueva?". Hoy las tres imprimen `len(models)` post-techo y se leen como "lo que el proveedor
+  expone". El defecto de invisibilidad total se arregla gratis en las tres porque comparten
+  `_probe_pairs`; el de la etiqueta engañosa hay que arreglarlo en cada una.
 
 ## No-goals
 

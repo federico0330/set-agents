@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from models_config import MANAGED_MCP
+import provider_registry
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--staging", required=True)
@@ -44,6 +45,25 @@ STATE_DIR = home / ".local/state/set-agentes"
 # files it USED to manage but no longer produces (e.g. a renamed skill/agent). Only paths
 # recorded here are ever deleted — user-created files are never touched.
 MANIFEST = STATE_DIR / "managed-files.json"
+# 022 PKG-4 (AC-11/AC-13/AC-15): the single source `opencode.json`'s `provider` object
+# renders FROM, same private STATE_DIR as MANIFEST above.
+PROVIDERS_TOML = STATE_DIR / provider_registry.PROVIDERS_TOML_NAME
+# AC-14: MANIFEST's own file-level orphan-pruning discipline, extended to JSON
+# SUBTREES -- `{"opencode.json": ["<provider id>", ...]}`, the provider ids THIS
+# installer wrote under `provider.*` last run. Deliberately a SEPARATE file from
+# MANIFEST (never a mixed-shape entry in that flat file-path list): `previous_targets()`
+# below builds real filesystem `Path`s straight out of MANIFEST's entries, and a
+# subtree pointer is not a path -- keeping the two apart means a JSON-subtree id can
+# never be misread as a file to unlink.
+JSON_MANIFEST = STATE_DIR / "managed-json-paths.json"
+# Populated by `apply_provider_registry` (called from `effective_specials()`, which runs
+# unconditionally, including under --preview) when `providers.toml` doesn't exist yet --
+# the freshly bootstrapped (AC-15 migration-or-seed) content to persist for real, but
+# ONLY from the commit section below, after every smoke check passes (same "compute
+# early, write only on the success path" discipline MANIFEST's own write already uses).
+# A --preview run computes this list too (harmless: it's simply never consulted, since
+# --preview exits before the commit section is reached).
+_PENDING_PROVIDERS_BOOTSTRAP = []
 
 
 def deep_merge(base, overlay):
@@ -110,11 +130,62 @@ def managed_files():
     return result
 
 
+def _previous_provider_ids():
+    """The provider ids `JSON_MANIFEST` says THIS installer wrote under `provider.*`
+    last run — the only ids AC-14's prune step is ever allowed to delete."""
+    if not JSON_MANIFEST.exists():
+        return set()
+    try:
+        stored = json.loads(JSON_MANIFEST.read_text())
+    except (OSError, json.JSONDecodeError):
+        return set()
+    return set(stored.get("opencode.json", []))
+
+
+def apply_provider_registry(content, target):
+    """AC-13/AC-14: `opencode.json`'s `provider` object, rendered FROM `providers.toml`
+    instead of the merge's passive pass-through (the overlay no longer carries a
+    `provider` key at all since `Global/_shared/opencode.json` stopped hardcoding one —
+    `deep_merge` alone would just leave whatever the live file already has completely
+    untouched, which is correct for ids nobody manages but wrong for the ones the
+    registry says should now exist, be updated, or be gone).
+
+    id-by-id, using the SAME manifest-diff discipline `previous_targets()`/`orphans`
+    already use for whole files, extended to a JSON subtree (AC-14): an id THIS
+    installer wrote last run (`JSON_MANIFEST`) that the registry no longer has is safe
+    to delete — we know we own it. Every id currently in the registry is written
+    (added or overwritten; the registry is the single source of truth for the ids it
+    tracks). Any OTHER live key — one this installer never recorded writing, e.g. a
+    block the user hand-added straight into `opencode.json` outside `set-agents`
+    entirely — is never touched, added, or removed; it is not even read for comparison,
+    only left exactly as `deep_merge` already found it.
+    """
+    doc = json.loads(content)
+    live_block = doc.get("provider")
+    if not isinstance(live_block, dict):
+        live_block = {}
+    entries, bootstrap_text = provider_registry.load_or_bootstrap(PROVIDERS_TOML, live_block)
+    if bootstrap_text is not None:
+        _PENDING_PROVIDERS_BOOTSTRAP.append((PROVIDERS_TOML, bootstrap_text))
+    orphan_ids = _previous_provider_ids() - set(entries)
+    block = dict(live_block)
+    for provider_id in orphan_ids:
+        block.pop(provider_id, None)
+    for provider_id, entry in entries.items():
+        block[provider_id] = entry.spec
+    doc["provider"] = block
+    rendered = (json.dumps(doc, indent=2) + "\n").encode()
+    # Idempotent re-substitution: `content` already had the placeholder resolved by
+    # `merged_json`'s own call below; a provider spec is never expected to carry it, but
+    # this costs nothing and stays correct if one someday does.
+    return substitute_root(rendered, json_escaped=True).decode()
+
+
 def effective_specials():
     result = []
     if "opencode" in targets:
         oc = targets["opencode"] / "opencode.json"
-        result.append((merged_json(oc, staging / "opencode/opencode.json"), oc))
+        result.append((apply_provider_registry(merged_json(oc, staging / "opencode/opencode.json"), oc), oc))
     if "claude-code" in targets:
         cc = targets["claude-code"] / "settings.json"
         result.append((merged_json(cc, staging / "claude-code/settings.overlay.json", union_lists=True), cc))
@@ -431,6 +502,27 @@ try:
             preserved = []
     managed = set(preserved) | {str(t.relative_to(home)) for t in new_targets}
     atomic_write(MANIFEST, json.dumps(sorted(managed), indent=2) + "\n")
+    # 022 PKG-4 (AC-11/AC-15): persist a freshly-bootstrapped `providers.toml` only now
+    # that every smoke check passed — a rolled-back install must never leave a registry
+    # file behind that the failed run itself invented.
+    for bootstrap_path, bootstrap_text in _PENDING_PROVIDERS_BOOTSTRAP:
+        atomic_write(bootstrap_path, bootstrap_text)
+    # AC-14: record which provider ids THIS run rendered, so the NEXT run's
+    # `_previous_provider_ids()` can tell "ours, now gone from the registry — safe to
+    # prune" apart from "never ours — never touch". Re-reads `providers.toml` (now
+    # guaranteed to exist, pre-existing or just bootstrapped above) rather than
+    # threading `entries` out of `apply_provider_registry`, the same "recompute the
+    # small thing instead of plumbing state through" choice `previous_targets()` itself
+    # makes for MANIFEST.
+    if "opencode" in targets:
+        json_manifest_data = {}
+        if JSON_MANIFEST.exists():
+            try:
+                json_manifest_data = json.loads(JSON_MANIFEST.read_text())
+            except (OSError, json.JSONDecodeError):
+                json_manifest_data = {}
+        json_manifest_data["opencode.json"] = sorted(provider_registry.parse_providers_toml(PROVIDERS_TOML))
+        atomic_write(JSON_MANIFEST, json.dumps(json_manifest_data, indent=2) + "\n")
     # Scope record: which harness trees THIS machine manages, so check-drift.sh can
     # compare only what was actually installed (a claude-only machine must not read
     # the never-installed opencode/codex trees as drift). Merged, not replaced: a
