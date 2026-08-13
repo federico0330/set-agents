@@ -22,7 +22,7 @@
 - [[features/020-honest-dashboard|020-honest-dashboard]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
-- [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `PACKAGE_PLANNING` · paquetes 0/4
+- [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `PACKAGE_REVIEW` · paquetes 0/4
 - [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `PACKAGE_PLANNING` · paquetes 0/4
 - [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_PLANNING` · paquetes 0/5
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
@@ -35,8 +35,6 @@
 - **010-spawn-provenance** → `PACKAGE_ACCEPTED` — P1-spawn-provenance: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
-- **023-senales-de-consumo** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
-- **023-senales-de-consumo** tareas pendientes en B4-estimado-nunca-dato-del-proveedor: basis, provider_reported false, ventana nombrada por su definicion y cobertura (AC-08), Guard test: una superficie sin etiqueta falla el gate (AC-09), Sin presupuesto declarado no se muestra restante, se muestra consumido (AC-10)
 - **024-listo-para-terceros** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
 - **024-listo-para-terceros** tareas pendientes en C4-higiene-de-repo-publico: LICENSE, CONTRIBUTING, CHANGELOG, SECURITY, y HANDOFF fuera de la raiz (AC-09), Ejemplos sin el nombre del cliente real (AC-10), Matriz de soporte MEDIDA, incluida la de roles subagent en opencode (AC-11), Update re-apuntable: hoy origin/main hardcodeado rompe un fork (AC-12)
 - **025-consola-minima-y-flexible** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
@@ -52,6 +50,7 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-13 correccion-el-plan-tenia-razon-a-medias-y-el-orquestador-tambien|Correccion: el plan tenia razon sobre un camino que la base no exhibia]]
 - [[decisiones/2026-08-13 los-modulos-de-test-no-pasan-aislados-preexistente|Los modulos de test no pasan aislados, y es preexistente]]
 - [[decisiones/2026-08-13 el-coordinador-deja-de-ser-gpt-en-la-lane-opencode|El coordinador deja de ser GPT en la lane de opencode]]
 - [[decisiones/2026-08-13 copilot-aparecio-solo-durante-la-noche|Copilot paso de no listable a 26 modelos durante la noche, y el harness lo adopto solo]]
@@ -59,14 +58,13 @@
 - [[decisiones/2026-08-13 captura-ab-cerrada-el-refresh-natural-confirmo-el-diseno|Captura A/B cerrada: el refresh natural confirmo el diseno de la firma]]
 - [[decisiones/2026-08-13 el-gate-de-pi-corre-despues-del-subproceso-preexistente|El gate de credenciales de pi corre despues del subproceso, y es preexistente]]
 - [[decisiones/2026-08-13 captura-ab-del-refresh-se-observa-no-se-fuerza|La captura A/B del refresh se observa pasivamente en vez de forzarse]]
-- [[decisiones/2026-08-13 check-owned-paths-no-ve-archivos-nuevos|El control de alcance no ve los archivos nuevos: usa git diff, que solo lista trackeados]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-13T15:35:37+00:00_
+_Actualizado: 2026-08-13T17:12:55+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

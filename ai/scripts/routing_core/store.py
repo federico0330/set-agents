@@ -150,6 +150,15 @@ def _usage_row(usage) -> tuple:
     `'ok'` -- NULL means "not reported", 0 means "reported as zero", and Pi reporting no
     cache/reasoning keys at all is the ordinary case this whole package exists to make
     visible rather than fabricate away.
+
+    023-senales-de-consumo PKG-B1 (ADR-0045): a NON-EMPTY dict matching NONE of this
+    vocabulary -- no recognized token field, no `totalTokens`, no `cost` -- is `invalid`,
+    not `ok`. Before this, `{"unrecognized_key": 1}` silently returned the all-NULL `'ok'`
+    row: indistinguishable from `{"cost": {"total": 0}}` (AC-11's own "sparse but valid"
+    case, correctly `'ok'`), and from `absent` in every view that only looks at "are the
+    columns NULL". Tightening only -- `{}`/`None` still short-circuit to `absent` above,
+    before this check is ever reached, and every previously-`ok` shape (at least one
+    recognized field, however sparse) is untouched.
     """
     all_null = (None,) * (len(USAGE_TOKEN_FIELDS) + 1)
     if not usage:
@@ -179,6 +188,12 @@ def _usage_row(usage) -> tuple:
         cost_micros = _cost_micros(cost["total"])
         if cost_micros is None:
             return all_null + ("invalid",)
+    # See the docstring's ADR-0045 paragraph: checked LAST, after every individual-field
+    # validity check above, so a recognized-but-bad value still reports its own specific
+    # `invalid` reason path first (unchanged) -- this only catches the case none of those
+    # paths would ever reach, a non-empty dict that recognized nothing at all.
+    if not tokens and total_tokens is None and "cost" not in usage:
+        return all_null + ("invalid",)
     return tuple(tokens.get(field) for field in USAGE_TOKEN_FIELDS) + (cost_micros, "ok")
 
 

@@ -4,6 +4,7 @@
     "AC-02",
     "AC-03",
     "AC-04",
+    "AC-04a",
     "AC-05",
     "AC-06",
     "AC-07",
@@ -12,8 +13,8 @@
     "AC-10"
   ],
   "approved_spec": {
-    "approved_at": "2026-08-13T14:25:34+00:00",
-    "hash": "2480a287d0f91af570795b5bee853c66db3f0f994ebf23422d3f5ab64028a0f5",
+    "approved_at": "2026-08-13T17:00:16+00:00",
+    "hash": "6b9ce1f94aa2f34232f4a32f23e85b28a54ec7b7ea380cad4e0068b822f5cadf",
     "path": "docs/specs/023-senales-de-consumo/spec.md"
   },
   "blockers": [],
@@ -25,7 +26,7 @@
     "max_spawns_per_package": 8,
     "max_verifications_per_package": 6
   },
-  "current_package_id": "B4-estimado-nunca-dato-del-proveedor",
+  "current_package_id": "B1-registro-que-no-miente",
   "feature_id": "023-senales-de-consumo",
   "final_state": null,
   "global_gates": [],
@@ -100,12 +101,352 @@
       "package_id": "B4-estimado-nunca-dato-del-proveedor",
       "timestamp": "2026-08-13T15:18:56+00:00",
       "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:35:58+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "amend-spec",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "approved_by": "federico (plan capa B; el orquestador re-midio antes de implementar y el diagnostico cambio)",
+        "new_hash": "4caf644453fe65f61f28db68a83fb99909bdc15fa39a1bcbe09bd77d25e436c0",
+        "reason": "El diagnostico del plan era falso y se re-midio ANTES de implementar. El plan afirmaba que opencode y claude-code persisten usage_status='ok' con todo NULL, o sea que mienten. Medido en routing.db, tabla dispatches, 80 filas: 1 con numeros reales (usage_input=3321, usage_output=5, cost_micros=3351), 54 'absent' (claude-code 10, opencode 14, pi 30) y 25 NULL. 'absent' NO es una mentira: store.py:140-142 lo documenta como 'el proveedor no reporto nada'. El defecto real es que NADIE MANDA EL USO NUNCA: --usage existe en set_agents_app.py:3641 y grep -rn sobre Global/_canonical/ da CERO menciones. El propio orquestador cerro unos veinte runs en esta sesion con --route-terminal success sin pasar --usage, teniendo los tokens de cada subagente a la vista. AC-01 pasa de 'normalizador unico' a 'que el uso efectivamente llegue', con la doctrina imperativa segun la leccion de ADR-0041; el normalizador baja a AC-02 y _usage_row NO se relaja."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T15:38:15+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:07+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:08+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que el harness registre de verdad cuanto gasta cada agente, que hoy no lo hace.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Que el consumo de cada spawn efectivamente llegue a la base, y que el normalizador no invente ni relaje",
+        "role": "implementer",
+        "route_id": "run1_08556f77458c0e5f404b308e8d49f90b",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "AC-01..03. Medido antes de implementar: 80 dispatches, 1 con numeros, 54 absent, 25 NULL. El plan decia que opencode y claude-code MIENTEN con ok+NULL; es falso, ponen absent, que es honesto. El defecto real: --usage existe (set_agents_app.py:3641) y la doctrina canonica no lo menciona NUNCA (grep da cero). El propio orquestador cerro ~20 runs esta sesion sin pasarlo."
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:39:35+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "amend-spec",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "approved_by": "federico (capa B aprobada; ampliacion de alcance derivada de una medicion del implementer de B1, no de una decision de producto nueva)",
+        "new_hash": "6b9ce1f94aa2f34232f4a32f23e85b28a54ec7b7ea380cad4e0068b822f5cadf",
+        "reason": "AC-04a agregado a PKG-2: cablear los adaptadores de spawn a routing_core/usage.py. El implementer de B1 midio que claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row no reconoce. El endurecimiento de AC-02 las convierte en 'invalid' contado en vez de 'ok' con NULLs silencioso, pero no las traduce. Sin AC-04a, B1 deja el descarte visible y el dato sigue perdido."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T17:00:16+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "routing_core/usage.py con la muestra real del cable por lane en el docstring (AC-01)",
+        "validations": [
+          "unittest: 1092 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:52+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Un dict no vacio sin campos reconocidos pasa de ok a invalid (AC-02)",
+        "validations": [
+          "unittest: 1092 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Prueba por lane con columnas no-NULL, evidenciada con status_counts (AC-03)",
+        "validations": [
+          "unittest: 1092 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:53+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:53+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:54+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:54+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:54+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:54+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:55+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:12:55+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:16:39+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:16:39+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:16:39+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:16:39+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T17:16:40+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
     "delta_reviews": 0,
     "human_questions_after_approval": 0,
-    "package_reviews": 0,
+    "package_reviews": 1,
     "repair_batches": 0,
     "task_deep_reviews": 0,
     "verifications": 0
@@ -118,27 +459,117 @@
         "AC-02",
         "AC-03"
       ],
-      "approved_exceptions": [],
+      "approved_exceptions": [
+        {
+          "path": "Global/_canonical/agents/orchestrator.md",
+          "reason": "AC-01: la doctrina pasa a exigir --usage al cerrar un run.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/claude-code/agents/orchestrator.md",
+          "reason": "Regenerado por build.sh.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/opencode/agents/orchestrator.md",
+          "reason": "Regenerado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/codex/agents/orchestrator.toml",
+          "reason": "Regenerado.",
+          "status": "approved"
+        },
+        {
+          "path": "Global/pi/agents/orchestrator.md",
+          "reason": "Regenerado.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/set_agents_app.py",
+          "reason": "AC-01/02: el borde que recibe --usage.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/023-senales-de-consumo/spec.md",
+          "reason": "Enmendada antes de implementar.",
+          "status": "approved"
+        }
+      ],
       "attempts": {
-        "deep_review_cycles": 0,
+        "deep_review_cycles": 1,
         "repair_batches": 0,
-        "spawns": 0,
+        "spawns": 1,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 0
       },
       "candidate_identity": null,
       "complexity": "medium",
-      "context_pack": null,
+      "context_pack": "docs/specs/023-senales-de-consumo/context/B1-registro-que-no-miente.md",
       "delta_reviews": [],
       "dependencies": [],
-      "diff_ref": null,
+      "diff_ref": "working-tree @ 73c42c2 (023/B1: Global/_canonical/agents/orchestrator.md:315-351 doctrina imperativa de --usage, routing_core/usage.py nuevo, store.py:150-160,188-198 _usage_row endurecido, 12 tests, ADR-0045)",
       "findings": [],
-      "gates": [],
-      "integrated": false,
+      "gates": [
+        {
+          "at": "2026-08-13T17:12:54+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T17:12:54+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T17:12:54+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T17:12:54+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
       "late_reviews": [],
       "module_impact_waiver": null,
-      "module_impacts": [],
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T17:16:39+00:00",
+          "cambio": "La doctrina exige --usage al cerrar un run y hay un normalizador unico con la muestra real del cable por runtime",
+          "feature_id": "023-senales-de-consumo",
+          "modelo_mental": "El harness deja de perder el consumo que tiene a la vista, y distingue 'no reporto' de 'reporto basura' en vez de tratar ambos como cero",
+          "module": "routing",
+          "package_id": "B1-registro-que-no-miente"
+        }
+      ],
       "objective": "Normalizador unico de consumo: que los cuatro lanes registren de verdad, y que un dict irreconocible se cuente como descarte",
       "owned_paths": [
         "ai/scripts/routing_core",
@@ -151,38 +582,89 @@
       "repair_ceiling": null,
       "repairs": [],
       "review_panels": [],
-      "reviews": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T17:16:39+00:00",
+          "evidence": "Reviewer independiente codex/openai-codex/gpt-5.6-terra, independence_verified=true. VEREDICTO approved, sin hallazgos. Punto 1, las cuatro direcciones con salida literal: None -> absent; {} -> absent; dict reconocido -> (7,3,None,None,None,250000,'ok'); dict no vacio sin claves reconocidas -> invalid. El endurecimiento preserva absent, que es lo que podia romperse. Punto 2: usage.py:51 declara reasoning/totalTokens de claude-code como UNVERIFIED y NO los mapea; :77 declara cached_input_tokens y cache_write_input_tokens de codex como UNVERIFIED y :172-176 no los mapean. No inventa. Punto 3: mordida verificada.",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
       "risks": [],
       "routing_reason": null,
-      "runtime_qa": [],
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T17:16:39+00:00",
+          "browser": "",
+          "checks": [
+            "absent sigue significando 'el proveedor no reporto nada'",
+            "Un dict no vacio sin campos reconocidos se cuenta como invalid, no pasa por ok",
+            "El normalizador no mapea ningun campo que declaro sin verificar"
+          ],
+          "evidence": "Verificado por el reviewer independiente con fixtures y salida literal. Medicion propia del implementer sobre los CLIs reales: en opencode tokens.total (30493) NO coincide con la suma de los otros cinco campos (30519), por eso nunca se mapea a totalTokens. La doctrina de --usage llego a los cuatro arboles via build.sh.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
       "runtime_surface": true,
       "selected_model": null,
       "selected_role": null,
       "shared_paths": [],
-      "spawns": [],
-      "status": "planned",
+      "spawns": [
+        {
+          "at": "2026-08-13T15:39:35+00:00",
+          "client": "Que el harness registre de verdad cuanto gasta cada agente, que hoy no lo hace.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Que el consumo de cada spawn efectivamente llegue a la base, y que el normalizador no invente ni relaje",
+          "role": "implementer",
+          "route_id": "run1_08556f77458c0e5f404b308e8d49f90b",
+          "spawn_id": "SPAWN-001",
+          "tech": "AC-01..03. Medido antes de implementar: 80 dispatches, 1 con numeros, 54 absent, 25 NULL. El plan decia que opencode y claude-code MIENTEN con ok+NULL; es falso, ponen absent, que es honesto. El defecto real: --usage existe (set_agents_app.py:3641) y la doctrina canonica no lo menciona NUNCA (grep da cero). El propio orquestador cerro ~20 runs esta sesion sin pasarlo."
+        }
+      ],
+      "status": "accepted",
       "strict_tdd": false,
       "tasks": [
         {
           "blockers": [],
           "id": "routing_core/usage.py con la muestra real del cable por lane en el docstring (AC-01)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1092 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "Un dict no vacio sin campos reconocidos pasa de ok a invalid (AC-02)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1092 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "Prueba por lane con columnas no-NULL, evidenciada con status_counts (AC-03)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1092 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         }
       ],
-      "testing": [],
+      "testing": [
+        {
+          "at": "2026-08-13T17:16:39+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1092 OK / 3 skips. Base 1080 -> 1092: 12 tests nuevos (endurecimiento de _usage_row, cuatro normalizadores con muestra real del cable, propagacion de basura, status_counts antes/despues, y uno de doctrina en test_harness).",
+          "status": "pass"
+        }
+      ],
       "verifications": []
     },
     {
@@ -397,8 +879,30 @@
       "verifications": []
     }
   ],
-  "phase": "PACKAGE_PLANNING",
-  "revision": 4,
+  "phase": "PACKAGE_ACCEPTED",
+  "revision": 34,
   "schema_version": 1,
-  "updated_at": "2026-08-13T15:18:56+00:00"
+  "spec_amendments": [
+    {
+      "actor": "orchestrator",
+      "approved_by": "federico (plan capa B; el orquestador re-midio antes de implementar y el diagnostico cambio)",
+      "at": "2026-08-13T15:38:15+00:00",
+      "hash": "4caf644453fe65f61f28db68a83fb99909bdc15fa39a1bcbe09bd77d25e436c0",
+      "old_hash": "2480a287d0f91af570795b5bee853c66db3f0f994ebf23422d3f5ab64028a0f5",
+      "old_path": "docs/specs/023-senales-de-consumo/spec.md",
+      "path": "docs/specs/023-senales-de-consumo/spec.md",
+      "reason": "El diagnostico del plan era falso y se re-midio ANTES de implementar. El plan afirmaba que opencode y claude-code persisten usage_status='ok' con todo NULL, o sea que mienten. Medido en routing.db, tabla dispatches, 80 filas: 1 con numeros reales (usage_input=3321, usage_output=5, cost_micros=3351), 54 'absent' (claude-code 10, opencode 14, pi 30) y 25 NULL. 'absent' NO es una mentira: store.py:140-142 lo documenta como 'el proveedor no reporto nada'. El defecto real es que NADIE MANDA EL USO NUNCA: --usage existe en set_agents_app.py:3641 y grep -rn sobre Global/_canonical/ da CERO menciones. El propio orquestador cerro unos veinte runs en esta sesion con --route-terminal success sin pasar --usage, teniendo los tokens de cada subagente a la vista. AC-01 pasa de 'normalizador unico' a 'que el uso efectivamente llegue', con la doctrina imperativa segun la leccion de ADR-0041; el normalizador baja a AC-02 y _usage_row NO se relaja."
+    },
+    {
+      "actor": "orchestrator",
+      "approved_by": "federico (capa B aprobada; ampliacion de alcance derivada de una medicion del implementer de B1, no de una decision de producto nueva)",
+      "at": "2026-08-13T17:00:16+00:00",
+      "hash": "6b9ce1f94aa2f34232f4a32f23e85b28a54ec7b7ea380cad4e0068b822f5cadf",
+      "old_hash": "4caf644453fe65f61f28db68a83fb99909bdc15fa39a1bcbe09bd77d25e436c0",
+      "old_path": "docs/specs/023-senales-de-consumo/spec.md",
+      "path": "docs/specs/023-senales-de-consumo/spec.md",
+      "reason": "AC-04a agregado a PKG-2: cablear los adaptadores de spawn a routing_core/usage.py. El implementer de B1 midio que claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row no reconoce. El endurecimiento de AC-02 las convierte en 'invalid' contado en vez de 'ok' con NULLs silencioso, pero no las traduce. Sin AC-04a, B1 deja el descarte visible y el dato sigue perdido."
+    }
+  ],
+  "updated_at": "2026-08-13T17:16:40+00:00"
 }

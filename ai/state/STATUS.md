@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-13T15:35:37+00:00
+Actualizado: 2026-08-13T17:12:55+00:00
 
 ## Features
 
@@ -27,7 +27,7 @@ Actualizado: 2026-08-13T15:35:37+00:00
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 | 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
-| 023-senales-de-consumo | scoped | PACKAGE_PLANNING | B4-estimado-nunca-dato-del-proveedor (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:18:56+00:00 create-package |
+| 023-senales-de-consumo | scoped | PACKAGE_REVIEW | B1-registro-que-no-miente (package_review) | 0/4 | 1/8 | 0/2 | 0 | - | - | 2026-08-13T17:12:55+00:00 transition |
 | 024-listo-para-terceros | scoped | PACKAGE_PLANNING | C4-higiene-de-repo-publico (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:19:15+00:00 create-package |
 | 025-consola-minima-y-flexible | scoped | PACKAGE_PLANNING | D5-vault-en-todo-spawn (planned) | 0/5 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:20:00+00:00 create-package |
 | 026-orquestador-elige-modelo | scoped | DONE | P2-modelo-por-instancia (accepted) | 2/2 | 2/8 | 1/2 | 0 | - | - | 2026-08-13T15:35:37+00:00 transition |
@@ -41,6 +41,10 @@ Actualizado: 2026-08-13T15:35:37+00:00
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-13T15:39:35+00:00] B1-registro-que-no-miente · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que el harness registre de verdad cuanto gasta cada agente, que hoy no lo hace.
+Ingeniería: AC-01..03. Medido antes de implementar: 80 dispatches, 1 con numeros, 54 absent, 25 NULL. El plan decia que opencode y claude-code MIENTEN con ok+NULL; es falso, ponen absent, que es honesto. El defecto real: --usage existe (set_agents_app.py:3641) y la doctrina canonica no lo menciona NUNCA (grep da cero). El propio orquestador cerro ~20 runs esta sesion sin pasarlo.
 
 [2026-08-13T14:27:39+00:00] P2-modelo-por-instancia · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el orquestador pueda pedir que modelo usar para cada agente que lanza, sin quedar atado a uno solo.
@@ -97,8 +101,4 @@ Ingeniería: Writer claude-code/anthropic/opus (run1_d8520988). Reviewer codex/o
 [2026-08-13T02:14:54+00:00] P2-techo-catalogo-tri-estado · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que agregar un proveedor de IA nuevo deje de exigir editar un archivo de configuracion a mano.
 Ingeniería: P2 de 022 (AC-04..06). _configured_models -> resolve_ceiling con tres estados, consumido por los TRES sitios que hoy divergen: _probe_pairs:487-489 (el 'if not allowed: continue' que es el defecto), _read_probe_cache:429 (re-intersecta al leer; en auto una interseccion ingenua deja el cache siempre vacio) y build_snapshot:652-653 (que ademas tiene la lista de proveedores hardcodeada, alcance cedi…
-
-[2026-08-13T01:56:40+00:00] P1-registro-de-proveedores · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
-Cliente: Un tercer revisor confirma que el arreglo de los dos controles realmente funciona y no rompio nada.
-Ingeniería: Delta acotado a tests/test_routing.py (unico archivo tocado por el repair). Reparador fue claude-code/anthropic/opus; delta reviewer en codex/openai-codex/gpt-5.6-terra, dec1_c4cd7f80, independence_verified=true.
 

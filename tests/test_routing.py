@@ -26,6 +26,7 @@ import set_agents_app
 import set_agents_spawn
 from routing_core import catalog as routing_catalog
 from routing_core import store as routing_store
+from routing_core import usage as routing_usage
 from routing_core.domain import classify_pi_terminal_error, resolve_bias_class, BIAS_CLASSES
 from routing_core.service import resolve_bias_class as service_resolve_bias_class
 
@@ -2593,6 +2594,154 @@ class RoutingTests(unittest.TestCase):
         ]
         for usage in cases:
             self.assertEqual(routing_store._usage_row(usage), all_null_invalid, msg=repr(usage))
+
+    # ---- 023-senales-de-consumo PKG-B1 (ADR-0045): _usage_row tightening + usage.py normalizers
+
+    def test_usage_row_nonempty_unrecognized_dict_is_invalid_not_ok(self):
+        """AC-02/AC-03: a NON-EMPTY dict matching NONE of the vocabulary (no token field, no
+        `totalTokens`, no `cost`) is `invalid`, never the silent all-NULL `ok` it used to be.
+        This is a tightening, not a relaxation -- every case here previously returned `ok`.
+        """
+        all_null_invalid = (None, None, None, None, None, None, "invalid")
+        cases = [
+            {"unrecognized_key": 1},
+            {"modelUsage": {"m": {"someWeirdField": 5}}},  # a raw, un-normalized claude-code
+                                                              # detail with nothing recognized
+            {"tokens": {"total": 5}},  # a raw opencode `part` with no input/output/reasoning/cache
+            {"foo": "bar", "baz": [1, 2, 3]},
+        ]
+        for usage in cases:
+            self.assertEqual(routing_store._usage_row(usage), all_null_invalid, msg=repr(usage))
+
+    def test_usage_row_absent_vs_invalid_boundary_is_emptiness_not_recognition(self):
+        """The exact boundary the tightening above must never cross: `{}`/`None` (genuinely
+        nothing reported) stay `absent`; a non-empty dict of the same "nothing recognized"
+        shape is `invalid`. Placed side by side so a future edit that merges the two branches
+        is caught here, not just in the two tests separately.
+        """
+        all_null_absent = (None, None, None, None, None, None, "absent")
+        all_null_invalid = (None, None, None, None, None, None, "invalid")
+        self.assertEqual(routing_store._usage_row({}), all_null_absent)
+        self.assertEqual(routing_store._usage_row({"anything": 1}), all_null_invalid)
+
+    def test_usage_row_still_ok_for_every_previously_valid_sparse_shape(self):
+        """Regression guard for the tightening above: every shape that recognizes AT LEAST
+        one field (however sparse) is completely unaffected -- `ok`, same values as before.
+        """
+        self.assertEqual(routing_store._usage_row({"input": 5}),
+                         (5, None, None, None, None, None, "ok"))
+        self.assertEqual(routing_store._usage_row({"totalTokens": 0}),
+                         (None, None, None, None, None, None, "ok"))
+        self.assertEqual(routing_store._usage_row({"cost": {"total": decimal.Decimal("0")}}),
+                         (None, None, None, None, None, 0, "ok"))
+
+    # Real wire samples, measured live 2026-08-13 (see routing_core/usage.py's module
+    # docstring for the exact commands run and the full captured JSON these are extracted
+    # from -- these are the same values, not re-derived here a second time).
+    _CLAUDE_CODE_SAMPLE = {
+        "total_cost_usd": 0.0271811,
+        "modelUsage": {"claude-haiku-4-5-20251001": {
+            "inputTokens": 10, "outputTokens": 43, "cacheReadInputTokens": 18101,
+            "cacheCreationInputTokens": 12573, "webSearchRequests": 0, "costUSD": 0.0271811,
+            "contextWindow": 200000, "maxOutputTokens": 32000,
+            "canonicalModel": "claude-haiku-4-5", "provider": "firstParty"}},
+    }
+    _OPENCODE_SAMPLE = {
+        "id": "prt_ffbcb816d001v7CnW0QpKaCrN6", "reason": "stop", "type": "step-finish",
+        "tokens": {"total": 30493, "input": 30322, "output": 0, "reasoning": 197,
+                   "cache": {"write": 0, "read": 0}},
+        "cost": 0,
+    }
+    _CODEX_SAMPLE = {"input_tokens": 16057, "cached_input_tokens": 8960,
+                     "cache_write_input_tokens": 0, "output_tokens": 5, "reasoning_output_tokens": 0}
+    _PI_SAMPLE = {"input": 3321, "output": 5, "reasoning": 0, "totalTokens": 3326,
+                  "cacheRead": 0, "cacheWrite": 0, "cost": {"total": decimal.Decimal("0.003351")}}
+
+    def test_usage_normalize_claude_code_real_sample_yields_nonnull_columns(self):
+        mapped = routing_usage.normalize_claude_code(self._CLAUDE_CODE_SAMPLE)
+        self.assertEqual(mapped, {"input": 10, "output": 43, "cache_read": 18101,
+                                  "cache_write": 12573, "cost": {"total": 0.0271811}})
+        row = routing_store._usage_row(mapped)
+        self.assertEqual(row[:5], (10, 43, 18101, 12573, None))  # reasoning stays NULL: UNVERIFIED
+        self.assertIsNotNone(row[5])  # cost_micros
+        self.assertEqual(row[6], "ok")
+
+    def test_usage_normalize_opencode_real_sample_yields_nonnull_columns(self):
+        mapped = routing_usage.normalize_opencode(self._OPENCODE_SAMPLE)
+        self.assertEqual(mapped, {"input": 30322, "output": 0, "reasoning": 197,
+                                  "cache_read": 0, "cache_write": 0, "cost": {"total": 0}})
+        self.assertNotIn("totalTokens", mapped)  # tokens.total != sum of the other five, measured
+        row = routing_store._usage_row(mapped)
+        self.assertEqual(row, (30322, 0, 0, 0, 197, 0, "ok"))
+
+    def test_usage_normalize_codex_real_sample_yields_nonnull_columns(self):
+        mapped = routing_usage.normalize_codex(self._CODEX_SAMPLE)
+        self.assertEqual(mapped, {"input": 16057, "output": 5, "reasoning": 0})
+        row = routing_store._usage_row(mapped)
+        self.assertEqual(row, (16057, 5, None, None, 0, None, "ok"))  # cache_*/cost stay NULL: UNVERIFIED
+
+    def test_usage_normalize_pi_is_identity_and_still_ok(self):
+        mapped = routing_usage.normalize_pi(self._PI_SAMPLE)
+        self.assertEqual(mapped, self._PI_SAMPLE)
+        row = routing_store._usage_row(mapped)
+        self.assertEqual(row, (3321, 5, 0, 0, 0, 3351, "ok"))
+
+    def test_usage_normalize_propagates_unrecognized_nonempty_input_as_invalid(self):
+        """AC-03: a non-empty per-runtime raw dict this module cannot map to ANYTHING must
+        still surface as `invalid` once it reaches `_usage_row` -- never silently `absent`.
+        """
+        cases = [
+            routing_usage.normalize_claude_code({"modelUsage": {"m": {"someWeirdField": 5}}}),
+            routing_usage.normalize_opencode({"tokens": {"total": 5}}),
+            routing_usage.normalize_codex({"weird_field": 123}),
+            routing_usage.normalize_pi({"weird_field": 1}),
+        ]
+        for mapped in cases:
+            self.assertTrue(mapped)  # non-empty: propagated, not silently dropped
+            self.assertEqual(routing_store._usage_row(mapped)[-1], "invalid", msg=repr(mapped))
+
+    def test_usage_normalize_genuinely_empty_input_stays_absent(self):
+        """The mirror of the test above: a runtime reporting LITERALLY nothing (`{}`/`None`)
+        must still normalize to `{}` and reach `_usage_row` as `absent`, never `invalid`.
+        """
+        for fn in (routing_usage.normalize_claude_code, routing_usage.normalize_opencode,
+                   routing_usage.normalize_codex, routing_usage.normalize_pi):
+            self.assertEqual(fn({}), {})
+            self.assertEqual(fn(None), {})
+            self.assertEqual(routing_store._usage_row(fn({}))[-1], "absent")
+
+    def test_usage_normalize_dispatch_table_covers_all_four_runtimes(self):
+        self.assertEqual(set(routing_usage.RUNTIMES),
+                         {"pi", "claude-code", "opencode", "codex"})
+        self.assertEqual(routing_usage.normalize("claude-code", self._CLAUDE_CODE_SAMPLE),
+                         routing_usage.normalize_claude_code(self._CLAUDE_CODE_SAMPLE))
+        self.assertEqual(routing_usage.normalize("unknown-runtime", {"input": 1}), {})
+
+    def test_report_status_counts_before_and_after_on_a_fixture_store_per_runtime(self):
+        """AC-03: `status_counts` measured BEFORE any run closes (empty fixture store) and
+        AFTER closing one run per real runtime sample (three `ok`), one genuine `absent`
+        (no usage passed), and one `invalid` (a non-empty, unrecognized raw dict) -- proof
+        by state transition, not by assertion alone.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "s")
+            before = svc.store.report()["tokens"]["status_counts"]
+            self.assertEqual(before, {})
+
+            def close(runtime_sample, normalizer, outcome="success"):
+                decision = self.authorize(svc)
+                svc.store.mark_dispatched(decision.run_id)
+                mapped = normalizer(runtime_sample) if normalizer is not None else None
+                svc.store.close_run(decision.run_id, outcome, usage=mapped)
+
+            close(self._CLAUDE_CODE_SAMPLE, routing_usage.normalize_claude_code)
+            close(self._OPENCODE_SAMPLE, routing_usage.normalize_opencode)
+            close(self._CODEX_SAMPLE, routing_usage.normalize_codex)
+            close(None, None, outcome="failure")  # genuinely never reported -> absent
+            close({"junk": 1}, lambda raw: raw, outcome="success")  # unrecognized -> invalid
+
+            after = svc.store.report()["tokens"]["status_counts"]
+            self.assertEqual(after, {"ok": 3, "absent": 1, "invalid": 1})
 
     def test_project_scoped_lifecycle_cannot_mutate_a_foreign_run(self):
         """P1-REV-001: opaque run ids are never a cross-project write capability."""

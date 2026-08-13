@@ -494,6 +494,47 @@ it:
    (step 2's cross-lane redirect above) is a FOURTH such exception — a real subprocess spawn, not mere
    observability — narrowly allowlisted by `coord_policy.SAFE_ARGV` with an exhaustively enumerated flag
    grammar, never a free-form passthrough. Every use is narrated like any other spawn action, never silent.
+8. **Usage travels with every close you make directly (ADR-0045).** Never compose a bare
+   `--route-terminal <run_id> success|failure` when the run you are closing is one YOU dispatched and got a
+   real spawn result back for — this is step 7's direct-close case, never the lost/dead worker close (step 5)
+   or the before-dispatch abandon (3a), where the store forces `absent` regardless of what you pass and there
+   is nothing to attach. Never `claude_code_spawn.py --dispatch-writer`/`--dispatch-review`, `opencode_spawn.py`,
+   or `codex_spawn.py` either — those already attach `--usage` internally. The platform's own subagent-spawn
+   result is sitting in front of you with the exact token/cost numbers when you call this directly; sending
+   none of them is the exact defect ADR-0045 exists to close. Build `--usage` from your CURRENT host harness's
+   own reported numbers, in the flat vocabulary `_usage_row`/`ai/scripts/routing_core/usage.py` accept
+   (`input`/`output`/`cache_read`/`cache_write`/`reasoning` token counts, `cost.total` in dollars) — never a
+   shape you invented, never a bare `0` for a number you did not actually observe:
+   - **Claude Code host** — the Task result's usage mirrors `claude --output-format json`'s own
+     `modelUsage.<model>` object (`inputTokens`, `outputTokens`, `cacheReadInputTokens`,
+     `cacheCreationInputTokens`, `costUSD`). Run exactly:
+     `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> success --usage
+     '{"input": <inputTokens>, "output": <outputTokens>, "cache_read": <cacheReadInputTokens>, "cache_write":
+     <cacheCreationInputTokens>, "cost": {"total": <costUSD>}}'` — never add a `totalTokens` key here: this
+     shape carries no reasoning-token field and no independent total to cross-check a derived sum against
+     (`ai/scripts/routing_core/usage.py` module docstring, measured live).
+   - **OpenCode host** — the subagent result's usage mirrors `opencode run --format json`'s `step_finish`
+     event, `part.tokens` (`total`, `input`, `output`, `reasoning`, `cache.read`, `cache.write`) with sibling
+     `part.cost`. Run exactly:
+     `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> success --usage
+     '{"input": <tokens.input>, "output": <tokens.output>, "reasoning": <tokens.reasoning>, "cache_read":
+     <tokens.cache.read>, "cache_write": <tokens.cache.write>, "cost": {"total": <part.cost>}}'` — never pass
+     `tokens.total` as `totalTokens`: measured live, it does not equal the sum of the other five fields, and
+     `_usage_row` would discard a genuine report as `invalid` over it.
+   - **Codex host** — the turn result's usage mirrors `codex exec --json`'s `turn.completed.usage`
+     (`input_tokens`, `output_tokens`, `reasoning_output_tokens`). Run exactly:
+     `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> success --usage
+     '{"input": <input_tokens>, "output": <output_tokens>, "reasoning": <reasoning_output_tokens>}'` —
+     `cached_input_tokens`/`cache_write_input_tokens` are UNVERIFIED as additive versus already included in
+     `input_tokens`: omit `cache_read`/`cache_write` rather than guess, and never invent a `cost` — this
+     lane's JSON stream carries no dollar figure.
+   - **Pi host** — `set_agents_spawn.route_and_spawn` already attaches `--usage` internally whenever it
+     dispatches; this rule only applies if you close a pi-hosted run some OTHER way (bypassing
+     `route_and_spawn`), in which case pi's own wire vocabulary is already the flat shape above — pass it
+     through unchanged, field names verbatim.
+   The exact mapping above is pinned by `ai/scripts/routing_core/usage.py` (ADR-0045) and its tests — if a
+   runtime's real shape ever changes, that module's docstring sample is what has to change first, this list
+   follows it, never the other way around.
 
 ### Decide siempre — every spawn gets a routing decision (ADR-0030)
 

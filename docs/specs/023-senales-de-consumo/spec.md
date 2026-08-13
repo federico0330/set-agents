@@ -6,14 +6,32 @@
   siempre etiquetada `ESTIMADO`, y **nunca entra al sort key**.
 - **ADRs**: 0045 (un vocabulario de consumo, traducido en el borde), 0046 (estimado es estimado).
 
-## El defecto que manda sobre todo lo demás
+## El defecto que manda sobre todo lo demás — RE-MEDIDO, el plan se equivocaba
 
-**El registro de consumo está roto en 2 de 4 lanes.** `opencode` y `claude-code` mandan formas que
-`_usage_row` no reconoce, y el resultado no es un error: se persiste `usage_status='ok'` con **todas
-las columnas en NULL**. O sea entran a los reportes como sesiones de cero tokens.
+El plan A→B→C decía que `opencode` y `claude-code` persisten `usage_status='ok'` con todas las
+columnas en NULL, o sea que **mienten**. **Medido en la base real el 2026-08-13, es falso y el
+defecto es otro, más simple y más grande.**
 
-Sin esto arreglado no hay estimación posible: estarías promediando ceros fantasma. Por eso **B1 es
-innegociablemente el primer paquete**, y ningún otro empieza hasta que esté verde por lane.
+`~/.local/state/set-agentes/routing-v2/routing.db`, tabla `dispatches`, 80 filas:
+
+| `usage_status` | filas | detalle |
+|---|---|---|
+| con números reales | **1** | `usage_input=3321, usage_output=5, cost_micros=3351` |
+| `absent` | 54 | claude-code 10, opencode 14, pi 30 |
+| `NULL` | 25 | runs cerrados sin pasar uso |
+
+`absent` **no es una mentira**: significa "el proveedor no reportó nada", y `_usage_row` lo
+documenta así explícitamente (`store.py:140-142`). El problema real es que **nadie manda el uso
+nunca**: la flag `--usage` existe (`set_agents_app.py:3641`, *"con --route-terminal: uso/costo del
+spawn"*) y **la doctrina canónica no la menciona una sola vez** — `grep -rn '\-\-usage'
+Global/_canonical/` da cero.
+
+O sea: no hay un normalizador roto que arreglar sobre datos que llegan mal. **No llegan.** El
+orquestador cierra los runs con `--route-terminal <id> success` y descarta el consumo que tiene a
+la vista, porque nada se lo pide.
+
+Sin esto arreglado no hay estimación posible: estarías promediando 1 dato. Por eso **B1 es
+innegociablemente el primer paquete**, y ningún otro empieza hasta que haya datos por lane.
 
 ## Límite honesto, escrito y no disimulado
 
@@ -26,16 +44,31 @@ ventana", que es medición y no adivinanza.
 
 ### PKG-1 — `registro-que-no-miente` (primero, sin excepción)
 
-- **AC-01**: un normalizador único, `ai/scripts/routing_core/usage.py`, con **la muestra real del
-  cable por lane pegada en el docstring** — no un esquema inventado. La traducción vive en el
-  adaptador de cada lane; `_usage_row` sigue siendo el validador cerrado.
-- **AC-02**: el fix de tres líneas que convierte un fantasma en un descarte contado: un dict **no
-  vacío** sin ningún campo reconocido pasa de `'ok'` a `'invalid'`. Hoy miente en silencio.
-- **AC-03**: prueba por lane, con un spawn real de cada uno, de que las columnas de consumo quedan
-  **no-NULL**. Evidenciado con `status_counts`, no con una afirmación.
+- **AC-01**: **que el uso efectivamente llegue.** La doctrina canónica del orquestador pasa a exigir
+  `--usage` al cerrar un run, con el formato exacto por runtime, y `Global/_canonical/agents/
+  orchestrator.md` lo dice de forma imperativa —no como opción—, siguiendo la lección de ADR-0041:
+  una regla escrita como menú es una regla que alguien elige no seguir.
+- **AC-02**: un normalizador único, `ai/scripts/routing_core/usage.py`, con **la muestra real del
+  cable por runtime pegada en el docstring** — no un esquema inventado. La traducción vive en el
+  adaptador; `_usage_row` sigue siendo el validador cerrado y **no se relaja**: `absent` sigue
+  significando "el proveedor no reportó nada", que es verdad y no un defecto.
+- **AC-03**: prueba por runtime de que las columnas quedan **no-NULL** cuando el uso se manda, y de
+  que un dict **no vacío** sin ningún campo reconocido se cuenta como `'invalid'` en vez de pasar
+  por bueno. Evidenciado con `status_counts` antes y después, no con una afirmación.
 
 ### PKG-2 — `el-reporte-dice-de-donde-sale`
 
+**Alcance ampliado durante B1** (nota de decisión `correccion-el-plan-tenia-razon-a-medias-y-el-
+orquestador-tambien`): el implementer de B1 encontró que `claude_code_spawn.py:602-605` y
+`opencode_spawn.py:318-321` **ya adjuntan** `--usage` en cada dispatch, con las formas
+`{"total_cost_usd", "modelUsage"}` y `{"tokens"}`, que `_usage_row` **no reconoce**. Antes del
+endurecimiento de AC-02 eso producía exactamente lo que el plan describía: `usage_status='ok'` con
+todo en NULL. Ahora produce `'invalid'`, que es un descarte **contado** — mejor, pero sigue sin ser
+el dato.
+
+- **AC-04a**: los adaptadores de spawn se cablean a `routing_core/usage.py`, para que la forma que
+  ya mandan se **traduzca** en vez de descartarse. Prueba: un dispatch por lane que hoy da
+  `'invalid'` pasa a dar columnas no-NULL, con `status_counts` antes y después.
 - **AC-04**: el riesgo real **no** es la etiqueta `"pi"` de `cost-report.py:312`: es el **doble
   conteo** con los stores propios de los CLIs. Dos secciones nombradas por su fuente, que **nunca
   se suman entre sí**.

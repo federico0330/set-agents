@@ -4146,6 +4146,37 @@ class HarnessTests(unittest.TestCase):
             # imply a tier-variant file is the only possible same-lane artifact.
             self.assertIn("BASE `<role>` agent with `data.model` applied at spawn time", text)
 
+    def test_orchestrator_doctrine_demands_usage_on_every_direct_route_terminal_close(self):
+        # 023-senales-de-consumo PKG-B1 (ADR-0045): the doctrine used to never mention
+        # `--usage` at all (`grep -rn '\-\-usage' Global/_canonical/` was zero hits before
+        # this package) -- the orchestrator closed real dispatched runs with the tokens
+        # already in front of it and sent none of them. This is now an imperative, pasted
+        # command per runtime, never a "you may pass --usage" menu (ADR-0041's lesson).
+        # Checked across every generated harness copy, generically discovered, same
+        # pattern as test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy.
+        run("./build.sh")
+        harness_root = ROOT / "Global"
+        generated = sorted(
+            path for path in harness_root.glob("*/agents/orchestrator.*")
+            if path.parent.parent.name != "_canonical"
+        )
+        self.assertGreaterEqual(len(generated), 3, generated)
+        for path in generated:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("ADR-0045", text)
+            self.assertIn("routing_core/usage.py", text)
+            # The exact, pasted commands -- one per runtime, never a bare mention of the flag.
+            self.assertIn(
+                "--route-terminal <run_id> success --usage",
+                text,
+            )
+            self.assertIn('"input": <inputTokens>, "output": <outputTokens>', text)  # claude-code
+            self.assertIn('"input": <tokens.input>, "output": <tokens.output>', text)  # opencode
+            self.assertIn('"input": <input_tokens>, "output": <output_tokens>', text)  # codex
+            # The two closes that must NOT be told to attach usage (nothing to attach --
+            # the store forces `absent` regardless) are named as explicitly excluded.
+            self.assertIn("route_and_spawn` already attaches", text)
+
     def test_opencode_orchestrator_permission_map_actually_admits_the_spawn_cli(self):
         # DR-01 (015 repair, delta-review round 2): the round-1 repair added a
         # coord_policy.SAFE_ARGV entry for claude_code_spawn.py's new CLI, but
