@@ -1,0 +1,432 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-13T14:25:35+00:00",
+    "hash": "f848f29b2069deb4d89858b9ac93f0604b241ab4bd32b9109e1c8570432715ae",
+    "path": "docs/specs/024-listo-para-terceros/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 8,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "C4-higiene-de-repo-publico",
+  "feature_id": "024-listo-para-terceros",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (plan A->B->C capa C, 2026-08-12: 'producto que se clona y se usa'; confirmado 2026-08-13)",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/024-listo-para-terceros/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T14:25:35+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "git mv ai/state a docs/historia y sembrar desde ai/state.seed, manteniendo el path (AC-01)",
+          "check-feature-state.py cambia la pregunta a 'desde mi baseline', sin apagar el degradado (AC-02)"
+        ]
+      },
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-13T15:19:15+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "[subscriptions] pasa a ausente = auto (AC-03)",
+          "El small model deja de exigir Zen en local, y la lane local se renombra a lo que es (AC-04)",
+          "Overlay de config del usuario en STATE_DIR, que desbloquea --update (AC-05)"
+        ]
+      },
+      "package_id": "C2-modelstoml-neutro",
+      "timestamp": "2026-08-13T15:19:15+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "El loop infinito de install.sh con --yes (AC-06)",
+          "ROUTING_UNCONFIGURED aditivo cuando todo fue PROVIDER_UNAUTHENTICATED (AC-07)",
+          "Dejar de reescribir los globales del usuario sin diff ni consentimiento (AC-08)"
+        ]
+      },
+      "package_id": "C3-primer-arranque-honesto",
+      "timestamp": "2026-08-13T15:19:15+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "LICENSE, CONTRIBUTING, CHANGELOG, SECURITY, y HANDOFF fuera de la raiz (AC-09)",
+          "Ejemplos sin el nombre del cliente real (AC-10)",
+          "Matriz de soporte MEDIDA, incluida la de roles subagent en opencode (AC-11)",
+          "Update re-apuntable: hoy origin/main hardcodeado rompe un fork (AC-12)"
+        ]
+      },
+      "package_id": "C4-higiene-de-repo-publico",
+      "timestamp": "2026-08-13T15:19:15+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "scoped",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que el estado de Federico deje de viajar en el clon, sin mover el path",
+      "owned_paths": [
+        "ai/state.seed",
+        ".gitignore",
+        "ai/scripts/check-feature-state.py",
+        "docs/historia",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "C1-estado-fuera-del-producto",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "git mv ai/state a docs/historia y sembrar desde ai/state.seed, manteniendo el path (AC-01)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "check-feature-state.py cambia la pregunta a 'desde mi baseline', sin apagar el degradado (AC-02)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-03",
+        "AC-04",
+        "AC-05"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "C1-estado-fuera-del-producto"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "models.toml deja de fijar las suscripciones de una persona y el usuario tiene overlay propio",
+      "owned_paths": [
+        "models.toml",
+        "ai/scripts/models_config.py",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "C2-modelstoml-neutro",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "[subscriptions] pasa a ausente = auto (AC-03)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "El small model deja de exigir Zen en local, y la lane local se renombra a lo que es (AC-04)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Overlay de config del usuario en STATE_DIR, que desbloquea --update (AC-05)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "C2-modelstoml-neutro"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que el primer arranque de un tercero diga que hacer en vez de morir mudo",
+      "owned_paths": [
+        "install.sh",
+        "ai/scripts/install.py",
+        "ai/scripts/routing_core",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "C3-primer-arranque-honesto",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "El loop infinito de install.sh con --yes (AC-06)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "ROUTING_UNCONFIGURED aditivo cuando todo fue PROVIDER_UNAUTHENTICATED (AC-07)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Dejar de reescribir los globales del usuario sin diff ni consentimiento (AC-08)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-09",
+        "AC-10",
+        "AC-11",
+        "AC-12"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "C3-primer-arranque-honesto"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Lo que un repo publico necesita, y una matriz de soporte medida en vez de asumida",
+      "owned_paths": [
+        "LICENSE",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
+        "SECURITY.md",
+        "docs",
+        "ai/scripts",
+        "tests"
+      ],
+      "package_id": "C4-higiene-de-repo-publico",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "LICENSE, CONTRIBUTING, CHANGELOG, SECURITY, y HANDOFF fuera de la raiz (AC-09)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Ejemplos sin el nombre del cliente real (AC-10)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Matriz de soporte MEDIDA, incluida la de roles subagent en opencode (AC-11)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Update re-apuntable: hoy origin/main hardcodeado rompe un fork (AC-12)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 4,
+  "schema_version": 1,
+  "updated_at": "2026-08-13T15:19:15+00:00"
+}

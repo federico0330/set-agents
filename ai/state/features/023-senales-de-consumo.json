@@ -1,0 +1,404 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-13T14:25:34+00:00",
+    "hash": "2480a287d0f91af570795b5bee853c66db3f0f994ebf23422d3f5ab64028a0f5",
+    "path": "docs/specs/023-senales-de-consumo/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 8,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "B4-estimado-nunca-dato-del-proveedor",
+  "feature_id": "023-senales-de-consumo",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (plan A->B->C capa B, 2026-08-12; confirmado 2026-08-13: 'anda haciendo la spec e implementacion de las demas restantes')",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/023-senales-de-consumo/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T14:25:34+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "routing_core/usage.py con la muestra real del cable por lane en el docstring (AC-01)",
+          "Un dict no vacio sin campos reconocidos pasa de ok a invalid (AC-02)",
+          "Prueba por lane con columnas no-NULL, evidenciada con status_counts (AC-03)"
+        ]
+      },
+      "package_id": "B1-registro-que-no-miente",
+      "timestamp": "2026-08-13T15:18:56+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Separar el consumo propio del de los stores de los CLIs (AC-04)",
+          "Ninguna superficie muestra un total sin decir su fuente (AC-05)"
+        ]
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T15:18:56+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Schema 8 con usage_rollups en la misma transaccion que close_run (AC-06)",
+          "Retencion de dispatches que nunca borra una fila referenciada (AC-07)"
+        ]
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T15:18:56+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "basis, provider_reported false, ventana nombrada por su definicion y cobertura (AC-08)",
+          "Guard test: una superficie sin etiqueta falla el gate (AC-09)",
+          "Sin presupuesto declarado no se muestra restante, se muestra consumido (AC-10)"
+        ]
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-13T15:18:56+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "scoped",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Normalizador unico de consumo: que los cuatro lanes registren de verdad, y que un dict irreconocible se cuente como descarte",
+      "owned_paths": [
+        "ai/scripts/routing_core",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "B1-registro-que-no-miente",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "routing_core/usage.py con la muestra real del cable por lane en el docstring (AC-01)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Un dict no vacio sin campos reconocidos pasa de ok a invalid (AC-02)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Prueba por lane con columnas no-NULL, evidenciada con status_counts (AC-03)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-04",
+        "AC-05"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "B1-registro-que-no-miente"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Dos secciones nombradas por su fuente que nunca se suman, para que no haya doble conteo",
+      "owned_paths": [
+        "ai/scripts",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Separar el consumo propio del de los stores de los CLIs (AC-04)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Ninguna superficie muestra un total sin decir su fuente (AC-05)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-06",
+        "AC-07"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "B2-el-reporte-dice-de-donde-sale"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Rollups en la misma transaccion que close_run, y retencion que no borra lo referenciado",
+      "owned_paths": [
+        "ai/scripts/routing_core",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "B3-ventana-y-rollup",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Schema 8 con usage_rollups en la misma transaccion que close_run (AC-06)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Retencion de dispatches que nunca borra una fila referenciada (AC-07)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-08",
+        "AC-09",
+        "AC-10"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "B3-ventana-y-rollup"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que ningun numero estimado viaje sin su base, su ventana y su cobertura",
+      "owned_paths": [
+        "ai/scripts",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "basis, provider_reported false, ventana nombrada por su definicion y cobertura (AC-08)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Guard test: una superficie sin etiqueta falla el gate (AC-09)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Sin presupuesto declarado no se muestra restante, se muestra consumido (AC-10)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 4,
+  "schema_version": 1,
+  "updated_at": "2026-08-13T15:18:56+00:00"
+}

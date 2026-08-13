@@ -1,7 +1,7 @@
 ---
 description: "Orchestrator \u2014 read-only coordinator of the package-based delivery lifecycle"
 mode: primary
-model: openai/gpt-5.6-fast
+model: opencode-go/grok-4.5
 temperature: 0.1
 steps: 50
 permission:

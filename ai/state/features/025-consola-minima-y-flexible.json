@@ -1,0 +1,500 @@
+{
+  "acceptance_criteria": [
+    "AC-01",
+    "AC-02",
+    "AC-03",
+    "AC-04",
+    "AC-05",
+    "AC-06",
+    "AC-07",
+    "AC-08",
+    "AC-09",
+    "AC-10",
+    "AC-11",
+    "AC-12"
+  ],
+  "approved_spec": {
+    "approved_at": "2026-08-13T14:25:35+00:00",
+    "hash": "1ff81af48729c64a642566a0aa767eee0006b3e725b423851096e893e206aae8",
+    "path": "docs/specs/025-consola-minima-y-flexible/spec.md"
+  },
+  "blockers": [],
+  "budgets": {
+    "max_deep_review_cycles": 2,
+    "max_gate_failures_per_package": 3,
+    "max_package_subdivisions": 1,
+    "max_repairs_per_finding": 2,
+    "max_spawns_per_package": 8,
+    "max_verifications_per_package": 6
+  },
+  "current_package_id": "D5-vault-en-todo-spawn",
+  "feature_id": "025-consola-minima-y-flexible",
+  "final_state": null,
+  "global_gates": [],
+  "history": [
+    {
+      "actor": "orchestrator",
+      "event": "init",
+      "from": "USER_APPROVAL",
+      "metadata": {
+        "approved_by": "federico (2026-08-12, pedido de terminal minimalista + expansion de menu y flexibilidad por escrito; confirmado 2026-08-13)",
+        "spec_hash_verified": true,
+        "spec_path": "docs/specs/025-consola-minima-y-flexible/spec.md"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-13T14:25:35+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Menu sin emoji, jerarquia por espaciado y peso (AC-01)",
+          "Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02)",
+          "Texto humano por default en los comandos de routing, --json para la maquina (AC-03)"
+        ]
+      },
+      "package_id": "D1-superficie-humana",
+      "timestamp": "2026-08-13T15:19:35+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Spinner o progreso para todo lo que tarde mas de 300 ms (AC-04)",
+          "Degradacion sin TTY, con NO_COLOR y en pipes; nunca unico indicador de estado (AC-05)"
+        ]
+      },
+      "package_id": "D2-trabajo-visible",
+      "timestamp": "2026-08-13T15:19:36+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Tres posturas elegibles con su explicacion en pantalla (AC-06)",
+          "Toggles de TDD estricto, SDD y RDD con su explicacion (AC-07)",
+          "RDD definido como Receipt Driven Development, nombrando lo que el harness ya practica (AC-08)"
+        ]
+      },
+      "package_id": "D3-posturas-de-autonomia",
+      "timestamp": "2026-08-13T15:19:36+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Instalar solo en un CLI y dejar los otros virgenes (AC-09)",
+          "Desinstalar de uno sin tocar los otros (AC-10)",
+          "Usar un CLI virgen por esta vez, sin desinstalar (AC-11)"
+        ]
+      },
+      "package_id": "D4-harness-por-CLI",
+      "timestamp": "2026-08-13T15:19:36+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "create-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "tasks": [
+          "Medir en un spawn REAL que parte de ADR-0012 se cumple hoy, antes de asumir nada (AC-12)",
+          "Cerrar la brecha entre lo que el ADR declara y lo que el spawn hace (AC-12)"
+        ]
+      },
+      "package_id": "D5-vault-en-todo-spawn",
+      "timestamp": "2026-08-13T15:20:00+00:00",
+      "to": "PACKAGE_PLANNING"
+    }
+  ],
+  "metrics": {
+    "delta_reviews": 0,
+    "human_questions_after_approval": 0,
+    "package_reviews": 0,
+    "repair_batches": 0,
+    "task_deep_reviews": 0,
+    "verifications": 0
+  },
+  "mode": "scoped",
+  "packages": [
+    {
+      "acceptance_criteria": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Menu sin emoji, 31 flags internas ocultas pero vivas, y salida humana en vez de JSON crudo",
+      "owned_paths": [
+        "ai/scripts/set_agents_app.py",
+        "ai/scripts/tui.py",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "D1-superficie-humana",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Menu sin emoji, jerarquia por espaciado y peso (AC-01)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Texto humano por default en los comandos de routing, --json para la maquina (AC-03)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-04",
+        "AC-05"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "small",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "D1-superficie-humana"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que se vea que el harness esta trabajando, sin romper pipes ni CI",
+      "owned_paths": [
+        "ai/scripts/tui.py",
+        "ai/scripts/set_agents_app.py",
+        "tests"
+      ],
+      "package_id": "D2-trabajo-visible",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Spinner o progreso para todo lo que tarde mas de 300 ms (AC-04)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Degradacion sin TTY, con NO_COLOR y en pipes; nunca unico indicador de estado (AC-05)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-06",
+        "AC-07",
+        "AC-08"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "D2-trabajo-visible"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que el usuario elija cuanta autonomia le da al harness, y que cada postura cambie algo observable",
+      "owned_paths": [
+        "ai/scripts",
+        "Global/_canonical",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "D3-posturas-de-autonomia",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Tres posturas elegibles con su explicacion en pantalla (AC-06)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Toggles de TDD estricto, SDD y RDD con su explicacion (AC-07)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "RDD definido como Receipt Driven Development, nombrando lo que el harness ya practica (AC-08)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-09",
+        "AC-10",
+        "AC-11"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "D3-posturas-de-autonomia"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Instalar y desinstalar el harness por CLI, sin tocar los otros",
+      "owned_paths": [
+        "ai/scripts/install.py",
+        "install.sh",
+        "ai/scripts/set_agents_app.py",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "D4-harness-por-CLI",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Instalar solo en un CLI y dejar los otros virgenes (AC-09)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Desinstalar de uno sin tocar los otros (AC-10)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Usar un CLI virgen por esta vez, sin desinstalar (AC-11)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    },
+    {
+      "acceptance_criteria": [
+        "AC-12"
+      ],
+      "approved_exceptions": [],
+      "attempts": {
+        "deep_review_cycles": 0,
+        "repair_batches": 0,
+        "spawns": 0,
+        "subdivisions": 0,
+        "verification_waivers": 0,
+        "verifications": 0
+      },
+      "candidate_identity": null,
+      "complexity": "medium",
+      "context_pack": null,
+      "delta_reviews": [],
+      "dependencies": [
+        "D4-harness-por-CLI"
+      ],
+      "diff_ref": null,
+      "findings": [],
+      "gates": [],
+      "integrated": false,
+      "late_reviews": [],
+      "module_impact_waiver": null,
+      "module_impacts": [],
+      "objective": "Que cada spawn de proyecto use Obsidian, verificando primero que se cumple hoy en un spawn real",
+      "owned_paths": [
+        "ai/scripts",
+        "Global/_canonical",
+        "tests",
+        "docs/adr"
+      ],
+      "package_id": "D5-vault-en-todo-spawn",
+      "read_only_paths": [],
+      "receipt": null,
+      "repair_ceiling": null,
+      "repairs": [],
+      "review_panels": [],
+      "reviews": [],
+      "risks": [],
+      "routing_reason": null,
+      "runtime_qa": [],
+      "runtime_surface": true,
+      "selected_model": null,
+      "selected_role": null,
+      "shared_paths": [],
+      "spawns": [],
+      "status": "planned",
+      "strict_tdd": false,
+      "tasks": [
+        {
+          "blockers": [],
+          "id": "Medir en un spawn REAL que parte de ADR-0012 se cumple hoy, antes de asumir nada (AC-12)",
+          "local_validations": [],
+          "status": "planned"
+        },
+        {
+          "blockers": [],
+          "id": "Cerrar la brecha entre lo que el ADR declara y lo que el spawn hace (AC-12)",
+          "local_validations": [],
+          "status": "planned"
+        }
+      ],
+      "testing": [],
+      "verifications": []
+    }
+  ],
+  "phase": "PACKAGE_PLANNING",
+  "revision": 5,
+  "schema_version": 1,
+  "updated_at": "2026-08-13T15:20:00+00:00"
+}

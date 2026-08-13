@@ -269,8 +269,16 @@ class HarnessTests(unittest.TestCase):
             row["role"]: row
             for row in mc.load_roles("go-zen", ROOT / "roles.tsv", ROOT / "models.toml")
         }
-        # Hot path (coord/analysis/implement/docs) runs on low-latency -fast variants.
-        for role in ("orchestrator", "implementer", "product-analyst"):
+        # Hot path latency policy, ADR-0044: measured, `-fast` is a naming convention that only
+        # exists on opencode's `openai` provider (`gpt-5.6-{luna,sol,terra}-fast`) -- neither
+        # opencode-go (18 ids) nor opencode-zen (61 ids) ships a single `-fast` variant. So this
+        # assertion never meant "low latency"; it meant "must be OpenAI". `orchestrator` is
+        # dropped from this loop on purpose: it is a single long-lived coordinator instance, not
+        # a high-volume dispatch, so sub-second `-fast` latency is not its selection criterion --
+        # [areas.coord].opencode is free to be a non-GPT model (see models.toml). `implementer`
+        # and `product-analyst` stay: they are the two high-volume hot-path roles that still want
+        # the low-latency variant, and this loop must keep failing if either loses it.
+        for role in ("implementer", "product-analyst"):
             self.assertTrue(rows[role]["opencode_model"].endswith("-fast"), role)
         # Reviewers stay on the deep-reasoning family, distinct from the implementer's.
         # 015-anthropic-dispatch-parity AC-06(a): [areas.audit].opencode."go-zen" moved off

@@ -240,14 +240,35 @@ class RoutingService:
             return redirect
         return runtime
 
-    def route(self, request: TaskRequest, facts, review_of_run_id=None, unverified_review=False) -> RouteDecision:
+    def route(self, request: TaskRequest, facts, review_of_run_id=None, unverified_review=False,
+              model_request=None) -> RouteDecision:
+        """`model_request` (AC-04..AC-07, 026-orquestador-elige-modelo P2): an OPTIONAL,
+        per-CALL `(provider, model)` tuple -- the ephemeral, per-instance sibling of
+        `review_of_run_id` above, never a `TaskRequest` field (so every existing
+        `TaskRequest(...)` construction site, and every existing caller of `route()`,
+        stays byte-identical). It never touches disk, never widens `self._model_pin`
+        (the PERSISTENT `[model_pin]` table, ADR-0032), and never outlives this one call
+        -- `set_agents_app.cmd_route_decide` is the only production caller that ever
+        supplies it, straight from `--route-decide`'s descriptor, never persisted
+        anywhere (AC-07). Same soft-preference discipline as the persistent pin: it can
+        only ever reorder candidates that ALREADY survived every hard exclusion below
+        (AC-05) -- see `model_request_reason`/the sort key/the additive reason-code block
+        further down, none of which run before the exclusion loop.
+        """
         issuer = self._facts.pop(id(facts), None)
         if not isinstance(request, TaskRequest) or issuer is None or not issuer.consume(facts, set(self.roster)):
             return RouteDecision(None, None, None, None, None, None, False, ("FACTS_INCOMPLETE",))
         # Caller claims are validated against the same closed vocabularies as observed facts;
         # every member must be a string so malformed intent degrades, never raises (backlog N-1).
+        # AC-04: `model_request` is validated the same defensive way -- `None` (absent) or a
+        # 2-tuple of non-empty strings, anything else degrades to FACTS_INCOMPLETE rather than
+        # raising; the real production caller (`cmd_route_decide`) already validated its shape
+        # at parse time (ROUTING_INPUT_INVALID/rc=2), this is a second, cheap, defensive floor
+        # for every other caller of this internal API.
         if (request.risk not in RISK_ORDER or not isinstance(request.required_tools, (tuple, list))
-                or not all(isinstance(tool, str) for tool in request.required_tools)):
+                or not all(isinstance(tool, str) for tool in request.required_tools)
+                or (model_request is not None and (not isinstance(model_request, tuple) or len(model_request) != 2
+                    or not all(isinstance(v, str) and v for v in model_request)))):
             return RouteDecision(None,None,None,None,None,None,False,("FACTS_INCOMPLETE",))
         role_class = self._role_class(facts.role)
         # AC-01/AC-05/AC-08 (014-model-preference-policy): resolved exactly once, right
@@ -290,6 +311,13 @@ class RoutingService:
         need = required_tier(facts.task_class, risk)
         needs_context = facts.context_required or risk == "high" or bool(facts.criticality)
         candidates, exclusions = [], []
+        # AC-05/AC-06 (026-orquestador-elige-modelo P2): the FIRST hard-exclusion reason a
+        # catalog route matching `model_request`'s (provider, model) hits in THIS SAME loop
+        # -- never computed separately, never re-running any part of the exclusion logic.
+        # `None` stays `None` when the requested identity never gets excluded here (either
+        # it survives as a real candidate, or no catalog route names that (provider, model)
+        # at all -- both resolved later, after the loop, from `candidates` itself).
+        model_request_reason = None
         for route in self.snapshot.routes:
             # AC-01: the identity/auth check below is evaluated against this route's
             # own EFFECTIVE runtime, not blindly against the caller's requested
@@ -352,7 +380,15 @@ class RoutingService:
             # soft sort key on TOP of this hard exclusion, not instead of it.
             elif writer and route.provider == writer.provider: reason="REVIEW_PROVIDER_CONFLICT"
             elif TIER_ORDER[route.tier] < TIER_ORDER[need]: reason="TIER_INSUFFICIENT"
-            if reason: exclusions.append({"route_id": route.route_id, "reason": reason})
+            if reason:
+                exclusions.append({"route_id": route.route_id, "reason": reason})
+                # AC-06: the FIRST barrier the requested identity itself hits, named --
+                # never a second, separate pass over the catalog (this IS the exclusion
+                # loop; `model_request_reason` only ever reads a `reason` this same loop
+                # already computed for this exact route).
+                if (model_request and model_request_reason is None
+                        and (route.provider, route.model) == model_request):
+                    model_request_reason = reason
             else: candidates.append((route, identity))
         # Lowest eligible tier >= required wins; 003's reviewer different-provider preference
         # stays first. AC-04 (014-model-preference-policy): `_bias_rank` is inserted at
@@ -376,10 +412,27 @@ class RoutingService:
         # metered candidate that is the ONLY one to satisfy the tier floor or the ONLY one
         # to survive the independence exclusions still wins here exactly as before this
         # ADR — cost is an ordering criterion among survivors, never an eligibility one.
+        # AC-05 (026-orquestador-elige-modelo P2): `model_request`'s rank is inserted HERE,
+        # strictly between `TIER_ORDER` and `billing_rank` -- i.e. it never runs before the
+        # independence/tier boundary this whole file's history of ADRs (ADR-0032's pin
+        # comment above; ADR-0035's billing_rank comment below) keeps naming as the one
+        # line that can never move. Every candidate this factor ever compares already
+        # SURVIVED the entire hard-exclusion loop above (identity, auth, role, tools,
+        # context, reviewer independence, tier floor) -- a requested (provider, model) that
+        # violated any of those never reaches `candidates` at all, so it can never win here
+        # no matter how it ranks; it can only ever reorder among candidates that were
+        # ALREADY eligible on their own. Deliberately placed AFTER `TIER_ORDER` (unlike the
+        # persistent pin, which sits BEFORE it and so can win "across tiers") -- an
+        # ephemeral, per-instance ask never outranks the lowest-sufficient-tier policy that
+        # predates this AC; it only breaks ties among candidates already tied on tier. This
+        # insertion does not reorder the pre-existing pin_rank/TIER_ORDER/billing_rank/
+        # _bias_rank/is_inferred/curated_priority/route_id chain relative to itself -- it is
+        # purely an ADDED column, same discipline ADR-0035's billing_rank insertion below
+        # already establishes as precedent.
         # Final tuple this ADR leaves:
-        # (same_provider_as_writer, pin_rank, TIER_ORDER, billing_rank, _bias_rank,
-        #  is_inferred, curated_priority, route_id).
-        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], billing_rank(x[0].provider, x[0].model), _bias_rank(x[0].provider, bias_preference), 1 if x[0].route_id in self._inferred_ids else 0, x[0].curated_priority, x[0].route_id))
+        # (same_provider_as_writer, pin_rank, TIER_ORDER, model_request_rank, billing_rank,
+        #  _bias_rank, is_inferred, curated_priority, route_id).
+        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], 0 if model_request and (x[0].provider, x[0].model) == model_request else 1, billing_rank(x[0].provider, x[0].model), _bias_rank(x[0].provider, bias_preference), 1 if x[0].route_id in self._inferred_ids else 0, x[0].curated_priority, x[0].route_id))
         if not candidates:
             return RouteDecision(None,None,None,None,None,None,False,("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",),tuple(exclusions),bias_class=bias_class,preference_configured=preference_configured)
         # ADR-0034 (AC-08): the block below used to run ONCE against the top-ranked
@@ -426,6 +479,37 @@ class RoutingService:
             if pin:
                 marker = "MODEL_PINNED" if (selected.provider, selected.model) == pin else "MODEL_PIN_UNAVAILABLE"
                 redirect_reason = redirect_reason + (f"{marker} {pin[0]}/{pin[1]}",)
+            # AC-06 (026-orquestador-elige-modelo P2): a decision carrying a per-instance
+            # `model_request` always says so, one of two additive markers, same discipline
+            # as MODEL_PINNED/MODEL_PIN_UNAVAILABLE above -- never replaces or reorders an
+            # existing code, never changes success/runtime/identity/fallback.
+            # MODEL_REQUEST_APPLIED when the requested identity is what actually got
+            # selected; MODEL_REQUEST_UNAVAILABLE, NAMING the requested model and WHY,
+            # otherwise -- never a silent degrade to a different model (the exact trap this
+            # AC exists to close). `reason` resolves in priority order: (1) the barrier the
+            # requested identity itself hit in the exclusion loop above
+            # (`model_request_reason`, e.g. REVIEW_PROVIDER_CONFLICT/REVIEW_MODEL_CONFLICT/
+            # TIER_INSUFFICIENT/PROVIDER_UNAUTHENTICATED/...); (2) "OUTRANKED" when the
+            # requested identity DID survive every hard exclusion (it is a genuinely
+            # eligible candidate) but a different, tier-tied-or-better candidate still won
+            # the sort -- eligible is not the same as chosen; (3) "NOT_IN_CATALOG" when no
+            # catalog route names that (provider, model) at all -- the exact, observable
+            # shape a model outside the curated ceiling (`resolve_ceiling`) takes by the
+            # time `route()` runs, since a ceiling-excluded model never becomes a
+            # `StaticRoute` in the first place (`catalog.build_snapshot`).
+            if model_request:
+                if (selected.provider, selected.model) == model_request:
+                    redirect_reason = redirect_reason + (
+                        f"MODEL_REQUEST_APPLIED {model_request[0]}/{model_request[1]}",)
+                else:
+                    if model_request_reason is not None:
+                        why = model_request_reason
+                    elif any((c[0].provider, c[0].model) == model_request for c in candidates):
+                        why = "OUTRANKED"
+                    else:
+                        why = "NOT_IN_CATALOG"
+                    redirect_reason = redirect_reason + (
+                        f"MODEL_REQUEST_UNAVAILABLE requested={model_request[0]}/{model_request[1]} reason={why}",)
             if self.simulate or role_class != "writer":
                 # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
                 # reason code — true only for a review decision that matched a real terminal writer and

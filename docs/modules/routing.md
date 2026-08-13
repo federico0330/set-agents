@@ -13,6 +13,8 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 
 ## Últimos cambios estructurales
 
+- 2026-08-13 026-orquestador-elige-modelo/P2-modelo-por-instancia — El descriptor de ruteo acepta model_request: preferencia de modelo por instancia, efimera
+- 2026-08-13 026-orquestador-elige-modelo/P1-latencia-por-modelo-no-por-sufijo — El coordinador deja de estar obligado al sufijo -fast y pasa a un modelo no-GPT de suscripcion
 - 2026-08-13 022-disponibilidad-real/P3-liveness-real — Firma de credencial por runtime en la clave de cache y una sola cache en la raiz del store
 - 2026-08-13 022-disponibilidad-real/P5-altas-y-bajas-automaticas — Verificacion empirica del CLI id, liveness real en --provider-verify y separacion listed/usable en tres superficies
 - 2026-08-13 022-disponibilidad-real/P1-registro-de-proveedores — Las siete tablas de proveedores pasan a derivarse de provider_registry.PROVIDERS

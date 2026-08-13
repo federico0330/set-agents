@@ -287,6 +287,27 @@ def _validate_model_pin_entry(role, value, roster_roles, valid_providers=_MODEL_
     return provider, model
 
 
+def _validate_model_request(value, valid_providers=_MODEL_PREFERENCE_PROVIDERS):
+    """AC-04 (026-orquestador-elige-modelo P2): validates `--route-decide`'s descriptor
+    `model_request` value -- the SAME "provider/model" shape and closed, network-free
+    provider vocabulary `_validate_model_pin_entry` already enforces for the PERSISTENT
+    `[model_pin]` table (reused here as a bare value: no role key, no file, nothing
+    written -- AC-07's ephemerality lives entirely in the caller never calling
+    `atomic_write`/`MODEL_PREFERENCE_PATH` for this value, not in this function).
+    Raises plain `ValueError` (never `ModelPreferenceError`, which is the sibling
+    FILE's own exception type) -- `cmd_route_decide`'s existing `except (OSError,
+    ValueError)` clause turns it into `ROUTING_INPUT_INVALID`/rc=2, the same PARSE-time
+    fail-closed discipline as `risk`/`selected_runtime`'s enum checks (F01): a malformed
+    model_request never reaches the service to degrade silently into a different
+    reason code. Returns `(provider, model)`."""
+    if not isinstance(value, str) or value.count("/") != 1:
+        raise ValueError
+    provider, model = value.split("/", 1)
+    if provider not in valid_providers or not _MODEL_PIN_MODEL_RE.fullmatch(model):
+        raise ValueError
+    return provider, model
+
+
 def load_model_pin(roster_roles=None):
     """ADR-0032: `{role_or_star: (provider, model)}` — absent file/table is the unpinned
     default (empty dict), never a crash; a malformed entry fails closed like every other
@@ -602,7 +623,11 @@ def _append_decision_log(entry: dict) -> None:
 
 
 def cmd_route_decide(source, human=False, fresh=False):
-    allowed = {"role", "task_class", "risk", "review_of_run_id", "selected_runtime", "feature_id", "package_id"}
+    # AC-04 (026-orquestador-elige-modelo P2): `model_request` is the ONE new key -- the
+    # closed set stays closed, an unrecognized key stays ROUTING_INPUT_INVALID/rc=2
+    # exactly as before (see the `set(doc) - allowed` check below, untouched shape).
+    allowed = {"role", "task_class", "risk", "review_of_run_id", "selected_runtime", "feature_id",
+               "package_id", "model_request"}
     try:
         raw = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
         doc = json.loads(raw)
@@ -617,6 +642,11 @@ def cmd_route_decide(source, human=False, fresh=False):
         # F01: a descriptor risk/runtime outside the closed enum is a PARSE failure (exit 2
         # ROUTING_INPUT_INVALID) — it never reaches the service to degrade into FACTS_INCOMPLETE.
         if req_risk not in routing.RISK_ORDER or runtime not in routing.SELECTED_RUNTIMES: raise ValueError
+        # AC-04: absent key -> `None` (no preference, byte-identical to every pre-AC-04
+        # decision); present -> validated "provider/model" -> `(provider, model)`, or this
+        # same PARSE-failure/rc=2 path as every other malformed descriptor field above.
+        model_request_raw = doc.get("model_request")
+        model_request = _validate_model_request(model_request_raw) if model_request_raw is not None else None
     except (OSError, ValueError):
         _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
     try:
@@ -655,7 +685,8 @@ def cmd_route_decide(source, human=False, fresh=False):
             required_tools=("read", "shell", "write") if writer else ("read",),
             context_required=needs_context,
             context_present=context_flag, critical_coverage=context_flag, selected_runtime=runtime)
-        decision = service.route(request, facts, review_of, unverified_review=unverified_review)
+        decision = service.route(request, facts, review_of, unverified_review=unverified_review,
+                                 model_request=model_request)
         tier = next((r.tier for r in service.snapshot.routes if r.route_id == decision.route_id), None)
         data = decision.to_dict(); data["tier"] = tier; data["role_class"] = role_class
         # F03: the effective (feature_id, package_id, context_ok) is always in the envelope,

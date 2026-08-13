@@ -79,7 +79,12 @@ incident_spawns = 2
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "high"
-opencode = { "go-zen" = "openai/gpt-5.6-fast", "zen" = "openai/gpt-5.4", "local" = "openai/gpt-5.4" }
+# ADR-0044: the coordinator drops the openai-only `-fast` latency policy (it is a single
+# long-lived instance, not a high-volume dispatch) and moves to a subscription, non-GPT
+# model. `opencode-go` on the go-zen lane because it is subscription-billed (does not
+# consume Copilot's nor zen's per-token budget). `grok-4.6` is NOT in [catalog].opencode_zen
+# (verified live), so zen/local stay on `grok-4.5`, same model already curated there.
+opencode = { "go-zen" = "opencode-go/grok-4.5", "zen" = "opencode/grok-4.5", "local" = "opencode/grok-4.5" }
 
 [areas.analysis]
 claude = "haiku"

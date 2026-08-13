@@ -5100,31 +5100,36 @@ class RoutingTests(unittest.TestCase):
             self.assertTrue(d2.preference_configured, role)  # configured, even though inert here
 
     def test_sort_key_tripwire_pins_full_tuple_shape(self):
-        # AC-04 point 5, extended by ADR-0034 (019 PKG-1) and ADR-0035 (019 PKG-2): pins
-        # the sort tuple's exact element order -- independence, tier, billing_rank
-        # (ADR-0035, new), role-class-preference-rank, is_inferred (ADR-0034), curated_
-        # priority, route_id (the FINAL tie-break, distinct from the route_id reference
-        # `is_inferred`'s own conditional reads to look itself up in `self._inferred_ids`
-        # -- `rindex` below deliberately finds the LAST occurrence, never the first) --
-        # so ANY future shape change (this contract's, 014's, 019 PKG-1's, or PKG-2's)
-        # fails loudly, not silently.
+        # AC-04 point 5, extended by ADR-0034 (019 PKG-1), ADR-0035 (019 PKG-2), and AC-05
+        # (026-orquestador-elige-modelo P2, model_request_rank): pins the sort tuple's
+        # exact element order -- independence, tier, model_request_rank (P2, new),
+        # billing_rank (ADR-0035), role-class-preference-rank, is_inferred (ADR-0034),
+        # curated_priority, route_id (the FINAL tie-break, distinct from the route_id
+        # reference `is_inferred`'s own conditional reads to look itself up in
+        # `self._inferred_ids` -- `rindex` below deliberately finds the LAST occurrence,
+        # never the first) -- so ANY future shape change (this contract's, 014's, 019
+        # PKG-1's, PKG-2's, or 026 P2's) fails loudly, not silently.
         source = (ROOT / "ai/scripts/routing_core/service.py").read_text()
         match = re.search(r"candidates\.sort\(key=lambda x: \((.*?)\)\)", source)
         self.assertIsNotNone(match, "candidates.sort(...) call not found")
         elements = match.group(1)
-        for token in ("writer.provider", "TIER_ORDER[x[0].tier]", "billing_rank(x[0].provider, x[0].model)",
+        for token in ("writer.provider", "TIER_ORDER[x[0].tier]",
+                      "model_request and (x[0].provider, x[0].model) == model_request",
+                      "billing_rank(x[0].provider, x[0].model)",
                       "_bias_rank(x[0].provider, bias_preference)",
                       "x[0].route_id in self._inferred_ids", "x[0].curated_priority", "x[0].route_id"):
             self.assertIn(token, elements)
         independence_pos = elements.index("writer.provider")
         tier_pos = elements.index("TIER_ORDER[x[0].tier]")
+        model_request_pos = elements.index("model_request and (x[0].provider, x[0].model) == model_request")
         billing_pos = elements.index("billing_rank(")
         bias_pos = elements.index("_bias_rank(")
         inferred_pos = elements.index("x[0].route_id in self._inferred_ids")
         priority_pos = elements.index("x[0].curated_priority")
         route_id_pos = elements.rindex("x[0].route_id")  # the trailing tie-break, not the is_inferred lookup
         self.assertLess(independence_pos, tier_pos)
-        self.assertLess(tier_pos, billing_pos)
+        self.assertLess(tier_pos, model_request_pos)
+        self.assertLess(model_request_pos, billing_pos)
         self.assertLess(billing_pos, bias_pos)
         self.assertLess(bias_pos, inferred_pos)
         self.assertLess(inferred_pos, priority_pos)
