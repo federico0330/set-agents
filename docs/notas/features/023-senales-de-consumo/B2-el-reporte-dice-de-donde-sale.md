@@ -10,8 +10,21 @@
 
 ## Tareas
 
-- [ ] Separar el consumo propio del de los stores de los CLIs (AC-04) (planned)
-- [ ] Ninguna superficie muestra un total sin decir su fuente (AC-05) (planned)
+- [x] Separar el consumo propio del de los stores de los CLIs (AC-04) (completed) · unittest: 1095 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS
+- [x] Ninguna superficie muestra un total sin decir su fuente (AC-05) (completed) · unittest: 1095 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS
+
+## Recorrido
+
+- gate `unittest-suite`: pass
+- gate `verify-sh`: pass
+- gate `build-check`: pass
+- gate `git-diff-check`: pass
+
+## Spawns
+
+- SPAWN-001 implementer · modelo anthropic/opus · effort medium · route run1_566c34a108b5c9ca05efd67240b7e517
+
+context pack: `docs/specs/023-senales-de-consumo/context/B2-el-reporte-dice-de-donde-sale.md`
 
 ↩ [[features/023-senales-de-consumo|023-senales-de-consumo]]
 <!-- /notas:auto -->

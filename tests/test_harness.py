@@ -7565,6 +7565,67 @@ class HarnessTests(unittest.TestCase):
         # totals: oc 100+50+10+5+2=167, claude (30+20+7+3)*2=120, codex 500 → 787
         self.assertIn("787", result.stdout)
 
+    def test_cost_report_prints_two_never_summed_sections_named_by_source(self):
+        """023-senales-de-consumo PKG-B2 (AC-04/AC-05): `cost-report.py` reads the CLI-
+        native stores AND the harness's own `dispatches` registry -- two measurements of
+        OVERLAPPING spend, never two halves of one total. This fixture puts a genuine
+        session in each source, with distinct, easy-to-spot totals (137 vs 246, chosen
+        under `fmt()`'s 1000 abbreviation threshold so they print byte-exact): both totals
+        must appear, each clearly labelled by its own section/source, and the WRONG summed
+        total (383) must never appear anywhere in the output -- proof that no code path in
+        this module ever adds the two sections together, not merely that the labels look
+        right.
+        """
+        app = self._import("set_agents_app")
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            project = Path(td) / "proj"
+            project.mkdir(parents=True)
+            key = app.project_key_for(project)
+
+            oc = home / ".local/share/opencode"
+            oc.mkdir(parents=True)
+            conn = sqlite3.connect(oc / "opencode.db")
+            conn.execute(
+                "CREATE TABLE session (directory TEXT, model TEXT, agent TEXT, tokens_input INT,"
+                " tokens_output INT, tokens_cache_read INT, tokens_cache_write INT,"
+                " tokens_reasoning INT, time_updated INT)"
+            )
+            conn.execute(
+                "INSERT INTO session VALUES (?, ?, ?, 100, 30, 5, 2, 0, 2000000000000)",
+                (str(project), json.dumps({"providerID": "opencode", "id": "nemotron"}), "orchestrator"),
+            )
+            conn.commit()
+            conn.close()
+
+            routing_root = home / ".local/state/set-agentes/routing-v2"
+            routing_root.mkdir(parents=True)
+            conn = sqlite3.connect(routing_root / "routing.db")
+            conn.execute(
+                "CREATE TABLE dispatches (project_key TEXT, actual_model TEXT, role TEXT, usage_status TEXT,"
+                " usage_input INT, usage_output INT, usage_cache_read INT, usage_cache_write INT,"
+                " usage_reasoning INT, updated_at INT)"
+            )
+            conn.execute(
+                "INSERT INTO dispatches VALUES (?, 'anthropic/claude-haiku-4-5', 'implementer', 'ok',"
+                " 200, 40, 5, 1, 0, 2000000000000)", (key,),
+            )
+            conn.commit()
+            conn.close()
+
+            result = run("python3", str(COST_REPORT), "--home", str(home), "--project", str(project))
+        # Named by source, both sections present.
+        self.assertIn("Section 1", result.stdout)
+        self.assertIn("CLI-native stores", result.stdout)
+        self.assertIn("Section 2", result.stdout)
+        self.assertIn("harness dispatch registry", result.stdout)
+        # Each section's own total is present ...
+        self.assertIn("137", result.stdout)
+        self.assertIn("246", result.stdout)
+        # ... but the two are never added into one grand total.
+        self.assertNotIn("383", result.stdout)
+        self.assertIn("Do not add the two sections", result.stdout)
+
     def test_pi_collector_project_key_matches_project_key_for(self):
         """AC-16: cost-report.py cannot import set_agents_app/routing_core -- a read-only
         reporter must never be able to redirect where durable authorizations are read from

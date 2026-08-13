@@ -88,6 +88,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config  # noqa: E402
 from routing_core.store import RoutingStore  # noqa: E402  (audit-binding sink, SEC-P1-003 precedent)
+from routing_core.usage import normalize_opencode  # noqa: E402  (023 PKG-B2: the ONE translator for this
+# lane's own `{"tokens": {...}}` wire shape into the store's flat vocabulary -- never a second,
+# independently-drifting copy of that mapping here; see `routing_core/usage.py`'s module docstring)
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_CLI = ROOT / "ai/scripts/set_agents_app.py"
@@ -315,10 +318,19 @@ def dispatch_writer(role: str, task: str, run_id: str, provider: str, model: str
         latency_ms = max(0, int((time.time() - started) * 1000))
         terminal_args = ["--route-terminal", run_id, "success" if outcome == "success" else "failure",
                          "--latency-ms", str(latency_ms), "--json"]
+        # 023-senales-de-consumo PKG-B2 (ADR-0045): this lane's own `tokens` sub-object
+        # (the `step_finish` event's `part.tokens`, module docstring/`spawn()` above) is
+        # genuinely what opencode reports -- never invented here -- but it is not the
+        # store's flat vocabulary, so `_usage_row` could not recognize it (PKG-B1
+        # hardening turned that mismatch into a COUNTED `invalid`, never a silent NULL
+        # row). `normalize_opencode` is the ONE place that already measured this exact
+        # wire shape and translates it; this is the wiring, not a second translation.
         tokens = detail.get("tokens")
         base_terminal_args = list(terminal_args)
         if isinstance(tokens, dict) and tokens:
-            terminal_args += ["--usage", json.dumps({"tokens": tokens})]
+            translated = normalize_opencode({"tokens": tokens})
+            if translated:
+                terminal_args += ["--usage", json.dumps(translated)]
         terminal = _run_app_cli(terminal_args, env=env, cwd=routing_cwd)
         # F-05 (review repair): usage telemetry is advisory — if the close WITH --usage
         # was rejected (e.g. a hostile/oversized tokens blob failing parse_usage), retry

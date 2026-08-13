@@ -13,6 +13,7 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 
 ## Últimos cambios estructurales
 
+- 2026-08-13 023-senales-de-consumo/B1-registro-que-no-miente — La doctrina exige --usage al cerrar un run y hay un normalizador unico con la muestra real del cable por runtime
 - 2026-08-13 026-orquestador-elige-modelo/P2-modelo-por-instancia — El descriptor de ruteo acepta model_request: preferencia de modelo por instancia, efimera
 - 2026-08-13 026-orquestador-elige-modelo/P1-latencia-por-modelo-no-por-sufijo — El coordinador deja de estar obligado al sufijo -fast y pasa a un modelo no-GPT de suscripcion
 - 2026-08-13 022-disponibilidad-real/P3-liveness-real — Firma de credencial por runtime en la clave de cache y una sola cache en la raiz del store

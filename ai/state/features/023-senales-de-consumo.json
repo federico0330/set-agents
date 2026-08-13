@@ -26,7 +26,7 @@
     "max_spawns_per_package": 8,
     "max_verifications_per_package": 6
   },
-  "current_package_id": "B1-registro-que-no-miente",
+  "current_package_id": "B2-el-reporte-dice-de-donde-sale",
   "feature_id": "023-senales-de-consumo",
   "final_state": null,
   "global_gates": [],
@@ -441,12 +441,323 @@
       "package_id": "B1-registro-que-no-miente",
       "timestamp": "2026-08-13T17:16:40+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:49+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:50+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:50+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:50+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:50+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:51+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:52+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:17:52+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que el gasto que el harness ya captura llegue completo, y que el reporte no cuente la misma plata dos veces.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Traducir las formas que los lanes ya mandan, y que el reporte no sume dos mediciones del mismo gasto",
+        "role": "implementer",
+        "route_id": "run1_566c34a108b5c9ca05efd67240b7e517",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "AC-04a (nuevo, derivado de una medicion de B1), AC-04, AC-05. claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row descarta como invalid; hay que cablearlas a routing_core/usage.py. Y cost-report.py lee los stores propios de los CLIs, que son OTRA medicion del mismo gasto que dispatches: dos secciones que nunca se suman."
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T17:18:29+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Separar el consumo propio del de los stores de los CLIs (AC-04)",
+        "validations": [
+          "unittest: 1095 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Ninguna superficie muestra un total sin decir su fuente (AC-05)",
+        "validations": [
+          "unittest: 1095 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:44+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:44+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:45+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:46+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:46+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:23:47+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:30:02+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:30:02+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:30:02+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:30:02+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "B2-el-reporte-dice-de-donde-sale",
+      "timestamp": "2026-08-13T18:30:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
     "delta_reviews": 0,
     "human_questions_after_approval": 0,
-    "package_reviews": 1,
+    "package_reviews": 2,
     "repair_batches": 0,
     "task_deep_reviews": 0,
     "verifications": 0
@@ -672,29 +983,119 @@
         "AC-04",
         "AC-05"
       ],
-      "approved_exceptions": [],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/claude_code_spawn.py",
+          "reason": "AC-04a: cablear el adaptador a routing_core/usage.py.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/opencode_spawn.py",
+          "reason": "AC-04a: idem.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/cost-report.py",
+          "reason": "AC-04/05: dos secciones por fuente.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/usage.py",
+          "reason": "Heredado de B1; se consume, no se reescribe.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0045-consumo-vocabulario-en-el-borde.md",
+          "reason": "AC-04 extiende 0045.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/023-senales-de-consumo/spec.md",
+          "reason": "Enmendada dos veces antes de B2.",
+          "status": "approved"
+        }
+      ],
       "attempts": {
-        "deep_review_cycles": 0,
+        "deep_review_cycles": 1,
         "repair_batches": 0,
-        "spawns": 0,
+        "spawns": 1,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 0
       },
       "candidate_identity": null,
       "complexity": "small",
-      "context_pack": null,
+      "context_pack": "docs/specs/023-senales-de-consumo/context/B2-el-reporte-dice-de-donde-sale.md",
       "delta_reviews": [],
       "dependencies": [
         "B1-registro-que-no-miente"
       ],
-      "diff_ref": null,
+      "diff_ref": "working-tree @ 4fbb19a (023/B2: claude_code_spawn.py:124-126,605-617 y opencode_spawn.py:91-93,321-333 cableados a usage.py, cost-report.py:390-460 dos secciones por fuente, 3 tests, ADR-0045 extendido)",
       "findings": [],
-      "gates": [],
-      "integrated": false,
+      "gates": [
+        {
+          "at": "2026-08-13T18:23:45+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T18:23:45+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T18:23:45+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T18:23:46+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
       "late_reviews": [],
       "module_impact_waiver": null,
-      "module_impacts": [],
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-13T18:30:02+00:00",
+          "cambio": "Los adaptadores de spawn traducen su forma al vocabulario del store, y el reporte separa las dos fuentes",
+          "feature_id": "023-senales-de-consumo",
+          "modelo_mental": "El gasto que el harness ya capturaba deja de descartarse, y el reporte no puede contar la misma plata dos veces",
+          "module": "routing",
+          "package_id": "B2-el-reporte-dice-de-donde-sale"
+        }
+      ],
       "objective": "Dos secciones nombradas por su fuente que nunca se suman, para que no haya doble conteo",
       "owned_paths": [
         "ai/scripts",
@@ -707,32 +1108,80 @@
       "repair_ceiling": null,
       "repairs": [],
       "review_panels": [],
-      "reviews": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T18:30:02+00:00",
+          "evidence": "Reviewer independiente codex/openai-codex/gpt-5.6-terra, independence_verified=true. VEREDICTO approved, sin hallazgos. Punto 1, con route-decide y dispatch_writer REALES contra stores temporales, salida literal: claude-code {usage_cache_read: 18101, usage_cache_write: 12573, usage_input: 10, usage_output: 43, usage_reasoning: null, usage_status: ok}; opencode {usage_cache_read: 0, usage_cache_write: 0, usage_input: 30322, usage_output: 0, usage_reasoning: 197, usage_status: ok}. Claude no informa reasoning y el campo queda null SIN inventar un cero. Mordida: reemplazo la normalizacion por el payload crudo y volvio a invalid; restaurado con cp. Punto 2: no existe total global ni diccionario combinado. Punto 3: mordidas sobre los tests nuevos.",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
       "risks": [],
       "routing_reason": null,
-      "runtime_qa": [],
+      "runtime_qa": [
+        {
+          "at": "2026-08-13T18:30:02+00:00",
+          "browser": "",
+          "checks": [
+            "El consumo que los lanes ya mandaban ahora se traduce y persiste no-NULL",
+            "El reporte no puede sumar las dos mediciones del mismo gasto"
+          ],
+          "evidence": "status_counts antes y despues por lane, medido por el implementer y re-verificado por el reviewer con dispatch real: claude-code y opencode pasan de 'invalid' a 'ok' con valores reales. Revertir el cableado devuelve 'invalid', confirmado en ambos. cost-report.py arma cli_native y harness_registry por separado, con TOTAL por seccion y disclaimer explicito de que nunca se suman.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
       "runtime_surface": true,
       "selected_model": null,
       "selected_role": null,
       "shared_paths": [],
-      "spawns": [],
-      "status": "planned",
+      "spawns": [
+        {
+          "at": "2026-08-13T17:18:29+00:00",
+          "client": "Que el gasto que el harness ya captura llegue completo, y que el reporte no cuente la misma plata dos veces.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Traducir las formas que los lanes ya mandan, y que el reporte no sume dos mediciones del mismo gasto",
+          "role": "implementer",
+          "route_id": "run1_566c34a108b5c9ca05efd67240b7e517",
+          "spawn_id": "SPAWN-001",
+          "tech": "AC-04a (nuevo, derivado de una medicion de B1), AC-04, AC-05. claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row descarta como invalid; hay que cablearlas a routing_core/usage.py. Y cost-report.py lee los stores propios de los CLIs, que son OTRA medicion del mismo gasto que dispatches: dos secciones que nunca se suman."
+        }
+      ],
+      "status": "accepted",
       "strict_tdd": false,
       "tasks": [
         {
           "blockers": [],
           "id": "Separar el consumo propio del de los stores de los CLIs (AC-04)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1095 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "Ninguna superficie muestra un total sin decir su fuente (AC-05)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1095 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         }
       ],
-      "testing": [],
+      "testing": [
+        {
+          "at": "2026-08-13T18:30:02+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1095 OK / 3 skips. Base 1092 -> 1095: 3 tests nuevos (UsageWiringRealDispatchTests con dispatch real por lane, y el de las dos secciones nunca sumadas).",
+          "status": "pass"
+        }
+      ],
       "verifications": []
     },
     {
@@ -880,7 +1329,7 @@
     }
   ],
   "phase": "PACKAGE_ACCEPTED",
-  "revision": 34,
+  "revision": 62,
   "schema_version": 1,
   "spec_amendments": [
     {
@@ -904,5 +1353,5 @@
       "reason": "AC-04a agregado a PKG-2: cablear los adaptadores de spawn a routing_core/usage.py. El implementer de B1 midio que claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row no reconoce. El endurecimiento de AC-02 las convierte en 'invalid' contado en vez de 'ok' con NULLs silencioso, pero no las traduce. Sin AC-04a, B1 deja el descarte visible y el dato sigue perdido."
     }
   ],
-  "updated_at": "2026-08-13T17:16:40+00:00"
+  "updated_at": "2026-08-13T18:30:03+00:00"
 }

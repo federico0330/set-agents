@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-13T17:12:55+00:00
+Actualizado: 2026-08-13T18:23:47+00:00
 
 ## Features
 
@@ -27,7 +27,7 @@ Actualizado: 2026-08-13T17:12:55+00:00
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 | 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
-| 023-senales-de-consumo | scoped | PACKAGE_REVIEW | B1-registro-que-no-miente (package_review) | 0/4 | 1/8 | 0/2 | 0 | - | - | 2026-08-13T17:12:55+00:00 transition |
+| 023-senales-de-consumo | scoped | PACKAGE_REVIEW | B2-el-reporte-dice-de-donde-sale (package_review) | 1/4 | 2/8 | 0/2 | 0 | - | - | 2026-08-13T18:23:47+00:00 transition |
 | 024-listo-para-terceros | scoped | PACKAGE_PLANNING | C4-higiene-de-repo-publico (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:19:15+00:00 create-package |
 | 025-consola-minima-y-flexible | scoped | PACKAGE_PLANNING | D5-vault-en-todo-spawn (planned) | 0/5 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:20:00+00:00 create-package |
 | 026-orquestador-elige-modelo | scoped | DONE | P2-modelo-por-instancia (accepted) | 2/2 | 2/8 | 1/2 | 0 | - | - | 2026-08-13T15:35:37+00:00 transition |
@@ -41,6 +41,10 @@ Actualizado: 2026-08-13T17:12:55+00:00
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-13T17:18:29+00:00] B2-el-reporte-dice-de-donde-sale · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que el gasto que el harness ya captura llegue completo, y que el reporte no cuente la misma plata dos veces.
+Ingeniería: AC-04a (nuevo, derivado de una medicion de B1), AC-04, AC-05. claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row descarta como invalid; hay que cablearlas a routing_core/usage.py. Y cost-report.py lee los stores propios de los CLIs, que son OTRA medicion del mismo gasto que dispatches: dos secciones que nunca se suman.
 
 [2026-08-13T15:39:35+00:00] B1-registro-que-no-miente · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el harness registre de verdad cuanto gasta cada agente, que hoy no lo hace.
@@ -97,8 +101,4 @@ Ingeniería: P3 de 022 (AC-07..10), clase security: lee archivos de credencial. 
 [2026-08-13T03:35:39+00:00] P2-techo-catalogo-tri-estado · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
 Cliente: Un revisor de otro proveedor de IA confirma que el cambio hace lo que dice y no abrio una puerta de mas.
 Ingeniería: Writer claude-code/anthropic/opus (run1_d8520988). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_0cbd3fc5, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida.
-
-[2026-08-13T02:14:54+00:00] P2-techo-catalogo-tri-estado · implementer · started · modelo anthropic/opus · effort medium
-Cliente: Que agregar un proveedor de IA nuevo deje de exigir editar un archivo de configuracion a mano.
-Ingeniería: P2 de 022 (AC-04..06). _configured_models -> resolve_ceiling con tres estados, consumido por los TRES sitios que hoy divergen: _probe_pairs:487-489 (el 'if not allowed: continue' que es el defecto), _read_probe_cache:429 (re-intersecta al leer; en auto una interseccion ingenua deja el cache siempre vacio) y build_snapshot:652-653 (que ademas tiene la lista de proveedores hardcodeada, alcance cedi…
 

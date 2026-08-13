@@ -20,6 +20,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"ai/scripts"))
 import claude_code_spawn
 import models_config
+import opencode_spawn
 import provider_registry
 import routing
 import set_agents_app
@@ -6595,6 +6596,149 @@ class ClaudeCodeSpawnTests(unittest.TestCase):
                                         "--task", "-", "--supplementary", "-"])
         spawn_mock.assert_not_called()
         self.assertIn("cannot both read stdin", err.getvalue())
+
+
+class UsageWiringRealDispatchTests(unittest.TestCase):
+    """023-senales-de-consumo PKG-B2 (AC-04a): `claude_code_spawn.dispatch_writer` /
+    `opencode_spawn.dispatch_writer` already attach `--usage` on every writer dispatch, in
+    the exact wire shape each lane's own child process reports (`total_cost_usd` +
+    `modelUsage` for claude-code -- `claude_code_spawn.py:602-609`; `{"tokens": {...}}` for
+    opencode -- `opencode_spawn.py:328-333`). Before this package, `_usage_row` (PKG-B1
+    hardening) turned that unrecognized-but-non-empty shape into a COUNTED `invalid`, never
+    a silent `ok`-with-NULLs -- but the data was still lost. This package wires both call
+    sites to `routing_core.usage.normalize_claude_code`/`normalize_opencode` so the SAME
+    shape they already send translates into the store's flat vocabulary instead.
+
+    These two tests exercise the REAL production path end to end, never a canned envelope:
+    a REAL `--route-decide` against a real (temp) routing store (subprocess, the actual
+    `set_agents_app.py`), a REAL `dispatch_writer` call whose OWN `--route-dispatched`/
+    `--route-terminal` calls are real subprocess calls too (never mocked) -- the ONLY thing
+    replaced is the innermost child-CLI spawn (`claude`/`opencode` themselves, which this
+    harness cannot invoke for free inside every `unittest discover` run); that one mock
+    returns the literal wire sample B1 measured LIVE this feature (see
+    `routing_core/usage.py`'s module docstring and `ClaudeCodeSpawnTests._CLAUDE_CODE_SAMPLE`/
+    `_OPENCODE_SAMPLE` above), never a fabricated shape. `status_counts`, read via the real
+    `--routing-report` CLI, is asserted BEFORE (empty store) and AFTER (one `ok` row) each
+    dispatch -- proof by state transition on the real store, not by assertion alone.
+
+    Manually confirmed red before this diff existed (per-package testing discipline): with
+    `claude_code_spawn.py:602-605`/`opencode_spawn.py:318-321` reverted to compose `--usage`
+    from the untranslated raw shape directly (the code exactly as B1 left it), both tests
+    below observed `after == {"invalid": 1}` instead of `{"ok": 1}` -- confirmed by running
+    this exact scenario against both the reverted and the fixed code, not asserted from
+    memory.
+    """
+
+    def _probe_stubs(self, td, *, claude_ok, opencode_ok):
+        """A trimmed, LOCAL copy of `RoutingTests._probe_stubs` (different `TestCase`, no
+        shared base here) -- fakes `codex`/`claude`/`opencode` auth-probe binaries so
+        catalog authorization is deterministic and hermetic, never a real network probe."""
+        bins = Path(td) / "bin"; bins.mkdir()
+        log = Path(td) / "probes.log"
+        claude_flag = "true" if claude_ok else "false"
+        opencode_body = (
+            'if [ "$1" = "auth" ]; then printf "\\342\\227\\217  OpenAI oauth\\n"; exit 0; fi\n'
+            'if [ "$2" = "openai" ]; then echo "openai/gpt-5.6-sol"; exit 0; fi\n'
+            'echo "Error: Provider not found: $2"; exit 0\n'
+        ) if opencode_ok else 'echo "Error: Provider not found: $2"; exit 0\n'
+        scripts = {
+            "codex": '#!/bin/sh\necho "$0 $@" >> %s\necho "Not logged in" 1>&2\n' % log,
+            "claude": "#!/bin/sh\necho \"$0 $@\" >> %s\necho '{\"loggedIn\": %s}'\n" % (log, claude_flag),
+            "opencode": ('#!/bin/sh\necho "$0 $@" >> %s\n' % log) + opencode_body,
+        }
+        for name, body in scripts.items():
+            path = bins / name; path.write_text(body); path.chmod(0o755)
+        return bins
+
+    def _cli_env(self, routing_root, bins):
+        env = dict(os.environ)
+        env["SET_AGENTS_ROUTING_TEST_ROOT"] = str(routing_root)
+        env["PATH"] = f"{bins}:{env['PATH']}"
+        return env
+
+    def _cli_run(self, args, env, input_text=None):
+        return subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", *args],
+                              cwd=ROOT, text=True, capture_output=True, env=env, input=input_text)
+
+    def _status_counts(self, env):
+        result = self._cli_run(["--routing-report", "--json"], env)
+        self.assertIn(result.returncode, (0, 1), result.stderr)
+        return json.loads(result.stdout)["data"]["tokens"]["status_counts"]
+
+    def test_claude_code_lane_real_dispatch_turns_invalid_into_ok_status_counts_before_and_after(self):
+        roster = models_config.load_roster(ROOT / "roles.tsv")
+        with tempfile.TemporaryDirectory() as td:
+            bins = self._probe_stubs(td, claude_ok=True, opencode_ok=False)
+            routing_root = Path(td) / "routing-root"
+            env = self._cli_env(routing_root, bins)
+
+            before = self._status_counts(env)
+            self.assertEqual(before, {})
+
+            descriptor = {"role": "implementer", "task_class": "mechanical", "selected_runtime": "claude-code"}
+            decide = self._cli_run(["--route-decide", "-", "--json"], env, json.dumps(descriptor))
+            self.assertEqual(decide.returncode, 0, decide.stderr)
+            ddata = json.loads(decide.stdout)["data"]
+            self.assertTrue(ddata["execution_enabled"], ddata)
+            self.assertEqual(ddata["runtime"], "claude-code")
+            run_id, provider, model = ddata["run_id"], ddata["provider"], ddata["model"]
+
+            # The exact shape `claude_code_spawn.py:446-457` extracts from a real `claude
+            # --output-format json` response -- the same literal sample this feature's own
+            # `routing_core/usage.py` module docstring measured live, never re-invented here.
+            model_usage = {"claude-haiku-4-5-20251001": {
+                "inputTokens": 10, "outputTokens": 43, "cacheReadInputTokens": 18101,
+                "cacheCreationInputTokens": 12573, "webSearchRequests": 0, "costUSD": 0.0271811,
+                "contextWindow": 200000, "maxOutputTokens": 32000,
+                "canonicalModel": "claude-haiku-4-5", "provider": "firstParty"}}
+            with mock.patch.object(claude_code_spawn, "spawn",
+                                   return_value=("success", {"model": "claude-haiku-4-5",
+                                                              "modelUsage": model_usage,
+                                                              "total_cost_usd": 0.0271811,
+                                                              "session_id": None, "result": ""})):
+                result = claude_code_spawn.dispatch_writer(
+                    "implementer", "reply with exactly one word: hi", run_id, provider, model,
+                    roster, routing_test_root=str(routing_root), spawn_cwd=str(ROOT))
+            self.assertEqual(result["status"], "success", result)
+
+            after = self._status_counts(env)
+            self.assertEqual(after, {"ok": 1})
+
+    def test_opencode_lane_real_dispatch_turns_invalid_into_ok_status_counts_before_and_after(self):
+        roster = models_config.load_roster(ROOT / "roles.tsv")
+        with tempfile.TemporaryDirectory() as td:
+            bins = self._probe_stubs(td, claude_ok=False, opencode_ok=True)
+            routing_root = Path(td) / "routing-root"
+            env = self._cli_env(routing_root, bins)
+
+            before = self._status_counts(env)
+            self.assertEqual(before, {})
+
+            descriptor = {"role": "implementer", "task_class": "mechanical", "selected_runtime": "opencode"}
+            decide = self._cli_run(["--route-decide", "-", "--json"], env, json.dumps(descriptor))
+            self.assertEqual(decide.returncode, 0, decide.stderr)
+            ddata = json.loads(decide.stdout)["data"]
+            self.assertTrue(ddata["execution_enabled"], ddata)
+            self.assertEqual(ddata["runtime"], "opencode")
+            run_id, provider, model = ddata["run_id"], ddata["provider"], ddata["model"]
+
+            # The exact `part.tokens` sub-object `opencode_spawn.py:255-256`/`:328`
+            # extracts from a real `opencode run --format json` `step_finish` event -- the
+            # same literal sample this feature's own `routing_core/usage.py` module
+            # docstring measured live, never re-invented here.
+            tokens = {"total": 30493, "input": 30322, "output": 0, "reasoning": 197,
+                      "cache": {"write": 0, "read": 0}}
+            with mock.patch.object(opencode_spawn, "spawn",
+                                   return_value=("success", {"model_ref": "openai/gpt-5.6-sol",
+                                                              "model_verified": False, "result": "",
+                                                              "tokens": tokens})):
+                result = opencode_spawn.dispatch_writer(
+                    "implementer", "reply with exactly one word: hi", run_id, provider, model,
+                    roster, routing_test_root=str(routing_root), spawn_cwd=str(ROOT))
+            self.assertEqual(result["status"], "success", result)
+
+            after = self._status_counts(env)
+            self.assertEqual(after, {"ok": 1})
 
 
 if __name__ == "__main__": unittest.main()

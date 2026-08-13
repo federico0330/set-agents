@@ -1,18 +1,35 @@
 #!/usr/bin/env python3
-"""Token-consumption report per project across the three harnesses, plus the pi lane.
+"""Token-consumption report per project -- TWO sections, named by source, NEVER summed
+together (023-senales-de-consumo PKG-B2, AC-04/AC-05): this harness's own dispatch ledger
+and each CLI's own native accounting are two independent MEASUREMENTS OF OVERLAPPING SPEND,
+never two halves of one total.
 
-Reads the session stores each harness already writes (no instrumentation):
+Section 1 -- CLI-NATIVE STORES (each CLI's own accounting, entirely independent of whether
+the harness dispatched the run at all -- a session started by hand shows up here too):
 - OpenCode:    ~/.local/share/opencode/opencode.db  (session table aggregates, per-agent)
 - Claude Code: ~/.claude/projects/<enc-cwd>/**/*.jsonl (per-message usage, per-agent)
 - Codex:       ~/.codex/state_5.sqlite threads (per-thread aggregate; --deep parses the
                rollout jsonl for the cached/reasoning breakdown)
-- pi:          the routing database this harness's own dispatches write
-               (~/.local/state/set-agentes/routing-v2/routing.db). Coverage is bounded to
-               spawns the harness itself dispatched through set_agents_spawn.py — a `pi`
-               session started by hand is invisible here. The stored project_key is a
-               one-way hash, not invertible to a directory: the pi lane is attributed to a
-               project only when --project is given (the key is recomputed locally and
-               matched); otherwise it is reported unattributed rather than guessed.
+
+Section 2 -- HARNESS DISPATCH REGISTRY (this harness's own `dispatches` table,
+~/.local/state/set-agentes/routing-v2/routing.db, 023-senales-de-consumo PKG-B1/B2): every
+run the ROUTER ITSELF dispatched and closed with usable usage, across EVERY runtime it can
+route to -- pi natively, plus any claude-code-lane/opencode-lane redirect PKG-B2 wired onto
+the store's flat vocabulary (`routing_core/usage.py`). Every row is still labeled "pi" for
+historical reasons this package does not fix (cosmetic, per the package's own context pack)
+-- but this section's COVERAGE is every runtime the harness dispatches, not only the pi CLI.
+Bounded to spawns the harness itself dispatched through set_agents_spawn.py/
+claude_code_spawn.py/opencode_spawn.py -- a session started by hand is invisible here. The
+stored project_key is a one-way hash, not invertible to a directory: this section is
+attributed to a project only when --project is given (the key is recomputed locally and
+matched); otherwise it is reported unattributed rather than guessed.
+
+WHY THESE NEVER SUM (AC-04): a run the harness dispatches through the claude-code or
+opencode lane is the SAME spend Section 1 already counts from that CLI's own transcript/
+session store -- Section 2 counts it a SECOND time, from the router's own vantage point.
+Adding the two sections' totals into one grand total would double-count that spend. Each
+section prints only its OWN total; this report never prints one total across sections
+(AC-05 -- no total anywhere on this surface without saying which section it came from).
 
 Tokens only — subscription plans have no meaningful dollar-per-token, what matters is quota.
 
@@ -39,12 +56,16 @@ FIELDS = ("input", "output", "cache_read", "cache_write", "reasoning")
 def parse_args():
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
-        epilog="pi lane coverage: only spawns dispatched through set_agents_spawn.py; a pi "
-               "session started by hand is invisible here. Without --project it is reported "
-               "unattributed (project_key is a one-way hash, never guessed back to a path).",
+        epilog="Two sections, never summed (AC-04/AC-05): Section 1 is each CLI's own native "
+               "store; Section 2 is this harness's own dispatch registry (every runtime it "
+               "dispatched, labeled 'pi' per row for historical reasons -- see the module "
+               "docstring). Section 2 coverage: only spawns dispatched through "
+               "set_agents_spawn.py/claude_code_spawn.py/opencode_spawn.py; a session started "
+               "by hand is invisible there. Without --project it is reported unattributed "
+               "(project_key is a one-way hash, never guessed back to a path).",
     )
     parser.add_argument("--project", help="only sessions whose cwd is inside this directory "
-                        "(also required to attribute the pi lane to a project)")
+                        "(also required to attribute Section 2 to a project)")
     parser.add_argument("--since", help="only sessions updated on/after this date (YYYY-MM-DD)")
     parser.add_argument("--md", action="store_true", help="markdown output")
     parser.add_argument("--deep", action="store_true", help="Codex: parse rollouts for cached/reasoning split")
@@ -370,9 +391,21 @@ def fmt(n):
     return str(n)
 
 
-def render(report, md):
+def render(report, md, *, title, source):
+    """AC-04/AC-05: `title`/`source` are printed WITH the table, never only in this
+    module's docstring -- a reader looking at one call's output alone still sees which of
+    the two sections it is and that the `TOTAL` row is scoped to THIS section only. Two
+    separate calls (`main`, below) are the only way this module ever renders a total --
+    there is no code path that sums `report` dicts from different sections together."""
+    heading = f"{title} (source: {source})"
+    if md:
+        print(f"## {heading}")
+    else:
+        print(heading)
+        print("=" * len(heading))
     if not report:
         print("No sessions matched.")
+        print()
         return
     header = ("project", "harness", "model", "agent", "sessions", "input", "output", "cache_read", "cache_write", "reasoning", "total")
     rows = []
@@ -385,7 +418,10 @@ def render(report, md):
             totals[field] += bucket[field]
         totals["sessions"] += bucket["sessions"]
     grand = sum(totals[field] for field in FIELDS)
-    footer = ("TOTAL", "", "", "", str(totals["sessions"]), *(fmt(totals[field]) for field in FIELDS), fmt(grand))
+    # AC-05: the footer literally says "this section only" -- a total copy-pasted out of
+    # context (e.g. into a chat message) still carries its own scope with it.
+    footer = (f"TOTAL ({title}, this section only)", "", "", "", str(totals["sessions"]),
+             *(fmt(totals[field]) for field in FIELDS), fmt(grand))
     if md:
         print("| " + " | ".join(header) + " |")
         print("|" + "---|" * len(header))
@@ -395,18 +431,40 @@ def render(report, md):
         widths = [max(len(str(row[i])) for row in [header, footer, *rows]) for i in range(len(header))]
         for row in [header, *rows, footer]:
             print("  ".join(str(cell).ljust(width) for cell, width in zip(row, widths)))
+    print()
+
+
+# AC-04: two sections, named by their own source, that this module never sums together --
+# see the module docstring's "WHY THESE NEVER SUM" paragraph for the double-count risk this
+# split exists to prevent.
+_SECTION_1_TITLE = "Section 1 -- CLI-native stores"
+_SECTION_1_SOURCE = "opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting)"
+_SECTION_2_TITLE = "Section 2 -- harness dispatch registry"
+_SECTION_2_SOURCE = "routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime)"
+_NEVER_SUM_DISCLAIMER = (
+    "These two sections measure OVERLAPPING spend from different vantage points -- a run this "
+    "harness dispatches through the claude-code or opencode lane is counted in BOTH sections "
+    "above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows "
+    "together; each section's own total is the only total this report ever prints (AC-05)."
+)
 
 
 def main():
     args = parse_args()
     home = Path(args.home)
     since_ms = since_epoch_ms(args.since)
-    report = defaultdict(new_bucket)
-    collect_opencode(report, home, args.project, since_ms)
-    collect_claude(report, home, args.project, since_ms)
-    collect_codex(report, home, args.project, since_ms, args.deep)
-    collect_pi(report, home, args.project, since_ms)
-    render(report, args.md)
+
+    cli_native = defaultdict(new_bucket)
+    collect_opencode(cli_native, home, args.project, since_ms)
+    collect_claude(cli_native, home, args.project, since_ms)
+    collect_codex(cli_native, home, args.project, since_ms, args.deep)
+
+    harness_registry = defaultdict(new_bucket)
+    collect_pi(harness_registry, home, args.project, since_ms)
+
+    render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
+    render(harness_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
+    print(_NEVER_SUM_DISCLAIMER)
 
 
 if __name__ == "__main__":

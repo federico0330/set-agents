@@ -1,7 +1,9 @@
 # ADR-0045 — Un vocabulario de consumo, traducido en el borde
 
 - Estado: Accepted (2026-08-13). Feature 023-senales-de-consumo, PKG-B1
-  (`B1-registro-que-no-miente`, AC-01..AC-03). No supersede nada.
+  (`B1-registro-que-no-miente`, AC-01..AC-03). No supersede nada. **Extendido por PKG-B2**
+  (`B2-el-reporte-dice-de-donde-sale`, AC-04a/AC-04/AC-05, mismo día) — ver §§4-5 y la
+  actualización de Consecuencias al final de este documento.
 
 ## Contexto
 
@@ -90,6 +92,51 @@ no seguir"*. El caso que NO necesita `--usage` (el cierre de un worker perdido/m
 abandono antes de dispatch, 3a) se nombra explícitamente como excluido, porque `close_run` fuerza
 `absent` en esa rama sin importar qué se pase — pedir `--usage` ahí sería ruido, no señal.
 
+## Extensión — PKG-B2 (2026-08-13): el cableado que B1 dejó nombrado, y el doble conteo
+
+B1 dejó dos cosas nombradas a propósito, no reparadas (§2 "no se conecta a ningún punto de
+dispatch" y la nota "el hallazgo adicional... fuera de `ALCANCE`" en el Contexto de arriba):
+que `claude_code_spawn.py:602-605`/`opencode_spawn.py:318-321` YA intentaban `--usage`, en
+una forma que `_usage_row` no reconocía; y el riesgo de doble conteo entre `dispatches` (el
+registro propio del harness) y los stores propios de cada CLI que `cost-report.py` lee. Este
+paquete cierra ambos, dentro de su propio `ALCANCE` (`claude_code_spawn.py`/
+`opencode_spawn.py`/`cost-report.py`/`tests/`).
+
+### 4. El cableado: `routing_core/usage.py` importado en el borde real, no sólo citado en la doctrina
+
+`claude_code_spawn.py:605-617` y `opencode_spawn.py:321-333` ahora importan y llaman
+`normalize_claude_code`/`normalize_opencode` (de `routing_core.usage`, sin re-derivar el
+mapeo) sobre la MISMA forma que ya extraían (`total_cost_usd`+`modelUsage` /
+`{"tokens": {...}}`), justo antes de componer `--usage`. `_usage_row` no se toca: la
+traducción sigue ocurriendo estrictamente en el borde, tal como este ADR ya decidía en su
+§2 — la wiring es la única novedad, el mapeo mismo es el que B1 ya midió y no se re-deriva.
+
+Medido con un dispatch real por lane (store real en disco, ciclo `--route-decide ->
+--route-dispatched -> --route-terminal` real vía subproceso contra `set_agents_app.py`;
+sólo el spawn del hijo LLM —`claude`/`opencode` mismos— está mockeado, con la muestra que
+B1 ya midió en vivo, nunca inventada): `status_counts` pasa de `{}` a `{"ok": 1}` en vez de
+`{"invalid": 1}` para los dos lanes (confirmado en rojo con el cableado revertido, y en
+verde restaurado — `docs/specs/023-senales-de-consumo/evidence/B2-implementer.md`).
+
+### 5. El doble conteo: dos secciones, nombradas por su fuente, nunca sumadas
+
+`cost-report.py` arma DOS diccionarios de reporte separados y llama a `render()` dos veces
+— nunca uno solo combinado:
+- **Sección 1 — CLI-native stores**: `collect_opencode`+`collect_claude`+`collect_codex`,
+  exactamente como antes de este paquete.
+- **Sección 2 — harness dispatch registry**: `collect_pi` (que en realidad lee `dispatches`
+  para TODO runtime que el harness despache — pi, y ahora también claude-code-lane/
+  opencode-lane una vez que §4 los hace `ok` — no sólo el CLI `pi`; la etiqueta de fila
+  `"pi"` sigue siendo cosmética, deliberadamente sin tocar, tal como el context pack de
+  este paquete la nombra explícitamente fuera de alcance).
+
+Cada `render()` imprime su propio título+fuente y su propio `TOTAL (..., this section
+only)`; `main()` nunca suma los dos diccionarios entre sí — no hay ningún `report` dict que
+contenga las dos fuentes a la vez — y el módulo imprime un disclaimer explícito al final:
+las dos secciones miden el MISMO gasto solapado desde dos vantage points distintos (un
+dispatch por el lane claude-code/opencode cuenta en las dos secciones a la vez desde que §4
+existe), sumarlas duplicaría esa plata.
+
 ## Alternativas rechazadas
 
 - **Relajar `_usage_row` para aceptar cualquier forma cruda de runtime directamente** (que el
@@ -114,10 +161,18 @@ abandono antes de dispatch, 3a) se nombra explícitamente como excluido, porque 
   verdad (`usage.py`) nombrada explícitamente para que un cambio de formato futuro se corrija ahí
   primero, nunca sólo en el prosa de la doctrina.
 - El defecto latente en `claude_code_spawn.py`/`opencode_spawn.py` (usage adjuntado en una forma
-  que `_usage_row` no reconoce) queda documentado y sin reparar — candidato explícito para B2.
-- El doble conteo con los stores de los CLIs (B2), rollups/retención (B3) y estimación (B4) quedan
-  fuera de este ADR, tal como los nombra el context pack de B1.
+  que `_usage_row` no reconoce) quedó documentado en PKG-B1 y **se cerró en PKG-B2** (§4 arriba):
+  ambos lanes ahora traducen antes de componer `--usage`, reusando el mismo traductor.
+- `cost-report.py` (PKG-B2, §5 arriba) ya no puede producir un total que sume dos mediciones del
+  mismo gasto — estructuralmente, no por convención: no existe ningún `report` dict que contenga
+  las dos fuentes a la vez, y cada sección imprime su propio total con su propio nombre.
+- El label `"pi"` por fila en la Sección 2 de `cost-report.py` sigue siendo impreciso para
+  dispatches claude-code/opencode-lane cerrados por el harness — nombrado, deliberadamente sin
+  reparar (cosmético, ver el context pack de PKG-B2).
+- Rollups/retención (B3) y estimación (B4) quedan fuera de este ADR, tal como los nombra el
+  context pack de B1 (y el de B2, que tampoco los toca).
 
 ## Evidencia
 
-`docs/specs/023-senales-de-consumo/evidence/B1-implementer.md`.
+`docs/specs/023-senales-de-consumo/evidence/B1-implementer.md` (PKG-B1) y
+`docs/specs/023-senales-de-consumo/evidence/B2-implementer.md` (PKG-B2).

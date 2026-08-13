@@ -11,6 +11,7 @@ subgraph sg_023_senales_de_consumo["023-senales-de-consumo"]
   end
   subgraph sg_023_senales_de_consumo_b2_el_reporte_dice_de_donde_sale["B2-el-reporte-dice-de-donde-sale"]
     package_023_senales_de_consumo_b2_el_reporte_dice_de_donde_sale_1["package: B2-el-reporte-dice-de-donde-sale"]
+    spawn_023_senales_de_consumo_b2_el_reporte_dice_de_donde_sale_1["SPAWN-001 implementer Traducir las formas que los lanes ya mandan, y que el reporte no sume dos mediciones del mismo ga…"]
   end
   subgraph sg_023_senales_de_consumo_b3_ventana_y_rollup["B3-ventana-y-rollup"]
     package_023_senales_de_consumo_b3_ventana_y_rollup_1["package: B3-ventana-y-rollup"]

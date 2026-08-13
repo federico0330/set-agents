@@ -121,6 +121,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config  # noqa: E402  (load_roster only -- the CLI entry point's own roster source)
 from routing_core.store import RoutingStore  # noqa: E402  (SEC-P1-003: the audit-trail sink's own 0700 root)
 from routing_core.domain import classify_pi_terminal_error  # noqa: E402  (017 PKG-C1: shared settled-signature allowlist)
+from routing_core.usage import normalize_claude_code  # noqa: E402  (023 PKG-B2: the ONE translator for this
+# lane's own `total_cost_usd`+`modelUsage` wire shape into the store's flat vocabulary -- never a second,
+# independently-drifting copy of that mapping here; see `routing_core/usage.py`'s module docstring)
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_CLI = ROOT / "ai/scripts/set_agents_app.py"
@@ -599,10 +602,19 @@ def dispatch_writer(role: str, task: str, run_id: str, provider: str, model: str
             terminal_args = ["--route-quota-exhausted", run_id, "--quota-error",
                              json.dumps(detail["quota_error"]),
                              "--latency-ms", str(latency_ms), "--json"]
+        # 023-senales-de-consumo PKG-B2 (ADR-0045): this lane's own `total_cost_usd`+
+        # `modelUsage` shape is genuinely what `claude --output-format json` reports
+        # (module docstring, `_classify_result`) -- never invented here -- but it is not
+        # the store's flat vocabulary, so `_usage_row` could not recognize it (PKG-B1
+        # hardening turned that mismatch into a COUNTED `invalid`, never a silent NULL
+        # row). `normalize_claude_code` is the ONE place that already measured this exact
+        # wire shape and translates it; this is the wiring, not a second translation.
         usage = detail.get("modelUsage")
         if isinstance(usage, dict) and usage:
-            terminal_args += ["--usage", json.dumps({"total_cost_usd": detail.get("total_cost_usd"),
-                                                      "modelUsage": usage})]
+            translated = normalize_claude_code({"total_cost_usd": detail.get("total_cost_usd"),
+                                                 "modelUsage": usage})
+            if translated:
+                terminal_args += ["--usage", json.dumps(translated)]
         terminal = _run_app_cli(terminal_args, env=env, cwd=routing_cwd)
         if detail.get("quota_error"):
             quota_result = _last_json_line(terminal.stdout).get("data", {})

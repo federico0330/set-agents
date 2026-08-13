@@ -22,7 +22,7 @@
 - [[features/020-honest-dashboard|020-honest-dashboard]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
-- [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `PACKAGE_REVIEW` · paquetes 0/4
+- [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `PACKAGE_REVIEW` · paquetes 1/4
 - [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `PACKAGE_PLANNING` · paquetes 0/4
 - [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_PLANNING` · paquetes 0/5
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
@@ -64,7 +64,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-13T17:12:55+00:00_
+_Actualizado: 2026-08-13T18:23:47+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias
