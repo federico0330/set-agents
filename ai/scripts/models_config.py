@@ -3,8 +3,10 @@
 
 roles.tsv holds structure only (role, mode, temperature, capability, duty);
 models.toml declares subscriptions, the model catalog, and the model assigned
-to each area (duty), with optional per-role overrides. The go-zen/zen/local
-profiles survive as lanes of the opencode dimension.
+to each area (duty), with optional per-role overrides. The go-zen/zen/openai-only
+profiles survive as lanes of the opencode dimension (ADR-0048, 024 C2: the third
+lane was called "local" although every one of its own catalog cells is a remote
+API call -- COMO-CAMBIAR-MODELO.md already documented it as "openai/* only").
 """
 
 import csv
@@ -26,7 +28,7 @@ from pathlib import Path
 import provider_registry
 
 ROOT = Path(__file__).resolve().parents[2]
-LANES = ("go-zen", "zen", "local")
+LANES = ("go-zen", "zen", "openai-only")
 PERMISSION_PROFILES = ("guarded", "yolo")
 DUTY_ORDER = ("coord", "analysis", "docs", "implement", "gate", "audit", "judge", "release", "memory", "ops")
 ROSTER_COLUMNS = {"role", "mode", "temperature", "capability", "duty"}
@@ -141,9 +143,15 @@ def load_config(models_path=None):
     schema = config.get("schema")
     if schema not in (1, 2):
         die("models.toml: unsupported schema (expected schema = 1 or 2)")
-    for section in ("subscriptions", "catalog", "session", "areas"):
+    for section in ("catalog", "session", "areas"):
         if not isinstance(config.get(section), dict) or not config[section]:
             die(f"models.toml: missing or empty [{section}]")
+    # ADR-0048 (024 C2, AC-03): [subscriptions] is the one section allowed to be an
+    # EMPTY table -- "ausente = auto" (ADR-0029) for every provider is the neutral,
+    # third-party-safe default; only its PRESENCE as a table is mandatory (a missing
+    # header entirely is still a schema error, same as before).
+    if not isinstance(config.get("subscriptions"), dict):
+        die("models.toml: missing [subscriptions] (an empty table is valid; the key must exist)")
     for key in ("claude", "codex", "codex_effort"):
         values = config["catalog"].get(key)
         if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
@@ -259,6 +267,91 @@ def permission_profile(models_path=None):
     return load_config(models_path)["permissions"].get("profile", "guarded")
 
 
+# ADR-0048 (024 C2, AC-05): per-machine [subscriptions] overlay -- the ONE
+# models.toml section that is a machine credential fact, never a project-curated
+# default (unlike [areas.*]/[roles.*], which stay in the tracked file by design --
+# see docs/adr/0048-*.md). Absent file == no overlay == every subscription "auto"
+# (ADR-0029). `setup_models.py`'s wizard (Suscripciones) and its `--add`/`--drop`
+# flags write here now, immediately, never into the tracked models.toml -- that
+# rewrite is what used to dirty the tree and block `--update` forever via
+# `set_agents_app.tree_clean()` (AC-05).
+
+
+def subscriptions_overlay_path():
+    """The same private per-user directory `set_agents_app.STATE_DIR`/
+    `MODEL_PREFERENCE_PATH` already live in -- resolved by LAZILY importing
+    `set_agents_app` (never at module scope: `set_agents_app` already imports
+    `models_config` unconditionally at ITS module scope, so a top-level import
+    here would be the real cycle) rather than hand-rolling that same home-directory
+    expression a second time in this file. ADR-0043's own tripwire (tests/
+    test_routing.py::test_adr0043_ac10_no_call_site_still_passes_the_legacy_state_
+    dir_shaped_root) exists precisely to keep that expression from reappearing here
+    as a second, independently-drifting root -- reusing the one `set_agents_app`
+    already computed closes that lesson further, not just avoids its tripwire."""
+    import set_agents_app
+    return set_agents_app.STATE_DIR / "subscriptions.local.toml"
+
+
+def load_subscriptions_overlay(path=None):
+    """Best-effort read of the per-machine overlay: a missing or malformed file
+    degrades to {} (== no override), same "never crash the caller" discipline as
+    `detect_subscriptions`. Never reads or returns anything beyond bool pins by
+    subscription name -- no credential material lives in this file either."""
+    overlay_path = Path(path) if path is not None else subscriptions_overlay_path()
+    try:
+        raw = tomllib.loads(overlay_path.read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    values = raw.get("subscriptions")
+    if not isinstance(values, dict):
+        return {}
+    return {key: value for key, value in values.items() if isinstance(key, str) and isinstance(value, bool)}
+
+
+def write_subscription_overlay(subscription, value, path=None):
+    """Atomic read-modify-write of the overlay (tempfile + os.replace, same discipline
+    as `emit_atomic`/set_agents_app.py's `atomic_write`). `value` True/False pins or
+    excludes `subscription` on THIS machine; `value=None` removes the key (back to
+    auto). Returns the resulting full overlay dict."""
+    overlay_path = Path(path) if path is not None else subscriptions_overlay_path()
+    current = load_subscriptions_overlay(overlay_path)
+    if value is None:
+        current.pop(subscription, None)
+    else:
+        current[subscription] = bool(value)
+    lines = [
+        "# subscriptions.local.toml -- per-machine [subscriptions] overlay (ADR-0048).",
+        "# Written by ./setup-models.sh (wizard: Suscripciones; or --add/--drop);",
+        "# models.toml stays neutral so a fresh clone starts at ausente = auto.",
+        "[subscriptions]",
+    ]
+    for key in sorted(current):
+        lines.append(f"{key} = {'true' if current[key] else 'false'}")
+    content = "\n".join(lines) + "\n"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{overlay_path.name}.", dir=overlay_path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, overlay_path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return current
+
+
+def effective_subscriptions(config):
+    """[subscriptions] merged with this machine's overlay (ADR-0048) -- the overlay
+    wins per key (a machine's own true/false pin), but a curated tracked-file `false`
+    still applies when the overlay says nothing about that key: "auto" in the
+    overlay never silently re-enables a curated exclusion (ADR-0029's contract).
+    Read-only view for validation/display -- `config["subscriptions"]` itself (what
+    `emit()` serializes) is never touched by this."""
+    return {**config.get("subscriptions", {}), **config.get("_subscriptions_overlay", {})}
+
+
 # ADR-0029 (017 PKG-A1): provider→subscription map for probe-backed detection.
 _PROVIDER_SUBSCRIPTION = {
     "openai-codex": "openai",
@@ -302,8 +395,8 @@ def detect_subscriptions(config):
 def auto_profile(config=None):
     """The lane is derived from the probe, never hand-picked (the old use-*.sh
     scripts are gone). Both opencode pairs live → go-zen; only opencode-zen →
-    zen; probe fine but no opencode pair → local. None on probe failure — the
-    caller keeps whatever active-profile already says and never dies."""
+    zen; probe fine but no opencode pair → openai-only. None on probe failure —
+    the caller keeps whatever active-profile already says and never dies."""
     try:
         from routing_core.catalog import probe_inventory
         cfg = config if config is not None else load_config()
@@ -315,7 +408,7 @@ def auto_profile(config=None):
         return "go-zen"
     if "opencode-zen" in live:
         return "zen"
-    return "local"
+    return "openai-only"
 
 
 def subscription_of(model, config):
@@ -440,6 +533,7 @@ def load_role_tiers(config, profile):
     if profile not in LANES:
         die(f"unsupported profile: {profile}")
     subscriptions = config["subscriptions"]
+    detected_subscriptions = None  # ADR-0029/ADR-0048: lazily probed, only when an absent key is hit
     result = {}
     for role, override in config.get("roles", {}).items():
         if not isinstance(override, dict) or TIER_FIELD not in override:
@@ -477,10 +571,26 @@ def load_role_tiers(config, profile):
                 die(f"{role}: invalid OpenCode tier model id for tier {tier}")
             subscription = subscription_of(model, config)
             if not subscriptions.get(subscription):
-                die(
-                    f"{role}: tier {tier} model {model} needs the '{subscription}' subscription, "
-                    "which is inactive in models.toml — reassign it (./setup-models.sh) or re-enable the subscription"
-                )
+                # ADR-0048 (024 C2): parity with `load_roles`'s own ADR-0029 tri-state
+                # (this function pre-dated it and, uniquely, never got it -- invisible
+                # while [subscriptions] always declared every used provider explicitly
+                # true; AC-03 leaving it neutral by default made the gap a hard, silent
+                # `die()` on every tiered role, on every machine, always).
+                if subscription in subscriptions or os.environ.get("SET_AGENTS_STRICT_MODELS") == "1":
+                    die(
+                        f"{role}: tier {tier} model {model} needs the '{subscription}' subscription, "
+                        "which is inactive in models.toml — reassign it (./setup-models.sh) or re-enable the subscription"
+                    )
+                if detected_subscriptions is None:
+                    detected_subscriptions = detect_subscriptions(config)
+                if detected_subscriptions is None or subscription not in detected_subscriptions:
+                    print(
+                        f"WARN degraded {role}@{tier}: {model} necesita la suscripción "
+                        f"'{subscription}' y el probe no la detectó en esta máquina — se mantiene el pin "
+                        "(el routing en vivo la excluye como PROVIDER_UNAUTHENTICATED); si la diste de "
+                        "baja a propósito, declarala false en models.toml o remapeá con ./setup-models.sh",
+                        file=sys.stderr,
+                    )
             resolved[tier] = model
         result[role] = resolved
     return result

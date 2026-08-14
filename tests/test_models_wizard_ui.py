@@ -95,15 +95,26 @@ class WizardBehaviorTests(unittest.TestCase):
         self.assertNotIn("AREA", out)
         self.assertIn("AREA", picker.call_args.kwargs["header"])  # lives in the picker frame
 
-    def test_subscription_auto_removes_the_key(self):
-        config, out, _ = self._run([
-            setup_models.tui.Selected(2),   # Suscripciones
-            setup_models.tui.Selected(1),   # choose(): "ollama" (sorted: anthropic, ollama)
-            setup_models.tui.Selected(2),   # tri-state: Auto (borrar la línea)
-            setup_models.tui.Selected(4),   # Salir sin guardar
-        ])
-        self.assertNotIn("ollama", config["subscriptions"])
-        self.assertIn("auto", out)
+    def test_subscription_auto_writes_the_overlay_never_the_tracked_config(self):
+        # ADR-0048 (024 C2, AC-05): the wizard's Suscripciones no longer touches
+        # `config["subscriptions"]` (the tracked models.toml) at all -- it writes the
+        # per-machine overlay, immediately, which is what stops a subscription toggle
+        # from dirtying the tree and blocking --update forever (tree_clean()).
+        with mock.patch.object(setup_models.models_config, "write_subscription_overlay",
+                               return_value={"anthropic": True}) as write:
+            config, out, _ = self._run([
+                setup_models.tui.Selected(2),   # Suscripciones
+                setup_models.tui.Selected(1),   # choose(): "ollama" -- candidate universe is
+                                                 # now the audited 4 names, sorted: anthropic,
+                                                 # ollama, openai, zen (index 1 == ollama)
+                setup_models.tui.Selected(2),   # tri-state: Auto (el probe decide)
+                setup_models.tui.Selected(4),   # Salir sin guardar
+            ])
+        write.assert_called_once_with("ollama", None)
+        self.assertEqual(config["subscriptions"], {"anthropic": True, "ollama": False})
+        self.assertEqual(config["_subscriptions_overlay"], {"anthropic": True})
+        self.assertIn("auto en este equipo", out)
+        self.assertIn("efectivo ya", out)
 
     def test_discovered_provider_toggle_round_trips(self):
         # ADR-0035 (AC-16): option 7 is now a three-way policy picker (auto/manual/none);

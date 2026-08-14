@@ -8,6 +8,12 @@ NOT `build.sh --check`, whose job since ADR-0041 is comparing Global/, not
 validating a config nothing has regenerated Global/ from yet) and --install.
 Writing is atomic and always validated in memory first (all three lanes); an
 invalid change never reaches the file.
+
+ADR-0048 (024 C2): [subscriptions] is the one field this file never writes into
+models.toml -- the wizard's Suscripciones and the --add/--drop flags write the
+per-machine overlay (`models_config.subscriptions_overlay_path()`, under
+`$STATE_DIR`) instead, immediately, so a machine's own credentials can never
+dirty the tracked tree (that used to block `--update` forever, tree_clean()).
 """
 
 import argparse
@@ -137,12 +143,26 @@ def dropped_cells(config, roster, subscription):
     return affected
 
 
+def _subscription_candidates(config):
+    """ADR-0048 (024 C2): the wizard/`--add`/`--drop` candidate universe. A neutral
+    tracked file (AC-03) has an EMPTY `[subscriptions]`, so offering only its keys
+    (the pre-024 behavior) would leave nothing to pick; the audited
+    `SUBSCRIPTION_BY_PREFIX` targets are the real closed universe, extended by any
+    repo `[providers]` addition and by whatever this machine (tracked file or
+    overlay) already names, so a hand-edited exotic subscription still shows up."""
+    names = set(models_config.SUBSCRIPTION_BY_PREFIX.values())
+    names |= set(config.get("providers", {}).values())
+    names |= set(config.get("subscriptions", {}))
+    names |= set(config.get("_subscriptions_overlay", {}))
+    return sorted(names)
+
+
 def _status_lines(config, roster, profile):
     """The lines `status()` prints -- factored out so `wizard()` can ALSO pass them as the
     WIZARD_ITEMS picker's `header=` (F-03): the config table used to be print()ed to the normal
     screen right before `run_picker` cleared it into the alternate screen, invisible exactly
     while the user is choosing what to change."""
-    subs = ", ".join(f"{k}={'on' if v else 'off'}" for k, v in sorted(config["subscriptions"].items()))
+    subs = ", ".join(f"{k}={'on' if v else 'off'}" for k, v in sorted(models_config.effective_subscriptions(config).items()))
     lines = [
         f"profile: {profile}    subscriptions: {subs}",
         f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]",
@@ -183,7 +203,10 @@ def _panel_lines(config, roster, profile, detected=None):
     (false), auto (absent — the probe decides; live state when `detected` came
     from a successful probe). `--status` keeps the full machine dump."""
     subs = []
-    subscriptions = config.get("subscriptions", {})
+    # ADR-0048 (024 C2): the EFFECTIVE view (tracked [subscriptions] merged with this
+    # machine's overlay) -- a neutral tracked file (AC-03) alone would show every
+    # subscription as "auto" even on a machine that curated one off via the overlay.
+    subscriptions = models_config.effective_subscriptions(config)
     for key in sorted(set(subscriptions) | (detected or set())):
         if key not in subscriptions:
             live = detected is not None and key in detected
@@ -372,10 +395,16 @@ def wizard(config, roster, profile, roles_path, models_out):
                 config.update(snapshot)
                 print(f"RECHAZADO: {exc}")
         elif option == "3":
-            subscription = choose("Suscripción a cambiar", sorted(config["subscriptions"]))
+            # ADR-0048 (024 C2, AC-05): the candidate universe is the audited
+            # SUBSCRIPTION_BY_PREFIX targets (extended by any repo [providers] and
+            # whatever this machine already declared) -- NOT just `config["subscriptions"]`
+            # keys, which a neutral tracked file (AC-03) now normally leaves empty.
+            candidates = _subscription_candidates(config)
+            subscription = choose("Suscripción a cambiar", candidates)
             if not subscription:
                 continue
-            enabled = config["subscriptions"].get(subscription, False)
+            effective = models_config.effective_subscriptions(config)
+            enabled = effective.get(subscription, False)
             if enabled:
                 # Pinned contract: this guard fires BEFORE any further picker.
                 affected = dropped_cells(config, roster, subscription)
@@ -395,13 +424,18 @@ def wizard(config, roster, profile, roles_path, models_out):
                 prompt=f"{subscription}:")
             if not isinstance(state, tui.Selected):
                 continue
-            if state.index == 2:
-                config["subscriptions"].pop(subscription, None)
-                print(f"OK: {subscription} = auto (el probe decide)")
+            # AC-05: writes the PER-MACHINE overlay, immediately -- never `config
+            # ["subscriptions"]` (the tracked file), which is what used to dirty the
+            # tree on every "Guardar" and block --update forever (tree_clean()).
+            # "Efectivo ya", same contract as pins (option 8) -- no "Guardar" needed.
+            value = None if state.index == 2 else (state.index == 0)
+            config["_subscriptions_overlay"] = models_config.write_subscription_overlay(subscription, value)
+            if value is None:
+                print(f"OK: {subscription} = auto en este equipo (el probe decide; efectivo ya, "
+                      "no requiere 'Guardar')")
             else:
-                config["subscriptions"][subscription] = state.index == 0
-                print(f"OK: {subscription} = {'on' if state.index == 0 else 'off'}")
-            dirty = True
+                print(f"OK: {subscription} = {'on' if value else 'off'} en este equipo (efectivo ya, "
+                      "no requiere 'Guardar')")
         elif option == "4":
             if not dirty:
                 print("Sin cambios.")
@@ -539,6 +573,11 @@ def main():
 
     try:
         config = models_config.load_config(models_path)
+        # ADR-0048 (024 C2): the per-machine overlay is ALWAYS layered onto the CLI's
+        # own view (status/wizard/--add/--drop), independent of `--models` plumbing --
+        # a `--models`-pointed fixture/test copy is a different models.toml, but the
+        # overlay is a property of THIS machine, not of that file.
+        config["_subscriptions_overlay"] = models_config.load_subscriptions_overlay()
         roster = models_config.load_roster(roles_path)
 
         if args.status:
@@ -564,9 +603,16 @@ def main():
             if value not in config["catalog"][catalog_key]:
                 config["catalog"][catalog_key] = sorted(set(config["catalog"][catalog_key]) | {value})
                 mutated = True
+        # ADR-0048 (024 C2, AC-05): --add/--drop write the PER-MACHINE overlay,
+        # immediately -- same "efectivo ya" contract as the wizard's Suscripciones
+        # (option 3) and as --model-pin-set. Never `config["subscriptions"]` (the
+        # tracked file): that write is what used to dirty the tree on every
+        # subscription change and block --update forever (tree_clean()).
+        subscription_written = False
         if args.add:
-            config["subscriptions"][args.add] = True
-            mutated = True
+            config["_subscriptions_overlay"] = models_config.write_subscription_overlay(args.add, True)
+            print(f"SUBSCRIPTION_WRITTEN {args.add}=true ({models_config.subscriptions_overlay_path()})")
+            subscription_written = True
         if args.drop:
             affected = dropped_cells(config, roster, args.drop)
             if affected:
@@ -577,11 +623,12 @@ def main():
                 return 2
             if args.drop in ("anthropic", "openai"):
                 print(f"AVISO: sin '{args.drop}' el harness nativo correspondiente queda sin uso (config se conserva).")
-            config["subscriptions"][args.drop] = False
-            mutated = True
+            config["_subscriptions_overlay"] = models_config.write_subscription_overlay(args.drop, False)
+            print(f"SUBSCRIPTION_WRITTEN {args.drop}=false ({models_config.subscriptions_overlay_path()})")
+            subscription_written = True
 
         if not mutated:
-            return wizard(config, roster, profile, roles_path, output)
+            return 0 if subscription_written else wizard(config, roster, profile, roles_path, output)
 
         validate(config, roles_path)
         models_config.emit_atomic(output, config)

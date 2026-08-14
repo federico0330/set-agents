@@ -32,9 +32,9 @@ class AutoProfileTests(unittest.TestCase):
     def test_zen_only_is_zen(self):
         self.assertEqual(self._derive(_probe(["opencode-zen"])), "zen")
 
-    def test_no_opencode_pair_is_local(self):
-        self.assertEqual(self._derive(_probe(["anthropic", "openai-codex"])), "local")
-        self.assertEqual(self._derive({}), "local")
+    def test_no_opencode_pair_is_openai_only(self):
+        self.assertEqual(self._derive(_probe(["anthropic", "openai-codex"])), "openai-only")
+        self.assertEqual(self._derive({}), "openai-only")
 
     def test_probe_failure_is_none_never_a_guess(self):
         with mock.patch("routing_core.catalog.probe_inventory", side_effect=OSError("down")):

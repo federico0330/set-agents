@@ -10,7 +10,7 @@ YES=0
 TARGETS=()
 
 usage() {
-  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|local] [--output DIR] [--target opencode|claude-code|codex|pi] [--yes]"
+  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|openai-only] [--output DIR] [--target opencode|claude-code|codex|pi] [--yes]"
 }
 
 ensure_active_profile() {

@@ -10,9 +10,22 @@
 
 ## Tareas
 
-- [ ] [subscriptions] pasa a ausente = auto (AC-03) (planned)
-- [ ] El small model deja de exigir Zen en local, y la lane local se renombra a lo que es (AC-04) (planned)
-- [ ] Overlay de config del usuario en STATE_DIR, que desbloquea --update (AC-05) (planned)
+- [x] [subscriptions] pasa a ausente = auto (AC-03) (completed) · unittest: 1113 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check BUILD_CHECK_PASS
+- [x] El small model deja de exigir Zen en local, y la lane local se renombra a lo que es (AC-04) (completed) · unittest: 1113 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check BUILD_CHECK_PASS
+- [x] Overlay de config del usuario en STATE_DIR, que desbloquea --update (AC-05) (completed) · unittest: 1113 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh + --check BUILD_CHECK_PASS
+
+## Recorrido
+
+- gate `unittest-suite`: pass
+- gate `verify-sh`: pass
+- gate `build-check`: pass
+- gate `git-diff-check`: pass
+
+## Spawns
+
+- SPAWN-001 implementer · modelo anthropic/opus · effort medium · route run1_c9272b14d418db96b5ae8a49c655d671
+
+context pack: `docs/specs/024-listo-para-terceros/context/C2-modelstoml-neutro.md`
 
 ↩ [[features/024-listo-para-terceros|024-listo-para-terceros]]
 <!-- /notas:auto -->

@@ -22,12 +22,19 @@ sys.path.insert(0, str(ROOT / "ai/scripts"))
 import models_config  # noqa: E402
 
 
-def _models_toml_without(line_prefix: str, replacement: str = "") -> str:
-    text = (ROOT / "models.toml").read_text()
-    pattern = re.compile(rf"(?m)^{re.escape(line_prefix)} *= *\w+\n")
-    self_check = pattern.search(text)
-    assert self_check, f"models.toml no longer has a '{line_prefix} =' line"
-    return pattern.sub(replacement, text)
+def _toml_with_subscription(name: str, value) -> str:
+    """The repo's own loaded config, with `[subscriptions].<name>` set to `value`
+    (True/False) or removed entirely (`value=None` -- absent, i.e. auto), then
+    re-emitted. ADR-0048 (024 C2, AC-03) leaves the tracked file's [subscriptions]
+    empty, so there is no longer a live 'openai = true' line to regex-match and
+    strip (the old `_models_toml_without` technique this replaces) -- load+mutate+
+    emit is the same idiom test_harness.py's `_repo_models_variant` already uses."""
+    config = models_config.load_config()
+    if value is None:
+        config["subscriptions"].pop(name, None)
+    else:
+        config["subscriptions"][name] = value
+    return models_config.emit(config)
 
 
 class SubscriptionTriStateTests(unittest.TestCase):
@@ -52,20 +59,20 @@ class SubscriptionTriStateTests(unittest.TestCase):
             os.unlink(path)
 
     def test_explicit_false_still_dies(self):
-        toml_text = _models_toml_without("openai", "openai = false\n")
+        toml_text = _toml_with_subscription("openai", False)
         models_config.detect_subscriptions = lambda config: {"openai", "anthropic", "zen"}
         with self.assertRaises(models_config.ModelsError):
             self._load(toml_text)
 
     def test_absent_and_detected_loads_silently(self):
-        toml_text = _models_toml_without("openai")
+        toml_text = _toml_with_subscription("openai", None)
         models_config.detect_subscriptions = lambda config: {"openai", "anthropic", "zen"}
         roles, stderr = self._load(toml_text)
         self.assertTrue(roles)
         self.assertNotIn("WARN degraded", stderr)
 
     def test_absent_and_undetected_warns_but_never_dies(self):
-        toml_text = _models_toml_without("openai")
+        toml_text = _toml_with_subscription("openai", None)
         models_config.detect_subscriptions = lambda config: {"anthropic"}
         roles, stderr = self._load(toml_text)
         self.assertTrue(roles)
@@ -73,18 +80,52 @@ class SubscriptionTriStateTests(unittest.TestCase):
         self.assertIn("PROVIDER_UNAUTHENTICATED", stderr)
 
     def test_probe_failure_on_absent_key_also_warns_and_keeps(self):
-        toml_text = _models_toml_without("openai")
+        toml_text = _toml_with_subscription("openai", None)
         models_config.detect_subscriptions = lambda config: None
         roles, stderr = self._load(toml_text)
         self.assertTrue(roles)
         self.assertIn("WARN degraded", stderr)
 
     def test_strict_env_restores_the_historical_die(self):
-        toml_text = _models_toml_without("openai")
+        toml_text = _toml_with_subscription("openai", None)
         models_config.detect_subscriptions = lambda config: set()
         os.environ["SET_AGENTS_STRICT_MODELS"] = "1"
         with self.assertRaises(models_config.ModelsError):
             self._load(toml_text)
+
+    # ADR-0048 (024 C2): `load_role_tiers` pre-dated ADR-0029 and, uniquely among the
+    # two subscription-consuming loaders, never got its tri-state tolerance -- this was
+    # invisible for the whole life of this contract because the tracked [subscriptions]
+    # always declared every USED provider explicitly `true`. AC-03 (neutral tracked
+    # default) turned the gap into a hard, unconditional `die()` on every tiered role,
+    # on every machine, on every build -- caught live by `verify.sh` after 024 C2's own
+    # subscriptions edit. These three mirror `load_roles`'s own tri-state tests above,
+    # against `load_role_tiers` instead.
+    def test_tier_table_explicit_false_still_dies(self):
+        config = models_config.load_config()
+        config["subscriptions"]["openai"] = False
+        with self.assertRaises(models_config.ModelsError):
+            models_config.load_role_tiers(config, "go-zen")
+
+    def test_tier_table_absent_and_detected_loads_silently(self):
+        config = models_config.load_config()
+        config["subscriptions"].pop("openai", None)
+        models_config.detect_subscriptions = lambda cfg: {"openai", "anthropic", "zen"}
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            tiers = models_config.load_role_tiers(config, "go-zen")
+        self.assertTrue(tiers)
+        self.assertNotIn("WARN degraded", stderr.getvalue())
+
+    def test_tier_table_absent_and_undetected_warns_but_never_dies(self):
+        config = models_config.load_config()
+        config["subscriptions"].pop("openai", None)
+        models_config.detect_subscriptions = lambda cfg: {"anthropic"}
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            tiers = models_config.load_role_tiers(config, "go-zen")
+        self.assertTrue(tiers)
+        self.assertIn("WARN degraded", stderr.getvalue())
 
     def test_detect_never_returns_credential_material(self):
         # Shape contract: a set of subscription names (or None) — nothing else.

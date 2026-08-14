@@ -14,19 +14,27 @@ el effort vive en la propia escalera de modelos y en la columna EFFORT estática
 Model routing lives in **`models.toml`**: active subscriptions, the model catalog, one model
 set per **area** (the `duty` column of `roles.tsv`), and per-role overrides. `roles.tsv` holds
 structure only (role, mode, temperature, capability, duty). `active-profile` selects the opencode
-lane (`go-zen`/`zen`/`local`) and is **auto-derived from the credentials probe** on the first
-`./build.sh` (both opencode pairs live → go-zen, only zen → zen, none → local). Override with
-`PROFILE=<lane> ./build.sh --install`, or delete `active-profile` to re-derive.
+lane (`go-zen`/`zen`/`openai-only`) and is **auto-derived from the credentials probe** on the
+first `./build.sh` (both opencode pairs live → go-zen, only zen → zen, none → openai-only).
+Override with `PROFILE=<lane> ./build.sh --install`, or delete `active-profile` to re-derive.
 
-## Suscripciones: tri-estado (ADR-0029)
+## Suscripciones: tri-estado (ADR-0029) + overlay por máquina (ADR-0048)
 
 Cada clave de `[subscriptions]` acepta tres estados:
 
 - `true` — pin curado: confiás en que está activa (comportamiento histórico).
 - `false` — exclusión dura: el build **muere** si algún modelo la referencia (histórico).
-- **ausente** — automático: el harness la detecta con el probe de credenciales. Si diste de baja
-  una suscripción, **borrá la línea y listo** — el build sigue verde con un `WARN degraded` y el
-  routing en vivo excluye ese proveedor solo (`PROVIDER_UNAUTHENTICATED`). Nada más que tocar.
+- **ausente** — automático: el harness la detecta con el probe de credenciales. El build sigue
+  verde con un `WARN degraded` y el routing en vivo excluye ese proveedor solo
+  (`PROVIDER_UNAUTHENTICATED`).
+
+El `models.toml` trackeado **no declara ninguna suscripción** (ausente = auto para las cuatro,
+siempre) — es el default neutro para que un tercero que clone el repo no herede las tuyas.
+Tus valores reales viven **al lado**, en un overlay por máquina
+(`~/.local/state/set-agentes/subscriptions.local.toml`, mismo precedente que
+`model-preference.toml`): `./setup-models.sh` (opción "Suscripciones") o
+`./setup-models.sh --add|--drop <nombre>` lo escriben ahí, de inmediato, nunca en el archivo
+trackeado — así que usarlos no ensucia el árbol ni bloquea `--update`.
 
 `SET_AGENTS_STRICT_MODELS=1` (CI) desactiva la tolerancia del estado ausente.
 
@@ -59,7 +67,8 @@ Scriptable one-shots (validated, atomic, chained into build --check/--install):
 `--drop` refuses to write while any role/lane still resolves to a model of that subscription:
 it prints `AFFECTED=<n>` with every orphaned cell so you reassign them first (wizard or
 `--set`). Dropping `openai`/`anthropic` also means the matching native harness (Codex/Claude
-Code) has nothing to run on; its config is kept but unused.
+Code) has nothing to run on; its config is kept but unused. Both flags write your per-machine
+overlay (ADR-0048), never `models.toml` — `git status` stays clean after either one.
 
 Editing `models.toml` by hand is fine too — run `./setup-models.sh --check` afterwards. The
 wizard rewrites the file deterministically and does not preserve standalone comments.
@@ -95,8 +104,9 @@ review-ro role and set its go-zen lane to an `opencode-go/*` model
 (`./setup-models.sh --set role:package-reviewer.opencode.go-zen=opencode-go/...`).
 
 The three lanes differ only in the opencode dimension: `go-zen` mixes OpenAI subscription models with
-`opencode-go/*`, `zen` uses `opencode/*` routers, and `local` uses `openai/*` only. `claude`/`codex`
-assignments are lane-independent (hosted).
+`opencode-go/*`, `zen` uses `opencode/*` routers, and `openai-only` uses `openai/*` only (the name is
+literal — it is the lane the probe derives when neither OpenCode pair is live, ADR-0048).
+`claude`/`codex` assignments are lane-independent (hosted).
 
 ## Codex reasoning effort (`codex_effort`)
 Only Codex has a per-agent reasoning-effort knob (`codex_effort` → `model_reasoning_effort`). It is tuned by

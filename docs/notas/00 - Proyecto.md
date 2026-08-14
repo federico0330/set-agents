@@ -23,7 +23,7 @@
 - [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `DONE` · paquetes 4/4 · **DONE**
-- [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `PACKAGE_REVIEW` · paquetes 0/4
+- [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `PACKAGE_REVIEW` · paquetes 1/4
 - [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_PLANNING` · paquetes 0/5
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
 
@@ -48,6 +48,7 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-14 un-test-puede-escribir-en-el-estado-real-del-usuario|Un test sin mockear puede escribir en el estado real del usuario, y lo hizo]]
 - [[decisiones/2026-08-13 relanzo-b3-en-otro-proveedor-por-limite-de-sesion|B3 se relanza en otro proveedor por limite de sesion, no por fallar la tarea]]
 - [[decisiones/2026-08-13 correccion-el-plan-tenia-razon-a-medias-y-el-orquestador-tambien|Correccion: el plan tenia razon sobre un camino que la base no exhibia]]
 - [[decisiones/2026-08-13 los-modulos-de-test-no-pasan-aislados-preexistente|Los modulos de test no pasan aislados, y es preexistente]]
@@ -55,14 +56,13 @@
 - [[decisiones/2026-08-13 copilot-aparecio-solo-durante-la-noche|Copilot paso de no listable a 26 modelos durante la noche, y el harness lo adopto solo]]
 - [[decisiones/2026-08-13 desvio-de-alcance-de-p4-aprobado-con-medicion|El desvio de alcance de P4 a provider_registry.py queda aprobado, medido]]
 - [[decisiones/2026-08-13 captura-ab-cerrada-el-refresh-natural-confirmo-el-diseno|Captura A/B cerrada: el refresh natural confirmo el diseno de la firma]]
-- [[decisiones/2026-08-13 el-gate-de-pi-corre-despues-del-subproceso-preexistente|El gate de credenciales de pi corre despues del subproceso, y es preexistente]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-14T06:20:46+00:00_
+_Actualizado: 2026-08-14T08:26:03+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

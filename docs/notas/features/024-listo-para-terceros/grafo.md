@@ -11,6 +11,7 @@ subgraph sg_024_listo_para_terceros["024-listo-para-terceros"]
   end
   subgraph sg_024_listo_para_terceros_c2_modelstoml_neutro["C2-modelstoml-neutro"]
     package_024_listo_para_terceros_c2_modelstoml_neutro_1["package: C2-modelstoml-neutro"]
+    spawn_024_listo_para_terceros_c2_modelstoml_neutro_1["SPAWN-001 implementer models.toml deja de fijar las suscripciones de una persona, y el usuario escribe su config AL LAD…"]
   end
   subgraph sg_024_listo_para_terceros_c3_primer_arranque_honesto["C3-primer-arranque-honesto"]
     package_024_listo_para_terceros_c3_primer_arranque_honesto_1["package: C3-primer-arranque-honesto"]

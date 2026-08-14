@@ -416,13 +416,21 @@ class HarnessTests(unittest.TestCase):
 
     # -------------------------------------------------------- setup-models
     def _setup_models(self, td, *args, check=False):
-        """Run setup_models.py against a working copy of the repo config."""
+        """Run setup_models.py against a working copy of the repo config.
+
+        ADR-0048 (024 C2): always isolates SET_AGENTS_STATE under `td` -- subscriptions
+        now read/write a per-machine overlay there (`--add`/`--drop`, the wizard's
+        Suscripciones), and this helper must never touch the real developer's
+        `~/.local/state/set-agentes` during a test run.
+        """
         models = Path(td) / "models.toml"
         if not models.exists():
             models.write_text((ROOT / "models.toml").read_text())
+        state = Path(td) / "state"
         return run(
             "python3", "ai/scripts/setup_models.py",
             "--models", str(models), "--profile", "go-zen", *args, check=check,
+            env={"SET_AGENTS_STATE": str(state)},
         ), models
 
     def test_setup_models_set_and_check_roundtrip(self):
@@ -448,7 +456,11 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("separation violation", result.stderr)
             self.assertEqual(before, models.read_text(), "invalid change must never be written")
 
-    def test_setup_models_drop_subscription_lists_affected(self):
+    def test_setup_models_drop_subscription_writes_the_overlay_not_the_tracked_file(self):
+        # ADR-0048 (024 C2, AC-05): --drop now writes the PER-MACHINE overlay, never
+        # models.toml -- the AFFECTED guard behaves exactly as before (it is about
+        # which cells USE the subscription, independent of its on/off value), but a
+        # successful drop must leave the tracked file byte-identical.
         with tempfile.TemporaryDirectory() as td:
             _, models = self._setup_models(td, "--status")
             before = models.read_text()
@@ -459,10 +471,15 @@ class HarnessTests(unittest.TestCase):
             self.assertGreater(int(match.group(1)), 0)
             self.assertIn("MODELS_NOT_WRITTEN", result.stdout)
             self.assertEqual(before, models.read_text())
-            # Dropping a subscription nothing resolves to goes through.
+            # Dropping a subscription nothing resolves to goes through -- into the
+            # overlay. models.toml itself must stay untouched (that is the whole point).
             result, _ = self._setup_models(td, "--drop", "ollama")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("MODELS_WRITTEN", result.stdout)
+            self.assertIn("SUBSCRIPTION_WRITTEN ollama=false", result.stdout)
+            self.assertNotIn("MODELS_WRITTEN", result.stdout)
+            self.assertEqual(before, models.read_text(), "models.toml must stay untouched -- AC-05")
+            overlay = Path(td) / "state" / "subscriptions.local.toml"
+            self.assertIn("ollama = false", overlay.read_text())
 
     def test_wizard_drop_subscription_hint_references_menu_labels_not_stale_numbers(self):
         # D-05: same defect as F-09 (fixed in set_agents_app.py) but left behind in
@@ -482,7 +499,9 @@ class HarnessTests(unittest.TestCase):
              ), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=[
                  setup_models.tui.Selected(2),  # WIZARD_ITEMS[2] == "Suscripciones"
-                 setup_models.tui.Selected(0),  # choose() picks the only subscription: "zen"
+                 # ADR-0048 (024 C2): the candidate universe is the audited 4 names
+                 # now, sorted: anthropic, ollama, openai, zen -- index 3 is "zen".
+                 setup_models.tui.Selected(3),  # choose(): "zen"
                  setup_models.tui.Selected(4),  # next loop: "Salir sin guardar"
              ]):
             buf = io.StringIO()
@@ -3989,11 +4008,13 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(before, (ROOT / "roles.tsv").read_bytes())
         self.assertEqual(models_before, (ROOT / "models.toml").read_bytes())
 
-    def test_local_profile_generates_and_validates(self):
-        # The `local` profile (leaf agents on Ollama, judgment roles hosted) must
-        # generate and pass separation-of-duties just like go-zen/zen.
+    def test_openai_only_profile_generates_and_validates(self):
+        # ADR-0048 (024 C2, AC-04): the third lane, renamed from "local" -- it never ran
+        # anything locally, every one of its own catalog cells is a remote openai/* call
+        # (COMO-CAMBIAR-MODELO.md already documented that). Must generate and pass
+        # separation-of-duties just like go-zen/zen.
         with tempfile.TemporaryDirectory() as td:
-            result = run("python3", "ai/scripts/generate.py", "--profile", "local",
+            result = run("python3", "ai/scripts/generate.py", "--profile", "openai-only",
                          "--output", str(Path(td) / "out"), check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -4377,7 +4398,7 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             def unprojectable_openai(config):
                 config["roles"]["debugger"]["tiers"]["fast"]["opencode"] = {
-                    lane: "openai/gpt-5.6-fast" for lane in ("go-zen", "zen", "local")
+                    lane: "openai/gpt-5.6-fast" for lane in ("go-zen", "zen", "openai-only")
                 }
             models = self._repo_models_variant(td, unprojectable_openai)
             result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
@@ -4389,7 +4410,7 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             def zen_aggregator_namespace(config):
                 config["roles"]["implementer"]["tiers"]["balanced"]["opencode"] = {
-                    lane: "opencode/kimi-k2.7-code" for lane in ("go-zen", "zen", "local")
+                    lane: "opencode/kimi-k2.7-code" for lane in ("go-zen", "zen", "openai-only")
                 }
             models = self._repo_models_variant(td, zen_aggregator_namespace)
             result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen",

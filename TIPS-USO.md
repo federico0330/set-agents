@@ -36,7 +36,7 @@ Detalles en `INSTALACION.md`.
 - `roles.tsv`: one row per role — structure only (mode, temperature, capability, duty).
 - `models.toml`: subscriptions, model catalog, per-area models with per-role overrides.
   Edit via `./setup-models.sh` (see `COMO-CAMBIAR-MODELO.md`).
-- `active-profile`: `go-zen`, `zen`, or `local` (the opencode lane).
+- `active-profile`: `go-zen`, `zen`, or `openai-only` (the opencode lane).
 - `models.toml [permissions]`: `profile = "yolo" | "guarded"` — OpenCode permission posture
   (yolo = no bash/edit prompts; hard denies and duty separation always survive). Tracked, so
   it applies fleet-wide on the next build/auto-update.
