@@ -26,6 +26,28 @@ construction**, not by an exception someone has to remember.
 Deliberately not distributed to scaffolded projects (`sync-project.sh` does not list
 it): a project has its own commit conventions, and this one would misfire there.
 
+ADR-0047 changed the question this asks, without touching what it protects. `ai/state/`
+is gitignored now and reseeded empty per clone/machine (`ai/state.seed/`,
+`ai/scripts/seed-state.py`); the git history is not gitignored, and the 23 features
+already delivered before that move stay in it forever. Read against the WHOLE history,
+this guard would see 23 delivery commits with no matching (freshly empty)
+`ai/state/features/*.json` and misreport every one of them on the very first `verify.sh`
+a fresh clone ever runs -- 23 false positives for work the clone's owner never touched.
+`baseline_sha()` anchors the question at "since ai/state.seed/ started existing" (the
+commit that performed the move): history at or before it is already accounted for
+in `docs/historia/estado-2026-08/`, which this guard does not read either; only commits
+strictly after it are ever checked, exactly the ones a fresh clone's own future work
+would add. The degraded case stays as loud as the pre-existing shallow-clone one: an
+anchor this guard cannot find is announced (`FEATURE_STATE_UNCHECKED
+reason=baseline-unknown`), never silently swapped back to full-history scanning.
+
+One case is not degraded: `ai/state.seed/` present on disk but not in any commit yet
+is the move itself, mid-flight -- this very repository's own state while the ADR-0047
+package was implemented (proven the hard way: `test_guest_copy_scaffolds_and_verifies_portably`,
+a full filesystem copy of an uncommitted checkout, failed on exactly this before the
+fallback existed). Nothing can be "after" a commit that has not been made yet, so
+that window is empty on purpose, not unusable.
+
 Usage: check-feature-state.py <root>
 """
 
@@ -76,24 +98,59 @@ def git(root: Path, *args: str) -> str | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
+def baseline_sha(root: Path) -> str | None:
+    """The commit ADR-0047's move landed in, or None when it cannot be found.
+
+    `ai/state.seed/` is tracked forever from the moment it was introduced, so the
+    OLDEST commit that added anything under it is a stable, repository-wide anchor --
+    the same commit for every clone, never a per-machine value. Everything at or
+    before it is pre-move history, already accounted for in
+    `docs/historia/estado-2026-08/` and out of scope for this guard; everything after
+    it is checked exactly as before, against whatever `ai/state/features/` this clone
+    has actually seeded and grown since.
+    """
+    log = git(root, "log", "--format=%H", "--diff-filter=A", "--", "ai/state.seed")
+    if log is None:
+        return None
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    return lines[-1] if lines else None
+
+
 def delivery_commits(root: Path) -> tuple[list[tuple[int, str, str]] | None, str]:
-    """Every delivery commit as (feature number, sha, subject), or None with a reason.
+    """Every delivery commit since the ADR-0047 baseline, or None with a reason.
 
     None means "this history cannot answer the question", which is a different claim
-    from "nothing was delivered".  Two ways to get there, and the second one is the
-    dangerous one: a shallow clone has the *whole working tree* but a truncated log, so
-    treating `git log`'s window as everything that ever happened silently inverts the
-    result.  Reproduced before this guard existed in its current form: `git clone
-    --depth 1` of this repository made the guard declare 006's waiver unnecessary and
-    exit 1, advising a deletion that would have broken every full clone.  CI fetches
-    with depth 0, so it would never have been the one to notice.
+    from "nothing was delivered".  Three ways to get there now, and the first two
+    predate the baseline logic: a shallow clone has the *whole working tree* but a
+    truncated log, so treating `git log`'s window as everything that ever happened
+    silently inverts the result.  Reproduced before this guard existed in its current
+    form: `git clone --depth 1` of this repository made the guard declare 006's waiver
+    unnecessary and exit 1, advising a deletion that would have broken every full
+    clone.  CI fetches with depth 0, so it would never have been the one to notice.
+    The third (`baseline-unknown`) is the same posture applied to the new anchor: a
+    full clone that somehow lacks `ai/state.seed/` ANYWHERE -- neither in history nor
+    on disk -- cannot answer "since the baseline" either, and guessing (by falling
+    back to the full history this function used to scan) would resurrect the exact
+    false-positive bug ADR-0047 exists to close.
+
+    One more case is not degraded, on purpose: `ai/state.seed/` present in the
+    working tree but not yet in any commit is not "unusable history", it is the
+    ADR-0047 move itself, mid-flight -- this repository, right now, before its own
+    migration commit lands.  Nothing can be "after" a commit that has not been made
+    yet, so the honest window is empty, and the honest answer is the same as any
+    other clone with nothing to report: no violations, not "can't tell".
     """
     shallow = git(root, "rev-parse", "--is-shallow-repository")
     if shallow is None:
         return None, "git-history-unavailable"
     if shallow.strip() == "true":
         return None, "shallow-clone"
-    log = git(root, "log", "--format=%h %s")
+    baseline = baseline_sha(root)
+    if baseline is None:
+        if (root / "ai" / "state.seed").is_dir():
+            return [], ""
+        return None, "baseline-unknown"
+    log = git(root, "log", "--format=%h %s", f"{baseline}..HEAD")
     if log is None:
         return None, "git-history-unavailable"
     found = []

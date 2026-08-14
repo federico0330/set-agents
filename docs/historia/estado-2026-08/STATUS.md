@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-14T05:10:03+00:00
+Actualizado: 2026-08-14T05:11:39+00:00
 
 ## Features
 
@@ -28,7 +28,7 @@ Actualizado: 2026-08-14T05:10:03+00:00
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 | 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
 | 023-senales-de-consumo | scoped | DONE | B4-estimado-nunca-dato-del-proveedor (accepted) | 4/4 | 8/8 | 1/2 | 0 | - | - | 2026-08-14T05:10:03+00:00 transition |
-| 024-listo-para-terceros | scoped | PACKAGE_PLANNING | C4-higiene-de-repo-publico (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:19:15+00:00 create-package |
+| 024-listo-para-terceros | scoped | PACKAGE_IMPLEMENTATION | C1-estado-fuera-del-producto (package_implementation) | 0/4 | 1/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-14T05:11:39+00:00 record-spawn |
 | 025-consola-minima-y-flexible | scoped | PACKAGE_PLANNING | D5-vault-en-todo-spawn (planned) | 0/5 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:20:00+00:00 create-package |
 | 026-orquestador-elige-modelo | scoped | DONE | P2-modelo-por-instancia (accepted) | 2/2 | 2/8 | 1/2 | 0 | - | - | 2026-08-13T15:35:37+00:00 transition |
 
@@ -41,6 +41,10 @@ Actualizado: 2026-08-14T05:10:03+00:00
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-14T05:11:39+00:00] C1-estado-fuera-del-producto · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que quien clone el proyecto no herede tu historial de trabajo, y que vos no pierdas el tuyo.
+Ingeniería: AC-01/02, clase migration. Medido: ai/state pesa 2,3 MB con 23 features, y ONCE modulos de ai/scripts lo leen. El path se MANTIENE -historial a docs/historia/estado-2026-08, ai/state gitignoreado y sembrado desde ai/state.seed-, que es lo que baja el cambio de 11 modulos a cero. Regla que protege al dueno: la siembra solo puebla un ai/state ausente, nunca pisa uno existente.
 
 [2026-08-14T04:11:49+00:00] B4-estimado-nunca-dato-del-proveedor · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que cuando el harness te diga cuanto gastaste, te diga tambien de donde saco el numero y cuanto de eso midio de verdad.
@@ -97,8 +101,4 @@ Ingeniería: Writer claude-code/anthropic/opus (run1_f193bfbd). Reviewer codex/o
 [2026-08-13T07:11:14+00:00] P4-proveedores-del-usuario · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que puedas agregar y sobre todo QUITAR proveedores desde la aplicacion, sin que el proximo install te los reponga.
 Ingeniería: P4 de 022 (AC-11..15). Medicion clave del pack: el bloque ollama del opencode.json del usuario es BYTE-IDENTICO al que envia Global/_shared/opencode.json:5-23, o sea no lo agrego el; y el endpoint esta muerto (curl 000). El caso real es quitar lo que el harness impuso, no lo que el usuario agrego. AC-13 renderiza el bloque desde el registro; AC-14 extiende la poda de archivos a subarboles JSON y …
-
-[2026-08-13T06:21:25+00:00] P3-liveness-real · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
-Cliente: Ultima verificacion independiente antes de dar por bueno el paquete.
-Ingeniería: Reparador claude-code/anthropic/opus (run1_ccfef5c2). Delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_686d1590, independence_verified=true. Es el segundo y ultimo ciclo de review del presupuesto.
 

@@ -5256,6 +5256,14 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             run("git", "-C", str(root), "init", "-q", "-b", "main")
+            # ADR-0047: the guard now anchors on "since ai/state.seed/ started
+            # existing" (baseline_sha()) rather than the whole history -- establish
+            # that baseline first, exactly like a real post-migration repo, so every
+            # commit below lands after it and the rest of this fixture keeps proving
+            # what it always proved.
+            (root / "ai/state.seed").mkdir(parents=True)
+            (root / "ai/state.seed/.gitkeep").write_text("")
+            commit(root, "seed: establish the ADR-0047 baseline (ai/state.seed/)")
             (root / "ai/state/features").mkdir(parents=True)
             for feature in ("010-delivered", "011-drafted"):
                 (root / "docs/specs" / feature).mkdir(parents=True)
@@ -5317,6 +5325,9 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             run("git", "-C", str(root), "init", "-q", "-b", "main")
+            (root / "ai/state.seed").mkdir(parents=True)
+            (root / "ai/state.seed/.gitkeep").write_text("")
+            commit(root, "seed: establish the ADR-0047 baseline (ai/state.seed/)")
             (root / "docs/specs/006-execution-graph").mkdir(parents=True)
             (root / "ai/state/features").mkdir(parents=True)
             (root / "ai/state/features/006-execution-graph.json").write_text("{}")
@@ -5371,6 +5382,152 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("feature-006-delivered-outside-state-machine", source)
         self.assertIn("docs/specs/009-self-application/spec.md:129-132", source)
         self.assertIn("WAIVER_WITHOUT_REASON", source)
+
+    def test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones(self):
+        # AC-02 (024-listo-para-terceros/C1, ADR-0047).  ai/state/ is gitignored and
+        # reseeded empty per clone now, so a fresh clone of a repository with real
+        # delivery history -- read against the WHOLE history, the pre-fix behavior --
+        # would misreport every feature ever delivered as FEATURE_STATE_MISSING on its
+        # very first `verify.sh`, none of it the clone owner's doing.  This fixture is
+        # exactly that shape: a delivery commit for 010-delivered *before*
+        # `ai/state.seed/` starts existing (the new baseline), and no
+        # `ai/state/features/010-delivered.json` anywhere -- the same shape a fresh
+        # clone's `ai/state/` actually has for anyone's already-finished work.  A
+        # delivery for a *different* feature, *after* the baseline, still has to be
+        # caught -- proving the fix narrows the question rather than retiring the
+        # guard (the "degradado ruidoso" the context pack asks to keep).
+        guard = "ai/scripts/check-feature-state.py"
+
+        def commit(root, message):
+            run("git", "-C", str(root), "add", "-A")
+            run("git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
+                "commit", "-q", "--allow-empty", "-m", message)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run("git", "-C", str(root), "init", "-q", "-b", "main")
+
+            # Pre-baseline: delivered the old way, ai/state/ tracked, no
+            # ai/state.seed/ yet -- exactly this repository's own history up to the
+            # ADR-0047 migration commit.
+            (root / "docs/specs/010-delivered").mkdir(parents=True)
+            (root / "docs/specs/010-delivered/spec.md").write_text("# 010-delivered\n\n## P1\n")
+            (root / "ai/state/features").mkdir(parents=True)
+            (root / "ai/state/features/010-delivered.json").write_text("{}")
+            commit(root, "Feature 010 P1-first-slice: deliver the first package")
+
+            # The ADR-0047 move: ai/state/ stops being tracked (as `git mv` to
+            # docs/historia/ leaves it -- gone from THIS repo's git history from here
+            # on), ai/state.seed/ starts existing. This commit IS the baseline.
+            run("git", "-C", str(root), "rm", "-r", "-q", "ai/state")
+            (root / "ai/state.seed").mkdir(parents=True)
+            (root / "ai/state.seed/.gitkeep").write_text("")
+            commit(root, "docs: ADR-0047 -- el estado no es el producto")
+
+            # A fresh clone's ai/state/ is empty (freshly seeded, or not seeded at
+            # all yet) -- 010-delivered's own state file does not exist here on
+            # purpose, and that must NOT be a violation.
+            clean = run("python3", guard, str(root), check=False)
+            self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
+            self.assertIn("FEATURE_STATE_OK", clean.stdout)
+            self.assertNotIn("010-delivered", clean.stdout)
+
+            # Post-baseline: a NEW delivery, still without a state file, still has to
+            # be caught.
+            (root / "docs/specs/011-new").mkdir(parents=True)
+            (root / "docs/specs/011-new/spec.md").write_text("# 011-new\n\n## P1\n")
+            commit(root, "Feature 011 P1-first-slice: deliver it")
+            caught = run("python3", guard, str(root), check=False)
+            self.assertEqual(caught.returncode, 1)
+            self.assertIn("FEATURE_STATE_MISSING id=011-new", caught.stdout)
+            self.assertNotIn("010-delivered", caught.stdout)
+
+    def test_seed_state_only_populates_an_absent_ai_state(self):
+        # AC-01 (024-listo-para-terceros/C1, ADR-0047).  The one rule that separates
+        # "the product can be cloned" from "it deleted the owner's real work":
+        # ai/scripts/seed-state.py populates ai/state/ from the tracked
+        # ai/state.seed/ skeleton ONLY when ai/state/ is absent, and never touches
+        # one that already exists -- whether that is a previous seed run or
+        # someone's real history.
+        script = "ai/scripts/seed-state.py"
+
+        def manifest(base):
+            return {str(p.relative_to(base)): p.read_bytes() for p in sorted(base.rglob("*")) if p.is_file()}
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "ai/state.seed/features").mkdir(parents=True)
+            (root / "ai/state.seed/bitacora").mkdir(parents=True)
+            (root / "ai/state.seed/features/.gitkeep").write_text("")
+            (root / "ai/state.seed/bitacora/.gitkeep").write_text("")
+
+            first = run("python3", script, str(root))
+            self.assertIn("STATE_SEEDED", first.stdout)
+            self.assertTrue((root / "ai/state/features/.gitkeep").exists())
+            self.assertTrue((root / "ai/state/bitacora/.gitkeep").exists())
+
+            # Idempotent: seeding an already-seeded tree a second time changes
+            # nothing and duplicates nothing -- pinned by a byte-for-byte manifest
+            # comparison, not just a status line.
+            before = manifest(root / "ai/state")
+            second = run("python3", script, str(root))
+            self.assertIn("STATE_SEED_SKIP_EXISTING", second.stdout)
+            self.assertEqual(before, manifest(root / "ai/state"))
+
+        # The protecting case: an ai/state/ that already holds real data is never
+        # overwritten, even though it is missing files the seed would otherwise add.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "ai/state.seed/features").mkdir(parents=True)
+            (root / "ai/state.seed/features/.gitkeep").write_text("")
+            (root / "ai/state/features").mkdir(parents=True)
+            real = root / "ai/state/features/999-real-work.json"
+            real.write_text('{"owner": "federico"}')
+
+            result = run("python3", script, str(root))
+            self.assertIn("STATE_SEED_SKIP_EXISTING", result.stdout)
+            self.assertEqual(real.read_text(), '{"owner": "federico"}')
+            self.assertFalse((root / "ai/state/features/.gitkeep").exists())
+
+    def test_feature_state_gate_mid_migration_uncommitted_seed_is_not_unusable(self):
+        # AC-02 (024/C1, ADR-0047), the exact shape this repository is in while this
+        # very package is implemented: ai/state.seed/ exists on disk (git mv already
+        # ran, `git add -A` already staged it) but has not landed in any commit yet --
+        # `baseline_sha()` legitimately finds nothing in history. Read as "unusable"
+        # this would degrade every verify.sh run of this package's own implementation
+        # window to FEATURE_STATE_UNCHECKED (caught for real: `git clone`+`shutil.copytree`
+        # guests of this exact repository state failed this exact assertion before the
+        # fix). The correct reading: nothing can be "after" a commit that has not been
+        # made yet, so the honest window is empty, not unusable.
+        guard = "ai/scripts/check-feature-state.py"
+
+        def commit(root, message):
+            run("git", "-C", str(root), "add", "-A")
+            run("git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
+                "commit", "-q", "--allow-empty", "-m", message)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run("git", "-C", str(root), "init", "-q", "-b", "main")
+            # Old-style delivery, committed, tracked ai/state/ -- pre-move history,
+            # same as this repository's own commits before today.
+            (root / "docs/specs/010-delivered").mkdir(parents=True)
+            (root / "docs/specs/010-delivered/spec.md").write_text("# 010-delivered\n\n## P1\n")
+            (root / "ai/state/features").mkdir(parents=True)
+            (root / "ai/state/features/010-delivered.json").write_text("{}")
+            commit(root, "Feature 010 P1-first-slice: deliver the first package")
+
+            # The move, entirely uncommitted: ai/state/ gone from the tree, ai/state.seed/
+            # present on disk, nothing staged or committed yet.
+            shutil.rmtree(root / "ai/state")
+            (root / "ai/state.seed/features").mkdir(parents=True)
+            (root / "ai/state.seed/features/.gitkeep").write_text("")
+
+            mid_flight = run("python3", guard, str(root), check=False)
+            self.assertEqual(mid_flight.returncode, 0, mid_flight.stdout + mid_flight.stderr)
+            self.assertIn("FEATURE_STATE_OK", mid_flight.stdout)
+            self.assertNotIn("baseline-unknown", mid_flight.stderr)
+            self.assertNotIn("010-delivered", mid_flight.stdout)
 
     def test_stale_waivers_guard_survives_independent_of_which_feature_is_waived(self):
         # AC-28 group 4's real regression guard, made independent of whatever happens to

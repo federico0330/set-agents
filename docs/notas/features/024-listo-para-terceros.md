@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_PLANNING` · modo: scoped · revisión 4
+- fase: `PACKAGE_REVIEW` · modo: scoped · revisión 23
 - spec: `docs/specs/024-listo-para-terceros/spec.md` (hash `f848f29b2069`)
 
 ## Criterios de aceptación
@@ -23,23 +23,26 @@
 
 ## Paquetes
 
-- [[features/024-listo-para-terceros/C1-estado-fuera-del-producto|C1-estado-fuera-del-producto]] — planned · Que el estado de Federico deje de viajar en el clon, sin mover el path
+- [[features/024-listo-para-terceros/C1-estado-fuera-del-producto|C1-estado-fuera-del-producto]] — package_review · Que el estado de Federico deje de viajar en el clon, sin mover el path
 - [[features/024-listo-para-terceros/C2-modelstoml-neutro|C2-modelstoml-neutro]] — planned · models.toml deja de fijar las suscripciones de una persona y el usuario tiene overlay pro…
 - [[features/024-listo-para-terceros/C3-primer-arranque-honesto|C3-primer-arranque-honesto]] — planned · Que el primer arranque de un tercero diga que hacer en vez de morir mudo
 - [[features/024-listo-para-terceros/C4-higiene-de-repo-publico|C4-higiene-de-repo-publico]] — planned · Lo que un repo publico necesita, y una matriz de soporte medida en vez de asumida
 
+## Approach y decisiones
+
+- [2026-08-14] implementer: AC-01/02, clase migration. Medido: ai/state pesa 2,3 MB con 23 features, y ONCE modulos de ai/scripts lo leen. El path se MANTIENE -historial a docs/historia/estado-2026-08, ai/st…
+
 ## Qué falta
 
-- → `PACKAGE_IMPLEMENTATION` — plan next coherent package
-- tareas pendientes en C4-higiene-de-repo-publico: LICENSE, CONTRIBUTING, CHANGELOG, SECURITY, y HANDOFF fuera de la raiz (AC-09), Ejemplos sin el nombre del cliente real (AC-10), Matriz de soporte MEDIDA, incluida la de roles subagent en opencode (AC-11), Update re-apuntable: hoy origin/main hardcodeado rompe un fork (AC-12)
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
-- spawns: 0 (máx 8/paquete) · deep review máx 2 ciclos
+- spawns: 1 (máx 8/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/024-listo-para-terceros/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/024-listo-para-terceros/bitacora.md`
 
-_Actualizado: 2026-08-13T15:19:15+00:00_
+_Actualizado: 2026-08-14T06:20:46+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

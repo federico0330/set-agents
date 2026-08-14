@@ -9,8 +9,21 @@
 
 ## Tareas
 
-- [ ] git mv ai/state a docs/historia y sembrar desde ai/state.seed, manteniendo el path (AC-01) (planned)
-- [ ] check-feature-state.py cambia la pregunta a 'desde mi baseline', sin apagar el degradado (AC-02) (planned)
+- [x] git mv ai/state a docs/historia y sembrar desde ai/state.seed, manteniendo el path (AC-01) (completed) · unittest: 1110 OK / 3 skips (orquestador); verify.sh VERIFY_PASS con FEATURE_STATE_OK; build.sh --check BUILD_CHECK_PASS
+- [x] check-feature-state.py cambia la pregunta a 'desde mi baseline', sin apagar el degradado (AC-02) (completed) · unittest: 1110 OK / 3 skips (orquestador); verify.sh VERIFY_PASS con FEATURE_STATE_OK; build.sh --check BUILD_CHECK_PASS
+
+## Recorrido
+
+- gate `unittest-suite`: pass
+- gate `verify-sh`: pass
+- gate `build-check`: pass
+- gate `git-diff-check`: pass
+
+## Spawns
+
+- SPAWN-001 implementer · modelo anthropic/opus · effort medium · route run1_b75accf4527aa0d01ef8cc005380f8ce
+
+context pack: `docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md`
 
 ↩ [[features/024-listo-para-terceros|024-listo-para-terceros]]
 <!-- /notas:auto -->

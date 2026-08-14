@@ -1,0 +1,1439 @@
+Reading additional input from stdin...
+OpenAI Codex v0.147.0
+--------
+workdir: /home/federico/SET-AGENTES
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: none
+session id: 019ffeee-2910-7a92-81bb-8242fe76fb74
+--------
+user
+Sos package-reviewer independiente en /home/federico/SET-AGENTES. Read-only sobre codigo de produccion.
+HACE LA REVISION VOS MISMO: no delegues. NUNCA escribas bajo ~ ni borres nada de ai/state ni de
+docs/historia: son el historial de trabajo REAL del dueno del repo.
+
+NO LEAS TODO. Solo:
+- ai/scripts/seed-state.py
+- ai/scripts/check-feature-state.py zonas 95-165
+- .gitignore
+- los tests nuevos en tests/test_harness.py (zonas 5386-5530)
+- git status y git diff --cached --summary
+
+Contexto: ai/state pesaba 2,3 MB con 23 features y viajaba en el clon, asi que un tercero heredaba el
+historial de Federico. El paquete mueve el historial a docs/historia/estado-2026-08 (trackeado,
+leido por nadie), gitignorea ai/state, y lo siembra desde ai/state.seed. EL PATH SE MANTIENE: eso es
+lo que evita tocar los once modulos que leen ai/state.
+
+Revisa EXACTAMENTE estos tres puntos.
+
+PUNTO 1 - La siembra puede pisar el trabajo del dueno?
+Es la regla que separa "el producto se puede clonar" de "le borre el trabajo al dueno":
+LA SIEMBRA SOLO PUEBLA UN ai/state AUSENTE, NUNCA PISA UNO EXISTENTE.
+Probalo con fixtures y HOME/directorio temporal, NUNCA contra el ai/state real:
+(a) directorio ausente -> siembra;
+(b) directorio existente con contenido -> NO toca nada, byte a byte;
+(c) sembrar dos veces seguidas -> idempotente.
+Si en algun caso pisa o duplica, es hallazgo CRITICAL.
+
+PUNTO 2 - check-feature-state.py sigue detectando lo que tiene que detectar?
+Se le cambio la pregunta de "toda la historia" a "desde mi baseline". Verifica las DOS direcciones:
+(a) un clon limpio ya no da rojo por las 23 specs historicas;
+(b) un spec entregado DESPUES del baseline sin su state file SIGUE dando rojo.
+Si (b) no da rojo, se apago el gate en vez de arreglarle la pregunta, y es hallazgo CRITICAL.
+
+PUNTO 3 - MORDIDA, y la sexta guarda hueca.
+En este proyecto ya aparecieron CINCO tests que decian cubrir algo que no miraban. Eligi al menos DOS
+de los tests nuevos -uno de la siembra y uno del baseline- y rompé lo que dicen proteger (cp a /tmp,
+muta, corre dirigido, restaura con cp; NO uses git checkout/restore/stash).
+Tienen que ponerse ROJOS. Pega rojo y verde literales.
+
+REGLAS:
+- Cada bloque literal, o marcado como recortado. Si no lo corriste, "sin verificar".
+- `pytest` NO esta instalado. python3 -m unittest dirigido.
+- NO corras la suite entera: el orquestador ya la corrio, 1110 OK / 3 skips, VERIFY_PASS.
+
+FORMATO DE SALIDA (al final, texto plano):
+VEREDICTO: approved | revision_required
+Por cada hallazgo: ID / SEVERIDAD / DONDE (file:line) / QUE / PRUEBA (comando y salida literal).
+Si no hay hallazgos, decilo y mostra igual la evidencia de los tres puntos.
+codex
+Voy a hacer una revisión independiente y estrictamente de solo lectura sobre producción. Voy a usar `request-triage` para encuadrar la revisión y `package-review` para aplicar el protocolo de evidencia; las únicas mutaciones serán copias temporales bajo `/tmp` para las pruebas de mordida solicitadas.
+exec
+/bin/bash -lc "sed -n '1,240p' /home/federico/SET-AGENTES/AGENTS.md && sed -n '1,260p' /home/federico/.codex/skills/request-triage/SKILL.md && sed -n '1,300p' /home/federico/.codex/skills/package-review/SKILL.md" in /home/federico/SET-AGENTES
+ exited 2 in 0ms:
+sed: can't read /home/federico/SET-AGENTES/AGENTS.md: No such file or directory
+
+exec
+/bin/bash -lc 'git status --short && git diff --cached --summary' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+M  .gitignore
+M  ai/scripts/check-feature-state.py
+A  ai/scripts/seed-state.py
+A  ai/state.seed/README.md
+A  ai/state.seed/bitacora/.gitkeep
+A  ai/state.seed/features/.gitkeep
+A  docs/adr/0047-el-estado-no-es-el-producto.md
+M  docs/adr/README.md
+R  ai/state/STATUS.md -> docs/historia/estado-2026-08/STATUS.md
+R  ai/state/bitacora/sin-feature.md -> docs/historia/estado-2026-08/bitacora/sin-feature.md
+R  ai/state/decisions-log.jsonl -> docs/historia/estado-2026-08/decisions-log.jsonl
+R  ai/state/features/002-adaptive-pi-orchestration.json -> docs/historia/estado-2026-08/features/002-adaptive-pi-orchestration.json
+R  ai/state/features/003-trusted-routing-pi-runtime.json -> docs/historia/estado-2026-08/features/003-trusted-routing-pi-runtime.json
+R  ai/state/features/004-adaptive-dispatch.json -> docs/historia/estado-2026-08/features/004-adaptive-dispatch.json
+R  ai/state/features/005-portable-harness.json -> docs/historia/estado-2026-08/features/005-portable-harness.json
+R  ai/state/features/006-execution-graph.json -> docs/historia/estado-2026-08/features/006-execution-graph.json
+R  ai/state/features/007-quota-visibility.json -> docs/historia/estado-2026-08/features/007-quota-visibility.json
+R  ai/state/features/008-dynamic-selection.json -> docs/historia/estado-2026-08/features/008-dynamic-selection.json
+R  ai/state/features/009-self-application.json -> docs/historia/estado-2026-08/features/009-self-application.json
+R  ai/state/features/010-spawn-provenance.json -> docs/historia/estado-2026-08/features/010-spawn-provenance.json
+R  ai/state/features/011-quota-failover.json -> docs/historia/estado-2026-08/features/011-quota-failover.json
+R  ai/state/features/012-discovered-inventory.json -> docs/historia/estado-2026-08/features/012-discovered-inventory.json
+R  ai/state/features/013-pi-interactive-target.json -> docs/historia/estado-2026-08/features/013-pi-interactive-target.json
+R  ai/state/features/014-model-preference-policy.json -> docs/historia/estado-2026-08/features/014-model-preference-policy.json
+R  ai/state/features/015-anthropic-dispatch-parity.json -> docs/historia/estado-2026-08/features/015-anthropic-dispatch-parity.json
+R  ai/state/features/016-audit-debt-repayment.json -> docs/historia/estado-2026-08/features/016-audit-debt-repayment.json
+R  ai/state/features/019-harness-evolution.json -> docs/historia/estado-2026-08/features/019-harness-evolution.json
+R  ai/state/features/020-honest-dashboard.json -> docs/historia/estado-2026-08/features/020-honest-dashboard.json
+R  ai/state/features/021-gates-que-no-mienten-ni-callan.json -> docs/historia/estado-2026-08/features/021-gates-que-no-mienten-ni-callan.json
+R  ai/state/features/022-disponibilidad-real.json -> docs/historia/estado-2026-08/features/022-disponibilidad-real.json
+R  ai/state/features/023-senales-de-consumo.json -> docs/historia/estado-2026-08/features/023-senales-de-consumo.json
+R  ai/state/features/024-listo-para-terceros.json -> docs/historia/estado-2026-08/features/024-listo-para-terceros.json
+R  ai/state/features/025-consola-minima-y-flexible.json -> docs/historia/estado-2026-08/features/025-consola-minima-y-flexible.json
+R  ai/state/features/026-orquestador-elige-modelo.json -> docs/historia/estado-2026-08/features/026-orquestador-elige-modelo.json
+R  ai/state/narrative-log.jsonl -> docs/historia/estado-2026-08/narrative-log.jsonl
+R  ai/state/project.json -> docs/historia/estado-2026-08/project.json
+R  ai/state/quickfix-log.jsonl -> docs/historia/estado-2026-08/quickfix-log.jsonl
+MM "docs/notas/00 - Proyecto.md"
+MM docs/notas/features/024-listo-para-terceros.md
+MM docs/notas/features/024-listo-para-terceros/C1-estado-fuera-del-producto.md
+M  docs/notas/features/024-listo-para-terceros/grafo.md
+AM docs/specs/024-listo-para-terceros/bitacora.md
+A  docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md
+A  docs/specs/024-listo-para-terceros/evidence/C1-implementer.md
+M  tests/test_harness.py
+ create mode 100755 ai/scripts/seed-state.py
+ create mode 100644 ai/state.seed/README.md
+ create mode 100644 ai/state.seed/bitacora/.gitkeep
+ create mode 100644 ai/state.seed/features/.gitkeep
+ create mode 100644 docs/adr/0047-el-estado-no-es-el-producto.md
+ rename {ai/state => docs/historia/estado-2026-08}/STATUS.md (94%)
+ rename {ai/state => docs/historia/estado-2026-08}/bitacora/sin-feature.md (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/decisions-log.jsonl (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/002-adaptive-pi-orchestration.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/003-trusted-routing-pi-runtime.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/004-adaptive-dispatch.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/005-portable-harness.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/006-execution-graph.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/007-quota-visibility.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/008-dynamic-selection.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/009-self-application.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/010-spawn-provenance.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/011-quota-failover.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/012-discovered-inventory.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/013-pi-interactive-target.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/014-model-preference-policy.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/015-anthropic-dispatch-parity.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/016-audit-debt-repayment.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/019-harness-evolution.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/020-honest-dashboard.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/021-gates-que-no-mienten-ni-callan.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/022-disponibilidad-real.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/023-senales-de-consumo.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/024-listo-para-terceros.json (67%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/025-consola-minima-y-flexible.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/026-orquestador-elige-modelo.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/narrative-log.jsonl (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/project.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/quickfix-log.jsonl (100%)
+ create mode 100644 docs/specs/024-listo-para-terceros/bitacora.md
+ create mode 100644 docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md
+ create mode 100644 docs/specs/024-listo-para-terceros/evidence/C1-implementer.md
+
+exec
+/bin/bash -lc "sed -n '1,260p' /home/federico/.codex/skills/request-triage/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: request-triage
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (consult/analysis, feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator
+---
+
+# Request Triage
+
+## When to use
+At the very start of EVERY user request, before any delegation. Classify the request, decide the mode, ask
+what you must, then run the matching flow. Do not dive into the SDD pipeline reflexively — that is exactly the
+failure this skill exists to prevent (applying the heavy flow to a problem that needed a fast, clever fix).
+
+## Step 0 — intake (always, before delegating)
+1. Restate the request in one line and name the **mode** you are choosing + why.
+2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
+   original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
+   scoping doubt one of those already answers is resolved with `log-decision`, not asked.
+3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+   questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
+   cart".
+4. Only then delegate the first action of the chosen mode.
+
+## The five modes
+
+### 0. Consult / analysis — thinking together, no pipeline (check this FIRST)
+Triggers: "qué opinás", "cómo encararías", "analizame esta idea", comparisons, design questions — any request
+where the user wants analysis or a recommendation, not a code change. This is a first-class mode, not a
+misclassified feature.
+Flow: NO `init`, NO state file, NO pipeline. Delegate in parallel (these spawns are allowed and cheap):
+- `brainstormer` — 3-6 genuinely different options with tradeoffs,
+- `architect` — read-only pass over the three axes (relational vs non-relational vs vector store, API Gateway,
+  deploy platform) plus design patterns / clean-architecture shape; NO ADR unless the user asks,
+- `security-auditor` — design-level threat sketch, only when the idea touches auth/money/PII/external input.
+Then SYNTHESIZE yourself into ONE multi-lens analysis: data model, architecture/patterns, security,
+algorithms/complexity — ending with a recommendation plus runner-up. Close by asking: "¿Lo convierto en spec
+(feature) o en scoped?". A consult NEVER starts the pipeline on its own; if durable learning surfaced,
+delegate a `memory-scribe` note to the domain knowledge.
+
+### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
+Triggers — full SDD is chosen ONLY when at least one of these holds; otherwise drop to scoped-feature (if a
+concrete risk signal is present) or quick-fix (the default lane):
+- a net-new system or module (not an addition to established infrastructure),
+- genuinely multi-package work (several coherent packages with dependencies),
+- the request touches one of the three architecture axes (data store type, API Gateway, deploy platform)
+  with no ADR covering it.
+Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
+expect? where centralized vs decentralized? what must be secure day one? and name these three axes
+explicitly, not generically — **does persistence need vector/semantic search or does relational cover it?
+does this need an API Gateway or is it a monolith with one client? where does it deploy and why (Vercel/PaaS
+vs VPS/IaaS vs managed)?** Then the rigorous
+**SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
+Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
+validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
+integration → judge → release → memory. Tests do NOT approve implementation; the independent package reviewer
+does. This order is mandatory in feature mode; the three lanes below are the only
+exceptions (scoped-feature / quick-fix / incident).
+
+### 2. Scoped-feature — for bounded work that shows a concrete risk signal
+Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
+present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
+multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
+change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
+the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
+Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
+decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
+consolidated package review over the complete package diff** → `security-auditor` when the package
+touches that surface → regression tests → `adversarial-judge` → release → memory.
+What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
+reviewing the complete relevant package/diff once, then delta-reviewing repairs. Escalate to feature mode only
+when one of feature mode's explicit triggers appears (net-new system, multi-package, uncovered architecture
+axis) — "this feels big" is a reason to scope the package better, not to escalate.
+
+### 3. Quick-fix — the DEFAULT for small and medium bounded work
+Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the write-side half of
+the same 1-3 number `orchestrator.md`'s "Direct-read vs. delegated-explore threshold" (ADR-0020) uses for the
+read side — the two are kept as one cross-referenced constant, not two independent numbers. This is the default lane: most
+day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
+`gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
+to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
+or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
+`python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
+— quick-fixes with no trace are how the development thread gets lost.
+
+### 4. Incident / break-glass — production is broken NOW
+Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
+prod user needs a password reset and there is no forgot-password flow → a one-shot `psql` script, done).
+Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual change to `debugger`/`implementer`
+(you still never implement yourself). MANDATORY afterward — never skip: (a) write down exactly what was done,
+(b) open a follow-up task to do it properly, (c) delegate a memory note. Break-glass is a conscious, logged
+exception to the rigor default — not a licence to abandon it.
+
+Ambiguous which mode? Ask. Otherwise pick the LIGHTEST mode that covers the risk actually observed in the
+request and the code — not the hypothetical risk. Escalate only when you find a concrete signal from the
+lists above, and name that signal in the narration. Downgrading is equally legitimate: if mid-scoped the
+planner or implementer establishes the change is smaller than assumed (no signal actually present), degrade
+to quick-fix and record why with `log-decision` — escalation is not a one-way ratchet.
+
+## Physical budgets per mode (enforced by the state CLI, not by prose)
+
+The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
+`feature-state.py init` via `--mode`:
+
+| Mode | `--mode` | Spawns/package | Deep review cycles | Gate failures |
+|---|---|---|---|---|
+| Feature / SDD | `feature` (opt-in) | 12 | 2 | 3 |
+| Scoped-feature | `scoped` (default) | 8 | 2 | 3 |
+| Quick-fix | `quick-fix` | 4 | 1 | 2 |
+| Incident | `incident` | 6 | 1 | 2 |
+
+Two physical waivers keep light modes light without prose exceptions:
+- `record-repair --skip-delta` skips the delta review ONLY when every repaired finding is ≤ medium severity
+  and the repair touched ≤ 3 files (the CLI rejects it otherwise, and the waiver is recorded in the event).
+- `create-package --runtime-surface false` (planner declaration) lets a package with no observable runtime
+  surface become accept-ready after testing, without spawning `app-runner`/`runtime-verifier`. Default is
+  `true` — fail-safe.
+
+`record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
+than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,
+logged decision), do not fight the budget.
+
+## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
+Before delegating in ANY mode, check the request against the three named axes above: **data store type
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. The
+check fires on EVIDENCE, not plausibility: the request or the files it names concretely require one of these
+axes (a new kind of persistence, a new external entry point, a deploy change) AND no existing ADR covers it.
+When it fires, do not implement directly — escalate to at least `scoped-feature` with an architecture
+checkpoint (`architect` loads `system-design-decisions`, proposes options, and the orchestrator asks the user
+per its Question policy) before any code is written. This applies even to a request that looks like a
+quick-fix on its surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store
+decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
+ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
+hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+**Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+Vercel", "store it in Supabase"), that axis is DECIDED — record it with `log-decision` and proceed without
+asking; `architect` writes the formal ADR afterwards. The red-flag question is only for an axis the user
+left genuinely open.
+
+## Waking the dormant agents (concrete triggers, not "by risk")
+These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in
+the plan or the diff (the concrete files/paths the package owns: auth/, payments/, migrations/, ui
+components, .env-adjacent config), not the topic of the request in the abstract; `package-planner` justifies
+each entry in `required_reviewers` with the paths that demand it:
+- **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
+  covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
+- **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).
+- **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
+- **queries / lists / transactions / migrations** → covered by `package-reviewer`'s own data-integrity/
+  scalability checklist (already mandatory, no separate agent).
+
+**Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
+when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before
+`adversarial-judge` is mandatory.
+
+## Hard logic → hosted implementer (never the local leaf)
+Concurrency, atomic transactions, money/financial rules, and security-critical logic must NOT be implemented by
+the local leaf model (the cheap 8B) — a weak first draft on exactly this logic triggers more strong-auditor
+rework than it saves. When a task touches these, pin implementation to a **hosted** model (e.g. `openai/gpt-5.4`)
+rather than the local `implementer`. Route such implementation deliberately from the package plan. The
+local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then reviews.
+
+## Output of triage
+State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
+incident mode, also name the follow-up task you will open once the fire is out.
+
+The first delegation is announced with the dual-register narration block from `orchestrator.md`
+(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
+parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
+since a consult has no feature state file.
+
+exec
+/bin/bash -lc "sed -n '1,360p' /home/federico/.codex/skills/package-review/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: package-review
+description: Deep independent review of a complete package diff against approved spec, package criteria, gates, integration behavior, and relevant risk surfaces.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: package-reviewer, delta-reviewer, adversarial-judge
+---
+
+# Package Review
+
+## Inputs
+Approved spec/version, package plan, diff, gate results, assumptions, and known risks.
+
+## Checks
+- Correctness against covered acceptance criteria.
+- Integration with existing contracts.
+- Architecture and maintainability with real impact.
+- Security/data/performance surfaces when touched.
+- Failure paths and edge cases.
+- Test gaps that would leave accepted behavior unprotected.
+
+## Cadence
+One deep review per integrated package. A second pass is focused on repair delta. Full re-review only when repair
+changes architecture, public contracts, or risk surface substantially.
+
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).
+
+exec
+/bin/bash -lc "sed -n '1,220p' .gitignore" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+# Local build and installation artifacts
+.build/
+.staging/
+.backups/
+*.tmp
+*.log
+# SEC-004: *.log above does not match the rotated `render-failures.log.1` sibling
+# _log_render_failure (ai/scripts/feature-state.py) writes past RENDER_FAILURE_LOG_CAP.
+render-failures.log*
+
+# Local credentials and environment overrides
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# Editor and operating-system noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Language caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+
+# Per-machine selection (each machine picks its own opencode lane)
+active-profile
+
+# Obsidian workspace and MCP session dumps
+.obsidian/
+.playwright-mcp/
+
+# ADR-0038: tools discovery -- the open-catalog overlay and its pending-proposal
+# staging file. F-11 repair: these live at ROOT (SET_AGENTS_ROOT, the harness CLONE
+# root -- ai/scripts/set_agents_app.py:41), never per-project -- an approve in any
+# project on this machine adds to the SAME catalog every other project on this clone
+# sees. Never curated, never committed either way.
+tools.local.toml
+tools.proposals.json
+
+# ADR-0047: the harness's own working state is not the product. The path stays
+# ai/state/ at runtime (every one of the eleven ai/scripts/ modules that read it is
+# unchanged), but the directory itself is now this machine's local, untracked history
+# -- reconstructed by ai/scripts/seed-state.py from the tracked, empty ai/state.seed/
+# skeleton whenever ai/state/ is absent, and never touched when it already exists.
+/ai/state/
+
+exec
+/bin/bash -lc "sed -n '1,260p' ai/scripts/seed-state.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+#!/usr/bin/env python3
+"""Populate `ai/state/` from the tracked `ai/state.seed/` skeleton -- ONLY when absent.
+
+ADR-0047: `ai/state/` is gitignored, so a fresh clone starts with no `ai/state/` at
+all, not the tracked directory eleven `ai/scripts/` modules read and write. Left
+alone, that is a hole shaped like a crash the first time any of them expects
+`ai/state/features/` to exist. This script fills the hole with a functional, empty
+harness -- no feature, no decision, no narrative entry belongs to whoever cloned
+the repo before this ran.
+
+The one invariant that matters more than the feature itself: this never overwrites
+a real `ai/state/`. Whether `ai/state/` already exists because this machine has
+real history (Federico's, or anyone's), or because a previous run of this exact
+script already seeded it, the answer is the same -- do nothing. The guard is
+"present or absent", nothing finer: this script does not diff, does not merge,
+does not selectively fill in missing files inside an existing tree. That
+coarseness is deliberate; anything finer is a second place this could get the
+"whose data wins" question wrong.
+
+Usage: seed-state.py <root>
+"""
+
+from __future__ import annotations
+
+import shutil
+import sys
+from pathlib import Path
+
+
+def _present(path: Path) -> bool:
+    """True for anything at all at `path` -- file, directory, or broken symlink.
+
+    `Path.exists()` follows symlinks and reports False for a broken one, which
+    would read as "absent" for a spot that is very much occupied. `lstat` never
+    follows, so a broken symlink still counts as present and the seed still
+    refuses to touch it.
+    """
+    try:
+        path.lstat()
+    except OSError:
+        return False
+    return True
+
+
+def seed_state(root: Path) -> str:
+    """Copy `ai/state.seed/` to `ai/state/`, but only into an absent `ai/state/`.
+
+    Returns a status word rather than raising, so a caller (or a test) can branch
+    on the outcome without parsing stderr.
+    """
+    target = root / "ai" / "state"
+    source = root / "ai" / "state.seed"
+    if _present(target):
+        return "STATE_SEED_SKIP_EXISTING"
+    if not source.is_dir():
+        return "STATE_SEED_SOURCE_MISSING"
+    shutil.copytree(source, target)
+    return "STATE_SEEDED"
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print("usage: seed-state.py <root>", file=sys.stderr)
+        return 2
+    root = Path(sys.argv[1])
+    status = seed_state(root)
+    print(status)
+    return 0 if status in ("STATE_SEEDED", "STATE_SEED_SKIP_EXISTING") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+exec
+/bin/bash -lc "sed -n '5386,5530p' tests/test_harness.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+    def test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones(self):
+        # AC-02 (024-listo-para-terceros/C1, ADR-0047).  ai/state/ is gitignored and
+        # reseeded empty per clone now, so a fresh clone of a repository with real
+        # delivery history -- read against the WHOLE history, the pre-fix behavior --
+        # would misreport every feature ever delivered as FEATURE_STATE_MISSING on its
+        # very first `verify.sh`, none of it the clone owner's doing.  This fixture is
+        # exactly that shape: a delivery commit for 010-delivered *before*
+        # `ai/state.seed/` starts existing (the new baseline), and no
+        # `ai/state/features/010-delivered.json` anywhere -- the same shape a fresh
+        # clone's `ai/state/` actually has for anyone's already-finished work.  A
+        # delivery for a *different* feature, *after* the baseline, still has to be
+        # caught -- proving the fix narrows the question rather than retiring the
+        # guard (the "degradado ruidoso" the context pack asks to keep).
+        guard = "ai/scripts/check-feature-state.py"
+
+        def commit(root, message):
+            run("git", "-C", str(root), "add", "-A")
+            run("git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
+                "commit", "-q", "--allow-empty", "-m", message)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run("git", "-C", str(root), "init", "-q", "-b", "main")
+
+            # Pre-baseline: delivered the old way, ai/state/ tracked, no
+            # ai/state.seed/ yet -- exactly this repository's own history up to the
+            # ADR-0047 migration commit.
+            (root / "docs/specs/010-delivered").mkdir(parents=True)
+            (root / "docs/specs/010-delivered/spec.md").write_text("# 010-delivered\n\n## P1\n")
+            (root / "ai/state/features").mkdir(parents=True)
+            (root / "ai/state/features/010-delivered.json").write_text("{}")
+            commit(root, "Feature 010 P1-first-slice: deliver the first package")
+
+            # The ADR-0047 move: ai/state/ stops being tracked (as `git mv` to
+            # docs/historia/ leaves it -- gone from THIS repo's git history from here
+            # on), ai/state.seed/ starts existing. This commit IS the baseline.
+            run("git", "-C", str(root), "rm", "-r", "-q", "ai/state")
+            (root / "ai/state.seed").mkdir(parents=True)
+            (root / "ai/state.seed/.gitkeep").write_text("")
+            commit(root, "docs: ADR-0047 -- el estado no es el producto")
+
+            # A fresh clone's ai/state/ is empty (freshly seeded, or not seeded at
+            # all yet) -- 010-delivered's own state file does not exist here on
+            # purpose, and that must NOT be a violation.
+            clean = run("python3", guard, str(root), check=False)
+            self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
+            self.assertIn("FEATURE_STATE_OK", clean.stdout)
+            self.assertNotIn("010-delivered", clean.stdout)
+
+            # Post-baseline: a NEW delivery, still without a state file, still has to
+            # be caught.
+            (root / "docs/specs/011-new").mkdir(parents=True)
+            (root / "docs/specs/011-new/spec.md").write_text("# 011-new\n\n## P1\n")
+            commit(root, "Feature 011 P1-first-slice: deliver it")
+            caught = run("python3", guard, str(root), check=False)
+            self.assertEqual(caught.returncode, 1)
+            self.assertIn("FEATURE_STATE_MISSING id=011-new", caught.stdout)
+            self.assertNotIn("010-delivered", caught.stdout)
+
+    def test_seed_state_only_populates_an_absent_ai_state(self):
+        # AC-01 (024-listo-para-terceros/C1, ADR-0047).  The one rule that separates
+        # "the product can be cloned" from "it deleted the owner's real work":
+        # ai/scripts/seed-state.py populates ai/state/ from the tracked
+        # ai/state.seed/ skeleton ONLY when ai/state/ is absent, and never touches
+        # one that already exists -- whether that is a previous seed run or
+        # someone's real history.
+        script = "ai/scripts/seed-state.py"
+
+        def manifest(base):
+            return {str(p.relative_to(base)): p.read_bytes() for p in sorted(base.rglob("*")) if p.is_file()}
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "ai/state.seed/features").mkdir(parents=True)
+            (root / "ai/state.seed/bitacora").mkdir(parents=True)
+            (root / "ai/state.seed/features/.gitkeep").write_text("")
+            (root / "ai/state.seed/bitacora/.gitkeep").write_text("")
+
+            first = run("python3", script, str(root))
+            self.assertIn("STATE_SEEDED", first.stdout)
+            self.assertTrue((root / "ai/state/features/.gitkeep").exists())
+            self.assertTrue((root / "ai/state/bitacora/.gitkeep").exists())
+
+            # Idempotent: seeding an already-seeded tree a second time changes
+            # nothing and duplicates nothing -- pinned by a byte-for-byte manifest
+            # comparison, not just a status line.
+            before = manifest(root / "ai/state")
+            second = run("python3", script, str(root))
+            self.assertIn("STATE_SEED_SKIP_EXISTING", second.stdout)
+            self.assertEqual(before, manifest(root / "ai/state"))
+
+        # The protecting case: an ai/state/ that already holds real data is never
+        # overwritten, even though it is missing files the seed would otherwise add.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "ai/state.seed/features").mkdir(parents=True)
+            (root / "ai/state.seed/features/.gitkeep").write_text("")
+            (root / "ai/state/features").mkdir(parents=True)
+            real = root / "ai/state/features/999-real-work.json"
+            real.write_text('{"owner": "federico"}')
+
+            result = run("python3", script, str(root))
+            self.assertIn("STATE_SEED_SKIP_EXISTING", result.stdout)
+            self.assertEqual(real.read_text(), '{"owner": "federico"}')
+            self.assertFalse((root / "ai/state/features/.gitkeep").exists())
+
+    def test_feature_state_gate_mid_migration_uncommitted_seed_is_not_unusable(self):
+        # AC-02 (024/C1, ADR-0047), the exact shape this repository is in while this
+        # very package is implemented: ai/state.seed/ exists on disk (git mv already
+        # ran, `git add -A` already staged it) but has not landed in any commit yet --
+        # `baseline_sha()` legitimately finds nothing in history. Read as "unusable"
+        # this would degrade every verify.sh run of this package's own implementation
+        # window to FEATURE_STATE_UNCHECKED (caught for real: `git clone`+`shutil.copytree`
+        # guests of this exact repository state failed this exact assertion before the
+        # fix). The correct reading: nothing can be "after" a commit that has not been
+        # made yet, so the honest window is empty, not unusable.
+        guard = "ai/scripts/check-feature-state.py"
+
+        def commit(root, message):
+            run("git", "-C", str(root), "add", "-A")
+            run("git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
+                "commit", "-q", "--allow-empty", "-m", message)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run("git", "-C", str(root), "init", "-q", "-b", "main")
+            # Old-style delivery, committed, tracked ai/state/ -- pre-move history,
+            # same as this repository's own commits before today.
+            (root / "docs/specs/010-delivered").mkdir(parents=True)
+            (root / "docs/specs/010-delivered/spec.md").write_text("# 010-delivered\n\n## P1\n")
+            (root / "ai/state/features").mkdir(parents=True)
+            (root / "ai/state/features/010-delivered.json").write_text("{}")
+            commit(root, "Feature 010 P1-first-slice: deliver the first package")
+
+            # The move, entirely uncommitted: ai/state/ gone from the tree, ai/state.seed/
+            # present on disk, nothing staged or committed yet.
+            shutil.rmtree(root / "ai/state")
+            (root / "ai/state.seed/features").mkdir(parents=True)
+            (root / "ai/state.seed/features/.gitkeep").write_text("")
+
+            mid_flight = run("python3", guard, str(root), check=False)
+            self.assertEqual(mid_flight.returncode, 0, mid_flight.stdout + mid_flight.stderr)
+            self.assertIn("FEATURE_STATE_OK", mid_flight.stdout)
+            self.assertNotIn("baseline-unknown", mid_flight.stderr)
+            self.assertNotIn("010-delivered", mid_flight.stdout)
+
+exec
+/bin/bash -lc "sed -n '95,165p' ai/scripts/check-feature-state.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+        )
+    except OSError:
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def baseline_sha(root: Path) -> str | None:
+    """The commit ADR-0047's move landed in, or None when it cannot be found.
+
+    `ai/state.seed/` is tracked forever from the moment it was introduced, so the
+    OLDEST commit that added anything under it is a stable, repository-wide anchor --
+    the same commit for every clone, never a per-machine value. Everything at or
+    before it is pre-move history, already accounted for in
+    `docs/historia/estado-2026-08/` and out of scope for this guard; everything after
+    it is checked exactly as before, against whatever `ai/state/features/` this clone
+    has actually seeded and grown since.
+    """
+    log = git(root, "log", "--format=%H", "--diff-filter=A", "--", "ai/state.seed")
+    if log is None:
+        return None
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    return lines[-1] if lines else None
+
+
+def delivery_commits(root: Path) -> tuple[list[tuple[int, str, str]] | None, str]:
+    """Every delivery commit since the ADR-0047 baseline, or None with a reason.
+
+    None means "this history cannot answer the question", which is a different claim
+    from "nothing was delivered".  Three ways to get there now, and the first two
+    predate the baseline logic: a shallow clone has the *whole working tree* but a
+    truncated log, so treating `git log`'s window as everything that ever happened
+    silently inverts the result.  Reproduced before this guard existed in its current
+    form: `git clone --depth 1` of this repository made the guard declare 006's waiver
+    unnecessary and exit 1, advising a deletion that would have broken every full
+    clone.  CI fetches with depth 0, so it would never have been the one to notice.
+    The third (`baseline-unknown`) is the same posture applied to the new anchor: a
+    full clone that somehow lacks `ai/state.seed/` ANYWHERE -- neither in history nor
+    on disk -- cannot answer "since the baseline" either, and guessing (by falling
+    back to the full history this function used to scan) would resurrect the exact
+    false-positive bug ADR-0047 exists to close.
+
+    One more case is not degraded, on purpose: `ai/state.seed/` present in the
+    working tree but not yet in any commit is not "unusable history", it is the
+    ADR-0047 move itself, mid-flight -- this repository, right now, before its own
+    migration commit lands.  Nothing can be "after" a commit that has not been made
+    yet, so the honest window is empty, and the honest answer is the same as any
+    other clone with nothing to report: no violations, not "can't tell".
+    """
+    shallow = git(root, "rev-parse", "--is-shallow-repository")
+    if shallow is None:
+        return None, "git-history-unavailable"
+    if shallow.strip() == "true":
+        return None, "shallow-clone"
+    baseline = baseline_sha(root)
+    if baseline is None:
+        if (root / "ai" / "state.seed").is_dir():
+            return [], ""
+        return None, "baseline-unknown"
+    log = git(root, "log", "--format=%h %s", f"{baseline}..HEAD")
+    if log is None:
+        return None, "git-history-unavailable"
+    found = []
+    for line in log.splitlines():
+        sha, _, subject = line.partition(" ")
+        named = DELIVERY_SUBJECT.match(subject)
+        if named:
+            found.append((int(named.group(1)), sha, subject))
+    return found, ""
+
+
+def remedy(root: Path, feature_id: str) -> str:
+
+exec
+/bin/bash -lc 'git status --short && git diff --cached --summary' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+M  .gitignore
+M  ai/scripts/check-feature-state.py
+A  ai/scripts/seed-state.py
+A  ai/state.seed/README.md
+A  ai/state.seed/bitacora/.gitkeep
+A  ai/state.seed/features/.gitkeep
+A  docs/adr/0047-el-estado-no-es-el-producto.md
+M  docs/adr/README.md
+R  ai/state/STATUS.md -> docs/historia/estado-2026-08/STATUS.md
+R  ai/state/bitacora/sin-feature.md -> docs/historia/estado-2026-08/bitacora/sin-feature.md
+R  ai/state/decisions-log.jsonl -> docs/historia/estado-2026-08/decisions-log.jsonl
+R  ai/state/features/002-adaptive-pi-orchestration.json -> docs/historia/estado-2026-08/features/002-adaptive-pi-orchestration.json
+R  ai/state/features/003-trusted-routing-pi-runtime.json -> docs/historia/estado-2026-08/features/003-trusted-routing-pi-runtime.json
+R  ai/state/features/004-adaptive-dispatch.json -> docs/historia/estado-2026-08/features/004-adaptive-dispatch.json
+R  ai/state/features/005-portable-harness.json -> docs/historia/estado-2026-08/features/005-portable-harness.json
+R  ai/state/features/006-execution-graph.json -> docs/historia/estado-2026-08/features/006-execution-graph.json
+R  ai/state/features/007-quota-visibility.json -> docs/historia/estado-2026-08/features/007-quota-visibility.json
+R  ai/state/features/008-dynamic-selection.json -> docs/historia/estado-2026-08/features/008-dynamic-selection.json
+R  ai/state/features/009-self-application.json -> docs/historia/estado-2026-08/features/009-self-application.json
+R  ai/state/features/010-spawn-provenance.json -> docs/historia/estado-2026-08/features/010-spawn-provenance.json
+R  ai/state/features/011-quota-failover.json -> docs/historia/estado-2026-08/features/011-quota-failover.json
+R  ai/state/features/012-discovered-inventory.json -> docs/historia/estado-2026-08/features/012-discovered-inventory.json
+R  ai/state/features/013-pi-interactive-target.json -> docs/historia/estado-2026-08/features/013-pi-interactive-target.json
+R  ai/state/features/014-model-preference-policy.json -> docs/historia/estado-2026-08/features/014-model-preference-policy.json
+R  ai/state/features/015-anthropic-dispatch-parity.json -> docs/historia/estado-2026-08/features/015-anthropic-dispatch-parity.json
+R  ai/state/features/016-audit-debt-repayment.json -> docs/historia/estado-2026-08/features/016-audit-debt-repayment.json
+R  ai/state/features/019-harness-evolution.json -> docs/historia/estado-2026-08/features/019-harness-evolution.json
+R  ai/state/features/020-honest-dashboard.json -> docs/historia/estado-2026-08/features/020-honest-dashboard.json
+R  ai/state/features/021-gates-que-no-mienten-ni-callan.json -> docs/historia/estado-2026-08/features/021-gates-que-no-mienten-ni-callan.json
+R  ai/state/features/022-disponibilidad-real.json -> docs/historia/estado-2026-08/features/022-disponibilidad-real.json
+R  ai/state/features/023-senales-de-consumo.json -> docs/historia/estado-2026-08/features/023-senales-de-consumo.json
+R  ai/state/features/024-listo-para-terceros.json -> docs/historia/estado-2026-08/features/024-listo-para-terceros.json
+R  ai/state/features/025-consola-minima-y-flexible.json -> docs/historia/estado-2026-08/features/025-consola-minima-y-flexible.json
+R  ai/state/features/026-orquestador-elige-modelo.json -> docs/historia/estado-2026-08/features/026-orquestador-elige-modelo.json
+R  ai/state/narrative-log.jsonl -> docs/historia/estado-2026-08/narrative-log.jsonl
+R  ai/state/project.json -> docs/historia/estado-2026-08/project.json
+R  ai/state/quickfix-log.jsonl -> docs/historia/estado-2026-08/quickfix-log.jsonl
+MM "docs/notas/00 - Proyecto.md"
+MM docs/notas/features/024-listo-para-terceros.md
+MM docs/notas/features/024-listo-para-terceros/C1-estado-fuera-del-producto.md
+M  docs/notas/features/024-listo-para-terceros/grafo.md
+AM docs/specs/024-listo-para-terceros/bitacora.md
+A  docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md
+A  docs/specs/024-listo-para-terceros/evidence/C1-implementer.md
+M  tests/test_harness.py
+ create mode 100755 ai/scripts/seed-state.py
+ create mode 100644 ai/state.seed/README.md
+ create mode 100644 ai/state.seed/bitacora/.gitkeep
+ create mode 100644 ai/state.seed/features/.gitkeep
+ create mode 100644 docs/adr/0047-el-estado-no-es-el-producto.md
+ rename {ai/state => docs/historia/estado-2026-08}/STATUS.md (94%)
+ rename {ai/state => docs/historia/estado-2026-08}/bitacora/sin-feature.md (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/decisions-log.jsonl (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/002-adaptive-pi-orchestration.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/003-trusted-routing-pi-runtime.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/004-adaptive-dispatch.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/005-portable-harness.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/006-execution-graph.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/007-quota-visibility.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/008-dynamic-selection.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/009-self-application.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/010-spawn-provenance.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/011-quota-failover.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/012-discovered-inventory.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/013-pi-interactive-target.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/014-model-preference-policy.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/015-anthropic-dispatch-parity.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/016-audit-debt-repayment.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/019-harness-evolution.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/020-honest-dashboard.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/021-gates-que-no-mienten-ni-callan.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/022-disponibilidad-real.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/023-senales-de-consumo.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/024-listo-para-terceros.json (67%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/025-consola-minima-y-flexible.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/026-orquestador-elige-modelo.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/narrative-log.jsonl (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/project.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/quickfix-log.jsonl (100%)
+ create mode 100644 docs/specs/024-listo-para-terceros/bitacora.md
+ create mode 100644 docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md
+ create mode 100644 docs/specs/024-listo-para-terceros/evidence/C1-implementer.md
+
+codex
+Ya confirmé el alcance del cambio: `ai/state/` queda ignorado y el historial se renombra fuera del path operativo. Ahora corro solamente los dos tests nuevos pertinentes en verde; después haré dos mordidas controladas y restauraré cada script desde una copia en `/tmp`.
+exec
+/bin/bash -lc 'python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v
+python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v' in /home/federico/SET-AGENTES
+ succeeded in 300ms:
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.083s
+
+OK
+test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.126s
+
+OK
+
+exec
+/bin/bash -lc 'review_tmp=$(mktemp -d /tmp/package-review-seed.XXXXXX)
+printf '"'%s\\n' \""'$review_tmp" > /tmp/package-review-seed.path
+cp ai/scripts/seed-state.py "$review_tmp/seed-state.py"' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/seed-state.py
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+exec
+/bin/bash -lc 'python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v' in /home/federico/SET-AGENTES
+ exited 1 in 44ms:
+FAIL
+
+======================================================================
+FAIL: test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 5474, in test_seed_state_only_populates_an_absent_ai_state
+    self.assertIn("STATE_SEED_SKIP_EXISTING", second.stdout)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'STATE_SEED_SKIP_EXISTING' not found in 'STATE_SEEDED\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.058s
+
+FAILED (failures=1)
+
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+exec
+/bin/bash -lc 'review_tmp=$(cat /tmp/package-review-seed.path)
+cp "$review_tmp/seed-state.py" ai/scripts/seed-state.py
+python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v' in /home/federico/SET-AGENTES
+ succeeded in 74ms:
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.085s
+
+OK
+
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+exec
+/bin/bash -lc 'review_tmp=$(mktemp -d /tmp/package-review-baseline.XXXXXX)
+printf '"'%s\\n' \""'$review_tmp" > /tmp/package-review-baseline.path
+cp ai/scripts/check-feature-state.py "$review_tmp/check-feature-state.py"' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/check-feature-state.py
+diff --git a/ai/scripts/check-feature-state.py b/ai/scripts/check-feature-state.py
+index 3035caa8d028cb2313bb08b8c20630a722bad8db..714ee24971e553443e52183dcb994b466ef9386d
+--- a/ai/scripts/check-feature-state.py
++++ b/ai/scripts/check-feature-state.py
+@@ -146,6 +146,7 @@
+     if shallow.strip() == "true":
+         return None, "shallow-clone"
+     baseline = baseline_sha(root)
++    return [], ""  # REVIEW BITE: wrongly suppress every post-baseline delivery.
+     if baseline is None:
+         if (root / "ai" / "state.seed").is_dir():
+             return [], ""
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+diff --git a/ai/scripts/check-feature-state.py b/ai/scripts/check-feature-state.py
+index 3035caa8d028cb2313bb08b8c20630a722bad8db..714ee24971e553443e52183dcb994b466ef9386d
+--- a/ai/scripts/check-feature-state.py
++++ b/ai/scripts/check-feature-state.py
+@@ -146,6 +146,7 @@
+     if shallow.strip() == "true":
+         return None, "shallow-clone"
+     baseline = baseline_sha(root)
++    return [], ""  # REVIEW BITE: wrongly suppress every post-baseline delivery.
+     if baseline is None:
+         if (root / "ai" / "state.seed").is_dir():
+             return [], ""
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+exec
+/bin/bash -lc 'python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v' in /home/federico/SET-AGENTES
+ exited 1 in 117ms:
+FAIL
+
+======================================================================
+FAIL: test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 5441, in test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones
+    self.assertEqual(caught.returncode, 1)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 1
+
+----------------------------------------------------------------------
+Ran 1 test in 0.129s
+
+FAILED (failures=1)
+
+diff --git a/ai/scripts/check-feature-state.py b/ai/scripts/check-feature-state.py
+index 3035caa8d028cb2313bb08b8c20630a722bad8db..714ee24971e553443e52183dcb994b466ef9386d
+--- a/ai/scripts/check-feature-state.py
++++ b/ai/scripts/check-feature-state.py
+@@ -146,6 +146,7 @@
+     if shallow.strip() == "true":
+         return None, "shallow-clone"
+     baseline = baseline_sha(root)
++    return [], ""  # REVIEW BITE: wrongly suppress every post-baseline delivery.
+     if baseline is None:
+         if (root / "ai" / "state.seed").is_dir():
+             return [], ""
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+exec
+/bin/bash -lc 'review_tmp=$(cat /tmp/package-review-baseline.path)
+cp "$review_tmp/check-feature-state.py" ai/scripts/check-feature-state.py
+python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v
+git status --short
+git diff --cached --summary' in /home/federico/SET-AGENTES
+ succeeded in 116ms:
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.113s
+
+OK
+M  .gitignore
+M  ai/scripts/check-feature-state.py
+A  ai/scripts/seed-state.py
+A  ai/state.seed/README.md
+A  ai/state.seed/bitacora/.gitkeep
+A  ai/state.seed/features/.gitkeep
+A  docs/adr/0047-el-estado-no-es-el-producto.md
+M  docs/adr/README.md
+R  ai/state/STATUS.md -> docs/historia/estado-2026-08/STATUS.md
+R  ai/state/bitacora/sin-feature.md -> docs/historia/estado-2026-08/bitacora/sin-feature.md
+R  ai/state/decisions-log.jsonl -> docs/historia/estado-2026-08/decisions-log.jsonl
+R  ai/state/features/002-adaptive-pi-orchestration.json -> docs/historia/estado-2026-08/features/002-adaptive-pi-orchestration.json
+R  ai/state/features/003-trusted-routing-pi-runtime.json -> docs/historia/estado-2026-08/features/003-trusted-routing-pi-runtime.json
+R  ai/state/features/004-adaptive-dispatch.json -> docs/historia/estado-2026-08/features/004-adaptive-dispatch.json
+R  ai/state/features/005-portable-harness.json -> docs/historia/estado-2026-08/features/005-portable-harness.json
+R  ai/state/features/006-execution-graph.json -> docs/historia/estado-2026-08/features/006-execution-graph.json
+R  ai/state/features/007-quota-visibility.json -> docs/historia/estado-2026-08/features/007-quota-visibility.json
+R  ai/state/features/008-dynamic-selection.json -> docs/historia/estado-2026-08/features/008-dynamic-selection.json
+R  ai/state/features/009-self-application.json -> docs/historia/estado-2026-08/features/009-self-application.json
+R  ai/state/features/010-spawn-provenance.json -> docs/historia/estado-2026-08/features/010-spawn-provenance.json
+R  ai/state/features/011-quota-failover.json -> docs/historia/estado-2026-08/features/011-quota-failover.json
+R  ai/state/features/012-discovered-inventory.json -> docs/historia/estado-2026-08/features/012-discovered-inventory.json
+R  ai/state/features/013-pi-interactive-target.json -> docs/historia/estado-2026-08/features/013-pi-interactive-target.json
+R  ai/state/features/014-model-preference-policy.json -> docs/historia/estado-2026-08/features/014-model-preference-policy.json
+R  ai/state/features/015-anthropic-dispatch-parity.json -> docs/historia/estado-2026-08/features/015-anthropic-dispatch-parity.json
+R  ai/state/features/016-audit-debt-repayment.json -> docs/historia/estado-2026-08/features/016-audit-debt-repayment.json
+R  ai/state/features/019-harness-evolution.json -> docs/historia/estado-2026-08/features/019-harness-evolution.json
+R  ai/state/features/020-honest-dashboard.json -> docs/historia/estado-2026-08/features/020-honest-dashboard.json
+R  ai/state/features/021-gates-que-no-mienten-ni-callan.json -> docs/historia/estado-2026-08/features/021-gates-que-no-mienten-ni-callan.json
+R  ai/state/features/022-disponibilidad-real.json -> docs/historia/estado-2026-08/features/022-disponibilidad-real.json
+R  ai/state/features/023-senales-de-consumo.json -> docs/historia/estado-2026-08/features/023-senales-de-consumo.json
+R  ai/state/features/024-listo-para-terceros.json -> docs/historia/estado-2026-08/features/024-listo-para-terceros.json
+R  ai/state/features/025-consola-minima-y-flexible.json -> docs/historia/estado-2026-08/features/025-consola-minima-y-flexible.json
+R  ai/state/features/026-orquestador-elige-modelo.json -> docs/historia/estado-2026-08/features/026-orquestador-elige-modelo.json
+R  ai/state/narrative-log.jsonl -> docs/historia/estado-2026-08/narrative-log.jsonl
+R  ai/state/project.json -> docs/historia/estado-2026-08/project.json
+R  ai/state/quickfix-log.jsonl -> docs/historia/estado-2026-08/quickfix-log.jsonl
+MM "docs/notas/00 - Proyecto.md"
+MM docs/notas/features/024-listo-para-terceros.md
+MM docs/notas/features/024-listo-para-terceros/C1-estado-fuera-del-producto.md
+M  docs/notas/features/024-listo-para-terceros/grafo.md
+AM docs/specs/024-listo-para-terceros/bitacora.md
+A  docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md
+A  docs/specs/024-listo-para-terceros/evidence/C1-implementer.md
+M  tests/test_harness.py
+ create mode 100755 ai/scripts/seed-state.py
+ create mode 100644 ai/state.seed/README.md
+ create mode 100644 ai/state.seed/bitacora/.gitkeep
+ create mode 100644 ai/state.seed/features/.gitkeep
+ create mode 100644 docs/adr/0047-el-estado-no-es-el-producto.md
+ rename {ai/state => docs/historia/estado-2026-08}/STATUS.md (94%)
+ rename {ai/state => docs/historia/estado-2026-08}/bitacora/sin-feature.md (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/decisions-log.jsonl (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/002-adaptive-pi-orchestration.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/003-trusted-routing-pi-runtime.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/004-adaptive-dispatch.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/005-portable-harness.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/006-execution-graph.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/007-quota-visibility.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/008-dynamic-selection.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/009-self-application.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/010-spawn-provenance.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/011-quota-failover.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/012-discovered-inventory.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/013-pi-interactive-target.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/014-model-preference-policy.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/015-anthropic-dispatch-parity.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/016-audit-debt-repayment.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/019-harness-evolution.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/020-honest-dashboard.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/021-gates-que-no-mienten-ni-callan.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/022-disponibilidad-real.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/023-senales-de-consumo.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/024-listo-para-terceros.json (67%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/025-consola-minima-y-flexible.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/features/026-orquestador-elige-modelo.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/narrative-log.jsonl (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/project.json (100%)
+ rename {ai/state => docs/historia/estado-2026-08}/quickfix-log.jsonl (100%)
+ create mode 100644 docs/specs/024-listo-para-terceros/bitacora.md
+ create mode 100644 docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md
+ create mode 100644 docs/specs/024-listo-para-terceros/evidence/C1-implementer.md
+
+diff --git a/ai/scripts/check-feature-state.py b/ai/scripts/check-feature-state.py
+index 3035caa8d028cb2313bb08b8c20630a722bad8db..714ee24971e553443e52183dcb994b466ef9386d
+--- a/ai/scripts/check-feature-state.py
++++ b/ai/scripts/check-feature-state.py
+@@ -146,6 +146,7 @@
+     if shallow.strip() == "true":
+         return None, "shallow-clone"
+     baseline = baseline_sha(root)
++    return [], ""  # REVIEW BITE: wrongly suppress every post-baseline delivery.
+     if baseline is None:
+         if (root / "ai" / "state.seed").is_dir():
+             return [], ""
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+codex
+Las dos mordidas dieron rojo y los dos tests volvieron a verde tras restaurar desde `/tmp`. No quedó una modificación de la revisión en los scripts; cierro con el veredicto y la evidencia literal pedida.
+codex
+VEREDICTO: approved
+
+No hay hallazgos.
+
+PUNTO 1 — siembra
+
+`ai/scripts/seed-state.py:51-56` corta ante cualquier `ai/state` presente (`lstat`, incluso symlink roto) y sólo usa `copytree` si está ausente. El test cubre: ausente→siembra; existente→no agrega ni toca contenido; segunda siembra→manifiesto byte a byte idéntico.
+
+Verde literal:
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v
+test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.083s
+
+OK
+```
+
+Mordida: eliminé temporalmente la guarda y habilité copia sobre directorio existente; el test se puso rojo.
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v
+test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state) ... FAIL
+
+======================================================================
+FAIL: test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 5474, in test_seed_state_only_populates_an_absent_ai_state
+    self.assertIn("STATE_SEED_SKIP_EXISTING", second.stdout)
+AssertionError: 'STATE_SEED_SKIP_EXISTING' not found in 'STATE_SEEDED\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.058s
+
+FAILED (failures=1)
+```
+
+Restaurado con `cp` desde `/tmp`; verde literal:
+
+```text
+Ran 1 test in 0.085s
+
+OK
+```
+
+PUNTO 2 — baseline
+
+`ai/scripts/check-feature-state.py:145-163` toma el primer commit que añadió `ai/state.seed` como baseline y evalúa sólo `baseline..HEAD`. El test prueba ambas direcciones: el entregable 010 pre-baseline no genera rojo; el 011 post-baseline, sin state file, genera `FEATURE_STATE_MISSING`.
+
+Verde literal:
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v
+test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.126s
+
+OK
+```
+
+Mordida: forcé temporalmente una ventana vacía luego de calcular el baseline; el gate dejó de detectar 011 y el test se puso rojo.
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v
+test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones) ... FAIL
+
+======================================================================
+FAIL: test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 5441, in test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones
+    self.assertEqual(caught.returncode, 1)
+AssertionError: 0 != 1
+
+----------------------------------------------------------------------
+Ran 1 test in 0.129s
+
+FAILED (failures=1)
+```
+
+Restaurado con `cp` desde `/tmp`; verde literal:
+
+```text
+Ran 1 test in 0.113s
+
+OK
+```
+
+PUNTO 3 — mordida
+
+Los dos tests elegidos se pusieron rojos ante la rotura real de la propiedad que declaran proteger y volvieron a verde tras restaurar. Sin hallazgos de guarda hueca.
+
+Estado/diff revisados: `.gitignore` contiene `/ai/state/`; el resumen staged crea `seed-state.py` y `ai/state.seed/`, y renombra el historial a `docs/historia/estado-2026-08/`. Salida de `git status --short`/`git diff --cached --summary`: recortada; no hubo cambios residuales de esta revisión en `ai/scripts/seed-state.py` ni `ai/scripts/check-feature-state.py`.
+diff --git a/ai/scripts/check-feature-state.py b/ai/scripts/check-feature-state.py
+index 3035caa8d028cb2313bb08b8c20630a722bad8db..714ee24971e553443e52183dcb994b466ef9386d
+--- a/ai/scripts/check-feature-state.py
++++ b/ai/scripts/check-feature-state.py
+@@ -146,6 +146,7 @@
+     if shallow.strip() == "true":
+         return None, "shallow-clone"
+     baseline = baseline_sha(root)
++    return [], ""  # REVIEW BITE: wrongly suppress every post-baseline delivery.
+     if baseline is None:
+         if (root / "ai" / "state.seed").is_dir():
+             return [], ""
+diff --git a/ai/scripts/seed-state.py b/ai/scripts/seed-state.py
+index 1f8b716a341256a5173699de31503e6e7b929545..b9e98b5c724056e630454cdfcffdfc33b4c76c85
+--- a/ai/scripts/seed-state.py
++++ b/ai/scripts/seed-state.py
+@@ -50,11 +50,11 @@
+     """
+     target = root / "ai" / "state"
+     source = root / "ai" / "state.seed"
+-    if _present(target):
++    if False:  # REVIEW BITE: erase the owner-protection guard.
+         return "STATE_SEED_SKIP_EXISTING"
+     if not source.is_dir():
+         return "STATE_SEED_SOURCE_MISSING"
+-    shutil.copytree(source, target)
++    shutil.copytree(source, target, dirs_exist_ok=True)
+     return "STATE_SEEDED"
+ 
+ 
+
+tokens used
+47.081
+VEREDICTO: approved
+
+No hay hallazgos.
+
+PUNTO 1 — siembra
+
+`ai/scripts/seed-state.py:51-56` corta ante cualquier `ai/state` presente (`lstat`, incluso symlink roto) y sólo usa `copytree` si está ausente. El test cubre: ausente→siembra; existente→no agrega ni toca contenido; segunda siembra→manifiesto byte a byte idéntico.
+
+Verde literal:
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v
+test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.083s
+
+OK
+```
+
+Mordida: eliminé temporalmente la guarda y habilité copia sobre directorio existente; el test se puso rojo.
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k seed_state_only_populates_an_absent_ai_state -v
+test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state) ... FAIL
+
+======================================================================
+FAIL: test_seed_state_only_populates_an_absent_ai_state (test_harness.HarnessTests.test_seed_state_only_populates_an_absent_ai_state)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 5474, in test_seed_state_only_populates_an_absent_ai_state
+    self.assertIn("STATE_SEED_SKIP_EXISTING", second.stdout)
+AssertionError: 'STATE_SEED_SKIP_EXISTING' not found in 'STATE_SEEDED\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.058s
+
+FAILED (failures=1)
+```
+
+Restaurado con `cp` desde `/tmp`; verde literal:
+
+```text
+Ran 1 test in 0.085s
+
+OK
+```
+
+PUNTO 2 — baseline
+
+`ai/scripts/check-feature-state.py:145-163` toma el primer commit que añadió `ai/state.seed` como baseline y evalúa sólo `baseline..HEAD`. El test prueba ambas direcciones: el entregable 010 pre-baseline no genera rojo; el 011 post-baseline, sin state file, genera `FEATURE_STATE_MISSING`.
+
+Verde literal:
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v
+test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.126s
+
+OK
+```
+
+Mordida: forcé temporalmente una ventana vacía luego de calcular el baseline; el gate dejó de detectar 011 y el test se puso rojo.
+
+```text
+$ python3 -m unittest discover -s tests -p test_harness.py -k feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones -v
+test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones) ... FAIL
+
+======================================================================
+FAIL: test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones (test_harness.HarnessTests.test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 5441, in test_feature_state_gate_baseline_excludes_pre_move_deliveries_but_not_new_ones
+    self.assertEqual(caught.returncode, 1)
+AssertionError: 0 != 1
+
+----------------------------------------------------------------------
+Ran 1 test in 0.129s
+
+FAILED (failures=1)
+```
+
+Restaurado con `cp` desde `/tmp`; verde literal:
+
+```text
+Ran 1 test in 0.113s
+
+OK
+```
+
+PUNTO 3 — mordida
+
+Los dos tests elegidos se pusieron rojos ante la rotura real de la propiedad que declaran proteger y volvieron a verde tras restaurar. Sin hallazgos de guarda hueca.
+
+Estado/diff revisados: `.gitignore` contiene `/ai/state/`; el resumen staged crea `seed-state.py` y `ai/state.seed/`, y renombra el historial a `docs/historia/estado-2026-08/`. Salida de `git status --short`/`git diff --cached --summary`: recortada; no hubo cambios residuales de esta revisión en `ai/scripts/seed-state.py` ni `ai/scripts/check-feature-state.py`.

@@ -44,3 +44,10 @@ active-profile
 # sees. Never curated, never committed either way.
 tools.local.toml
 tools.proposals.json
+
+# ADR-0047: the harness's own working state is not the product. The path stays
+# ai/state/ at runtime (every one of the eleven ai/scripts/ modules that read it is
+# unchanged), but the directory itself is now this machine's local, untracked history
+# -- reconstructed by ai/scripts/seed-state.py from the tracked, empty ai/state.seed/
+# skeleton whenever ai/state/ is absent, and never touched when it already exists.
+/ai/state/

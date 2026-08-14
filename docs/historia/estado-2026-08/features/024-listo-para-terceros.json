@@ -27,7 +27,7 @@
     "max_spawns_per_package": 8,
     "max_verifications_per_package": 6
   },
-  "current_package_id": "C4-higiene-de-repo-publico",
+  "current_package_id": "C1-estado-fuera-del-producto",
   "feature_id": "024-listo-para-terceros",
   "final_state": null,
   "global_gates": [],
@@ -104,6 +104,109 @@
       "package_id": "C4-higiene-de-repo-publico",
       "timestamp": "2026-08-13T15:19:15+00:00",
       "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:11+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:11+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:11+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:11+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:11+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:12+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:12+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {},
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:12+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:12+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que quien clone el proyecto no herede tu historial de trabajo, y que vos no pierdas el tuyo.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Que el estado de Federico deje de viajar en el clon, sin mover el path ni perder su historial",
+        "role": "implementer",
+        "route_id": "run1_b75accf4527aa0d01ef8cc005380f8ce",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "AC-01/02, clase migration. Medido: ai/state pesa 2,3 MB con 23 features, y ONCE modulos de ai/scripts lo leen. El path se MANTIENE -historial a docs/historia/estado-2026-08, ai/state gitignoreado y sembrado desde ai/state.seed-, que es lo que baja el cambio de 11 modulos a cero. Regla que protege al dueno: la siembra solo puebla un ai/state ausente, nunca pisa uno existente."
+      },
+      "package_id": "C1-estado-fuera-del-producto",
+      "timestamp": "2026-08-14T05:11:39+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
     }
   ],
   "metrics": {
@@ -121,18 +224,54 @@
         "AC-01",
         "AC-02"
       ],
-      "approved_exceptions": [],
+      "approved_exceptions": [
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado del harness, lo reescribe feature-state.py.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log de decisiones.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/verify.sh",
+          "reason": "AC-02: el gate que corre check-feature-state.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0047-el-estado-no-es-el-producto.md",
+          "reason": "AC-01 pide ADR-0047.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/024-listo-para-terceros/spec.md",
+          "reason": "Spec de la feature.",
+          "status": "approved"
+        }
+      ],
       "attempts": {
         "deep_review_cycles": 0,
         "repair_batches": 0,
-        "spawns": 0,
+        "spawns": 1,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 0
       },
       "candidate_identity": null,
       "complexity": "medium",
-      "context_pack": null,
+      "context_pack": "docs/specs/024-listo-para-terceros/context/C1-estado-fuera-del-producto.md",
       "delta_reviews": [],
       "dependencies": [],
       "diff_ref": null,
@@ -165,8 +304,21 @@
       "selected_model": null,
       "selected_role": null,
       "shared_paths": [],
-      "spawns": [],
-      "status": "planned",
+      "spawns": [
+        {
+          "at": "2026-08-14T05:11:39+00:00",
+          "client": "Que quien clone el proyecto no herede tu historial de trabajo, y que vos no pierdas el tuyo.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Que el estado de Federico deje de viajar en el clon, sin mover el path ni perder su historial",
+          "role": "implementer",
+          "route_id": "run1_b75accf4527aa0d01ef8cc005380f8ce",
+          "spawn_id": "SPAWN-001",
+          "tech": "AC-01/02, clase migration. Medido: ai/state pesa 2,3 MB con 23 features, y ONCE modulos de ai/scripts lo leen. El path se MANTIENE -historial a docs/historia/estado-2026-08, ai/state gitignoreado y sembrado desde ai/state.seed-, que es lo que baja el cambio de 11 modulos a cero. Regla que protege al dueno: la siembra solo puebla un ai/state ausente, nunca pisa uno existente."
+        }
+      ],
+      "status": "package_implementation",
       "strict_tdd": false,
       "tasks": [
         {
@@ -425,8 +577,8 @@
       "verifications": []
     }
   ],
-  "phase": "PACKAGE_PLANNING",
-  "revision": 4,
+  "phase": "PACKAGE_IMPLEMENTATION",
+  "revision": 14,
   "schema_version": 1,
-  "updated_at": "2026-08-13T15:19:15+00:00"
+  "updated_at": "2026-08-14T05:11:39+00:00"
 }
