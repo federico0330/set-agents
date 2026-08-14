@@ -16,6 +16,9 @@
 
 ## Recorrido
 
+- review: pass (0 hallazgos)
+- testing: pass
+- runtime QA: pass
 - gate `unittest-suite`: pass
 - gate `verify-sh`: pass
 - gate `build-check`: pass

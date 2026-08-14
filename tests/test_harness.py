@@ -636,6 +636,38 @@ class HarnessTests(unittest.TestCase):
             )
             self.assertIn("BOOTSTRAP_SKIP set-agents-link", result.stdout)
 
+    def test_install_sh_yes_terminates_the_opencode_auth_loop(self):
+        # AC-06 (024/C3): confirm() always returns 0 under --yes (install.sh:56-62), so the
+        # old `while confirm ...; do opencode auth login; done` at install.sh:309-311 never
+        # terminated -- an unattended install (--yes) hung there forever. Prove BOTH
+        # termination (bounded timeout, no TimeoutExpired) AND a single login attempt: --yes
+        # means consent to log in once, not "ask forever".
+        with tempfile.TemporaryDirectory() as td:
+            env, stubs = self._bootstrap_env(td, ("claude", "codex"), isolated=False)
+            login_log = Path(td) / "login-calls.log"
+            login_log.write_text("")
+            opencode = stubs / "opencode"
+            opencode.write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                '  --version) echo stub-1.0 ;;\n'
+                '  auth)\n'
+                '    case "$2" in\n'
+                '      list) : ;;\n'
+                f'      login) echo x >> "{login_log}" ;;\n'
+                '    esac ;;\n'
+                'esac\n'
+            )
+            opencode.chmod(0o755)
+            result = subprocess.run(
+                ["bash", "install.sh", "--skip-deps", "--no-install", "--harness", "opencode", "--yes"],
+                cwd=ROOT, env={**os.environ, **env}, text=True, capture_output=True,
+                timeout=90, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("BOOTSTRAP_DONE", result.stdout)
+            self.assertEqual(login_log.read_text().count("x"), 1)
+
     def test_set_agents_tools_catalog(self):
         with tempfile.TemporaryDirectory() as td:
             env, stubs = self._bootstrap_env(td, ("npm", "jq"))
@@ -5708,6 +5740,47 @@ class HarnessTests(unittest.TestCase):
             self.assertNotEqual(failed.returncode, 0)
             self.assertEqual(claude_settings.read_bytes(), before)
             self.assertEqual(unrelated.read_text(), "keep\n")
+
+    def test_install_py_flags_codex_model_change_distinctly(self):
+        # AC-08 (024/C3): merge_codex (install.py) used to change the user's live
+        # ~/.codex/config.toml `model`/`model_reasoning_effort` with the only trace being
+        # one unified-diff hunk buried inside a from-scratch install's huge --preview dump
+        # (measured live: ~565KB across 96 files touched on a first install). Prove it now
+        # prints its own greppable line -- present when the value actually changes, ABSENT
+        # when it already matches (no false-positive noise on an ordinary re-install) and
+        # ABSENT on a fresh machine with no prior config.toml (nothing of the user's to lose).
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging_dir:
+            home = Path(td)
+            (home / ".codex").mkdir()
+            (home / ".codex/config.toml").write_text(
+                'model = "not-a-real-model"\nmodel_reasoning_effort = "low"\n'
+            )
+            run("./build.sh", "--output", staging_dir)
+            changed = run(
+                "python3", "ai/scripts/install.py", "--staging", staging_dir,
+                "--home", str(home), "--target", "codex", "--preview",
+            )
+            self.assertRegex(
+                changed.stdout,
+                r"(?m)^CODEX_GLOBAL_MODEL_CHANGE model: not-a-real-model -> \S+.*file=.*config\.toml$",
+            )
+            # Apply it for real, then preview again with the now-correct value: silence.
+            run("python3", "ai/scripts/install.py", "--staging", staging_dir,
+                "--home", str(home), "--target", "codex")
+            stable = run(
+                "python3", "ai/scripts/install.py", "--staging", staging_dir,
+                "--home", str(home), "--target", "codex", "--preview",
+            )
+            self.assertNotIn("CODEX_GLOBAL_MODEL_CHANGE", stable.stdout)
+            # A fresh machine (no prior config.toml at all) has nothing of the user's to
+            # overwrite -- bootstrap stays silent on this specific line.
+            with tempfile.TemporaryDirectory() as td2:
+                fresh_home = Path(td2)
+                fresh = run(
+                    "python3", "ai/scripts/install.py", "--staging", staging_dir,
+                    "--home", str(fresh_home), "--target", "codex", "--preview",
+                )
+                self.assertNotIn("CODEX_GLOBAL_MODEL_CHANGE", fresh.stdout)
 
     def test_sync_project_copies_generic_scripts_and_guards_active_state(self):
         with tempfile.TemporaryDirectory() as td:

@@ -13,6 +13,7 @@ Compila roles.tsv + models.toml + prompts canónicos en los árboles nativos por
 
 ## Últimos cambios estructurales
 
+- 2026-08-14 024-listo-para-terceros/C2-modelstoml-neutro — models.toml neutro, overlay del usuario en STATE_DIR, y la lane 'local' renombrada a 'openai-only'
 - 2026-08-13 022-disponibilidad-real/P4-proveedores-del-usuario — El bloque provider de opencode.json se renderiza desde providers.toml en vez de estar hardcodeado en _shared
 - 2026-08-12 021-gates-que-no-mienten-ni-callan/P2-gates-que-no-callan — Nuevo ai/scripts/heartbeat-run.py: corre un comando largo streameando su salida linea a linea e inyectando un latido sintetico si pasa el intervalo sin emitir. La doctrina contra el antipatron quedo …
 - 2026-08-12 021-gates-que-no-mienten-ni-callan/P1-check-que-verifica — build.sh --check dejo de ser un no-op: genera con --profile go-zen FIJO y compara contra los cuatro arboles de Global/, fallando con rc distinto de cero y nombrando los archivos. Antes solo cotejaba …

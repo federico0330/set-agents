@@ -191,6 +191,7 @@ def effective_specials():
         result.append((merged_json(cc, staging / "claude-code/settings.overlay.json", union_lists=True), cc))
     if "codex" in targets:
         cx = targets["codex"] / "config.toml"
+        flag_codex_model_change(cx)
         result.append((merge_codex(cx), cx))
     return result
 
@@ -232,6 +233,37 @@ def roster_codex_orchestrator():
     import models_config
 
     return models_config.codex_orchestrator()
+
+
+_CODEX_TOP_KEY = {
+    "model": re.compile(r'(?m)^\s*model\s*=\s*"([^"]*)"'),
+    "model_reasoning_effort": re.compile(r'(?m)^\s*model_reasoning_effort\s*=\s*"([^"]*)"'),
+}
+
+
+def flag_codex_model_change(current):
+    """AC-08 (024/C3): `merge_codex` below silently overwrites the session `model`/
+    `model_reasoning_effort` of the user's live `~/.codex/config.toml` -- measured live:
+    on a from-scratch install this line is one unified-diff hunk buried inside a
+    ~565KB/96-file `--preview` dump, effectively invisible. `model`/`model_reasoning_effort`
+    are the only two keys in this managed MERGE (unlike the rest of `config.toml`, which is
+    pure harness-owned scaffolding) a user could plausibly have set by hand -- so an actual
+    VALUE CHANGE against a pre-existing key gets its own greppable, un-buried line, printed
+    unconditionally (both --preview and the real write, and regardless of --yes: --yes is
+    consent to proceed, never consent to silence). A file that doesn't exist yet, or a key
+    that was never set, is ordinary bootstrap -- nothing of the user's to lose, no line.
+    """
+    if not current.exists():
+        return
+    text = current.read_text()
+    new_model, new_effort = roster_codex_orchestrator()
+    changes = []
+    for key, new_value in (("model", new_model), ("model_reasoning_effort", new_effort)):
+        match = _CODEX_TOP_KEY[key].search(text)
+        if match and match.group(1) != new_value:
+            changes.append(f"{key}: {match.group(1)} -> {new_value}")
+    if changes:
+        print(f"CODEX_GLOBAL_MODEL_CHANGE {'; '.join(changes)} file={current}")
 
 
 def merge_codex(current):

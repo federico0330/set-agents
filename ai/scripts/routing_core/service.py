@@ -66,6 +66,28 @@ def _bias_rank(provider: str, preference: tuple) -> int:
         return len(preference)
 
 
+# AC-07 (024/C3): additive diagnostic for "just cloned, zero live credentials" --
+# NO_ELIGIBLE_ROUTE alone is correct (fail-closed) but names no next step. Fires only when
+# `route()`'s exclusion loop rejected EVERY route for the exact same reason
+# (PROVIDER_UNAUTHENTICATED, catalog.py's own auth-probe fallback) -- a genuine catalog
+# exclusion anywhere in the same decision (ROLE_INCOMPATIBLE, TOOLS_MISSING,
+# TIER_INSUFFICIENT, an empty catalog, ...) keeps this OFF, so the hint never claims "just
+# log in" when the real problem is something else. Sigue siendo fail-closed: never widens
+# `execution_enabled`, never replaces NO_ELIGIBLE_ROUTE, purely an extra reason_codes entry.
+_ROUTING_UNCONFIGURED_HINT = (
+    "ROUTING_UNCONFIGURED no live credentials -- log in first: "
+    "opencode auth login | codex login | claude (then /login)"
+)
+
+
+def _routing_unconfigured(exclusions):
+    """True only when `exclusions` is non-empty AND every entry is PROVIDER_UNAUTHENTICATED
+    -- an empty `exclusions` (e.g. an empty catalog) is a genuine catalog problem, not an
+    auth one, and must never be misdiagnosed as "just log in" (vacuous `all()` on `()` would
+    otherwise say True)."""
+    return bool(exclusions) and all(item["reason"] == "PROVIDER_UNAUTHENTICATED" for item in exclusions)
+
+
 class _FactsIssuer:
     """Invocation-scoped fact issuer; absent from the public facade and serialization."""
     def __init__(self, clock): self._scope, self._clock, self._used = object(), clock, False
@@ -434,7 +456,13 @@ class RoutingService:
         #  _bias_rank, is_inferred, curated_priority, route_id).
         candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], 0 if model_request and (x[0].provider, x[0].model) == model_request else 1, billing_rank(x[0].provider, x[0].model), _bias_rank(x[0].provider, bias_preference), 1 if x[0].route_id in self._inferred_ids else 0, x[0].curated_priority, x[0].route_id))
         if not candidates:
-            return RouteDecision(None,None,None,None,None,None,False,("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",),tuple(exclusions),bias_class=bias_class,preference_configured=preference_configured)
+            no_route_reasons = ("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",)
+            # AC-07 (024/C3): additive only, and only for the plain NO_ELIGIBLE_ROUTE case
+            # -- REVIEWER_INDEPENDENCE_UNAVAILABLE stays exactly the closed, hard-denial
+            # signal it always was (ADR-0011's `--route-decide` contract), never decorated.
+            if not writer and _routing_unconfigured(exclusions):
+                no_route_reasons = no_route_reasons + (_ROUTING_UNCONFIGURED_HINT,)
+            return RouteDecision(None,None,None,None,None,None,False,no_route_reasons,tuple(exclusions),bias_class=bias_class,preference_configured=preference_configured)
         # ADR-0034 (AC-08): the block below used to run ONCE against the top-ranked
         # candidate and abort with PROVIDER_UNAUTHENTICATED the moment the FRESH reprobe
         # rejected it -- wasting every other still-eligible candidate a dynamic

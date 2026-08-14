@@ -15,6 +15,7 @@ subgraph sg_024_listo_para_terceros["024-listo-para-terceros"]
   end
   subgraph sg_024_listo_para_terceros_c3_primer_arranque_honesto["C3-primer-arranque-honesto"]
     package_024_listo_para_terceros_c3_primer_arranque_honesto_1["package: C3-primer-arranque-honesto"]
+    spawn_024_listo_para_terceros_c3_primer_arranque_honesto_1["SPAWN-001 implementer Que el primer arranque de un tercero termine, diga que hacer, y no le pise los globales sin avisa…"]
   end
   subgraph sg_024_listo_para_terceros_c4_higiene_de_repo_publico["C4-higiene-de-repo-publico"]
     package_024_listo_para_terceros_c4_higiene_de_repo_publico_1["package: C4-higiene-de-repo-publico"]

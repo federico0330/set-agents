@@ -306,9 +306,17 @@ auth_opencode() {
   echo "AUTH_NEEDED opencode"
   if [ "$DRY" -eq 0 ]; then
     echo "Iniciá sesión con cada proveedor que tengas suscripto (OpenAI, OpenCode Zen, etc.)."
-    while confirm "¿Correr 'opencode auth login' (una vez por proveedor)?"; do
+    if [ "$YES" -eq 1 ]; then
+      # AC-06 (024/C3): confirm() always returns 0 under --yes, so a `while
+      # confirm ...; do ...; done` loop here never terminates (an unattended
+      # install would hang forever). --yes already means consent for one
+      # login attempt per run; it does not mean "ask forever".
       opencode auth login || true
-    done
+    else
+      while confirm "¿Correr 'opencode auth login' (una vez por proveedor)?"; do
+        opencode auth login || true
+      done
+    fi
   fi
 }
 

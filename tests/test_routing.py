@@ -278,6 +278,12 @@ class RoutingTests(unittest.TestCase):
         # fall to auth, and the eligible frontier route is excluded for context — not risk passthrough.
         self.assertEqual({item["reason"] for item in decision.exclusions},
                          {"RUNTIME_UNAVAILABLE","PROVIDER_UNAUTHENTICATED","CONTEXT_MISSING"})
+        # AC-07 (024/C3), negative direction: a GENUINE mix of exclusion reasons (not every
+        # route excluded for PROVIDER_UNAUTHENTICATED alone) must never get the
+        # ROUTING_UNCONFIGURED hint -- it would misdiagnose "just log in" when the real
+        # problem also includes RUNTIME_UNAVAILABLE/CONTEXT_MISSING routes.
+        self.assertEqual(decision.reason_codes,("NO_ELIGIBLE_ROUTE",))
+        self.assertFalse(any(code.startswith("ROUTING_UNCONFIGURED") for code in decision.reason_codes))
         # The same observation with low risk routes normally.
         ok=svc.route(routing.TaskRequest("product-analyst","change","documentation",risk="low",selected_runtime="claude-code"),
                      self.observed(svc,risk="low",context_required=False,context_present=False,critical_coverage=False))
@@ -312,7 +318,13 @@ class RoutingTests(unittest.TestCase):
         unavailable=self.service(simulate=True,inventory={("codex","openai-codex"):{"gpt-5.6-sol"}})
         d=unavailable.route(routing.TaskRequest("product-analyst","change","documentation",selected_runtime="opencode"),self.observed(unavailable,runtime="opencode"))
         self.assertFalse(d.execution_enabled); self.assertIsNone(d.route_id)
-        self.assertEqual(d.reason_codes,("NO_ELIGIBLE_ROUTE",))
+        # AC-07 (024/C3): every exclusion here is PROVIDER_UNAUTHENTICATED (no anthropic/
+        # opencode entry anywhere in this inventory), so ROUTING_UNCONFIGURED is now also
+        # additively present alongside NO_ELIGIBLE_ROUTE -- same discipline ADR-0035's
+        # BILLING_RANK addition already established elsewhere in this file.
+        self.assertEqual(d.reason_codes[0],"NO_ELIGIBLE_ROUTE")
+        self.assertTrue(d.reason_codes[1].startswith("ROUTING_UNCONFIGURED "))
+        self.assertEqual(len(d.reason_codes),2)
         # A real (non-simulate, writer-role) authorization attempt over an unprobed pi pair
         # is excluded the same way — no durable authorization without a fresh positive probe.
         with tempfile.TemporaryDirectory() as td:
@@ -320,9 +332,37 @@ class RoutingTests(unittest.TestCase):
             d=real.route(routing.TaskRequest("implementer","change","documentation",selected_runtime="pi"),
                          self.observed(real,"implementer","pi"))
             self.assertFalse(d.execution_enabled); self.assertIsNone(d.route_id)
-            self.assertEqual(d.reason_codes,("NO_ELIGIBLE_ROUTE",))
             self.assertTrue(all(item["reason"]=="PROVIDER_UNAUTHENTICATED" for item in d.exclusions))
+            # AC-07 (024/C3): same additive code, same reason -- every exclusion here is
+            # PROVIDER_UNAUTHENTICATED too (line above).
+            self.assertEqual(d.reason_codes[0],"NO_ELIGIBLE_ROUTE")
+            self.assertTrue(d.reason_codes[1].startswith("ROUTING_UNCONFIGURED "))
+            self.assertEqual(len(d.reason_codes),2)
             self.assertEqual(real.store.open_runs(),[])  # never durably authorized
+
+    def test_ac07_routing_unconfigured_names_the_login_commands_by_runtime(self):
+        # AC-07 (024/C3): a fresh clone, zero live credentials anywhere -- NO_ELIGIBLE_ROUTE
+        # stays fail-closed (unchanged), but now additively names what to do about it. The
+        # inventory below has ONE entry, for a (runtime, provider) pair no real route uses,
+        # so it stays non-empty (self.service's `inventory or self.inventory` would silently
+        # fall back to the generous default fixture on an empty dict) while still leaving
+        # every real route unauthenticated.
+        no_live_creds_anywhere = {("nowhere", "nobody"): {"x"}}
+        svc = self.service(simulate=True, inventory=no_live_creds_anywhere)
+        d = svc.route(
+            routing.TaskRequest("product-analyst", "change", "documentation", selected_runtime="opencode"),
+            self.observed(svc, runtime="opencode"),
+        )
+        self.assertFalse(d.execution_enabled)
+        self.assertTrue(d.exclusions)
+        self.assertTrue(all(item["reason"] == "PROVIDER_UNAUTHENTICATED" for item in d.exclusions))
+        self.assertEqual(d.reason_codes[0], "NO_ELIGIBLE_ROUTE")
+        self.assertTrue(d.reason_codes[1].startswith("ROUTING_UNCONFIGURED "))
+        self.assertEqual(len(d.reason_codes), 2)
+        hint = d.reason_codes[1]
+        self.assertIn("opencode auth login", hint)
+        self.assertIn("codex login", hint)
+        self.assertIn("claude", hint)
 
     def test_pi_becomes_executable_once_probed_positive_by_the_normal_inventory_check(self):
         # T-305 flip: with PI_SIMULATION_ONLY=False, a pi pair that a probe (real or
