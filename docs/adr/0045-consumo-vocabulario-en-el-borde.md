@@ -137,6 +137,21 @@ las dos secciones miden el MISMO gasto solapado desde dos vantage points distint
 dispatch por el lane claude-code/opencode cuenta en las dos secciones a la vez desde que §4
 existe), sumarlas duplicaría esa plata.
 
+### 6. PKG-B3: el agregado es transaccional y la poda conserva procedencia
+
+Schema 8 agrega `usage_rollups`: un agregado por ventana UTC, proyecto, identidad efectiva,
+resultado y estado de uso. Cada campo numérico conserva además su cantidad de reportes; por eso
+un cero informado no se confunde con un campo ausente al compactar. `close_run` actualiza el
+dispatch y ese agregado en la misma transacción: datos de uso inválidos ya se vuelven la categoría
+`invalid` antes de escribir, por lo que no impiden cerrar; un error real de SQLite revierte ambos,
+sin dejar un cierre sin rollup ni un rollup sin cierre.
+
+La compactación de `dispatches` comparte la transacción del escritor como la de `events`, y sólo
+borra terminales que ya tienen su rollup. Conserva siempre un padre referenciado por
+`replacement_of_run_id` y los 20 writers exitosos más recientes por proyecto que un reviewer
+puede consultar. Si no puede demostrar esas condiciones, retiene la fila: el costo de disco es
+preferible a perder evidencia de procedencia.
+
 ## Alternativas rechazadas
 
 - **Relajar `_usage_row` para aceptar cualquier forma cruda de runtime directamente** (que el

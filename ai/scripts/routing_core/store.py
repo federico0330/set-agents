@@ -13,7 +13,7 @@ import datetime as dt
 from pathlib import Path
 from .domain import ImplementationIdentity, RoutingError
 
-SCHEMA = 7
+SCHEMA = 9
 _RUN = re.compile(r"^run1_[0-9a-f]{32}$")
 _PROJECT_KEY = re.compile(r"^proj1_[0-9a-f]{32}$")
 NIL_PROJECT_KEY = "proj1_00000000000000000000000000000000"
@@ -47,6 +47,34 @@ USAGE_COLUMNS = tuple(
     "usage_status TEXT CHECK(usage_status IS NULL OR usage_status IN ('ok','absent','invalid'))",
 )
 USAGE_COLUMNS_SQL = ", ".join(USAGE_COLUMNS)
+# B3-F04: `usage_input_sum` etc. are the ACCUMULATORS -- unlike the per-run
+# `dispatches.usage_x` columns, they are re-written by `usage_x=usage_x+excluded.usage_x`
+# on every close that shares a key, and SQLite's INTEGER affinity does not protect an
+# addition the way its `SUM()` aggregate does: an addition that overflows the 64-bit
+# signed range is silently carried out in floating point instead of raising, corrupting
+# every further update of that row (measured: two closes of a single `usage_input=2**62`
+# turn the stored sum into `9.223...e+18 real`). `_usage_row` bounds `cost_micros` the
+# same way `_COST_MICROS_BOUND` already does for the per-run figure, but has no upper
+# bound on token counts (out of this package's ALCANCE to add). `CHECK(typeof(...)='integer')`
+# on each accumulator is the detector instead: the moment a write would degrade a sum to
+# REAL, the CHECK fails, `_rollup_usage_in` raises inside the caller's transaction, and
+# `close_run`/`close_exhausted_and_authorize_replacement` roll back rather than commit a
+# rollup that already lost precision -- the same "corruption detector, not input
+# validation" role the `>= 0` CHECKs already play (see the USAGE_COLUMNS comment above).
+_USAGE_ROLLUPS_DDL = """CREATE TABLE usage_rollups (
+ window_start INTEGER NOT NULL, project_key TEXT NOT NULL, route_key TEXT NOT NULL,
+ runtime TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL,
+ outcome TEXT NOT NULL CHECK(outcome IN ('success','failure')),
+ usage_status TEXT NOT NULL CHECK(usage_status IN ('ok','absent','invalid','unknown')),
+ run_count INTEGER NOT NULL CHECK(run_count >= 0),
+ usage_input_sum INTEGER NOT NULL CHECK(usage_input_sum >= 0) CHECK(typeof(usage_input_sum)='integer'), usage_input_reported_count INTEGER NOT NULL CHECK(usage_input_reported_count >= 0),
+ usage_output_sum INTEGER NOT NULL CHECK(usage_output_sum >= 0) CHECK(typeof(usage_output_sum)='integer'), usage_output_reported_count INTEGER NOT NULL CHECK(usage_output_reported_count >= 0),
+ usage_cache_read_sum INTEGER NOT NULL CHECK(usage_cache_read_sum >= 0) CHECK(typeof(usage_cache_read_sum)='integer'), usage_cache_read_reported_count INTEGER NOT NULL CHECK(usage_cache_read_reported_count >= 0),
+ usage_cache_write_sum INTEGER NOT NULL CHECK(usage_cache_write_sum >= 0) CHECK(typeof(usage_cache_write_sum)='integer'), usage_cache_write_reported_count INTEGER NOT NULL CHECK(usage_cache_write_reported_count >= 0),
+ usage_reasoning_sum INTEGER NOT NULL CHECK(usage_reasoning_sum >= 0) CHECK(typeof(usage_reasoning_sum)='integer'), usage_reasoning_reported_count INTEGER NOT NULL CHECK(usage_reasoning_reported_count >= 0),
+ cost_micros_sum INTEGER NOT NULL CHECK(cost_micros_sum >= 0) CHECK(typeof(cost_micros_sum)='integer'), cost_micros_reported_count INTEGER NOT NULL CHECK(cost_micros_reported_count >= 0),
+ PRIMARY KEY(window_start,project_key,route_key,runtime,provider,model,family,outcome,usage_status))"""
+_DISPATCHES_RETENTION_INDEX_DDL = "CREATE INDEX dispatches_retention ON dispatches(state,terminal_at,updated_at,run_id)"
 # Bare column names, derived rather than hand-listed a second time: `close_run` binds these
 # in `_usage_row`'s order on BOTH UPDATE branches.
 _USAGE_COLUMN_NAMES = tuple(definition.split()[0] for definition in USAGE_COLUMNS)
@@ -202,6 +230,25 @@ _OUTCOMES = {"success", "failure", "none"}
 _SCHEMA_OBJECTS = "SELECT name,sql FROM sqlite_master WHERE type IN ('table','index') AND sql IS NOT NULL"
 # `[` closes with `]` and has no escape at all; the other three double themselves.
 _DDL_DELIMITERS = {"'": "'", '"': '"', "`": "`", "[": "]"}
+
+# ONE named source per retention magnitude, shared by every consumer. B3-F02 is what a
+# second, independently-typed copy costs: `recent_writers` and the retention guard each
+# hardcoded their own `20` and picked OPPOSITE ORDER BY tie-breaks, so with `terminal_at`
+# tied the guard deleted exactly the row a reviewer's own query would have returned first.
+# 90 days and 10000 rows are the same retention budget applied to two tables (`events`,
+# `dispatches`); one constant each, rather than a second hand-typed `90`/`10000` that can
+# drift the same way.
+_DAY_MS = 86400000
+_RETENTION_DAYS = 90
+_RETENTION_CUTOFF_MS = _RETENTION_DAYS * _DAY_MS
+_RETENTION_ROW_LIMIT = 10000
+# `recent_writers` and `_compact_dispatches_in`'s protected-candidate clause MUST agree on
+# both how many rows and which one wins a tie, or retention can prune the exact row a
+# reviewer is about to read (B3-F02). DESC on both columns: newest `terminal_at` first, and
+# `run_id` DESC breaks a tie the same way whether the query is the plain SELECT
+# `recent_writers` runs or the correlated subquery the retention guard runs.
+_RECENT_WRITERS_LIMIT = 20
+_RECENT_WRITERS_ORDER_BY = "terminal_at DESC,run_id DESC"
 
 
 def _normalize_ddl(text: str) -> str:
@@ -423,7 +470,7 @@ CREATE TABLE dispatches (
 CREATE TABLE events (event_id INTEGER PRIMARY KEY, occurred_at INTEGER NOT NULL, event_type TEXT NOT NULL, route_id TEXT, runtime TEXT, provider TEXT, model TEXT, family TEXT, outcome TEXT NOT NULL, reason_family TEXT NOT NULL, latency_ms INTEGER, latency_bucket TEXT NOT NULL);
 CREATE TABLE metric_rollups (route_key TEXT NOT NULL, runtime TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL, outcome TEXT NOT NULL, reason_family TEXT NOT NULL, latency_bucket TEXT NOT NULL, lifetime_count INTEGER NOT NULL, lifetime_latency_sum_ms INTEGER NOT NULL, compacted_count INTEGER NOT NULL, exclusion_count INTEGER NOT NULL, fallback_offered_count INTEGER NOT NULL, fallback_consumed_count INTEGER NOT NULL, fallback_success_count INTEGER NOT NULL, fallback_failure_count INTEGER NOT NULL, PRIMARY KEY(route_key,runtime,provider,model,family,outcome,reason_family,latency_bucket));
 CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
- CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX events_route_retention ON events(route_id,occurred_at,event_id); CREATE INDEX dispatches_review ON dispatches(project_key,role,state,terminal_at); CREATE UNIQUE INDEX dispatches_one_replacement ON dispatches(replacement_of_run_id) WHERE replacement_of_run_id IS NOT NULL;
+""" + _USAGE_ROLLUPS_DDL + ";" + _DISPATCHES_RETENTION_INDEX_DDL + """; CREATE INDEX events_retention ON events(occurred_at,event_id); CREATE INDEX events_route_retention ON events(route_id,occurred_at,event_id); CREATE INDEX dispatches_review ON dispatches(project_key,role,state,terminal_at); CREATE UNIQUE INDEX dispatches_one_replacement ON dispatches(replacement_of_run_id) WHERE replacement_of_run_id IS NOT NULL;
 """)
         c.execute("INSERT INTO meta VALUES('schema_version',?)", (str(SCHEMA),)); c.execute("INSERT INTO meta VALUES('installation_hmac_salt',?)", (secrets.token_hex(32),))
 
@@ -431,7 +478,7 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
         quick=c.execute("PRAGMA integrity_check").fetchone()
         tables={row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         meta=dict(c.execute("SELECT key,value FROM meta")) if "meta" in tables else {}
-        if quick != ("ok",) or tables != {"meta","dispatches","events","metric_rollups","provider_exhaustions"} or meta.keys() != {"schema_version","installation_hmac_salt"} or meta["schema_version"] != str(SCHEMA) or len(meta["installation_hmac_salt"]) != 64:
+        if quick != ("ok",) or tables != {"meta","dispatches","events","metric_rollups","provider_exhaustions","usage_rollups"} or meta.keys() != {"schema_version","installation_hmac_salt"} or meta["schema_version"] != str(SCHEMA) or len(meta["installation_hmac_salt"]) != 64:
             raise RoutingError("ROUTING_UNAVAILABLE")
 
     _canonical_ddl = None
@@ -570,6 +617,67 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
         c.execute("CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
         c.execute("CREATE UNIQUE INDEX dispatches_one_replacement ON dispatches(replacement_of_run_id) WHERE replacement_of_run_id IS NOT NULL")
 
+    def _migrate_7_to_8(self, c, harness_project_key):
+        """023 B3: retain a lossless, UTC-day usage aggregate before pruning dispatches.
+
+        Existing schema-7 rows have no rollup.  `unknown` is deliberately distinct from
+        `absent`: historic NULL status did not record whether the provider reported nothing,
+        so migration must not invent that fact merely to fit the new table.
+        """
+        c.execute(_USAGE_ROLLUPS_DDL)
+        c.execute(_DISPATCHES_RETENTION_INDEX_DDL)
+        c.execute(f"""INSERT INTO usage_rollups(
+            window_start,project_key,route_key,runtime,provider,model,family,outcome,usage_status,run_count,
+            usage_input_sum,usage_input_reported_count,usage_output_sum,usage_output_reported_count,
+            usage_cache_read_sum,usage_cache_read_reported_count,usage_cache_write_sum,usage_cache_write_reported_count,
+            usage_reasoning_sum,usage_reasoning_reported_count,cost_micros_sum,cost_micros_reported_count)
+            SELECT (COALESCE(terminal_at,updated_at)/{_DAY_MS})*{_DAY_MS},project_key,
+            COALESCE(actual_route_id,selected_route_id),COALESCE(actual_runtime,selected_runtime),
+            COALESCE(actual_provider,selected_provider),COALESCE(actual_model,selected_model),COALESCE(actual_family,selected_family),
+            CASE WHEN state='terminal_success' THEN 'success' ELSE 'failure' END,COALESCE(usage_status,'unknown'),COUNT(*),
+            COALESCE(SUM(usage_input),0),COUNT(usage_input),COALESCE(SUM(usage_output),0),COUNT(usage_output),
+            COALESCE(SUM(usage_cache_read),0),COUNT(usage_cache_read),COALESCE(SUM(usage_cache_write),0),COUNT(usage_cache_write),
+            COALESCE(SUM(usage_reasoning),0),COUNT(usage_reasoning),COALESCE(SUM(cost_micros),0),COUNT(cost_micros)
+            FROM dispatches WHERE state IN ('terminal_success','terminal_failure','abandoned')
+            GROUP BY 1,2,3,4,5,6,7,8,9""")
+
+    def _migrate_8_to_9(self, c, harness_project_key):
+        """023 B3-F04 follow-up: the six `CHECK(typeof(x)='integer')` clauses B3-F04 added to
+        `usage_rollups`' accumulator columns landed in `_USAGE_ROLLUPS_DDL` -- shared by
+        `_create_schema` AND `_migrate_7_to_8` -- WITHOUT a matching `SCHEMA` bump. Every
+        database already migrated to schema 8 before that change has the untyped CHECK on
+        disk; the live code's canonical DDL now has the typed one; `_ddl_divergence` sees
+        `usage_rollups` as `altered` and every open refuses with `ROUTING_UNAVAILABLE`
+        (measured against a real installation, `docs/specs/023-senales-de-consumo/evidence/
+        B3-repair.md`'s follow-up section). This step is the missing bump made real.
+
+        SQLite has no `ALTER TABLE ... ALTER COLUMN`, so the table is rebuilt: renamed
+        aside, recreated from the CURRENT `_USAGE_ROLLUPS_DDL` (which already carries the
+        typed CHECK), every row copied across with one `INSERT ... SELECT`, and the old
+        table dropped. Column order and names are identical between the two DDLs -- only a
+        CHECK clause was added -- so `SELECT *` lines up with the new table's columns
+        without a hand-written column list to keep in step.
+
+        DECISION, not left implicit: if any already-stored row has a REAL-typed
+        accumulator -- exactly the corruption B3-F04's CHECK exists to prevent on FUTURE
+        writes, but does nothing to repair on rows already written before that CHECK
+        existed -- the INSERT below violates the new CHECK and raises
+        `sqlite3.IntegrityError`. That is deliberate and left to fail loud: `migrate()`
+        runs every step inside one `BEGIN EXCLUSIVE` and rolls the whole transaction back
+        on any exception (see its own docstring), so this raise leaves the on-disk file at
+        schema 8 exactly as it was -- still refused, never a silently accepted downgrade of
+        trust -- and `migrate()`'s pre-migration backup, already taken and verified before
+        any step runs, is untouched. Silently rounding, dropping, or re-deriving the
+        corrupted row instead would destroy the only evidence of which row and which figure
+        lost precision; an operator who hits this has the backup file to inspect by hand and
+        decide with the real numbers in front of them, which is exactly what a quiet repair
+        would erase.
+        """
+        c.execute("ALTER TABLE usage_rollups RENAME TO usage_rollups_v8")
+        c.execute(_USAGE_ROLLUPS_DDL)
+        c.execute("INSERT INTO usage_rollups SELECT * FROM usage_rollups_v8")
+        c.execute("DROP TABLE usage_rollups_v8")
+
     def migrate(self, harness_project_key: str) -> tuple[int, Path, int, int]:
         """Explicit, backup-first migration to the current SCHEMA; never automatic.
 
@@ -668,7 +776,7 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
         return int(dt.datetime.combine(tomorrow, dt.time.min, tzinfo=dt.timezone.utc).timestamp() * 1000)
     @staticmethod
     def _bucket(latency): return "none" if latency is None else ("0-99" if latency < 100 else "100+")
-    def _event(self, c, event_type, identity=None, outcome="none", reason="none", latency=None, fallback=False, via_fallback=False):
+    def _event(self, c, event_type, identity=None, outcome="none", reason="none", latency=None, fallback=False, via_fallback=False, compact=True):
         if event_type not in _EVENT_TYPES or outcome not in _OUTCOMES: raise RoutingError("AUTHORIZATION_INVALID")
         now=self._now(); route,runtime,provider,model,family,_effort = identity or (None,)*6
         c.execute("INSERT INTO events(occurred_at,event_type,route_id,runtime,provider,model,family,outcome,reason_family,latency_ms,latency_bucket) VALUES(?,?,?,?,?,?,?,?,?,?,?)", (now,event_type,route,runtime,provider,model,family,outcome,reason,latency,self._bucket(latency)))
@@ -680,8 +788,14 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
         fb_failure = 1 if (event_type == "terminal" and outcome == "failure" and via_fallback) else 0
         c.execute("INSERT INTO metric_rollups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(route_key,runtime,provider,model,family,outcome,reason_family,latency_bucket) DO UPDATE SET lifetime_count=lifetime_count+1,lifetime_latency_sum_ms=lifetime_latency_sum_ms+excluded.lifetime_latency_sum_ms,exclusion_count=exclusion_count+excluded.exclusion_count,fallback_offered_count=fallback_offered_count+excluded.fallback_offered_count,fallback_consumed_count=fallback_consumed_count+excluded.fallback_consumed_count,fallback_success_count=fallback_success_count+excluded.fallback_success_count,fallback_failure_count=fallback_failure_count+excluded.fallback_failure_count", (*key,1,latency or 0,0,exclusion,1 if fallback else 0,consumed,fb_success,fb_failure))
         # Compaction shares the writer's transaction: the retention bound holds
-        # at COMMIT and no separate connection re-runs integrity validation.
-        self._compact_in(c, now)
+        # at COMMIT and no separate connection re-runs integrity validation. B3-F05: a
+        # transaction that emits more than one event -- only
+        # `close_exhausted_and_authorize_replacement` does, up to three -- runs this ONCE:
+        # `compact=False` on the extra events. Retention already covers the whole
+        # transaction from the first pass; repeating it under the same write lock cost
+        # real wall-clock time (measured) for no additional guarantee.
+        if compact:
+            self._compact_in(c, now)
 
     def _authorize_issued(self, run_id, nonce, identity, fallback, role, role_class, snapshot):
         if (not _RUN.fullmatch(run_id) or self._issuer is None or role_class != "writer"
@@ -750,11 +864,19 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
             c.execute("INSERT INTO provider_exhaustions(provider,expires_at) VALUES(?,?) "
                       "ON CONFLICT(provider) DO UPDATE SET expires_at=excluded.expires_at",
                       (original_identity[2], expires_at))
+            usage_row=_usage_row(usage)
             changed=c.execute("UPDATE dispatches SET state='terminal_failure',terminal_outcome='quota_exhausted',terminal_at=?,updated_at=?,"
                               + _USAGE_SET_CLAUSE + " WHERE run_id=? AND project_key=? AND state='dispatched'",
-                              (now,now,*_usage_row(usage),run_id,self.project_key))
+                              (now,now,*usage_row,run_id,self.project_key))
             if changed.rowcount != 1:
                 c.execute("ROLLBACK"); raise RoutingError("STATE_CONFLICT")
+            # B3-F01: this UPDATE just wrote usage columns on `dispatches` -- it MUST also
+            # land the paired rollup in the SAME transaction, on BOTH branches below (with
+            # and without a replacement), or retention's "a matching rollup exists" guard
+            # can be satisfied by an unrelated sibling close that happens to share this
+            # exact key, and prune the only evidence of THIS run's quota exhaustion. One
+            # call here covers both branches: neither one issues a second, different close.
+            self._rollup_usage_in(c, now, original_identity, "failure", usage_row)
             if c.execute("SELECT 1 FROM provider_exhaustions WHERE provider=? AND expires_at>?", (fallback[2],now)).fetchone():
                 # The exhausted original remains durably closed; contract 011 forbids
                 # choosing a third identity when its already-stored replacement expired.
@@ -766,9 +888,14 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
                      "authorized_at","dispatched_at","updated_at","project_key","replacement_of_run_id")
             values=(replacement_id,row[14],row[15],*fallback,*fallback,"dispatched",0,0,0,now,now,now,row[16],run_id)
             c.execute("INSERT INTO dispatches (" + ",".join(columns) + ") VALUES(" + ",".join("?" for _ in values) + ")", values)
+            # B3-F05: three events in one BEGIN IMMEDIATE transaction used to mean three
+            # full retention passes (`_event` -> `_compact_in` -> `_compact_dispatches_in`)
+            # under the same write lock -- measured at hundreds of ms at realistic table
+            # sizes, and with `busy_timeout=0` any concurrent writer got SQLITE_BUSY ->
+            # ROUTING_UNAVAILABLE. Retention only needs to run once per transaction.
             self._event(c,"terminal",original_identity,"failure",reason="quota_exhausted",latency=latency_ms)
-            self._event(c,"authorized",fallback)
-            self._event(c,"dispatched",fallback)
+            self._event(c,"authorized",fallback,compact=False)
+            self._event(c,"dispatched",fallback,compact=False)
             c.execute("COMMIT"); return {"run_id": replacement_id, "existing": False,
                                             "provider": fallback[2], "model": fallback[3]}
         except RoutingError:
@@ -821,6 +948,16 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
         now=self._now(); self._transition(run_id,"UPDATE dispatches SET state='dispatched',fallback_window_open=0,actual_route_id=selected_route_id,actual_runtime=selected_runtime,actual_provider=selected_provider,actual_model=selected_model,actual_family=selected_family,actual_effort=selected_effort,dispatched_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='authorized' AND fallback_window_open=1 AND partial_write=0",(now,now,run_id,self.project_key),"dispatched")
     def mark_partial(self, run_id):
         now=self._now(); self._transition(run_id,"UPDATE dispatches SET partial_write=1,partial_write_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='dispatched' AND partial_write=0",(now,now,run_id,self.project_key),"partial")
+    # B3-F01 review question: `terminal()`/`abandon()` below have NO production caller today
+    # (only `close_run` does, per its own docstring -- grepped repo-wide, only tests use
+    # either) and, unlike `close_exhausted_and_authorize_replacement`, neither one ever
+    # writes `_USAGE_SET_CLAUSE` at all, so a row they close keeps `usage_status` NULL.
+    # Retention's `rollup` guard reads that as `COALESCE(usage_status,'unknown')`, and
+    # nothing writes an `'unknown'` rollup except the one-time 7->8 migration for
+    # pre-existing NULL rows -- so a row THESE close can never prove a matching rollup and
+    # is retained forever. That fails safe (excess disk, never lost evidence, the same
+    # direction "ante la duda, no borres" already requires), so it is deliberately left
+    # unchanged rather than adding an unreachable rollup call to dead code.
     def terminal(self, run_id, outcome, latency_ms=None):
         if outcome not in {"success","failure"}: raise RoutingError("AUTHORIZATION_INVALID")
         now=self._now(); self._transition(run_id,"UPDATE dispatches SET state=?,fallback_window_open=0,terminal_at=?,updated_at=? WHERE run_id=? AND project_key=? AND state='dispatched'",(f"terminal_{outcome}",now,now,run_id,self.project_key),"terminal",outcome,latency_ms)
@@ -880,22 +1017,29 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
                           "fallback_consumed FROM dispatches WHERE run_id=? AND project_key=?",(run_id,self.project_key)).fetchone()
             state = row[0] if row else None
             if state == "dispatched":
+                usage_row = _usage_row(usage)
                 changed=c.execute("UPDATE dispatches SET state=?,fallback_window_open=0,terminal_at=?,updated_at=?,"
                                   + _USAGE_SET_CLAUSE +
                                   " WHERE run_id=? AND project_key=? AND state='dispatched'",
-                                  (f"terminal_{outcome}",now,now,*_usage_row(usage),run_id,self.project_key))
+                                  (f"terminal_{outcome}",now,now,*usage_row,run_id,self.project_key))
                 if changed.rowcount != 1:
                     c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
                 identity = tuple(row[1:7]) if all(row[1:7]) else tuple(row[7:13])
+                # `_usage_row` is total: bad provider data becomes the valid `invalid`
+                # category, so usage never aborts the close. A real SQLite failure here
+                # rolls back this UPDATE too; no committed close can lack its rollup.
+                self._rollup_usage_in(c, now, identity, outcome, usage_row)
                 self._event(c,"terminal",identity,outcome,latency=latency_ms,via_fallback=bool(row[13])); c.execute("COMMIT")
                 return f"terminal_{outcome}"
             if state == "authorized" and outcome == "failure":
+                usage_row = _usage_row(None)
                 changed=c.execute("UPDATE dispatches SET state='abandoned',fallback_window_open=0,updated_at=?,"
                                   + _USAGE_SET_CLAUSE +
                                   " WHERE run_id=? AND project_key=? AND state='authorized'",
-                                  (now,*_usage_row(None),run_id,self.project_key))
+                                  (now,*usage_row,run_id,self.project_key))
                 if changed.rowcount != 1:
                     c.execute("ROLLBACK"); self._rejection_event(tuple(row[7:13]),"STATE_CONFLICT"); raise RoutingError("STATE_CONFLICT")
+                self._rollup_usage_in(c, now, tuple(row[7:13]), "failure", usage_row)
                 self._event(c,"abandoned",tuple(row[7:13]),"failure"); c.execute("COMMIT")
                 return "abandoned"
             # Nonexistent run_id, already-terminal/abandoned row, or authorized+success (which
@@ -920,12 +1064,17 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
                     c.execute("SELECT run_id,state,authorized_at FROM dispatches WHERE state IN ('authorized','dispatched') ORDER BY authorized_at")]
         finally:c.close()
 
-    def recent_writers(self, limit=20):
-        """Redacted listing of recent terminal-success writer run_ids for reviewer identity sourcing."""
+    def recent_writers(self, limit=_RECENT_WRITERS_LIMIT):
+        """Redacted listing of recent terminal-success writer run_ids for reviewer identity sourcing.
+
+        Order and default limit come from `_RECENT_WRITERS_ORDER_BY`/`_RECENT_WRITERS_LIMIT`,
+        the SAME constants `_compact_dispatches_in`'s protected-candidate clause uses, so a
+        row this query would return first can never be the row retention prunes (B3-F02).
+        """
         c=self._connect()
         try:
             return [{"run_id":r[0],"terminal_at":r[1]} for r in
-                    c.execute("SELECT run_id,terminal_at FROM dispatches WHERE project_key=? AND role_class='writer' AND state='terminal_success' ORDER BY terminal_at DESC,run_id LIMIT ?",(self.project_key,int(limit)))]
+                    c.execute(f"SELECT run_id,terminal_at FROM dispatches WHERE project_key=? AND role_class='writer' AND state='terminal_success' ORDER BY {_RECENT_WRITERS_ORDER_BY} LIMIT ?",(self.project_key,int(limit)))]
         finally:c.close()
 
     def implementation_identity(self, run_id):
@@ -935,15 +1084,85 @@ CREATE TABLE provider_exhaustions (provider TEXT PRIMARY KEY, expires_at INTEGER
             if not row or row[0] != "writer" or row[-1] != "terminal_success" or any(value is None for value in row[1:-1]): raise RoutingError("REVIEW_IDENTITY_INVALID")
             return ImplementationIdentity(row[3],row[5],row[1],row[2],row[4],row[6])
         finally:c.close()
+
+    def _rollup_usage_in(self, c, now_ms, identity, outcome, usage_row):
+        """Upsert one close into its UTC-day aggregate on the caller's transaction.
+
+        Sums use zero only as an accumulator identity; the paired reported counts preserve
+        whether a field was actually supplied. This keeps NULL-versus-zero observable after
+        dispatch retention, without treating an absent provider value as an estimate.
+        """
+        route,runtime,provider,model,family,_effort = identity
+        numbers = usage_row[:-1]
+        sums = tuple(value if value is not None else 0 for value in numbers)
+        reported = tuple(1 if value is not None else 0 for value in numbers)
+        window_start = (now_ms // _DAY_MS) * _DAY_MS
+        c.execute("""INSERT INTO usage_rollups(
+            window_start,project_key,route_key,runtime,provider,model,family,outcome,usage_status,run_count,
+            usage_input_sum,usage_input_reported_count,usage_output_sum,usage_output_reported_count,
+            usage_cache_read_sum,usage_cache_read_reported_count,usage_cache_write_sum,usage_cache_write_reported_count,
+            usage_reasoning_sum,usage_reasoning_reported_count,cost_micros_sum,cost_micros_reported_count)
+            VALUES(?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(window_start,project_key,route_key,runtime,provider,model,family,outcome,usage_status) DO UPDATE SET
+            run_count=run_count+1,
+            usage_input_sum=usage_input_sum+excluded.usage_input_sum,usage_input_reported_count=usage_input_reported_count+excluded.usage_input_reported_count,
+            usage_output_sum=usage_output_sum+excluded.usage_output_sum,usage_output_reported_count=usage_output_reported_count+excluded.usage_output_reported_count,
+            usage_cache_read_sum=usage_cache_read_sum+excluded.usage_cache_read_sum,usage_cache_read_reported_count=usage_cache_read_reported_count+excluded.usage_cache_read_reported_count,
+            usage_cache_write_sum=usage_cache_write_sum+excluded.usage_cache_write_sum,usage_cache_write_reported_count=usage_cache_write_reported_count+excluded.usage_cache_write_reported_count,
+            usage_reasoning_sum=usage_reasoning_sum+excluded.usage_reasoning_sum,usage_reasoning_reported_count=usage_reasoning_reported_count+excluded.usage_reasoning_reported_count,
+            cost_micros_sum=cost_micros_sum+excluded.cost_micros_sum,cost_micros_reported_count=cost_micros_reported_count+excluded.cost_micros_reported_count""",
+            (window_start,self.project_key,route,runtime,provider,model,family,outcome,usage_row[-1],
+             sums[0],reported[0],sums[1],reported[1],sums[2],reported[2],sums[3],reported[3],sums[4],reported[4],sums[5],reported[5]))
+
     def _compact_in(self, c, now_ms):
-        """Retention inside the caller's open transaction: 90 days and 10000 events."""
-        cutoff=now_ms-90*86400*1000
-        doomed = "occurred_at < ? OR event_id IN (SELECT event_id FROM events WHERE occurred_at >= ? ORDER BY occurred_at DESC,event_id DESC LIMIT -1 OFFSET 10000)"
+        """Retention inside the caller's open transaction.
+
+        `_RETENTION_DAYS` (90) and `_RETENTION_ROW_LIMIT` (10000) bound both tables that
+        share this transaction: `events` right here, then `dispatches` via
+        `_compact_dispatches_in` below -- this docstring used to describe only the
+        `events` half, from before B3 added the second one.
+        """
+        cutoff=now_ms-_RETENTION_CUTOFF_MS
+        doomed = f"occurred_at < ? OR event_id IN (SELECT event_id FROM events WHERE occurred_at >= ? ORDER BY occurred_at DESC,event_id DESC LIMIT -1 OFFSET {_RETENTION_ROW_LIMIT})"
         groups=c.execute(f"SELECT COALESCE(route_id,'none'),COALESCE(runtime,'none'),COALESCE(provider,'none'),COALESCE(model,'none'),COALESCE(family,'none'),outcome,reason_family,latency_bucket,COUNT(*) FROM events WHERE {doomed} GROUP BY route_id,runtime,provider,model,family,outcome,reason_family,latency_bucket", (cutoff,cutoff)).fetchall()
         if groups:
             for *key, count in groups:
                 c.execute("INSERT INTO metric_rollups VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(route_key,runtime,provider,model,family,outcome,reason_family,latency_bucket) DO UPDATE SET compacted_count=compacted_count+excluded.compacted_count", (*key,0,0,count,0,0,0,0,0))
             c.execute(f"DELETE FROM events WHERE {doomed}", (cutoff,cutoff))
+        self._compact_dispatches_in(c, now_ms)
+
+    def _compact_dispatches_in(self, c, now_ms):
+        """Prune only terminal provenance already represented by a rollup.
+
+        The review-candidate guard below and `recent_writers` share ONE order/limit pair
+        -- `_RECENT_WRITERS_ORDER_BY`/`_RECENT_WRITERS_LIMIT` -- so "the latest
+        `_RECENT_WRITERS_LIMIT` successful writers" names the same rows, tie included, in
+        both places; a second, independently-typed copy of either is how B3-F02 happened
+        (opposite tie-break order deleted the exact row `recent_writers` would have
+        returned first). A replacement parent always remains too. If a row cannot prove a
+        matching rollup, it is deliberately retained.
+        """
+        cutoff=now_ms-_RETENTION_CUTOFF_MS
+        terminal="state IN ('terminal_success','terminal_failure','abandoned')"
+        rollup=f"""EXISTS (SELECT 1 FROM usage_rollups AS r WHERE
+            r.window_start=(COALESCE(dispatches.terminal_at,dispatches.updated_at)/{_DAY_MS})*{_DAY_MS}
+            AND r.project_key=dispatches.project_key AND r.route_key=COALESCE(dispatches.actual_route_id,dispatches.selected_route_id)
+            AND r.runtime=COALESCE(dispatches.actual_runtime,dispatches.selected_runtime)
+            AND r.provider=COALESCE(dispatches.actual_provider,dispatches.selected_provider)
+            AND r.model=COALESCE(dispatches.actual_model,dispatches.selected_model)
+            AND r.family=COALESCE(dispatches.actual_family,dispatches.selected_family)
+            AND r.outcome=CASE WHEN dispatches.state='terminal_success' THEN 'success' ELSE 'failure' END
+            AND r.usage_status=COALESCE(dispatches.usage_status,'unknown'))"""
+        protected=f"""NOT EXISTS (SELECT 1 FROM dispatches AS successor WHERE successor.replacement_of_run_id=dispatches.run_id)
+            AND NOT (dispatches.role_class='writer' AND dispatches.state='terminal_success' AND dispatches.run_id IN
+                (SELECT review.run_id FROM dispatches AS review WHERE review.project_key=dispatches.project_key
+                 AND review.role_class='writer' AND review.state='terminal_success'
+                 ORDER BY {_RECENT_WRITERS_ORDER_BY} LIMIT {_RECENT_WRITERS_LIMIT}))"""
+        overflow=f"""dispatches.run_id IN (SELECT candidate.run_id FROM dispatches AS candidate
+            WHERE candidate.state IN ('terminal_success','terminal_failure','abandoned')
+            ORDER BY COALESCE(candidate.terminal_at,candidate.updated_at) DESC,candidate.run_id DESC LIMIT -1 OFFSET {_RETENTION_ROW_LIMIT})"""
+        c.execute(f"DELETE FROM dispatches WHERE {terminal} AND {rollup} AND {protected} AND "
+                  f"(COALESCE(terminal_at,updated_at) < ? OR {overflow})", (cutoff,))
 
     def compact(self, now_ms=None):
         c=self._connect()
@@ -1012,4 +1231,6 @@ _MIGRATION_STEPS = {
     4: RoutingStore._migrate_4_to_5,
     5: RoutingStore._migrate_5_to_6,
     6: RoutingStore._migrate_6_to_7,
+    7: RoutingStore._migrate_7_to_8,
+    8: RoutingStore._migrate_8_to_9,
 }

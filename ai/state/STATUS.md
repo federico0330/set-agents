@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-13T18:23:47+00:00
+Actualizado: 2026-08-14T02:10:06+00:00
 
 ## Features
 
@@ -27,7 +27,7 @@ Actualizado: 2026-08-13T18:23:47+00:00
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 | 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
-| 023-senales-de-consumo | scoped | PACKAGE_REVIEW | B2-el-reporte-dice-de-donde-sale (package_review) | 1/4 | 2/8 | 0/2 | 0 | - | - | 2026-08-13T18:23:47+00:00 transition |
+| 023-senales-de-consumo | scoped | DELTA_REVIEW | B3-ventana-y-rollup (delta_review_required) | 2/4 | 7/8 | 1/2 | 0 | - | - | 2026-08-14T02:10:06+00:00 record-spawn |
 | 024-listo-para-terceros | scoped | PACKAGE_PLANNING | C4-higiene-de-repo-publico (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:19:15+00:00 create-package |
 | 025-consola-minima-y-flexible | scoped | PACKAGE_PLANNING | D5-vault-en-todo-spawn (planned) | 0/5 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:20:00+00:00 create-package |
 | 026-orquestador-elige-modelo | scoped | DONE | P2-modelo-por-instancia (accepted) | 2/2 | 2/8 | 1/2 | 0 | - | - | 2026-08-13T15:35:37+00:00 transition |
@@ -41,6 +41,26 @@ Actualizado: 2026-08-13T18:23:47+00:00
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-14T02:10:06+00:00] B3-ventana-y-rollup · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Un tercer revisor confirma que los dos agujeros por los que se perdian registros quedaron cerrados.
+Ingeniería: Reparador claude-code/anthropic/opus (run1_26d316ee). Delta reviewer en codex, proveedor distinto. El orquestador ya verifico los seis en el codigo y ademas encontro y cerro un hueco propio: B3-F02 estaba arreglado sin test que lo protegiera.
+
+[2026-08-13T20:47:18+00:00] B3-ventana-y-rollup · repair-agent · started · modelo anthropic/opus · effort medium
+Cliente: Cerrar dos agujeros por los que el harness podia borrar registros que despues iba a necesitar.
+Ingeniería: B3-F01 critical: close_exhausted no escribe rollup y la guarda EXISTS(rollup con esta clave) deja que un agregado ajeno 'pruebe' la fila, que se borra. B3-F02 critical: la guarda ordena run_id DESC y recent_writers ASC, asi que con terminal_at empatado borra la fila que el reviewer consulta primero. B3-F03 high: la QUINTA guarda hueca. F04/F05/F06 medium y low.
+
+[2026-08-13T19:47:55+00:00] B3-ventana-y-rollup · package-reviewer · started · modelo anthropic/opus · effort medium
+Cliente: Un revisor de otro proveedor confirma que el cambio de base no perdio nada y que la limpieza no borra lo que hace falta.
+Ingeniería: Writer fue codex/openai-codex/gpt-5.6-terra (run1_af1780fa, relanzado tras el limite de sesion de anthropic). Reviewer claude-code/anthropic/opus, dec1_97e06bb0, independence_verified=true: proveedor distinto, que es lo que exige la regla dura de service.py:353. El orquestador ya migro la base real del usuario (7->8, 84 filas, backup doble) y corrio el gate: 1098 OK, VERIFY_PASS.
+
+[2026-08-13T19:15:46+00:00] B3-ventana-y-rollup · implementer · started · modelo openai-codex/gpt-5.6-terra · effort high
+Cliente: Retomar el trabajo que quedo cortado, en otro proveedor, sin perder nada.
+Ingeniería: Relanzada de run1_0f2ddb58 que murio por session limit sin dejar codigo. Ahora codex/openai-codex/gpt-5.6-terra. OJO para el review posterior: el writer pasa a ser codex, asi que el reviewer NO puede ser codex.
+
+[2026-08-13T18:31:05+00:00] B3-ventana-y-rollup · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que el gasto se agregue por ventana y que la base no crezca sin limite, sin perder nada que alguien pueda necesitar.
+Ingeniería: AC-06/07, clase migration. Medido: schema_version=7, dispatches 82 filas sin retencion, events 200 con retencion ya implementada (indices events_retention y events_route_retention, DELETE en store.py:946, compactacion que comparte la transaccion del escritor en :682). Hay 0 filas con replacement_of_run_id, asi que ese caso se valida con fixture y se declara asi.
 
 [2026-08-13T17:18:29+00:00] B2-el-reporte-dice-de-donde-sale · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el gasto que el harness ya captura llegue completo, y que el reporte no cuente la misma plata dos veces.
@@ -81,24 +101,4 @@ Ingeniería: Reparador claude-code/anthropic/opus (run1_ccfef5c2). Delta reviewe
 [2026-08-13T05:44:21+00:00] P3-liveness-real · repair-agent · started · modelo anthropic/opus · effort medium
 Cliente: Cerrar el ultimo agujero del mismo tipo: un archivo de credenciales con forma rara que el harness daba por bueno.
 Ingeniería: P3-F03 critical: pi_auth_provider_keys acepta {'openai-codex': []} y hasta {'proveedor-inventado': {...}}, devolviendo keyset y firma no vacios. Ultimo ciclo de review disponible (1 de 2 consumido). Se pide ademas barrida sistematica: toda funcion que lea credenciales valida forma, todo test que diga cubrir 'foreign shape' cubre objetos.
-
-[2026-08-13T05:37:36+00:00] P3-liveness-real · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
-Cliente: Un tercer revisor confirma que los dos agujeros de seguridad quedaron cerrados y no se abrio otro.
-Ingeniería: Delta acotado a catalog.py (firmas) y tests/test_routing.py. Reparador claude-code/anthropic/opus; delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_2eeb028a, independence_verified=true.
-
-[2026-08-13T05:02:20+00:00] P3-liveness-real · repair-agent · started · modelo anthropic/opus · effort medium
-Cliente: Cerrar dos agujeros: cuando el archivo de credencial esta roto o ausente, el harness lo daba por bueno en vez de volver a preguntar.
-Ingeniería: P3-F01 critical: un JSON objeto con forma invalida ({} en codex, {claudeAiOauth:{}} en claude) produce firma NO vacia; y el test que dice cubrir 'foreign-shaped JSON' solo prueba listas. P3-F02 high: pi_auth_provider_keys no comprueba st_uid propio y _pi_auth_signature hashea el conjunto vacio con la version, asi que archivo ausente o symlink dan firma no vacia. Ambos reproducidos por el orquesta…
-
-[2026-08-13T04:43:38+00:00] P3-liveness-real · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
-Cliente: Un revisor de otro proveedor audita que leer las credenciales para detectar altas y bajas no filtre nada.
-Ingeniería: Writer claude-code/anthropic/opus (run1_b2ca9919). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_1b7703d7, independence_verified=true. Se le pide ademas dictaminar si el diseno de la firma aguanta aunque el supuesto de no-rotacion resultara falso, porque la captura A/B esta pendiente de un refresh natural.
-
-[2026-08-13T03:41:24+00:00] P3-liveness-real · implementer · started · modelo anthropic/opus · effort medium
-Cliente: Que dar de alta o de baja una suscripcion se note en la decision siguiente, no cinco minutos despues.
-Ingeniería: P3 de 022 (AC-07..10), clase security: lee archivos de credencial. Firma por runtime, todo stat/lectura local -- hoy _live_opencode_auth_signature:378 cuesta un SUBPROCESO por composicion y no hay que multiplicarlo por cuatro. Trampa medida y ausente de la spec: ~/.claude/.credentials.json contiene TAMBIEN mcpOAuth (token de Vercel), asi que hashear el archivo o su mtime rota en cada refresh de M…
-
-[2026-08-13T03:35:39+00:00] P2-techo-catalogo-tri-estado · package-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
-Cliente: Un revisor de otro proveedor de IA confirma que el cambio hace lo que dice y no abrio una puerta de mas.
-Ingeniería: Writer claude-code/anthropic/opus (run1_d8520988). Reviewer codex/openai-codex/gpt-5.6-terra, dec1_0cbd3fc5, independence_verified=true. Asignacion acotada a 3 puntos + 1 mordida.
 

@@ -18,10 +18,8 @@ into the store's vocabulary, so:
   recognize -- see the two per-runtime sections below) has one correct mapping to import
   instead of re-deriving it.
 
-Nothing in this package wires these functions into any runtime spawn call site (out of
-`ALCANCE` for 023-senales-de-consumo PKG-B1) -- they are reachable from tests and from the
-orchestrator's own hand-composed `--usage` JSON, deliberately, not from `claude_code_spawn.py`/
-`opencode_spawn.py`/`codex_spawn.py`, which this package's `ALCANCE` does not touch.
+Since PKG-B2, `claude_code_spawn.py` and `opencode_spawn.py` call these normalizers at their
+dispatch edges; only `codex_spawn.py` remains deliberately disconnected (outside its scope).
 
 ## Real wire samples, one per runtime, measured live this package (2026-08-13), never invented
 

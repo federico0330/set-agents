@@ -26,7 +26,7 @@
     "max_spawns_per_package": 8,
     "max_verifications_per_package": 6
   },
-  "current_package_id": "B2-el-reporte-dice-de-donde-sale",
+  "current_package_id": "B3-ventana-y-rollup",
   "feature_id": "023-senales-de-consumo",
   "final_state": null,
   "global_gates": [],
@@ -752,15 +752,457 @@
       "package_id": "B2-el-reporte-dice-de-donde-sale",
       "timestamp": "2026-08-13T18:30:03+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:22+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:22+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:23+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:23+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:23+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:23+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:24+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:24+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:24+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:24+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:24+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:25+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:25+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:30:25+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que el gasto se agregue por ventana y que la base no crezca sin limite, sin perder nada que alguien pueda necesitar.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Schema 8 con usage_rollups en la misma transaccion que close_run, y retencion de dispatches que no borra evidencia",
+        "role": "implementer",
+        "route_id": "run1_0f2ddb58515f213d3953f34d5916ee0a",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "AC-06/07, clase migration. Medido: schema_version=7, dispatches 82 filas sin retencion, events 200 con retencion ya implementada (indices events_retention y events_route_retention, DELETE en store.py:946, compactacion que comparte la transaccion del escritor en :682). Hay 0 filas con replacement_of_run_id, asi que ese caso se valida con fixture y se declara asi."
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T18:31:05+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Retomar el trabajo que quedo cortado, en otro proveedor, sin perder nada.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Schema 8 con usage_rollups y retencion de dispatches -- relanzado en codex tras limite de sesion en anthropic",
+        "role": "implementer",
+        "route_id": "run1_af1780fa18fbfe6ba4f94492c96be20c",
+        "spawn_id": "SPAWN-002",
+        "spawns": 2,
+        "tech": "Relanzada de run1_0f2ddb58 que murio por session limit sin dejar codigo. Ahora codex/openai-codex/gpt-5.6-terra. OJO para el review posterior: el writer pasa a ser codex, asi que el reviewer NO puede ser codex."
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:15:46+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Schema 8 con usage_rollups en la misma transaccion que close_run (AC-06)",
+        "validations": [
+          "unittest: 1098 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS. Los fallos que reporto el implementer eran del sandbox de codex (.git/hooks en filesystem read-only), no defectos."
+        ]
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Retencion de dispatches que nunca borra una fila referenciada (AC-07)",
+        "validations": [
+          "unittest: 1098 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS. Los fallos que reporto el implementer eran del sandbox de codex (.git/hooks en filesystem read-only), no defectos."
+        ]
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:32+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:33+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:46:33+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "client": "Un revisor de otro proveedor confirma que el cambio de base no perdio nada y que la limpieza no borra lo que hace falta.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Review independiente de B3: la migracion no pierde datos y la retencion no borra evidencia",
+        "role": "package-reviewer",
+        "route_id": "dec1_97e06bb0ce17530ac0d6c162c01b986e",
+        "spawn_id": "SPAWN-003",
+        "spawns": 3,
+        "tech": "Writer fue codex/openai-codex/gpt-5.6-terra (run1_af1780fa, relanzado tras el limite de sesion de anthropic). Reviewer claude-code/anthropic/opus, dec1_97e06bb0, independence_verified=true: proveedor distinto, que es lo que exige la regla dura de service.py:353. El orquestador ya migro la base real del usuario (7->8, 84 filas, backup doble) y corrio el gate: 1098 OK, VERIFY_PASS."
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T19:47:55+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 6,
+        "verdict": "repair_required"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T20:46:18+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-verification",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "refuted": 0,
+        "upheld": 6
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T20:46:31+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "client": "Cerrar dos agujeros por los que el harness podia borrar registros que despues iba a necesitar.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Reparacion consolidada de los seis hallazgos de B3, dos criticos de perdida de evidencia",
+        "role": "repair-agent",
+        "route_id": "run1_26d316ee214122eceb945694e42e6d52",
+        "spawn_id": "SPAWN-004",
+        "spawns": 4,
+        "tech": "B3-F01 critical: close_exhausted no escribe rollup y la guarda EXISTS(rollup con esta clave) deja que un agregado ajeno 'pruebe' la fila, que se borra. B3-F02 critical: la guarda ordena run_id DESC y recent_writers ASC, asi que con terminal_at empatado borra la fila que el reviewer consulta primero. B3-F03 high: la QUINTA guarda hueca. F04/F05/F06 medium y low."
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-13T20:47:18+00:00",
+      "to": "PACKAGE_REPAIR"
+    },
+    {
+      "actor": "repair-agent",
+      "event": "record-repair",
+      "from": "PACKAGE_REPAIR",
+      "metadata": {
+        "delta_waived": false,
+        "finding_ids": [
+          "B3-F01",
+          "B3-F02",
+          "B3-F03",
+          "B3-F04",
+          "B3-F05",
+          "B3-F06"
+        ]
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T01:58:45+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "client": "Un tercer revisor confirma que los dos agujeros por los que se perdian registros quedaron cerrados.",
+        "effort": "high",
+        "model": "gpt-5.6-terra",
+        "provider": "openai-codex",
+        "purpose": "Delta review de la reparacion de los seis hallazgos de B3, dos criticos de perdida de evidencia",
+        "role": "delta-reviewer",
+        "spawn_id": "SPAWN-005",
+        "spawns": 5,
+        "tech": "Reparador claude-code/anthropic/opus (run1_26d316ee). Delta reviewer en codex, proveedor distinto. El orquestador ya verifico los seis en el codigo y ademas encontro y cerro un hueco propio: B3-F02 estaba arreglado sin test que lo protegiera."
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T02:10:06+00:00",
+      "to": "DELTA_REVIEW"
+    },
+    {
+      "actor": "delta-reviewer",
+      "event": "record-delta-review",
+      "from": "DELTA_REVIEW",
+      "metadata": {
+        "requires_full_review": false,
+        "verdict": "pass"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T04:10:44+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T04:10:44+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T04:10:44+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T04:10:44+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "B3-ventana-y-rollup",
+      "timestamp": "2026-08-14T04:10:45+00:00",
+      "to": "PACKAGE_ACCEPTED"
     }
   ],
   "metrics": {
-    "delta_reviews": 0,
+    "delta_reviews": 1,
     "human_questions_after_approval": 0,
-    "package_reviews": 2,
-    "repair_batches": 0,
+    "package_reviews": 3,
+    "repair_batches": 1,
     "task_deep_reviews": 0,
-    "verifications": 0
+    "verifications": 1
   },
   "mode": "scoped",
   "packages": [
@@ -1189,29 +1631,219 @@
         "AC-06",
         "AC-07"
       ],
-      "approved_exceptions": [],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/routing_core/store.py",
+          "reason": "AC-06/07: schema 8, usage_rollups y retencion de dispatches.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/usage.py",
+          "reason": "Arreglo de una linea del docstring que quedo falso tras B2.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0045-consumo-vocabulario-en-el-borde.md",
+          "reason": "AC-06 extiende 0045.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/claude_code_spawn.py",
+          "reason": "Heredado de B2.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/opencode_spawn.py",
+          "reason": "Heredado de B2.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/cost-report.py",
+          "reason": "Heredado de B2.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/023-senales-de-consumo/spec.md",
+          "reason": "Enmendada antes de los paquetes.",
+          "status": "approved"
+        }
+      ],
       "attempts": {
-        "deep_review_cycles": 0,
-        "repair_batches": 0,
-        "spawns": 0,
+        "deep_review_cycles": 1,
+        "repair_batches": 1,
+        "spawns": 5,
         "subdivisions": 0,
         "verification_waivers": 0,
-        "verifications": 0
+        "verifications": 1
       },
       "candidate_identity": null,
       "complexity": "medium",
-      "context_pack": null,
-      "delta_reviews": [],
+      "context_pack": "docs/specs/023-senales-de-consumo/context/B3-ventana-y-rollup.md",
+      "delta_reviews": [
+        {
+          "at": "2026-08-14T04:10:44+00:00",
+          "closed_findings": [
+            "B3-F01",
+            "B3-F02",
+            "B3-F03",
+            "B3-F04",
+            "B3-F05",
+            "B3-F06"
+          ],
+          "new_or_reopened_findings": [],
+          "reason": "Delta reviewer independiente en codex/openai-codex/gpt-5.6-terra, proveedor distinto del reparador (anthropic/opus). VEREDICTO approved, sin hallazgos. Punto 1: close_exhausted hace el rollup ANTES de bifurcar, asi que cubre las dos ramas (store.py:867-884), y el probe de cuota 1000 mas una hermana de 1, misma identidad, conserva 1001 a traves de compact() -antes de la reparacion quedaba 1-. La guarda y recent_writers comparten _RECENT_WRITERS_ORDER_BY y limite (:1067-1077,:1156-1160), y el test de 21 empates pasa. Puntos 2 a 4 sin hallazgos. NOTA: el primer despacho del delta murio a los 39 bytes; se relanzo una vez y completo.",
+          "requires_full_review": false,
+          "verdict": "pass"
+        }
+      ],
       "dependencies": [
         "B2-el-reporte-dice-de-donde-sale"
       ],
-      "diff_ref": null,
-      "findings": [],
-      "gates": [],
-      "integrated": false,
+      "diff_ref": "working-tree @ b1235aa (023/B3: store.py SCHEMA=8, _migrate_7_to_8:587, retencion en :1024, usage.py:21 docstring corregido, tests +125)",
+      "findings": [
+        {
+          "detail": "Confirmado por el orquestador leyendo el codigo: _rollup_usage_in solo se llama en :932 y :943, nunca dentro de close_exhausted_and_authorize_replacement. Es un camino de cierre de PRODUCCION (--route-quota-exhausted, cableado desde claude_code_spawn.py:599), no legacy. Dos danos: usage_rollups subcuenta permanentemente, y -peor- la guarda de retencion es EXISTS(rollup con esta clave), que comprueba que exista una fila de rollup con esa clave, NO que este run este contado en ella; si otra hermana del mismo grupo crea la fila, la del quota-exhausted queda 'probada' por un agregado ajeno y se borra. El reviewer lo reprodujo: 'run A sobrevive: False | input total recuperable AHORA: 1 (antes de compact: 1001)'.",
+          "id": "B3-F01",
+          "location": "ai/scripts/routing_core/store.py:762-808 (UPDATE con usage en :791-793); consumidor de produccion set_agents_app.py:763",
+          "repair_attempts": 1,
+          "required": "Llamar a _rollup_usage_in en la misma transaccion, en las dos ramas (con y sin replacement), con identity=original_identity y outcome='failure'. Mas un test que cierre por quota-exhausted, envejezca la fila junto a una hermana del mismo grupo y verifique que SUM(usage_input_sum)+SUM(usage_input) se conserva a traves de compact().",
+          "severity": "critical",
+          "status": "closed",
+          "title": "close_exhausted_and_authorize_replacement escribe usage pero nunca su rollup, y la retencion borra esa fila",
+          "verified_at": "2026-08-13T20:46:31+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "Confirmado por el orquestador: recent_writers usa 'ORDER BY terminal_at DESC,run_id' (ASC) y la guarda usa 'ORDER BY review.terminal_at DESC,review.run_id DESC LIMIT 20'. Desempate OPUESTO. Con terminal_at empatado los dos conjuntos de 20 diferentes, y la retencion borra exactamente la fila que recent_writers devuelve PRIMERA. El reviewer lo midio: 'implementation_identity(antes[0]): RoutingError(REVIEW_IDENTITY_INVALID) <-- evidencia borrada'. Y el docstring de :1027 afirma 'The review candidate guard matches recent_writers', que es falso: un comentario que miente sobre el invariante.",
+          "id": "B3-F02",
+          "location": "ai/scripts/routing_core/store.py:1046 (guarda) vs :973 (recent_writers); docstring falso en :1027",
+          "repair_attempts": 1,
+          "required": "Que la guarda y recent_writers compartan UNA expresion de orden y UN limite en una constante nombrada, no el 20 escrito dos veces. Test con >=21 writers con el mismo terminal_at que exija set(recent_writers()) contenido en las filas vivas despues de compact().",
+          "severity": "critical",
+          "status": "closed",
+          "title": "La guarda de retencion ordena al reves que recent_writers y borra la fila que el reviewer consulta primero",
+          "verified_at": "2026-08-13T20:46:31+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "El test se llama ..._keeps_replacement_parents_and_current_reviewer_candidates y su docstring dice cubrir 'the two irrecoverable-evidence guards'. Borrando ENTERA la clausula NOT EXISTS(successor...) del codigo, el test sigue en VERDE (mutacion M8 del reviewer: 'Ran 3 tests OK'). La causa es B3-F01: en ese fixture el padre se cierra con close_exhausted, que no escribe rollup, asi que la fila la retiene la guarda de rollup y no la de replacement. El test observa el efecto correcto por el mecanismo equivocado. Es la quinta de esta familia en el proyecto: cuatro apareciron en 022.",
+          "id": "B3-F03",
+          "location": "tests/test_routing.py:2361-2394 contra store.py:1043",
+          "repair_attempts": 1,
+          "required": "Un test cuyo padre de replacement tenga rollup propio -lo tendra recien despues de reparar B3-F01- y que muera si se quita NOT EXISTS(successor...).",
+          "severity": "high",
+          "status": "closed",
+          "title": "QUINTA guarda hueca: el test dice cubrir las dos protecciones y solo cubre una",
+          "verified_at": "2026-08-13T20:46:31+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "El INTEGER NOT NULL CHECK(>=0) no lo impide por la afinidad de tipos de SQLite. Medido por el reviewer con dos cierres de input=2**62 por la API publica: el rollup pasa a (9.223372036854776e+18, 'real'), mientras SUM() sobre los MISMOS datos en dispatches aborta con 'integer overflow'. Los tokens no tienen cota superior en _usage_row -solo cost_micros la tiene, _COST_MICROS_BOUND=2**53-, asi que bastan DOS cierres de un proveedor roto u hostil. Contradice el trabajo que _cost_micros (:88) se toma con Decimal justamente para no hacer plata en flotante.",
+          "id": "B3-F04",
+          "location": "ai/scripts/routing_core/store.py:47-61 (_USAGE_ROLLUPS_DDL) y :996-1010 (ON CONFLICT DO UPDATE)",
+          "repair_attempts": 1,
+          "required": "Acotar los tokens como ya se acotan los micros, o hacer detectable el desborde con CHECK(typeof(x)='integer') en las columnas de suma.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "Los acumuladores del rollup degradan de INTEGER a REAL al desbordar, y el dinero pasa a punto flotante",
+          "verified_at": "2026-08-13T20:46:31+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "close_exhausted_and_authorize_replacement emite tres events (:808-810), o sea tres pasadas completas en una sola transaccion. A/B medido por el reviewer contra una linea base sin la pasada de dispatches: +9 ms a 9k filas, +228 ms a 20k y +664 ms a 40k, porque la primera compactacion post-upgrade borra N-10000 filas sin batching dentro de un BEGIN IMMEDIATE de cara al usuario y con busy_timeout=0 (:412): cualquier otro proceso que quiera escribir recibe SQLITE_BUSY inmediato -> ROUTING_UNAVAILABLE. Y ese N grande es precisamente el caso que B3 existe para atender.",
+          "id": "B3-F05",
+          "location": "ai/scripts/routing_core/store.py:1024-1050, invocada desde :1022 <- _compact_in <- _event (:722)",
+          "repair_attempts": 1,
+          "required": "Acotar el trabajo por pasada (borrado por lotes) o mover la pasada de dispatches a una vez por transaccion en vez de una por event.",
+          "severity": "medium",
+          "status": "closed",
+          "title": "La retencion corre una vez por EVENT, no por transaccion, y la primera pasada post-upgrade bloquea",
+          "verified_at": "2026-08-13T20:46:31+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        },
+        {
+          "detail": "El docstring de _compact_in (:1014) sigue diciendo '90 days and 10000 events' cuando ahora tambien poda dispatches. El corte de 90 dias esta duplicado literal en :1015 y :1031; el tope 10000 en :1016 y :1049; 86400000 aparece en cinco lugares. El 20 de :1046 duplica el default de recent_writers (:968) sin constante compartida, y ESA duplicacion es la causa directa de B3-F02. El docstring de :1027 afirma una equivalencia que el codigo no cumple.",
+          "id": "B3-F06",
+          "location": "ai/scripts/routing_core/store.py:1014,1015,1016,1027,1031,1046,1049 y :968",
+          "repair_attempts": 1,
+          "required": "Constantes nombradas para retencion (dias, tope de events, tope de dispatches, tope de reviewer-candidates) y una unica expresion de orden compartida.",
+          "severity": "low",
+          "status": "closed",
+          "title": "Duplicacion de constantes de retencion, y un docstring que afirma un invariante que el codigo no cumple",
+          "verified_at": "2026-08-13T20:46:31+00:00",
+          "verified_by": "orchestrator",
+          "verified_verdict": "upheld"
+        }
+      ],
+      "gates": [
+        {
+          "at": "2026-08-13T19:46:32+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T19:46:32+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T19:46:32+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-13T19:46:32+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
       "late_reviews": [],
       "module_impact_waiver": null,
-      "module_impacts": [],
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-14T04:10:44+00:00",
+          "cambio": "usage_rollups por ventana en la misma transaccion que close_run, retencion de dispatches, y un candado que impide cambiar un DDL sin bumpear el esquema",
+          "feature_id": "023-senales-de-consumo",
+          "modelo_mental": "El gasto se agrega por ventana sin perder la fila cruda que un review pueda necesitar, y el esquema ya no puede cambiar en silencio",
+          "module": "routing",
+          "package_id": "B3-ventana-y-rollup"
+        }
+      ],
       "objective": "Rollups en la misma transaccion que close_run, y retencion que no borra lo referenciado",
       "owned_paths": [
         "ai/scripts/routing_core",
@@ -1222,35 +1854,172 @@
       "read_only_paths": [],
       "receipt": null,
       "repair_ceiling": null,
-      "repairs": [],
+      "repair_entry": "review",
+      "repairs": [
+        {
+          "at": "2026-08-14T01:58:45+00:00",
+          "changed_files": [
+            "ai/scripts/routing_core/store.py",
+            "tests/test_routing.py"
+          ],
+          "finding_ids": [
+            "B3-F01",
+            "B3-F02",
+            "B3-F03",
+            "B3-F04",
+            "B3-F05",
+            "B3-F06"
+          ],
+          "verification": [
+            "Verificado por el ORQUESTADOR, no por el reparador. Los seis arreglos confirmados en el codigo: _rollup_usage_in en store.py:842 dentro de close_exhausted (antes solo :994 y :1005); _RECENT_WRITERS_LIMIT/_RECENT_WRITERS_ORDER_BY en :250-251 compartidos entre recent_writers :1040 y la guarda :1123; 7 CHECK typeof; un solo 86400000 literal; el docstring que afirmaba 'The review candidate guard matches recent_writers' ya no existe. HUECO ENCONTRADO POR EL ORQUESTADOR Y CERRADO EN ESTE MISMO BATCH: B3-F02 quedaba arreglado pero SIN proteger -reintroduciendo la divergencia solo en la guarda, 'python3 -m unittest tests.test_routing' daba 'Ran 314 tests OK'-, y grep de _RECENT_WRITERS_ORDER_BY sobre tests/ daba cero. El review lo habia pedido en su RESULTADO REQUERIDO y no se habia escrito. Se agrego test_b3_retention_guard_protects_every_row_recent_writers_would_return_on_a_terminal_at_tie (tests/test_routing.py:2409-2455), con 21 writers de terminal_at empatado; mordida propia del orquestador: con la divergencia reintroducida da 'AssertionError: False is not true: {run1_ef69bab6...}' y FAILED, restaurado da OK. El reparador ademas reporto por su cuenta que su primera corrida del gate la pipeo a tail violando ADR-0041, lo detecto y la repitio."
+          ]
+        }
+      ],
       "review_panels": [],
-      "reviews": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-13T20:46:18+00:00",
+          "evidence": "Reviewer independiente claude-code/anthropic/opus, dec1_97e06bb0, independence_verified=true, proveedor distinto del writer (openai-codex, relanzado tras limite de sesion). VEREDICTO revision_required, 6 hallazgos (2 critical, 1 high, 2 medium, 1 low). CORRIGIO AL ORQUESTADOR: el cambio de 'to=7' a 'to={routing_store.SCHEMA}' NO es un debilitamiento y B3 toco UN solo sitio, no dos -:1572 ya venia parametrizado-; la mutacion M1 (migracion que bumpea version sin crear la tabla) pone el test en ROJO porque _ddl_divergence lo atrapa. Lo que SI paso: migracion 7->8 lossless sobre fixture con datos incluidos replacement_of_run_id; close_run resiste 14 formas de usage basura y un fallo REAL de SQLite via authorizer SQLITE_DENY, no un mock; el indice dispatches_retention se usa de verdad. Nueve mutaciones aplicadas (M1-M9), todas restauradas con cp, md5sum final identico.",
+          "findings": [
+            "B3-F01",
+            "B3-F02",
+            "B3-F03",
+            "B3-F04",
+            "B3-F05",
+            "B3-F06"
+          ],
+          "verdict": "repair_required"
+        }
+      ],
       "risks": [],
       "routing_reason": null,
-      "runtime_qa": [],
+      "runtime_qa": [
+        {
+          "at": "2026-08-14T04:10:44+00:00",
+          "browser": "",
+          "checks": [
+            "La base real del usuario migro 7->8->9 sin perder datos",
+            "El ruteo volvio a funcionar despues de la regresion de esquema",
+            "La retencion no borra ni padres de replacement ni candidatos de reviewer"
+          ],
+          "evidence": "Medido por el orquestador sobre la base REAL: schema 9, 85 dispatches, 34 usage_rollups, PRAGMA integrity_check ok, los 6 CHECK typeof presentes, y --route-terminal responde ok:true. Tres respaldos: routing-v7-20260813T194723Z.db y routing-v8-20260814T034003Z.db del propio harness, mas dos copias en scratchpad. La regresion de esquema -DDL cambiado sin bumpear SCHEMA- dejo el ruteo caido con ROUTING_UNAVAILABLE y se cerro con SCHEMA=9, _migrate_8_to_9 y un candado de fingerprint que falla en las dos direcciones.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
       "runtime_surface": true,
       "selected_model": null,
       "selected_role": null,
       "shared_paths": [],
-      "spawns": [],
-      "status": "planned",
+      "spawns": [
+        {
+          "at": "2026-08-13T18:31:05+00:00",
+          "client": "Que el gasto se agregue por ventana y que la base no crezca sin limite, sin perder nada que alguien pueda necesitar.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Schema 8 con usage_rollups en la misma transaccion que close_run, y retencion de dispatches que no borra evidencia",
+          "role": "implementer",
+          "route_id": "run1_0f2ddb58515f213d3953f34d5916ee0a",
+          "spawn_id": "SPAWN-001",
+          "tech": "AC-06/07, clase migration. Medido: schema_version=7, dispatches 82 filas sin retencion, events 200 con retencion ya implementada (indices events_retention y events_route_retention, DELETE en store.py:946, compactacion que comparte la transaccion del escritor en :682). Hay 0 filas con replacement_of_run_id, asi que ese caso se valida con fixture y se declara asi."
+        },
+        {
+          "at": "2026-08-13T19:15:46+00:00",
+          "client": "Retomar el trabajo que quedo cortado, en otro proveedor, sin perder nada.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Schema 8 con usage_rollups y retencion de dispatches -- relanzado en codex tras limite de sesion en anthropic",
+          "role": "implementer",
+          "route_id": "run1_af1780fa18fbfe6ba4f94492c96be20c",
+          "spawn_id": "SPAWN-002",
+          "tech": "Relanzada de run1_0f2ddb58 que murio por session limit sin dejar codigo. Ahora codex/openai-codex/gpt-5.6-terra. OJO para el review posterior: el writer pasa a ser codex, asi que el reviewer NO puede ser codex."
+        },
+        {
+          "at": "2026-08-13T19:47:55+00:00",
+          "client": "Un revisor de otro proveedor confirma que el cambio de base no perdio nada y que la limpieza no borra lo que hace falta.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Review independiente de B3: la migracion no pierde datos y la retencion no borra evidencia",
+          "role": "package-reviewer",
+          "route_id": "dec1_97e06bb0ce17530ac0d6c162c01b986e",
+          "spawn_id": "SPAWN-003",
+          "tech": "Writer fue codex/openai-codex/gpt-5.6-terra (run1_af1780fa, relanzado tras el limite de sesion de anthropic). Reviewer claude-code/anthropic/opus, dec1_97e06bb0, independence_verified=true: proveedor distinto, que es lo que exige la regla dura de service.py:353. El orquestador ya migro la base real del usuario (7->8, 84 filas, backup doble) y corrio el gate: 1098 OK, VERIFY_PASS."
+        },
+        {
+          "at": "2026-08-13T20:47:18+00:00",
+          "client": "Cerrar dos agujeros por los que el harness podia borrar registros que despues iba a necesitar.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Reparacion consolidada de los seis hallazgos de B3, dos criticos de perdida de evidencia",
+          "role": "repair-agent",
+          "route_id": "run1_26d316ee214122eceb945694e42e6d52",
+          "spawn_id": "SPAWN-004",
+          "tech": "B3-F01 critical: close_exhausted no escribe rollup y la guarda EXISTS(rollup con esta clave) deja que un agregado ajeno 'pruebe' la fila, que se borra. B3-F02 critical: la guarda ordena run_id DESC y recent_writers ASC, asi que con terminal_at empatado borra la fila que el reviewer consulta primero. B3-F03 high: la QUINTA guarda hueca. F04/F05/F06 medium y low."
+        },
+        {
+          "at": "2026-08-14T02:10:06+00:00",
+          "client": "Un tercer revisor confirma que los dos agujeros por los que se perdian registros quedaron cerrados.",
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai-codex",
+          "purpose": "Delta review de la reparacion de los seis hallazgos de B3, dos criticos de perdida de evidencia",
+          "role": "delta-reviewer",
+          "spawn_id": "SPAWN-005",
+          "tech": "Reparador claude-code/anthropic/opus (run1_26d316ee). Delta reviewer en codex, proveedor distinto. El orquestador ya verifico los seis en el codigo y ademas encontro y cerro un hueco propio: B3-F02 estaba arreglado sin test que lo protegiera."
+        }
+      ],
+      "status": "accepted",
       "strict_tdd": false,
       "tasks": [
         {
           "blockers": [],
           "id": "Schema 8 con usage_rollups en la misma transaccion que close_run (AC-06)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1098 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS. Los fallos que reporto el implementer eran del sandbox de codex (.git/hooks en filesystem read-only), no defectos."
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "Retencion de dispatches que nunca borra una fila referenciada (AC-07)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1098 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS. Los fallos que reporto el implementer eran del sandbox de codex (.git/hooks en filesystem read-only), no defectos."
+          ],
+          "status": "completed"
         }
       ],
-      "testing": [],
-      "verifications": []
+      "testing": [
+        {
+          "at": "2026-08-14T04:10:44+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1102 OK / 3 skips. Base 1095 -> 1102. Incluye el test de terminal_at empatado que el orquestador detecto faltante y el candado de DDL que nacio de la regresion de esquema.",
+          "status": "pass"
+        }
+      ],
+      "verifications": [
+        {
+          "at": "2026-08-13T20:46:31+00:00",
+          "evidence": "Verificacion del orquestador en UNA sola llamada. B3-F01 y B3-F02 confirmados leyendo el codigo directamente: grep de _rollup_usage_in da solo :932 y :943, ninguno dentro de close_exhausted_and_authorize_replacement que arranca en :762; y los dos ORDER BY tienen desempate opuesto -recent_writers :973 usa 'ORDER BY terminal_at DESC,run_id' (ASC) y la guarda :1046 usa 'ORDER BY review.terminal_at DESC,review.run_id DESC'-, mientras el docstring :1027 afirma 'The review candidate guard matches recent_writers'. B3-F03 a B3-F06 se aceptan con la evidencia del reviewer, que incluye nueve mutaciones con salida literal y una medicion A/B de rendimiento contra linea base. El orquestador NO reprodujo esos cuatro por su cuenta y lo declara asi en vez de sugerir que lo hizo.",
+          "refuted": [],
+          "upheld": [
+            "B3-F01",
+            "B3-F02",
+            "B3-F03",
+            "B3-F04",
+            "B3-F05",
+            "B3-F06"
+          ]
+        }
+      ]
     },
     {
       "acceptance_criteria": [
@@ -1329,7 +2098,7 @@
     }
   ],
   "phase": "PACKAGE_ACCEPTED",
-  "revision": 62,
+  "revision": 98,
   "schema_version": 1,
   "spec_amendments": [
     {
@@ -1353,5 +2122,5 @@
       "reason": "AC-04a agregado a PKG-2: cablear los adaptadores de spawn a routing_core/usage.py. El implementer de B1 midio que claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row no reconoce. El endurecimiento de AC-02 las convierte en 'invalid' contado en vez de 'ok' con NULLs silencioso, pero no las traduce. Sin AC-04a, B1 deja el descarte visible y el dato sigue perdido."
     }
   ],
-  "updated_at": "2026-08-13T18:30:03+00:00"
+  "updated_at": "2026-08-14T04:10:45+00:00"
 }

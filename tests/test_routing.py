@@ -1,6 +1,7 @@
 import os
 import dataclasses
 import decimal
+import hashlib
 import io
 import json
 import re
@@ -78,12 +79,17 @@ def frozen_dispatches_script(*, version=4, comments=True, n03="present"):
                 backups on this machine actually look like, AC-05)
                           | "altered" (the same CHECK with one conjunct dropped: still a
                 parseable table-level CHECK, genuinely weaker -- AC-04)
-    version  -- 4, 5 (PROJECT_KEY_COLUMN), 6 (plus USAGE_COLUMNS), or 7 (the
-                failover link/exhaustion table), each spliced where
-                `_create_schema` puts it: after the last column definition and before the
-                first table constraint, which is exactly where ALTER TABLE ADD COLUMN
-                lands them.  So a database of any live schema can be CREATED directly
-                instead of being reachable only through migration.
+    version  -- 4, 5 (PROJECT_KEY_COLUMN), 6 (plus USAGE_COLUMNS), 7 (the
+                failover link/exhaustion table), 8 (usage rollups/retention -- the REAL
+                historical schema 8, with the UNTYPED sum CHECKs: this is what
+                `_migrate_7_to_8` actually wrote to disk before B3-F04 added
+                `CHECK(typeof(x)='integer')`, and it is deliberately NOT byte-identical to
+                current `_USAGE_ROLLUPS_DDL` -- that gap is the fixture the 8->9 migration
+                test needs), or 9 (the current, typed CHECK -- B3-F04's follow-up), each
+                spliced where `_create_schema` puts it: after the last column definition
+                and before the first table constraint, which is exactly where ALTER TABLE
+                ADD COLUMN lands them.  So a database of any live schema can be CREATED
+                directly instead of being reachable only through migration.
     """
     if n03 not in ("present", "absent", "altered"):
         raise ValueError(n03)
@@ -114,6 +120,30 @@ def frozen_dispatches_script(*, version=4, comments=True, n03="present"):
     if version >= 7:
         text = text.replace("usage_status TEXT CHECK(usage_status IS NULL OR usage_status IN ('ok','absent','invalid')),",
                             "usage_status TEXT CHECK(usage_status IS NULL OR usage_status IN ('ok','absent','invalid')), replacement_of_run_id TEXT REFERENCES dispatches(run_id), terminal_outcome TEXT,")
+    if version >= 8:
+        # Kept as a fixture literal: borrowing production DDL here would make the
+        # current-schema compatibility test tautological. `typed` distinguishes the REAL
+        # historical schema 8 (`version==8`, untyped sum CHECKs -- what `_migrate_7_to_8`
+        # actually wrote before B3-F04) from schema 9 onward (typed, current
+        # `_USAGE_ROLLUPS_DDL`). Byte-identical wording otherwise.
+        typed = version >= 9
+        def col(name):
+            clause = f" CHECK(typeof({name})='integer')" if typed else ""
+            return f"{name} INTEGER NOT NULL CHECK({name} >= 0){clause}"
+        text += f"""\nCREATE TABLE usage_rollups (
+ window_start INTEGER NOT NULL, project_key TEXT NOT NULL, route_key TEXT NOT NULL,
+ runtime TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL,
+ outcome TEXT NOT NULL CHECK(outcome IN ('success','failure')),
+ usage_status TEXT NOT NULL CHECK(usage_status IN ('ok','absent','invalid','unknown')),
+ run_count INTEGER NOT NULL CHECK(run_count >= 0),
+ {col('usage_input_sum')}, usage_input_reported_count INTEGER NOT NULL CHECK(usage_input_reported_count >= 0),
+ {col('usage_output_sum')}, usage_output_reported_count INTEGER NOT NULL CHECK(usage_output_reported_count >= 0),
+ {col('usage_cache_read_sum')}, usage_cache_read_reported_count INTEGER NOT NULL CHECK(usage_cache_read_reported_count >= 0),
+ {col('usage_cache_write_sum')}, usage_cache_write_reported_count INTEGER NOT NULL CHECK(usage_cache_write_reported_count >= 0),
+ {col('usage_reasoning_sum')}, usage_reasoning_reported_count INTEGER NOT NULL CHECK(usage_reasoning_reported_count >= 0),
+ {col('cost_micros_sum')}, cost_micros_reported_count INTEGER NOT NULL CHECK(cost_micros_reported_count >= 0),
+ PRIMARY KEY(window_start,project_key,route_key,runtime,provider,model,family,outcome,usage_status));
+CREATE INDEX dispatches_retention ON dispatches(state,terminal_at,updated_at,run_id);"""
     return text
 
 
@@ -144,6 +174,39 @@ FROZEN_V4_ROW = (
     None, None, None, None, None, None, None, None, None, None, None, None,
     "authorized", 0, 1, 0, 1, None, None, None, None, 1,
 )
+
+
+def _ddl_fingerprint(canonical):
+    """A deterministic SHA-256 over every canonical (table/index name, normalized DDL) pair.
+
+    Ordered by name so the digest does not depend on `sqlite_master`'s row order, and
+    NUL-joined so no legal DDL text (which cannot contain NUL) can forge a collision by
+    shifting a `:`/`=` boundary between two entries.
+    """
+    return hashlib.sha256(
+        "\x00".join(f"{name}={canonical[name]}" for name in sorted(canonical)).encode()
+    ).hexdigest()
+
+
+# THE bump-discipline pin (B3-F04 follow-up): the SHA-256 fingerprint of
+# `RoutingStore._canonical_schema_sql()` at each `SCHEMA` value this file has ever known
+# about, keyed by that value. `test_canonical_ddl_is_pinned_to_schema` below recomputes the
+# digest from the CURRENT `_canonical_schema_sql()` and looks it up by the CURRENT `SCHEMA`
+# -- so it bites in two independent directions, deliberately:
+#   1. A DDL constant (any of them: `_create_schema`'s inline SQL, `USAGE_COLUMNS`,
+#      `_USAGE_ROLLUPS_DDL`, ...) changes while `SCHEMA` stays put -- exactly B3-F04's own
+#      regression, measured against a real installation
+#      (docs/specs/023-senales-de-consumo/evidence/B3-repair.md) -- and the recomputed
+#      digest no longer matches the entry already on file for that (unchanged) `SCHEMA`
+#      value: `assertEqual` fails.
+#   2. `SCHEMA` is bumped without adding a new entry here: `assertIn` fails first, with a
+#      message that says why, rather than silently comparing against a stale value that
+#      happens to still be in the dict (there is no fallback/default lookup).
+# Copying the OLD digest forward under the NEW key would defeat direction 2 while looking
+# like compliance, so the message says so explicitly.
+_CANONICAL_DDL_FINGERPRINTS = {
+    9: "a397159792ed60f3d7d607da49014a2ca58d354dbe0a14445a88e0cbb497e61a",
+}
 
 
 class RoutingTests(unittest.TestCase):
@@ -1356,6 +1419,41 @@ class RoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(routing.RoutingError,"ROUTING_UNAVAILABLE"):
                 routing.RoutingStore._for_tests(root).report()
 
+    # ---- B3-F04 follow-up: DDL/SCHEMA bump discipline (023 B3 repair)
+
+    def test_canonical_ddl_is_pinned_to_schema(self):
+        """The regression, made structurally impossible to repeat silently.
+
+        B3-F04 added `CHECK(typeof(x)='integer')` to six `usage_rollups` columns in
+        `_USAGE_ROLLUPS_DDL` -- shared by `_create_schema` and every `_migrate_N_to_(N+1)`
+        step that touches that table -- without bumping `SCHEMA`. Every other test in this
+        file either builds its fixture FROM `_create_schema` (tautological: both sides of
+        the comparison move together) or references `routing_store.SCHEMA` dynamically
+        (same reason), so none of them could have caught it; a real installation already
+        migrated to schema 8 hit `SchemaDivergence`/`ROUTING_UNAVAILABLE` on every open.
+
+        This test is the one exception: `_CANONICAL_DDL_FINGERPRINTS` is a hand-maintained,
+        version-keyed constant, and the digest it is compared against is recomputed from the
+        CURRENT canonical DDL every run. See that dict's own comment for the two directions
+        this bites in (DDL changed under an unchanged `SCHEMA` key; `SCHEMA` bumped with no
+        matching new key) -- both are exercised for real in this package's evidence file
+        (docs/specs/023-senales-de-consumo/evidence/B3-repair.md), not merely asserted here.
+        """
+        canonical = routing.RoutingStore._canonical_schema_sql()
+        digest = _ddl_fingerprint(canonical)
+        self.assertIn(
+            routing_store.SCHEMA, _CANONICAL_DDL_FINGERPRINTS,
+            "SCHEMA bumped without a new _CANONICAL_DDL_FINGERPRINTS entry in "
+            "tests/test_routing.py -- add one deliberately (never copy the previous "
+            "value forward), after confirming the DDL change it accompanies is real."
+        )
+        self.assertEqual(
+            digest, _CANONICAL_DDL_FINGERPRINTS[routing_store.SCHEMA],
+            "canonical DDL changed without a SCHEMA bump (or a migration step is "
+            "missing for it) -- see routing_core/store.py's SCHEMA constant and "
+            "_MIGRATION_STEPS; this is exactly the B3-F04 regression."
+        )
+
     # ---- 007-P1 AC-01/AC-02: one normalizer, delimiter-aware
 
     def test_normalize_ddl_is_delimiter_aware_across_all_four_quoting_forms(self):
@@ -2271,6 +2369,292 @@ class RoutingTests(unittest.TestCase):
             finally: conn.close()
             report=store.report(); self.assertEqual((report["p50_ms"],report["p90_ms"]),(20,30))
 
+    # ---- 023 B3 AC-06/AC-07: usage rollups and conservative dispatch retention
+
+    def test_b3_migrates_a_populated_schema_seven_into_usage_rollups_without_losing_the_run(self):
+        """AC-06: a real schema-7-shaped fixture gets one schema-8 rollup and keeps its row.
+
+        This deliberately starts at 7, rather than rebuilding from current DDL: the proof is
+        the 7->8 migration over pre-existing data, not that a fresh database has the table.
+        """
+        project = "proj1_" + "c" * 32
+        run_id = "run1_" + "b" * 32
+        terminal_at = 1_700_000_000_000
+        with tempfile.TemporaryDirectory() as td:
+            store = routing.RoutingStore._for_tests(Path(td) / "routing", project_key=project)
+            build_schema_db(store, frozen_dispatches_script(version=7), schema_version=7)
+            c = sqlite3.connect(store.db_path)
+            try:
+                c.execute(
+                    "INSERT INTO dispatches (run_id,role,role_class,selected_route_id,selected_runtime,"
+                    "selected_provider,selected_model,selected_family,selected_effort,actual_route_id,"
+                    "actual_runtime,actual_provider,actual_model,actual_family,actual_effort,state,"
+                    "fallback_window_open,authorized_at,dispatched_at,terminal_at,updated_at,project_key,"
+                    "usage_input,usage_output,cost_micros,usage_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (run_id, "implementer", "writer", "route-1", "codex", "openai-codex", "gpt-5.6-sol", "gpt-5.6", "high",
+                     "route-1", "codex", "openai-codex", "gpt-5.6-sol", "gpt-5.6", "high", "terminal_success",
+                     0, terminal_at - 20, terminal_at - 10, terminal_at, terminal_at, project, 13, 5, 1800, "ok"),
+                )
+                c.commit()
+            finally:
+                c.close()
+            rows, _backup, before, after = store.migrate(project)
+            # `after` is the CURRENT SCHEMA, not a hardcoded 8: the chain now also walks
+            # 8->9 (typed usage_rollups CHECK, B3-F04 follow-up) in the same transaction.
+            self.assertEqual((rows, before, after), (1, 7, routing_store.SCHEMA))
+            c = sqlite3.connect(store.db_path)
+            try:
+                self.assertEqual(c.execute("SELECT state,usage_input,usage_output,cost_micros,usage_status FROM dispatches WHERE run_id=?", (run_id,)).fetchone(),
+                                 ("terminal_success", 13, 5, 1800, "ok"))
+                self.assertEqual(c.execute("SELECT run_count,usage_input_sum,usage_input_reported_count,usage_output_sum,usage_output_reported_count,cost_micros_sum,cost_micros_reported_count,usage_status FROM usage_rollups").fetchone(),
+                                 (1, 13, 1, 5, 1, 1800, 1, "ok"))
+            finally:
+                c.close()
+
+    def test_b3f04_migrates_a_populated_schema_eight_into_the_typed_usage_rollups_check_without_losing_the_row(self):
+        """023 B3-F04 follow-up (AC: the bump this repair adds): a real schema-8-shaped
+        fixture -- the UNTYPED `usage_rollups` DDL `_migrate_7_to_8` actually wrote before
+        B3-F04 added `CHECK(typeof(x)='integer')`, exactly what an already-migrated
+        installation has on disk -- survives 8->9 with every rollup row intact and the new
+        CHECK in force afterward.
+
+        Two rollup rows, deliberately: one ordinary (all-integer sums) row that must
+        survive untouched, and a second whose `run_count` -- an accumulator the NEW CHECK
+        does not even cover -- is far from either boundary, so this is a genuine copy
+        proof, not merely "the one row present happened to make it".
+        """
+        project = "proj1_" + "d" * 32
+        window_start = 1_700_000_000_000
+        with tempfile.TemporaryDirectory() as td:
+            store = routing.RoutingStore._for_tests(Path(td) / "routing", project_key=project)
+            build_schema_db(store, frozen_dispatches_script(version=8), schema_version=8)
+            c = sqlite3.connect(store.db_path)
+            try:
+                c.execute(
+                    "INSERT INTO usage_rollups(window_start,project_key,route_key,runtime,provider,model,family,"
+                    "outcome,usage_status,run_count,usage_input_sum,usage_input_reported_count,usage_output_sum,"
+                    "usage_output_reported_count,usage_cache_read_sum,usage_cache_read_reported_count,"
+                    "usage_cache_write_sum,usage_cache_write_reported_count,usage_reasoning_sum,"
+                    "usage_reasoning_reported_count,cost_micros_sum,cost_micros_reported_count) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (window_start, project, "route-1", "codex", "openai-codex", "gpt-5.6-sol", "gpt-5.6",
+                     "success", "ok", 2, 13, 2, 5, 2, 0, 2, 0, 2, 0, 2, 1800, 2),
+                )
+                c.execute(
+                    "INSERT INTO usage_rollups(window_start,project_key,route_key,runtime,provider,model,family,"
+                    "outcome,usage_status,run_count,usage_input_sum,usage_input_reported_count,usage_output_sum,"
+                    "usage_output_reported_count,usage_cache_read_sum,usage_cache_read_reported_count,"
+                    "usage_cache_write_sum,usage_cache_write_reported_count,usage_reasoning_sum,"
+                    "usage_reasoning_reported_count,cost_micros_sum,cost_micros_reported_count) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (window_start, project, "route-2", "opencode", "openai-codex", "gpt-5.6-luna", "gpt-5.6",
+                     "failure", "unknown", 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                )
+                c.commit()
+            finally:
+                c.close()
+            rows, backup, before, after = store.migrate(project)
+            self.assertEqual((rows, before, after), (0, 8, routing_store.SCHEMA))
+            c = sqlite3.connect(store.db_path)
+            try:
+                self.assertEqual(
+                    c.execute("SELECT route_key,run_count,usage_input_sum,usage_input_reported_count,"
+                              "usage_output_sum,cost_micros_sum,cost_micros_reported_count,usage_status "
+                              "FROM usage_rollups ORDER BY route_key").fetchall(),
+                    [("route-1", 2, 13, 2, 5, 1800, 2, "ok"), ("route-2", 1, 0, 0, 0, 0, 0, "unknown")])
+                # The new CHECK is really live post-migration, not merely "the table exists":
+                # a REAL-typed sum written straight to the migrated table is refused.
+                with self.assertRaises(sqlite3.IntegrityError):
+                    c.execute("UPDATE usage_rollups SET usage_input_sum=? WHERE route_key='route-1'",
+                              (9223372036854775808.0,))
+                c.rollback()
+                self.assertEqual(dict(c.execute("SELECT key,value FROM meta"))["schema_version"], str(routing_store.SCHEMA))
+            finally:
+                c.close()
+            self.assertTrue(backup.exists())
+
+    def test_b3f04_migration_refuses_loudly_when_a_stored_sum_is_already_real_typed(self):
+        """023 B3-F04 follow-up: the documented decision in `_migrate_8_to_9`'s docstring,
+        proved rather than merely asserted in prose.
+
+        A row already corrupted by the pre-CHECK overflow bug (docstring at
+        `store.py:50-63`: two closes of `usage_input=2**62` degrade the accumulator to
+        REAL) cannot be silently repaired -- there is no value to reconstruct it from that
+        wasn't already lost to float precision. The migration must refuse loudly, leave the
+        on-disk schema_version at 8 (never a silently-accepted downgrade of trust), and
+        leave the pre-migration backup `migrate()` already verified untouched.
+        """
+        project = "proj1_" + "e" * 32
+        window_start = 1_700_000_000_000
+        with tempfile.TemporaryDirectory() as td:
+            store = routing.RoutingStore._for_tests(Path(td) / "routing", project_key=project)
+            build_schema_db(store, frozen_dispatches_script(version=8), schema_version=8)
+            c = sqlite3.connect(store.db_path)
+            try:
+                # Bypass the (untyped, schema-8) CHECKs the same way the real overflow bug
+                # does: a REAL value with no fractional part still fails a *typed* CHECK
+                # even though `>= 0` alone would accept it, because typeof() sees 'real'.
+                c.execute(
+                    "INSERT INTO usage_rollups(window_start,project_key,route_key,runtime,provider,model,family,"
+                    "outcome,usage_status,run_count,usage_input_sum,usage_input_reported_count,usage_output_sum,"
+                    "usage_output_reported_count,usage_cache_read_sum,usage_cache_read_reported_count,"
+                    "usage_cache_write_sum,usage_cache_write_reported_count,usage_reasoning_sum,"
+                    "usage_reasoning_reported_count,cost_micros_sum,cost_micros_reported_count) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (window_start, project, "route-1", "codex", "openai-codex", "gpt-5.6-sol", "gpt-5.6",
+                     "success", "ok", 2, 9223372036854775808.0, 2, 5, 2, 0, 2, 0, 2, 0, 2, 1800, 2),
+                )
+                c.commit()
+            finally:
+                c.close()
+            self.assertEqual(
+                sqlite3.connect(f"file:{store.db_path}?mode=ro", uri=True)
+                .execute("SELECT typeof(usage_input_sum) FROM usage_rollups").fetchone(), ("real",))
+            before_bytes = store.db_path.read_bytes()
+            with self.assertRaisesRegex(routing.RoutingError, "ROUTING_UNAVAILABLE"):
+                store.migrate(project)
+            # Refused loudly, not silently downgraded: the file on disk is untouched byte
+            # for byte (the failed step's transaction rolled back) and still says schema 8.
+            self.assertEqual(store.db_path.read_bytes(), before_bytes)
+            self.assertEqual(
+                dict(sqlite3.connect(f"file:{store.db_path}?mode=ro", uri=True)
+                     .execute("SELECT key,value FROM meta"))["schema_version"], "8")
+            backups = list((store.root / "backups").glob("routing-v8-*.db"))
+            self.assertEqual(len(backups), 1)
+            backup_check = sqlite3.connect(f"file:{backups[0]}?mode=ro", uri=True)
+            try:
+                self.assertEqual(backup_check.execute("PRAGMA integrity_check").fetchone(), ("ok",))
+                self.assertEqual(
+                    backup_check.execute("SELECT typeof(usage_input_sum) FROM usage_rollups").fetchone(), ("real",))
+            finally:
+                backup_check.close()
+
+    def test_b3_rollup_write_failure_rolls_back_the_close_instead_of_leaving_a_half_closed_run(self):
+        """AC-06: a real SQL write failure has one outcome: neither close nor rollup commits."""
+        inv = {("codex", "openai-codex"): {"gpt-5.6-luna"}}
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "state", inventory=inv)
+            decision = svc.route(routing.TaskRequest("implementer", "change", "mechanical", selected_runtime="codex"),
+                                 self.observed(svc, "implementer", "codex", task_class="mechanical", context_required=False))
+            svc.store.mark_dispatched(decision.run_id)
+            with mock.patch.object(svc.store, "_rollup_usage_in", side_effect=sqlite3.OperationalError("fixture rollup failure")):
+                with self.assertRaisesRegex(routing.RoutingError, "ROUTING_UNAVAILABLE"):
+                    svc.store.close_run(decision.run_id, "success", usage={"input": 1, "totalTokens": 1})
+            c = svc.store._connect()
+            try:
+                self.assertEqual(c.execute("SELECT state,usage_status FROM dispatches WHERE run_id=?", (decision.run_id,)).fetchone(),
+                                 ("dispatched", None))
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM usage_rollups").fetchone(), (0,))
+            finally:
+                c.close()
+            # Bad provider data is not a SQLite failure: it becomes a persisted `invalid`
+            # category, so the close remains possible and still gets its paired rollup.
+            self.assertEqual(svc.store.close_run(decision.run_id, "success", usage={"garbage": True}), "terminal_success")
+            c = svc.store._connect()
+            try:
+                self.assertEqual(c.execute("SELECT state,usage_status FROM dispatches WHERE run_id=?", (decision.run_id,)).fetchone(),
+                                 ("terminal_success", "invalid"))
+                self.assertEqual(c.execute("SELECT usage_status,run_count FROM usage_rollups").fetchone(), ("invalid", 1))
+            finally:
+                c.close()
+
+    def test_b3_dispatch_retention_keeps_replacement_parents_and_current_reviewer_candidates(self):
+        """AC-07: the two irrecoverable-evidence guards are fixtures, never a live-data claim.
+
+        B3-F03: `original` MUST end up with its own qualifying `usage_rollups` row (via the
+        B3-F01 fix to `close_exhausted_and_authorize_replacement`) before this is a real
+        guard on the `NOT EXISTS (successor...)` clause. Without that own rollup, `original`
+        survives compaction merely because it fails the `rollup` EXISTS check -- true no
+        matter what `protected` says -- so deleting the successor clause would leave this
+        test green for the wrong reason (the actual B3-F03 defect: verified by neutering the
+        clause below, killed, restored).
+        """
+        with tempfile.TemporaryDirectory() as td:
+            svc = self._failover_service(Path(td) / "state")
+            original = self.authorize(svc, runtime="opencode")
+            svc.store.mark_dispatched(original.run_id)
+            replacement = svc.store.close_exhausted_and_authorize_replacement(original.run_id, "quota_exhausted")
+            reviewer_candidate = self.authorize(svc, runtime="opencode")
+            svc.store.mark_dispatched(reviewer_candidate.run_id)
+            svc.store.close_run(reviewer_candidate.run_id, "success", usage={"input": 2, "totalTokens": 2})
+            ordinary_terminal = self.authorize(svc, runtime="opencode")
+            svc.store.mark_dispatched(ordinary_terminal.run_id)
+            svc.store.close_run(ordinary_terminal.run_id, "failure", usage={"input": 3, "totalTokens": 3})
+            old = svc.store._now() - 91 * 86400 * 1000
+            c = svc.store._connect()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                c.execute("UPDATE dispatches SET authorized_at=?,dispatched_at=?,terminal_at=?,updated_at=? WHERE run_id IN (?,?,?)",
+                          (old - 2, old - 1, old, old, original.run_id, reviewer_candidate.run_id, ordinary_terminal.run_id))
+                c.execute("UPDATE usage_rollups SET window_start=?", ((old // 86400000) * 86400000,))
+                c.execute("COMMIT")
+            finally:
+                c.close()
+            svc.store.compact(now_ms=old + 91 * 86400 * 1000 + 1)
+            c = svc.store._connect()
+            try:
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM dispatches WHERE run_id=?", (original.run_id,)).fetchone(), (1,))
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM dispatches WHERE run_id=?", (reviewer_candidate.run_id,)).fetchone(), (1,))
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM dispatches WHERE run_id=?", (ordinary_terminal.run_id,)).fetchone(), (0,))
+                # Three closes, three rollup contributions (B3-F01): `original`'s own
+                # quota-exhaustion close now lands its own rollup row in the same
+                # transaction, which is the premise this test's successor-clause guard
+                # depends on -- see the docstring above.
+                self.assertEqual(c.execute("SELECT SUM(run_count) FROM usage_rollups").fetchone(), (3,))
+                self.assertEqual(c.execute("SELECT COUNT(*) FROM usage_rollups WHERE outcome='failure' AND run_count=1").fetchone()[0] >= 1, True)
+                self.assertIn(reviewer_candidate.run_id, {row["run_id"] for row in svc.store.recent_writers()})
+                self.assertIsNotNone(replacement["run_id"])
+            finally:
+                c.close()
+
+    def test_b3_retention_guard_protects_every_row_recent_writers_would_return_on_a_terminal_at_tie(self):
+        """B3-F02 regression: the guard and `recent_writers` MUST share one tie-break.
+
+        21 writer closes (one more than `_RECENT_WRITERS_LIMIT`) are forced onto the exact
+        SAME `terminal_at`, then aged past the retention cutoff. `recent_writers()` is read
+        BEFORE `compact()` -- that snapshot is exactly what a reviewer's own query would have
+        returned -- and the assertion is that every one of those run_ids is still a live row
+        afterward. This is deterministic, not probabilistic: with N>=21 tied rows, the 20
+        largest run_ids (`terminal_at DESC,run_id DESC`, what `recent_writers` returns) and
+        the 20 smallest (`terminal_at DESC,run_id ASC`, the pre-fix guard order B3-F02 found)
+        can never be the same set -- the single largest run_id is always in the first LIMIT 20
+        and never in the second. So the guard's tie-break MUST match `recent_writers`'s or this
+        goes red: mutate `_compact_dispatches_in`'s protected-candidate ORDER BY (store.py
+        around line 1123) from `{_RECENT_WRITERS_ORDER_BY}` back to the opposite tie-break
+        (`terminal_at DESC,run_id ASC`) and the largest run_id -- present in the pre-compact
+        `recent_writers()` snapshot -- is deleted underneath it.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            svc = self.service(Path(td) / "state")
+            run_ids = []
+            for _ in range(21):
+                decision = self.authorize(svc)
+                svc.store.mark_dispatched(decision.run_id)
+                svc.store.close_run(decision.run_id, "success", usage={"input": 1, "totalTokens": 1})
+                run_ids.append(decision.run_id)
+            old = svc.store._now() - 91 * 86400 * 1000
+            c = svc.store._connect()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                c.executemany(
+                    "UPDATE dispatches SET authorized_at=?,dispatched_at=?,terminal_at=?,updated_at=? WHERE run_id=?",
+                    [(old - 2, old - 1, old, old, run_id) for run_id in run_ids],
+                )
+                c.execute("UPDATE usage_rollups SET window_start=?", ((old // 86400000) * 86400000,))
+                c.execute("COMMIT")
+            finally:
+                c.close()
+            recent_before = {row["run_id"] for row in svc.store.recent_writers()}
+            # Sanity on the fixture itself, not the guard: 21 ties, LIMIT 20 -> exactly 20.
+            self.assertEqual(len(recent_before), 20)
+            svc.store.compact(now_ms=old + 91 * 86400 * 1000 + 1)
+            c = svc.store._connect()
+            try:
+                live = {row[0] for row in c.execute("SELECT run_id FROM dispatches")}
+            finally:
+                c.close()
+            self.assertTrue(recent_before.issubset(live), recent_before - live)
+
     # ---- 007-P2 AC-15: --routing-report gains tokens per route
 
     def test_report_tokens_sum_across_runs_on_the_same_route(self):
@@ -2359,10 +2743,10 @@ class RoutingTests(unittest.TestCase):
             identity = json.loads((ROOT / "ai/state/project.json").read_text())["project_key"]
             result = self._cli_run(["--routing-migrate"], self._cli_env(root))
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertRegex(result.stdout, r"ROUTING_MIGRATE_OK from=4 to=7 rows=1 backup=.+")
+            self.assertRegex(result.stdout, rf"ROUTING_MIGRATE_OK from=4 to={routing_store.SCHEMA} rows=1 backup=.+")
             migrated = sqlite3.connect(f"file:{store.db_path}?mode=ro", uri=True)
             try:
-                self.assertEqual(dict(migrated.execute("SELECT key,value FROM meta"))["schema_version"], "7")
+                self.assertEqual(dict(migrated.execute("SELECT key,value FROM meta"))["schema_version"], str(routing_store.SCHEMA))
                 self.assertEqual(migrated.execute("SELECT project_key FROM dispatches").fetchone(), (identity,))
             finally:
                 migrated.close()
