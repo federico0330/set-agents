@@ -1,0 +1,1122 @@
+Reading additional input from stdin...
+OpenAI Codex v0.147.0
+--------
+workdir: /home/federico/SET-AGENTES
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: none
+session id: 019ffff2-52a0-7222-a55c-6ecbb24e6ffd
+--------
+user
+Sos package-reviewer independiente en /home/federico/SET-AGENTES. Read-only sobre codigo de produccion.
+HACE LA REVISION VOS MISMO: no delegues. NUNCA escribas bajo ~. NO corras comandos gh que MUTEN nada
+del repositorio de GitHub: solo lectura.
+
+NO LEAS TODO. Solo:
+- LICENSE, CONTRIBUTING.md, CHANGELOG.md, SECURITY.md (nuevos)
+- README.md zonas 130-200
+- ai/scripts/set_agents_app.py zonas 1055-1090
+- los tests nuevos
+- git diff --cached --summary y git status
+
+Contexto: ultimo paquete de 024. Agrega los archivos que un repo publico necesita, una matriz de
+soporte MEDIDA, y hace re-apuntable el upstream (origin/main estaba hardcodeado, asi que un fork
+media contra el lugar equivocado).
+
+Revisa EXACTAMENTE estos cuatro puntos.
+
+PUNTO 1 - La matriz de soporte promete algo que no midio?
+Es el AC con mas valor y el mas facil de arruinar con optimismo. Leé README.md:182-190 y por CADA
+fila preguntate: hay una medicion detras, con fecha? Verificá vos al menos DOS filas corriendo el
+comando correspondiente. Si alguna fila afirma algo no medido, es hallazgo HIGH: alguien la va a
+creer.
+
+PUNTO 2 - El upstream re-apuntable funciona en las dos direcciones?
+El implementer dice haber cubierto 7 sitios, no los 3 que el context pack citaba. Verificá que no
+quedo ninguno hardcodeado: grep -n 'origin/main' ai/scripts/. Y proba que con SET_AGENTS_UPSTREAM
+apuntando a otro remoto/rama funciona, y que SIN la variable el default sigue siendo origin/main.
+Si quedo un sitio hardcodeado, el fork sigue roto.
+
+PUNTO 3 - El LICENSE es MIT canonico de verdad?
+Compará el texto contra una copia real de MIT que exista en el filesystem (hay varias en
+node_modules y en site-packages). Una licencia con el texto alterado no es MIT. Y verificá que el
+titular y el ano son coherentes.
+
+PUNTO 4 - MORDIDA.
+Eligi al menos UN test nuevo y rompé lo que dice proteger (cp a /tmp, muta, corre dirigido, restaura
+con cp; NO uses git checkout/restore/stash). Tiene que ponerse ROJO. Pega rojo y verde literales.
+Ya van CINCO guardas huecas en este proyecto.
+
+CONTEXTO QUE NO TENES QUE RE-INVESTIGAR: el implementer encontro que generate.py:475 shippea un
+codename de cliente real al orchestrator.md de cada tercero, y que el repo es PUBLICO. Eso ya esta
+verificado por el orquestador y registrado como HUMAN_DECISION_REQUIRED. NO es tu tarea resolverlo
+ni ampliarlo; si lo mencionas, que sea en una linea.
+
+REGLAS:
+- Cada bloque literal, o marcado como recortado. Si no lo corriste, "sin verificar".
+- `pytest` NO esta instalado. python3 -m unittest dirigido.
+- NO corras la suite entera: el orquestador ya la corrio, 1117 OK / 3 skips, VERIFY_PASS.
+
+FORMATO DE SALIDA (al final, texto plano):
+VEREDICTO: approved | revision_required
+Por cada hallazgo: ID / SEVERIDAD / DONDE (file:line) / QUE / PRUEBA (comando y salida literal).
+Si no hay hallazgos, decilo y mostra igual la evidencia de los cuatro puntos.
+codex
+Voy a hacer una revisión acotada y de solo lectura sobre los archivos y pruebas indicados. Uso `request-triage` porque las reglas del proyecto lo exigen al inicio; después voy directo a los cuatro puntos solicitados, sin delegar ni modificar producción.
+exec
+/bin/bash -lc "sed -n '1,240p' /home/federico/.codex/skills/request-triage/SKILL.md && pwd && rg --files -g AGENTS.md -g '"'!node_modules'"' -g '"'!site-packages'"' | sed -n '1,20p'" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: request-triage
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (consult/analysis, feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator
+---
+
+# Request Triage
+
+## When to use
+At the very start of EVERY user request, before any delegation. Classify the request, decide the mode, ask
+what you must, then run the matching flow. Do not dive into the SDD pipeline reflexively — that is exactly the
+failure this skill exists to prevent (applying the heavy flow to a problem that needed a fast, clever fix).
+
+## Step 0 — intake (always, before delegating)
+1. Restate the request in one line and name the **mode** you are choosing + why.
+2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
+   original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
+   scoping doubt one of those already answers is resolved with `log-decision`, not asked.
+3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+   questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
+   cart".
+4. Only then delegate the first action of the chosen mode.
+
+## The five modes
+
+### 0. Consult / analysis — thinking together, no pipeline (check this FIRST)
+Triggers: "qué opinás", "cómo encararías", "analizame esta idea", comparisons, design questions — any request
+where the user wants analysis or a recommendation, not a code change. This is a first-class mode, not a
+misclassified feature.
+Flow: NO `init`, NO state file, NO pipeline. Delegate in parallel (these spawns are allowed and cheap):
+- `brainstormer` — 3-6 genuinely different options with tradeoffs,
+- `architect` — read-only pass over the three axes (relational vs non-relational vs vector store, API Gateway,
+  deploy platform) plus design patterns / clean-architecture shape; NO ADR unless the user asks,
+- `security-auditor` — design-level threat sketch, only when the idea touches auth/money/PII/external input.
+Then SYNTHESIZE yourself into ONE multi-lens analysis: data model, architecture/patterns, security,
+algorithms/complexity — ending with a recommendation plus runner-up. Close by asking: "¿Lo convierto en spec
+(feature) o en scoped?". A consult NEVER starts the pipeline on its own; if durable learning surfaced,
+delegate a `memory-scribe` note to the domain knowledge.
+
+### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
+Triggers — full SDD is chosen ONLY when at least one of these holds; otherwise drop to scoped-feature (if a
+concrete risk signal is present) or quick-fix (the default lane):
+- a net-new system or module (not an addition to established infrastructure),
+- genuinely multi-package work (several coherent packages with dependencies),
+- the request touches one of the three architecture axes (data store type, API Gateway, deploy platform)
+  with no ADR covering it.
+Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
+expect? where centralized vs decentralized? what must be secure day one? and name these three axes
+explicitly, not generically — **does persistence need vector/semantic search or does relational cover it?
+does this need an API Gateway or is it a monolith with one client? where does it deploy and why (Vercel/PaaS
+vs VPS/IaaS vs managed)?** Then the rigorous
+**SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
+Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
+validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
+integration → judge → release → memory. Tests do NOT approve implementation; the independent package reviewer
+does. This order is mandatory in feature mode; the three lanes below are the only
+exceptions (scoped-feature / quick-fix / incident).
+
+### 2. Scoped-feature — for bounded work that shows a concrete risk signal
+Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
+present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
+multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
+change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
+the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
+Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
+decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
+consolidated package review over the complete package diff** → `security-auditor` when the package
+touches that surface → regression tests → `adversarial-judge` → release → memory.
+What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
+reviewing the complete relevant package/diff once, then delta-reviewing repairs. Escalate to feature mode only
+when one of feature mode's explicit triggers appears (net-new system, multi-package, uncovered architecture
+axis) — "this feels big" is a reason to scope the package better, not to escalate.
+
+### 3. Quick-fix — the DEFAULT for small and medium bounded work
+Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the write-side half of
+the same 1-3 number `orchestrator.md`'s "Direct-read vs. delegated-explore threshold" (ADR-0020) uses for the
+read side — the two are kept as one cross-referenced constant, not two independent numbers. This is the default lane: most
+day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
+`gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
+to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
+or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
+`python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
+— quick-fixes with no trace are how the development thread gets lost.
+
+### 4. Incident / break-glass — production is broken NOW
+Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
+prod user needs a password reset and there is no forgot-password flow → a one-shot `psql` script, done).
+Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual change to `debugger`/`implementer`
+(you still never implement yourself). MANDATORY afterward — never skip: (a) write down exactly what was done,
+(b) open a follow-up task to do it properly, (c) delegate a memory note. Break-glass is a conscious, logged
+exception to the rigor default — not a licence to abandon it.
+
+Ambiguous which mode? Ask. Otherwise pick the LIGHTEST mode that covers the risk actually observed in the
+request and the code — not the hypothetical risk. Escalate only when you find a concrete signal from the
+lists above, and name that signal in the narration. Downgrading is equally legitimate: if mid-scoped the
+planner or implementer establishes the change is smaller than assumed (no signal actually present), degrade
+to quick-fix and record why with `log-decision` — escalation is not a one-way ratchet.
+
+## Physical budgets per mode (enforced by the state CLI, not by prose)
+
+The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
+`feature-state.py init` via `--mode`:
+
+| Mode | `--mode` | Spawns/package | Deep review cycles | Gate failures |
+|---|---|---|---|---|
+| Feature / SDD | `feature` (opt-in) | 12 | 2 | 3 |
+| Scoped-feature | `scoped` (default) | 8 | 2 | 3 |
+| Quick-fix | `quick-fix` | 4 | 1 | 2 |
+| Incident | `incident` | 6 | 1 | 2 |
+
+Two physical waivers keep light modes light without prose exceptions:
+- `record-repair --skip-delta` skips the delta review ONLY when every repaired finding is ≤ medium severity
+  and the repair touched ≤ 3 files (the CLI rejects it otherwise, and the waiver is recorded in the event).
+- `create-package --runtime-surface false` (planner declaration) lets a package with no observable runtime
+  surface become accept-ready after testing, without spawning `app-runner`/`runtime-verifier`. Default is
+  `true` — fail-safe.
+
+`record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
+than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,
+logged decision), do not fight the budget.
+
+## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
+Before delegating in ANY mode, check the request against the three named axes above: **data store type
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. The
+check fires on EVIDENCE, not plausibility: the request or the files it names concretely require one of these
+axes (a new kind of persistence, a new external entry point, a deploy change) AND no existing ADR covers it.
+When it fires, do not implement directly — escalate to at least `scoped-feature` with an architecture
+checkpoint (`architect` loads `system-design-decisions`, proposes options, and the orchestrator asks the user
+per its Question policy) before any code is written. This applies even to a request that looks like a
+quick-fix on its surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store
+decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
+ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
+hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+**Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+Vercel", "store it in Supabase"), that axis is DECIDED — record it with `log-decision` and proceed without
+asking; `architect` writes the formal ADR afterwards. The red-flag question is only for an axis the user
+left genuinely open.
+
+## Waking the dormant agents (concrete triggers, not "by risk")
+These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in
+the plan or the diff (the concrete files/paths the package owns: auth/, payments/, migrations/, ui
+components, .env-adjacent config), not the topic of the request in the abstract; `package-planner` justifies
+each entry in `required_reviewers` with the paths that demand it:
+- **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
+  covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
+- **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).
+- **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
+- **queries / lists / transactions / migrations** → covered by `package-reviewer`'s own data-integrity/
+  scalability checklist (already mandatory, no separate agent).
+
+**Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
+when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before
+`adversarial-judge` is mandatory.
+
+## Hard logic → hosted implementer (never the local leaf)
+Concurrency, atomic transactions, money/financial rules, and security-critical logic must NOT be implemented by
+the local leaf model (the cheap 8B) — a weak first draft on exactly this logic triggers more strong-auditor
+rework than it saves. When a task touches these, pin implementation to a **hosted** model (e.g. `openai/gpt-5.4`)
+rather than the local `implementer`. Route such implementation deliberately from the package plan. The
+local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then reviews.
+
+## Output of triage
+State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
+incident mode, also name the follow-up task you will open once the fire is out.
+
+The first delegation is announced with the dual-register narration block from `orchestrator.md`
+(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
+parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
+since a consult has no feature state file.
+/home/federico/SET-AGENTES
+Global/opencode/AGENTS.md
+PROYECTO/AGENTS.md
+Global/codex/AGENTS.md
+Global/pi/AGENTS.md
+
+exec
+/bin/bash -lc "sed -n '1,260p' AGENTS.md 2>/dev/null || true; sed -n '1,260p' PROYECTO/AGENTS.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+# Reglas del Proyecto — <NOMBRE DEL PROYECTO>
+
+> Esqueleto. Reemplazá los placeholders <...> y borrá lo que no aplique. Este archivo manda sobre las
+> reglas globales del harness cuando hay conflicto, SOLO para este repo.
+
+## Dominio del producto
+<Una o dos frases: qué resuelve el sistema y para quién.>
+Ejemplo: control de cobros futuros, pagos pendientes, comprobantes, detección de duplicados y conciliación manual.
+
+## Fuente de verdad
+- Specs: `docs/specs/**`  · ADRs: `docs/adr/**`  · Estado IA: `ai/state/features/*.json`
+  · Logs IA: `ai/state/**`  · Memoria IA: `docs/ai/memory-log.md`
+
+## Invariantes de dominio (ejemplos — ajustar)
+- La plata NUNCA se calcula con punto flotante binario (usar enteros en unidades mínimas o decimal exacto).
+- Toda acción de cobro/pago/comprobante/conciliación es auditable (actor, timestamp, antes/después).
+- Operaciones que deben pasar juntas van en UNA transacción (atómicas).
+- La detección de duplicados NO fusiona automáticamente: propone candidatos para revisión humana.
+- Estados (pendiente/futuro/vencido) se derivan de status explícito + fechas, no de lógica oculta de UI.
+
+## Verificación
+Correr validaciones locales por tarea dentro del paquete y `./ai/scripts/verify.sh` antes de la revisión profunda
+del paquete. Después de paquetes aceptados e integración final, `adversarial-judge` debe devolver `JUDGE_PASS`.
+
+## Alcance de implementación
+Implementar SOLO el paquete/work packet aprobado en `ai/state/features/<feature_id>.json` y sus ownership paths.
+No agregar integraciones, sync bancario, exportes contables, OCR ni pasarelas de pago si no están pedidos.
+
+## Gates de revisión (cuándo son obligatorios)
+- Revisión profunda normal: una vez por paquete integrado, no después de cada tarea individual.
+- **DB**: el `package-reviewer` carga `db-integrity` cuando toca schema, migraciones, plata, duplicados, conciliación, concurrencia o audit trail.
+- **Seguridad**: el `package-reviewer` carga `security-review` y, si hay checkpoint de riesgo explícito, documenta la razón en el estado.
+- **Performance**: el `package-reviewer` carga `performance-scalability` para listados, queries, loops sobre datos, paginación, colas o caché.
+- **Diseño** (`@architect`): nuevos módulos, cambios de modelo de datos, máquinas de estado.
+- **UI/UX** (`@ux-ui-designer`): cualquier cambio de interfaz o manejo de errores en el cliente.
+
+## Stack y comandos
+- Stack: <node | .NET | go | python | ...>
+- Test: `<comando de test>`  · Lint: `<...>`  · Build: `<...>` (reflejarlos en verify.sh).
+
+## Separación de deberes
+El orquestador sólo inspecciona y delega. `gate-runner` ejecuta la verificación. `package-reviewer`,
+`delta-reviewer`, `security-auditor` y `finding-verifier` son read-only. Ningún agente que modifica código
+audita o juzga ese mismo cambio — y ninguno refuta un hallazgo contra su propio diff: retirar un hallazgo sin
+tocar código es un verbo de autorización, así que sólo el `finding-verifier` puede hacerlo, nunca sobre un
+hallazgo que él mismo levantó.
+
+## MCP
+- Context7 para docs actuales del framework/ORM/librerías de test cuando haya incertidumbre de versión.
+- Engram solo para decisiones de alto valor y lecciones verificadas del proyecto.
+- Runtime QA/E2E puede encender `playwright` o `brave-cdp` mediante `ai/scripts/mcp.sh` o `ai/scripts/e2e.sh`,
+  usarlo sólo para la prueba observable y apagarlo al salir. No pedir al usuario que manipule toggles cuando el
+  script puede hacerlo; pedir sólo login/credenciales si el servicio remoto lo exige.
+
+codex
+Modo: análisis/revisión independiente, porque pediste evaluar evidencia concreta sin cambios. El alcance está definido, así que no hace falta una decisión adicional; ahora relevo el estado indexado y los archivos nuevos para ubicar los tests y las líneas exactas.
+exec
+/bin/bash -lc 'git status --short && git diff --cached --summary && git diff --cached --name-status' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+ M README.md
+ M ai/scripts/set_agents_app.py
+R  HANDOFF-PASO9.md -> docs/HANDOFF-PASO9.md
+ M docs/modules/routing.md
+ M "docs/notas/00 - Proyecto.md"
+ M docs/notas/features/024-listo-para-terceros.md
+ M docs/notas/features/024-listo-para-terceros/C3-primer-arranque-honesto.md
+ M docs/notas/features/024-listo-para-terceros/C4-higiene-de-repo-publico.md
+ M docs/notas/features/024-listo-para-terceros/grafo.md
+ M docs/specs/024-listo-para-terceros/bitacora.md
+ M tests/test_harness.py
+?? CHANGELOG.md
+?? CONTRIBUTING.md
+?? LICENSE
+?? SECURITY.md
+?? "docs/notas/decisiones/2026-08-14 HUMAN-DECISION-codename-de-cliente-real-en-repo-publico.md"
+?? docs/specs/024-listo-para-terceros/context/C4-higiene-de-repo-publico.md
+?? docs/specs/024-listo-para-terceros/evidence/C4-implementer.md
+ rename HANDOFF-PASO9.md => docs/HANDOFF-PASO9.md (100%)
+R100	HANDOFF-PASO9.md	docs/HANDOFF-PASO9.md
+
+exec
+/bin/bash -lc "nl -ba README.md | sed -n '130,200p'
+nl -ba ai/scripts/set_agents_app.py | sed -n '1055,1090p'
+nl -ba LICENSE
+nl -ba CONTRIBUTING.md
+nl -ba CHANGELOG.md
+nl -ba SECURITY.md
+git diff -- tests/test_harness.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+   130	Los agentes documentan mientras trabajan: cada proyecto mantiene `docs/notas/` (hub con
+   131	"qué falta", una nota por feature, por paquete y por decisión, enlazadas con `[[wikilinks]]`)
+   132	**regeneradas automáticamente** por el workflow — nadie las escribe a mano. Un vault por
+   133	empresa/cliente las junta en un solo grafo navegable:
+   134	
+   135	```bash
+   136	set-agents --vault-init ~/acme --company ACME          # una vez por empresa/cliente
+   137	set-agents --vault-link ~/acme/mi-proyecto              # notas dentro del repo (default)
+   138	set-agents --vault-link ~/acme/mi-proyecto --private    # notas dentro del vault, fuera del git
+   139	```
+   140	
+   141	Abrís `~/acme/obsidian` en Obsidian: `00 - INICIO` es la nota del café ☕ (tu rol, cómo se
+   142	trabaja, qué falta por proyecto) y desde ahí navegás hasta cualquier paquete. Lo que escribas
+   143	fuera de los bloques `notas:auto` nunca se pisa. Las decisiones que trascienden un paquete se
+   144	registran con `feature-state.py log-decision`. El vault también trae `Casos/` con una
+   145	plantilla de caso de una página por proyecto terminado (tu portfolio).
+   146	
+   147	**¿Default o `--private`?** En el default las notas viven versionadas en `docs/notas/` del
+   148	repo (bien para repos propios). Con `--private` las notas viven **dentro del vault** y el
+   149	repo queda con un symlink local excluido de git (`.git/info/exclude`): nada llega jamás al
+   150	remoto del proyecto — usalo cuando el repo es de un tercero (empresa/cliente) y las notas
+   151	son tuyas. El motor de notas escribe igual en ambos modos.
+   152	
+   153	## Trabajar en dos máquinas
+   154	
+   155	Cada cosa viaja por su canal — nada se copia a mano:
+   156	
+   157	| Qué | Cómo viaja |
+   158	|---|---|
+   159	| El harness (SET-AGENTS) | auto-update al abrir `set-agents` |
+   160	| Los proyectos (código) | git normal (clone/pull/push) |
+   161	| El estado del workflow | `ai/state/` dentro del repo de cada proyecto (git) |
+   162	| Las notas Obsidian (vault) | **Syncthing** entre tus máquinas (P2P, open source, sin nube) |
+   163	
+   164	Setup una sola vez (en ambas máquinas):
+   165	
+   166	```bash
+   167	set-agents --tools-install syncthing
+   168	systemctl --user enable --now syncthing
+   169	```
+   170	
+   171	Abrí `http://localhost:8384` en cada máquina: **Actions → Show ID** en una, **Add Remote
+   172	Device** en la otra (en la misma red se autodescubren), aceptá en ambas, y compartí la
+   173	carpeta `~/acme/obsidian` (Add Folder → path exacto en las dos). Un cliente freelance nuevo =
+   174	Add Folder de su vault; sin repos nuevos.
+   175	
+   176	- ⚠️ Syncthing es P2P: sincroniza cuando **ambas máquinas están prendidas** (típicamente en
+   177	  tu LAN antes de salir y al volver). Dejá la que editaste prendida un minuto junto a la otra.
+   178	- ⚠️ **Nunca** sincronices repos git por Syncthing (corrompe `.git`); solo el vault.
+   179	- En una máquina nueva, después del primer sync corré `set-agents --vault-link <proyecto>
+   180	  --private` en cada proyecto: el symlink y el exclude de git son por-máquina.
+   181	
+   182	## Matriz de soporte (medida, no prometida)
+   183	
+   184	Los tres harnesses no tienen el mismo nivel de soporte — esto es lo que se pudo **confirmar**
+   185	hasta hoy, no una promesa de paridad. Lo que no está en esta tabla no se midió.
+   186	
+   187	| Harness | Estado medido |
+   188	|---|---|
+   189	| **opencode** | De primera clase. 47 agentes instalados (`~/.config/opencode/agents/*.md`, y en la fuente `Global/opencode/agents/`); de esos, solo `orchestrator.md` declara `mode: primary` — los otros 46 son `mode: subagent`. Consecuencia (medida el 2026-08-13, al intentar despachar un `package-reviewer`): `opencode run --agent <rol>` **no despacha un subagent** — cae al agente por defecto con un warning, porque `run --agent` solo sabe arrancar un `primary`. *(Medido: 2026-08-14, última fila 2026-08-13.)* |
+   190	| **codex** | **Cero comandos.** `Global/codex/` no tiene directorio `commands/` (a diferencia de `Global/opencode/commands/`); en una instalación real, `~/.codex/commands` no existe. *(Medido: 2026-08-14.)* |
+   191	| **pi** | **Cero hooks**, y su lane de dispatch corre con `--no-skills` (guard incondicional, `ai/scripts/set_agents_spawn.py:249-261`). `Global/pi/` no tiene directorio `hooks/`; en una instalación real, `~/.pi` no tiene subdirectorio `hooks` (a diferencia de `~/.codex/hooks` y `~/.config/opencode/hooks`, que sí existen). *(Medido: 2026-08-14.)* |
+   192	
+   193	## Más documentación
+   194	
+   195	- [INSTALACION.md](INSTALACION.md) — instalación en detalle y flags del instalador.
+   196	- [TIPS-USO.md](TIPS-USO.md) — flujo de trabajo del harness (control plane, lanes, drift).
+   197	- [COMO-CAMBIAR-MODELO.md](COMO-CAMBIAR-MODELO.md) — modelos por área/suscripción.
+  1055	        ["git", "-C", str(ROOT), *args],
+  1056	        capture_output=True, text=True, timeout=timeout, check=False,
+  1057	        # Never let git throw an interactive credential prompt at a captured TTY.
+  1058	        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+  1059	    )
+  1060	
+  1061	
+  1062	# AC-12 (024/C4): a GitHub fork's `origin` is the fork's OWN copy, not the project this harness
+  1063	# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+  1064	# fork", not "commits behind the real upstream". Re-pointable via SET_AGENTS_UPSTREAM (e.g.
+  1065	# "upstream/main" after `git remote add upstream https://github.com/federico0330/set-agents.git`);
+  1066	# DEFAULT_UPSTREAM is the fallback, so a direct clone (this repo's own README instructions, where
+  1067	# `origin` already IS upstream) keeps behaving exactly as before.
+  1068	DEFAULT_UPSTREAM = "origin/main"
+  1069	
+  1070	
+  1071	def upstream_ref():
+  1072	    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
+  1073	
+  1074	
+  1075	def _upstream_remote_and_branch():
+  1076	    remote, _, branch = upstream_ref().partition("/")
+  1077	    return remote, branch or "main"
+  1078	
+  1079	
+  1080	def fetch(timeout=10):
+  1081	    remote, _branch = _upstream_remote_and_branch()
+  1082	    try:
+  1083	        return git("fetch", "--quiet", remote, timeout=timeout).returncode == 0
+  1084	    except subprocess.TimeoutExpired:
+  1085	        return False
+  1086	
+  1087	
+  1088	def short_sha():
+  1089	    result = git("rev-parse", "--short", "HEAD")
+  1090	    return result.stdout.strip() if result.returncode == 0 else "?"
+     1	MIT License
+     2	
+     3	Copyright (c) 2026 Federico
+     4	
+     5	Permission is hereby granted, free of charge, to any person obtaining a copy
+     6	of this software and associated documentation files (the "Software"), to deal
+     7	in the Software without restriction, including without limitation the rights
+     8	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+     9	copies of the Software, and to permit persons to whom the Software is
+    10	furnished to do so, subject to the following conditions:
+    11	
+    12	The above copyright notice and this permission notice shall be included in all
+    13	copies or substantial portions of the Software.
+    14	
+    15	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    16	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    17	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    18	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    19	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    20	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    21	SOFTWARE.
+     1	# Contributing
+     2	
+     3	## Access model
+     4	
+     5	The maintainer (Federico) is the only account with write access to `main`. There is no
+     6	accepted-contributor list beyond that today. If you want to propose a change: fork the repo,
+     7	branch, and open a pull request against `main`. Issues are enabled on this repository (verified
+     8	via `gh repo view --json hasIssuesEnabled` -> `true`), so bug reports and feature requests belong
+     9	there too — except vulnerabilities, see `SECURITY.md`.
+    10	
+    11	By opening a pull request you agree your contribution is licensed under the terms in `LICENSE`
+    12	(MIT).
+    13	
+    14	## CI
+    15	
+    16	`.github/workflows/ci.yml` runs on every `push` and `pull_request` against `main`, no extra setup
+    17	required on your side:
+    18	
+    19	- `verify-linux` / `verify-macos`: `./ai/scripts/verify.sh` (full gate) on real Ubuntu and macOS
+    20	  runners.
+    21	- `windows-bootstrap`: parses `install.ps1`, runs it with `-DryRun`, `py_compile`s every
+    22	  `ai/scripts/*.py`, and runs the full `unittest` suite under Windows Python.
+    23	
+    24	## Before opening a pull request
+    25	
+    26	Run these locally first — they are the same commands CI runs, and they need to pass before review
+    27	makes sense:
+    28	
+    29	```bash
+    30	python3 -m unittest discover -s tests   # pytest is NOT installed in this repo's dev environment
+    31	./ai/scripts/verify.sh                  # expect VERIFY_PASS
+    32	./build.sh --check                      # expect GLOBAL_TREE_SYNC_OK + BUILD_CHECK_PASS
+    33	git diff --check                        # no trailing-whitespace / conflict-marker errors
+    34	```
+    35	
+    36	The full unit test suite takes a while (order of minutes); for long-running commands, use
+    37	`ai/scripts/heartbeat-run.py --interval 20 -- <command>` so the process doesn't look hung to
+    38	whatever is watching it (see `docs/adr/0041-build-check-verifies-global.md`).
+    39	
+    40	## Scope of a pull request
+    41	
+    42	- Keep diffs bounded to the change you're proposing — no opportunistic reformatting of unrelated
+    43	  files.
+    44	- Preserve existing public entry points (`set-agents`, `ai/scripts/set_agents_app.py --*` flags,
+    45	  `models.toml`/`tools.toml` schemas) unless the PR's own description says otherwise and updates
+    46	  the tests that pin them.
+    47	- Add or update the focused test that covers your change under `tests/` — the suite is what a
+    48	  reviewer actually checks against, not the description.
+    49	
+    50	## What this repo is
+    51	
+    52	`SET-AGENTS` installs and configures OpenCode, Claude Code, Codex, and Pi with a shared
+    53	model-routing, permissions, and workflow layer (see `README.md` and `TIPS-USO.md`). It has no
+    54	separate staging/production deploy of its own — the test suite and the two gate scripts above are
+    55	the validation surface.
+     1	# Changelog
+     2	
+     3	All notable changes to this project are documented here, following the spirit of
+     4	[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+     5	
+     6	This project does not use tagged releases or semantic versioning yet (`git tag --list` is empty as
+     7	of this writing) — entries land under `Unreleased` until a first tagged release exists. The
+     8	durable, per-decision record already lives in `docs/adr/` (indexed at `docs/adr/README.md`, 49
+     9	ADRs as of this writing); this file is a human-readable summary layer for people who clone the
+    10	repo, not a replacement for the ADR log.
+    11	
+    12	## [Unreleased]
+    13	
+    14	### Added
+    15	
+    16	- `LICENSE` (MIT), `CONTRIBUTING.md`, `CHANGELOG.md` (this file), `SECURITY.md` — public-repo
+    17	  hygiene baseline (feature `024-listo-para-terceros`, package C4, AC-09).
+    18	- Re-pointable upstream for the update-distance check (`ai/scripts/set_agents_app.py`) — a fork no
+    19	  longer measures itself against `federico0330/set-agents` by default only; the remote is
+    20	  configurable, current default preserved as fallback (AC-12).
+    21	
+    22	### Changed
+    23	
+    24	- `HANDOFF-PASO9.md` moved from the repo root to `docs/HANDOFF-PASO9.md` (AC-09).
+     1	# Security Policy
+     2	
+     3	## Supported versions
+     4	
+     5	This project does not publish tagged releases yet (`git tag --list` returns nothing as of this
+     6	writing) — `main` is the only supported line, and security fixes land there.
+     7	
+     8	## Reporting a vulnerability
+     9	
+    10	Please do **not** open a public GitHub issue for a security vulnerability. Use GitHub's private
+    11	reporting channel instead:
+    12	
+    13	- On the repo: **Security** tab -> **Report a vulnerability**, or directly
+    14	  <https://github.com/federico0330/set-agents/security/advisories/new>.
+    15	
+    16	Private vulnerability reporting is enabled on this repository (verified live:
+    17	`gh api repos/federico0330/set-agents/private-vulnerability-reporting` -> `{"enabled": true}`).
+    18	
+    19	This is a single-maintainer project, so there is no measured response-time SLA to promise here —
+    20	expect an acknowledgement from the maintainer, not a guaranteed turnaround.
+    21	
+    22	## Scope
+    23	
+    24	This repository installs and auto-updates third-party AI CLIs (OpenCode, Claude Code, Codex, Pi)
+    25	on the user's machine, and runs a routing/dispatch layer on top of them. Reports of particular
+    26	interest:
+    27	
+    28	- Anything that lets install/auto-update (`install.sh`, `install.ps1`, `ai/scripts/install.py`)
+    29	  execute untrusted code or write outside the paths it documents.
+    30	- Credential or secret exposure — `.env` contents, `models.toml`, vault/Obsidian data, or
+    31	  provider tokens — in logs, generated notes, or committed files.
+    32	- A way to bypass the guarded/yolo permission profile documented in `README.md` (e.g. an
+    33	  irreversible operation — `sudo`, `rm -rf`, `git push --force` — running without the
+    34	  confirmation the harness promises).
+    35	
+    36	## Out of scope
+    37	
+    38	Vulnerabilities in the third-party CLIs this repo configures (OpenCode, Claude Code, Codex, Pi,
+    39	`gh`, `gcloud`, etc.) belong to their own upstream repositories, not this one.
+diff --git i/tests/test_harness.py w/tests/test_harness.py
+index 5a1d4c3..94e6b00 100644
+--- i/tests/test_harness.py
++++ w/tests/test_harness.py
+@@ -577,6 +577,64 @@ class HarnessTests(unittest.TestCase):
+             self.assertEqual(result.returncode, 1)
+             self.assertIn("UPDATE_BLOCKED", result.stdout)
+ 
++    def test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork(self):
++        # AC-12 (024/C4): a fork's `origin` is the fork's OWN copy, not the project's real
++        # upstream -- `rev_count("HEAD..origin/main")` measured against the wrong place.
++        # Proves both directions: the default (SET_AGENTS_UPSTREAM unset) still measures
++        # against `origin` exactly like test_set_agents_update_flow above, and pointing
++        # SET_AGENTS_UPSTREAM at a distinct `upstream` remote measures AND pulls from that one
++        # instead -- even though `origin` (the fork) never received the commit.
++        with tempfile.TemporaryDirectory() as td:
++            upstream_bare = Path(td) / "upstream.git"
++            run("git", "init", "--quiet", "--bare", "-b", "main", str(upstream_bare))
++            useed = Path(td) / "useed"
++            run("git", "clone", "--quiet", str(upstream_bare), str(useed))
++            (useed / "file.txt").write_text("v1\n")
++            run("git", "-C", str(useed), "add", ".", env=self.GIT_ENV)
++            run("git", "-C", str(useed), "commit", "--quiet", "-m", "v1", env=self.GIT_ENV)
++            run("git", "-C", str(useed), "push", "--quiet", "origin", "main", env=self.GIT_ENV)
++
++            # The fork: a bare repo cloned from upstream at v1, never synced again -- exactly
++            # what a stale GitHub fork looks like.
++            fork_bare = Path(td) / "fork.git"
++            run("git", "clone", "--quiet", "--bare", str(upstream_bare), str(fork_bare))
++
++            # Real upstream moves on -- the fork does NOT get this commit.
++            (useed / "file.txt").write_text("v2\n")
++            run("git", "-C", str(useed), "commit", "--quiet", "-am", "v2", env=self.GIT_ENV)
++            run("git", "-C", str(useed), "push", "--quiet", "origin", "main", env=self.GIT_ENV)
++
++            # The app's own working copy: cloned from the FORK ("origin"), with "upstream"
++            # added as a second remote pointing at the real project -- exactly what
++            # `git remote add upstream <url>` produces for a fork maintainer.
++            app_root = Path(td) / "app"
++            run("git", "clone", "--quiet", str(fork_bare), str(app_root))
++            run("git", "-C", str(app_root), "remote", "add", "upstream", str(upstream_bare),
++                env=self.GIT_ENV)
++
++            env = {"SET_AGENTS_ROOT": str(app_root), "SET_AGENTS_STATE": str(Path(td) / "state")}
++
++            # Default fallback (SET_AGENTS_UPSTREAM unset): measures against `origin` (the
++            # fork), which never moved -- 0, even though the real project is 1 commit ahead.
++            # This is the documented default/fallback, not the bug under test.
++            result = run("bash", "set-agents", "--check-update", env=env)
++            self.assertIn("UPDATE_AVAILABLE=0", result.stdout)
++
++            # Re-pointed: measures against `upstream/main` -- sees the commit `origin` never got.
++            env_upstream = {**env, "SET_AGENTS_UPSTREAM": "upstream/main"}
++            result = run("bash", "set-agents", "--check-update", env=env_upstream)
++            self.assertIn("UPDATE_AVAILABLE=1", result.stdout)
++
++            # And it actually pulls FROM upstream, not from origin/the fork.
++            result = run("bash", "set-agents", "--update", "--no-install", env=env_upstream)
++            self.assertIn("UPDATE_APPLIED", result.stdout)
++            self.assertEqual((app_root / "file.txt").read_text(), "v2\n")
++
++            # origin (the fork) genuinely never received this commit -- proves the pull came
++            # from `upstream`, not from `origin` silently having it too.
++            fork_log = run("git", "-C", str(fork_bare), "log", "--oneline", "main")
++            self.assertNotIn("v2", fork_log.stdout)
++
+     def test_set_agents_status_and_auto_update_config(self):
+         with tempfile.TemporaryDirectory() as td:
+             env, _ = self._bootstrap_env(td, ())
+
+codex
+La matriz sí declara fechas por fila. Ahora verifico dos filas con las mediciones que describen y reviso el barrido completo de `origin/main`; luego corro el test focalizado y hago la mordida temporal, restaurando el archivo desde `/tmp`.
+exec
+/bin/bash -lc "printf '%s\\n' '--- matriz: opencode ---'
+printf 'source_agents='; rg --files Global/opencode/agents | wc -l
+printf 'installed_agents='; rg --files /home/federico/.config/opencode/agents 2>/dev/null | wc -l
+printf 'source_primary='; rg -l '"'^mode: primary$'"' Global/opencode/agents | wc -l
+printf 'source_subagent='; rg -l '"'^mode: subagent$'"' Global/opencode/agents | wc -l
+printf '%s\\n' '--- matriz: codex ---'
+test "'! -d Global/codex/commands; printf '"'global_codex_commands_absent=%s\\n' \""'$?"
+test ! -d /home/federico/.codex/commands; printf '"'installed_codex_commands_absent=%s\\n' \""'$?"
+printf '"'%s\\n' '--- upstream literals ---'
+rg -n -F 'origin/main' ai/scripts/" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+--- matriz: opencode ---
+source_agents=47
+installed_agents=47
+source_primary=1
+source_subagent=46
+--- matriz: codex ---
+global_codex_commands_absent=0
+installed_codex_commands_absent=0
+--- upstream literals ---
+ai/scripts/set_agents_app.py:1063:# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+ai/scripts/set_agents_app.py:1068:DEFAULT_UPSTREAM = "origin/main"
+
+exec
+/bin/bash -lc 'python3 -m unittest -v tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork' in /home/federico/SET-AGENTES
+ succeeded in 570ms:
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.582s
+
+OK
+
+exec
+/bin/bash -lc 'cp ai/scripts/set_agents_app.py /tmp/set_agents_app.py.package-reviewer-backup && sha256sum ai/scripts/set_agents_app.py /tmp/set_agents_app.py.package-reviewer-backup' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+00a1a535ee088c0723739c4337ac1b01a3d9ffdcdd482edd5c5069bd3a39fe32  ai/scripts/set_agents_app.py
+00a1a535ee088c0723739c4337ac1b01a3d9ffdcdd482edd5c5069bd3a39fe32  /tmp/set_agents_app.py.package-reviewer-backup
+
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/set_agents_app.py
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+exec
+/bin/bash -lc 'python3 -m unittest -v tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork' in /home/federico/SET-AGENTES
+ exited 1 in 381ms:
+FAIL
+
+======================================================================
+FAIL: test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_harness.py", line 626, in test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork
+    self.assertIn("UPDATE_AVAILABLE=1", result.stdout)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'UPDATE_AVAILABLE=1' not found in 'UPDATE_AVAILABLE=0\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.393s
+
+FAILED (failures=1)
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+exec
+/bin/bash -lc 'cp /tmp/set_agents_app.py.package-reviewer-backup ai/scripts/set_agents_app.py && sha256sum ai/scripts/set_agents_app.py /tmp/set_agents_app.py.package-reviewer-backup && python3 -m unittest -v tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork' in /home/federico/SET-AGENTES
+ succeeded in 566ms:
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.575s
+
+OK
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+codex
+La prueba dirigida pasó en verde, falló como corresponde tras inutilizar la lectura de `SET_AGENTS_UPSTREAM`, y volvió a verde después de restaurar el archivo desde la copia temporal. Me queda contrastar la licencia con una copia MIT local y corroborar coherencia mínima de año/titular.
+exec
+/bin/bash -lc "rg -l -m 1 --glob 'LICENSE*' '"'^MIT License$'"' /usr/local/lib/python3.11/site-packages /usr/lib/node_modules 2>/dev/null | head -n 5
+git log --format='%ad | %an <%ae>' --date=format:%Y --reverse | head -n 1
+git log --format='%ad | %an <%ae>' --date=format:%Y -n 1" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+/usr/lib/node_modules/openai-cli/node_modules/gopd/LICENSE
+/usr/lib/node_modules/npm/node_modules/safer-buffer/LICENSE
+/usr/lib/node_modules/openai-cli/node_modules/es-set-tostringtag/LICENSE
+/usr/lib/node_modules/openai-cli/node_modules/has-symbols/LICENSE
+/usr/lib/node_modules/openai-cli/node_modules/get-proto/LICENSE
+2026 | federico0330 <oviedofederico2003@gmail.com>
+2026 | federico0330 <oviedofederico2003@gmail.com>
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+exec
+/bin/bash -lc "nl -ba /usr/lib/node_modules/openai-cli/node_modules/gopd/LICENSE
+diff -u <(sed -n '5,"'$p'"' /usr/lib/node_modules/openai-cli/node_modules/gopd/LICENSE) <(sed -n '5,"'$p'"' LICENSE); printf 'license_body_diff_exit=%s\\n' \""'$?"' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+     1	MIT License
+     2	
+     3	Copyright (c) 2022 Jordan Harband
+     4	
+     5	Permission is hereby granted, free of charge, to any person obtaining a copy
+     6	of this software and associated documentation files (the "Software"), to deal
+     7	in the Software without restriction, including without limitation the rights
+     8	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+     9	copies of the Software, and to permit persons to whom the Software is
+    10	furnished to do so, subject to the following conditions:
+    11	
+    12	The above copyright notice and this permission notice shall be included in all
+    13	copies or substantial portions of the Software.
+    14	
+    15	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    16	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    17	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    18	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    19	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    20	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    21	SOFTWARE.
+license_body_diff_exit=0
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+exec
+/bin/bash -lc "grep -R -n -- 'origin/main' ai/scripts/
+printf '%s\\n' '--- upstream helper references ---'
+rg -n 'upstream_ref|DEFAULT_UPSTREAM|_upstream_remote_and_branch' ai/scripts/set_agents_app.py
+git status --short
+git diff --cached --summary" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+grep: ai/scripts/__pycache__/set_agents_app.cpython-314.pyc: binary file matches
+ai/scripts/set_agents_app.py:1063:# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+ai/scripts/set_agents_app.py:1068:DEFAULT_UPSTREAM = "origin/main"
+--- upstream helper references ---
+1066:# DEFAULT_UPSTREAM is the fallback, so a direct clone (this repo's own README instructions, where
+1068:DEFAULT_UPSTREAM = "origin/main"
+1071:def upstream_ref():
+1072:    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
+1075:def _upstream_remote_and_branch():
+1076:    remote, _, branch = upstream_ref().partition("/")
+1081:    remote, _branch = _upstream_remote_and_branch()
+1164:        "sha": short_sha(), "drift": drift_state(), "behind": rev_count(f"HEAD..{upstream_ref()}"),
+1213:    behind = rev_count(f"HEAD..{upstream_ref()}")
+1225:    ref = upstream_ref()
+1240:    remote, branch = _upstream_remote_and_branch()
+1263:    ref = upstream_ref()
+ M README.md
+ M ai/scripts/set_agents_app.py
+R  HANDOFF-PASO9.md -> docs/HANDOFF-PASO9.md
+ M docs/modules/routing.md
+ M "docs/notas/00 - Proyecto.md"
+ M docs/notas/features/024-listo-para-terceros.md
+ M docs/notas/features/024-listo-para-terceros/C3-primer-arranque-honesto.md
+ M docs/notas/features/024-listo-para-terceros/C4-higiene-de-repo-publico.md
+ M docs/notas/features/024-listo-para-terceros/grafo.md
+ M docs/specs/024-listo-para-terceros/bitacora.md
+ M tests/test_harness.py
+?? CHANGELOG.md
+?? CONTRIBUTING.md
+?? LICENSE
+?? SECURITY.md
+?? "docs/notas/decisiones/2026-08-14 HUMAN-DECISION-codename-de-cliente-real-en-repo-publico.md"
+?? docs/specs/024-listo-para-terceros/context/C4-higiene-de-repo-publico.md
+?? docs/specs/024-listo-para-terceros/evidence/C4-implementer.md
+ rename HANDOFF-PASO9.md => docs/HANDOFF-PASO9.md (100%)
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+exec
+/bin/bash -lc "grep -n -- 'origin/main' ai/scripts/*.py" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+ai/scripts/set_agents_app.py:1063:# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+ai/scripts/set_agents_app.py:1068:DEFAULT_UPSTREAM = "origin/main"
+
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+codex
+VEREDICTO: approved
+
+No hay hallazgos en los cuatro puntos revisados.
+
+PUNTO 1 — matriz medida
+
+No promete paridad sin evidencia: las tres filas llevan fecha en [README.md](/home/federico/SET-AGENTES/README.md:189). Verifiqué dos mediciones:
+
+Comando y salida literal:
+```text
+source_agents=47
+installed_agents=47
+source_primary=1
+source_subagent=46
+global_codex_commands_absent=0
+installed_codex_commands_absent=0
+```
+
+Coinciden con opencode (47 / 1 primary / 46 subagent) y codex (sin `commands/`) declarados.
+
+PUNTO 2 — upstream re-apuntable
+
+No quedó ningún uso operativo hardcodeado: los únicos literales son el comentario y el default deliberado.
+
+Comando y salida literal:
+```text
+ai/scripts/set_agents_app.py:1063:# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+ai/scripts/set_agents_app.py:1068:DEFAULT_UPSTREAM = "origin/main"
+```
+
+Los siete puntos de uso pasan por `upstream_ref()` o `_upstream_remote_and_branch()`. El test nuevo prueba ambos sentidos: sin variable conserva `origin/main`; con `SET_AGENTS_UPSTREAM=upstream/main` detecta y aplica desde el remoto alternativo.
+
+Salida literal:
+```text
+test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.582s
+
+OK
+```
+
+PUNTO 3 — LICENSE MIT
+
+[LICENSE](/home/federico/SET-AGENTES/LICENSE:1) coincide exactamente, salvo la línea de copyright que corresponde personalizar, con una copia MIT local de `gopd`.
+
+Comando y salida literal:
+```text
+license_body_diff_exit=0
+```
+
+El año 2026 y el titular Federico son coherentes con el primer y último commit:
+
+```text
+2026 | federico0330 <oviedofederico2003@gmail.com>
+2026 | federico0330 <oviedofederico2003@gmail.com>
+```
+
+PUNTO 4 — MORDIDA
+
+Respaldé `ai/scripts/set_agents_app.py` en `/tmp`, reemplacé temporalmente `upstream_ref()` para ignorar `SET_AGENTS_UPSTREAM`, corrí el test dirigido y restauré con `cp`. El ROJO fue real:
+
+```text
+FAIL: test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork)
+AssertionError: 'UPDATE_AVAILABLE=1' not found in 'UPDATE_AVAILABLE=0\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.393s
+
+FAILED (failures=1)
+```
+
+Restauración y VERDE literal:
+
+```text
+00a1a535ee088c0723739c4337ac1b01a3d9ffdcdd482edd5c5069bd3a39fe32  ai/scripts/set_agents_app.py
+00a1a535ee088c0723739c4337ac1b01a3d9ffdcdd482edd5c5069bd3a39fe32  /tmp/set_agents_app.py.package-reviewer-backup
+test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.575s
+
+OK
+```
+
+Estado observado: los cambios C4 siguen sin stagear; `git diff --cached --summary` sólo muestra el rename de `HANDOFF-PASO9.md`. Esto no altera el veredicto técnico de los cuatro puntos solicitados.
+diff --git a/ai/scripts/set_agents_app.py b/ai/scripts/set_agents_app.py
+index 467c7f403879f2bcd22e905afe332ade929c30ab..bd96095612f198f0878524abd6a90567b12ea8b5
+--- a/ai/scripts/set_agents_app.py
++++ b/ai/scripts/set_agents_app.py
+@@ -1069,7 +1069,7 @@
+ 
+ 
+ def upstream_ref():
+-    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
++    return DEFAULT_UPSTREAM
+ 
+ 
+ def _upstream_remote_and_branch():
+
+tokens used
+50.130
+VEREDICTO: approved
+
+No hay hallazgos en los cuatro puntos revisados.
+
+PUNTO 1 — matriz medida
+
+No promete paridad sin evidencia: las tres filas llevan fecha en [README.md](/home/federico/SET-AGENTES/README.md:189). Verifiqué dos mediciones:
+
+Comando y salida literal:
+```text
+source_agents=47
+installed_agents=47
+source_primary=1
+source_subagent=46
+global_codex_commands_absent=0
+installed_codex_commands_absent=0
+```
+
+Coinciden con opencode (47 / 1 primary / 46 subagent) y codex (sin `commands/`) declarados.
+
+PUNTO 2 — upstream re-apuntable
+
+No quedó ningún uso operativo hardcodeado: los únicos literales son el comentario y el default deliberado.
+
+Comando y salida literal:
+```text
+ai/scripts/set_agents_app.py:1063:# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+ai/scripts/set_agents_app.py:1068:DEFAULT_UPSTREAM = "origin/main"
+```
+
+Los siete puntos de uso pasan por `upstream_ref()` o `_upstream_remote_and_branch()`. El test nuevo prueba ambos sentidos: sin variable conserva `origin/main`; con `SET_AGENTS_UPSTREAM=upstream/main` detecta y aplica desde el remoto alternativo.
+
+Salida literal:
+```text
+test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.582s
+
+OK
+```
+
+PUNTO 3 — LICENSE MIT
+
+[LICENSE](/home/federico/SET-AGENTES/LICENSE:1) coincide exactamente, salvo la línea de copyright que corresponde personalizar, con una copia MIT local de `gopd`.
+
+Comando y salida literal:
+```text
+license_body_diff_exit=0
+```
+
+El año 2026 y el titular Federico son coherentes con el primer y último commit:
+
+```text
+2026 | federico0330 <oviedofederico2003@gmail.com>
+2026 | federico0330 <oviedofederico2003@gmail.com>
+```
+
+PUNTO 4 — MORDIDA
+
+Respaldé `ai/scripts/set_agents_app.py` en `/tmp`, reemplacé temporalmente `upstream_ref()` para ignorar `SET_AGENTS_UPSTREAM`, corrí el test dirigido y restauré con `cp`. El ROJO fue real:
+
+```text
+FAIL: test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork)
+AssertionError: 'UPDATE_AVAILABLE=1' not found in 'UPDATE_AVAILABLE=0\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.393s
+
+FAILED (failures=1)
+```
+
+Restauración y VERDE literal:
+
+```text
+00a1a535ee088c0723739c4337ac1b01a3d9ffdcdd482edd5c5069bd3a39fe32  ai/scripts/set_agents_app.py
+00a1a535ee088c0723739c4337ac1b01a3d9ffdcdd482edd5c5069bd3a39fe32  /tmp/set_agents_app.py.package-reviewer-backup
+test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork (tests.test_harness.HarnessTests.test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.575s
+
+OK
+```
+
+Estado observado: los cambios C4 siguen sin stagear; `git diff --cached --summary` sólo muestra el rename de `HANDOFF-PASO9.md`. Esto no altera el veredicto técnico de los cuatro puntos solicitados.

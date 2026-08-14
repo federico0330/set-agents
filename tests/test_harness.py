@@ -577,6 +577,64 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("UPDATE_BLOCKED", result.stdout)
 
+    def test_set_agents_update_flow_repoints_to_a_configured_upstream_for_a_fork(self):
+        # AC-12 (024/C4): a fork's `origin` is the fork's OWN copy, not the project's real
+        # upstream -- `rev_count("HEAD..origin/main")` measured against the wrong place.
+        # Proves both directions: the default (SET_AGENTS_UPSTREAM unset) still measures
+        # against `origin` exactly like test_set_agents_update_flow above, and pointing
+        # SET_AGENTS_UPSTREAM at a distinct `upstream` remote measures AND pulls from that one
+        # instead -- even though `origin` (the fork) never received the commit.
+        with tempfile.TemporaryDirectory() as td:
+            upstream_bare = Path(td) / "upstream.git"
+            run("git", "init", "--quiet", "--bare", "-b", "main", str(upstream_bare))
+            useed = Path(td) / "useed"
+            run("git", "clone", "--quiet", str(upstream_bare), str(useed))
+            (useed / "file.txt").write_text("v1\n")
+            run("git", "-C", str(useed), "add", ".", env=self.GIT_ENV)
+            run("git", "-C", str(useed), "commit", "--quiet", "-m", "v1", env=self.GIT_ENV)
+            run("git", "-C", str(useed), "push", "--quiet", "origin", "main", env=self.GIT_ENV)
+
+            # The fork: a bare repo cloned from upstream at v1, never synced again -- exactly
+            # what a stale GitHub fork looks like.
+            fork_bare = Path(td) / "fork.git"
+            run("git", "clone", "--quiet", "--bare", str(upstream_bare), str(fork_bare))
+
+            # Real upstream moves on -- the fork does NOT get this commit.
+            (useed / "file.txt").write_text("v2\n")
+            run("git", "-C", str(useed), "commit", "--quiet", "-am", "v2", env=self.GIT_ENV)
+            run("git", "-C", str(useed), "push", "--quiet", "origin", "main", env=self.GIT_ENV)
+
+            # The app's own working copy: cloned from the FORK ("origin"), with "upstream"
+            # added as a second remote pointing at the real project -- exactly what
+            # `git remote add upstream <url>` produces for a fork maintainer.
+            app_root = Path(td) / "app"
+            run("git", "clone", "--quiet", str(fork_bare), str(app_root))
+            run("git", "-C", str(app_root), "remote", "add", "upstream", str(upstream_bare),
+                env=self.GIT_ENV)
+
+            env = {"SET_AGENTS_ROOT": str(app_root), "SET_AGENTS_STATE": str(Path(td) / "state")}
+
+            # Default fallback (SET_AGENTS_UPSTREAM unset): measures against `origin` (the
+            # fork), which never moved -- 0, even though the real project is 1 commit ahead.
+            # This is the documented default/fallback, not the bug under test.
+            result = run("bash", "set-agents", "--check-update", env=env)
+            self.assertIn("UPDATE_AVAILABLE=0", result.stdout)
+
+            # Re-pointed: measures against `upstream/main` -- sees the commit `origin` never got.
+            env_upstream = {**env, "SET_AGENTS_UPSTREAM": "upstream/main"}
+            result = run("bash", "set-agents", "--check-update", env=env_upstream)
+            self.assertIn("UPDATE_AVAILABLE=1", result.stdout)
+
+            # And it actually pulls FROM upstream, not from origin/the fork.
+            result = run("bash", "set-agents", "--update", "--no-install", env=env_upstream)
+            self.assertIn("UPDATE_APPLIED", result.stdout)
+            self.assertEqual((app_root / "file.txt").read_text(), "v2\n")
+
+            # origin (the fork) genuinely never received this commit -- proves the pull came
+            # from `upstream`, not from `origin` silently having it too.
+            fork_log = run("git", "-C", str(fork_bare), "log", "--oneline", "main")
+            self.assertNotIn("v2", fork_log.stdout)
+
     def test_set_agents_status_and_auto_update_config(self):
         with tempfile.TemporaryDirectory() as td:
             env, _ = self._bootstrap_env(td, ())

@@ -19,6 +19,7 @@ subgraph sg_024_listo_para_terceros["024-listo-para-terceros"]
   end
   subgraph sg_024_listo_para_terceros_c4_higiene_de_repo_publico["C4-higiene-de-repo-publico"]
     package_024_listo_para_terceros_c4_higiene_de_repo_publico_1["package: C4-higiene-de-repo-publico"]
+    spawn_024_listo_para_terceros_c4_higiene_de_repo_publico_1["SPAWN-001 implementer Lo que un repo publico necesita, y una matriz de soporte MEDIDA en vez de asumida #91;haiku#93;"]
   end
 end
 ```

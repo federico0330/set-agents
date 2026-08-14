@@ -133,12 +133,12 @@ Los agentes documentan mientras trabajan: cada proyecto mantiene `docs/notas/` (
 empresa/cliente las junta en un solo grafo navegable:
 
 ```bash
-set-agents --vault-init ~/iey --company IEY            # una vez por empresa/cliente
-set-agents --vault-link ~/iey/mi-proyecto               # notas dentro del repo (default)
-set-agents --vault-link ~/iey/mi-proyecto --private     # notas dentro del vault, fuera del git
+set-agents --vault-init ~/acme --company ACME          # una vez por empresa/cliente
+set-agents --vault-link ~/acme/mi-proyecto              # notas dentro del repo (default)
+set-agents --vault-link ~/acme/mi-proyecto --private    # notas dentro del vault, fuera del git
 ```
 
-Abrís `~/iey/obsidian` en Obsidian: `00 - INICIO` es la nota del café ☕ (tu rol, cómo se
+Abrís `~/acme/obsidian` en Obsidian: `00 - INICIO` es la nota del café ☕ (tu rol, cómo se
 trabaja, qué falta por proyecto) y desde ahí navegás hasta cualquier paquete. Lo que escribas
 fuera de los bloques `notas:auto` nunca se pisa. Las decisiones que trascienden un paquete se
 registran con `feature-state.py log-decision`. El vault también trae `Casos/` con una
@@ -170,7 +170,7 @@ systemctl --user enable --now syncthing
 
 Abrí `http://localhost:8384` en cada máquina: **Actions → Show ID** en una, **Add Remote
 Device** en la otra (en la misma red se autodescubren), aceptá en ambas, y compartí la
-carpeta `~/iey/obsidian` (Add Folder → path exacto en las dos). Un cliente freelance nuevo =
+carpeta `~/acme/obsidian` (Add Folder → path exacto en las dos). Un cliente freelance nuevo =
 Add Folder de su vault; sin repos nuevos.
 
 - ⚠️ Syncthing es P2P: sincroniza cuando **ambas máquinas están prendidas** (típicamente en
@@ -178,6 +178,17 @@ Add Folder de su vault; sin repos nuevos.
 - ⚠️ **Nunca** sincronices repos git por Syncthing (corrompe `.git`); solo el vault.
 - En una máquina nueva, después del primer sync corré `set-agents --vault-link <proyecto>
   --private` en cada proyecto: el symlink y el exclude de git son por-máquina.
+
+## Matriz de soporte (medida, no prometida)
+
+Los tres harnesses no tienen el mismo nivel de soporte — esto es lo que se pudo **confirmar**
+hasta hoy, no una promesa de paridad. Lo que no está en esta tabla no se midió.
+
+| Harness | Estado medido |
+|---|---|
+| **opencode** | De primera clase. 47 agentes instalados (`~/.config/opencode/agents/*.md`, y en la fuente `Global/opencode/agents/`); de esos, solo `orchestrator.md` declara `mode: primary` — los otros 46 son `mode: subagent`. Consecuencia (medida el 2026-08-13, al intentar despachar un `package-reviewer`): `opencode run --agent <rol>` **no despacha un subagent** — cae al agente por defecto con un warning, porque `run --agent` solo sabe arrancar un `primary`. *(Medido: 2026-08-14, última fila 2026-08-13.)* |
+| **codex** | **Cero comandos.** `Global/codex/` no tiene directorio `commands/` (a diferencia de `Global/opencode/commands/`); en una instalación real, `~/.codex/commands` no existe. *(Medido: 2026-08-14.)* |
+| **pi** | **Cero hooks**, y su lane de dispatch corre con `--no-skills` (guard incondicional, `ai/scripts/set_agents_spawn.py:249-261`). `Global/pi/` no tiene directorio `hooks/`; en una instalación real, `~/.pi` no tiene subdirectorio `hooks` (a diferencia de `~/.codex/hooks` y `~/.config/opencode/hooks`, que sí existen). *(Medido: 2026-08-14.)* |
 
 ## Más documentación
 

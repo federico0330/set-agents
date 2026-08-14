@@ -13,6 +13,7 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 
 ## Últimos cambios estructurales
 
+- 2026-08-14 024-listo-para-terceros/C3-primer-arranque-honesto — El primer arranque termina, dice que hacer cuando no hay credenciales, y avisa antes de pisar un global
 - 2026-08-14 023-senales-de-consumo/B4-estimado-nunca-dato-del-proveedor — Todo numero estimado viaja con base, ventana y cobertura, y sin presupuesto declarado no existe 'restante'
 - 2026-08-14 023-senales-de-consumo/B3-ventana-y-rollup — usage_rollups por ventana en la misma transaccion que close_run, retencion de dispatches, y un candado que impide cambiar un DDL sin bumpear el esquema
 - 2026-08-13 023-senales-de-consumo/B2-el-reporte-dice-de-donde-sale — Los adaptadores de spawn traducen su forma al vocabulario del store, y el reporte separa las dos fuentes
@@ -22,7 +23,6 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 - 2026-08-13 022-disponibilidad-real/P3-liveness-real — Firma de credencial por runtime en la clave de cache y una sola cache en la raiz del store
 - 2026-08-13 022-disponibilidad-real/P5-altas-y-bajas-automaticas — Verificacion empirica del CLI id, liveness real en --provider-verify y separacion listed/usable en tres superficies
 - 2026-08-13 022-disponibilidad-real/P1-registro-de-proveedores — Las siete tablas de proveedores pasan a derivarse de provider_registry.PROVIDERS
-- 2026-08-13 022-disponibilidad-real/P2-techo-catalogo-tri-estado — [catalog].opencode_zen/go pasa a tri-estado: lista = techo, [] = veto, ausente = auto
 
 _Debajo de esta línea la prosa es mantenida a mano — contrastala con la fecha del último cambio estructural._
 <!-- /notas:auto -->

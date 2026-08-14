@@ -1059,9 +1059,28 @@ def git(*args, timeout=None):
     )
 
 
+# AC-12 (024/C4): a GitHub fork's `origin` is the fork's OWN copy, not the project this harness
+# ships from -- comparing against a hardcoded "origin/main" then measures "commits behind my own
+# fork", not "commits behind the real upstream". Re-pointable via SET_AGENTS_UPSTREAM (e.g.
+# "upstream/main" after `git remote add upstream https://github.com/federico0330/set-agents.git`);
+# DEFAULT_UPSTREAM is the fallback, so a direct clone (this repo's own README instructions, where
+# `origin` already IS upstream) keeps behaving exactly as before.
+DEFAULT_UPSTREAM = "origin/main"
+
+
+def upstream_ref():
+    return os.environ.get("SET_AGENTS_UPSTREAM") or DEFAULT_UPSTREAM
+
+
+def _upstream_remote_and_branch():
+    remote, _, branch = upstream_ref().partition("/")
+    return remote, branch or "main"
+
+
 def fetch(timeout=10):
+    remote, _branch = _upstream_remote_and_branch()
     try:
-        return git("fetch", "--quiet", timeout=timeout).returncode == 0
+        return git("fetch", "--quiet", remote, timeout=timeout).returncode == 0
     except subprocess.TimeoutExpired:
         return False
 
@@ -1142,7 +1161,7 @@ def _status_data(*, rows=True):
     data/print split -- it never calls this with `rows=True`.
     """
     data = {
-        "sha": short_sha(), "drift": drift_state(), "behind": rev_count("HEAD..origin/main"),
+        "sha": short_sha(), "drift": drift_state(), "behind": rev_count(f"HEAD..{upstream_ref()}"),
         "auto_update": auto_update_enabled(), "rows": [],
     }
     if rows:
@@ -1191,7 +1210,7 @@ def cmd_status(human=False):
 
 def cmd_check_update():
     online = fetch()
-    behind = rev_count("HEAD..origin/main")
+    behind = rev_count(f"HEAD..{upstream_ref()}")
     suffix = "" if online else " (sin red: valor cacheado)"
     print(f"UPDATE_AVAILABLE={behind if behind is not None else '?'}{suffix}")
     return 0 if behind is not None else 2
@@ -1203,8 +1222,9 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
         return 1
     if not assume_fetched:
         fetch()
-    behind = rev_count("HEAD..origin/main")
-    ahead = rev_count("origin/main..HEAD")
+    ref = upstream_ref()
+    behind = rev_count(f"HEAD..{ref}")
+    ahead = rev_count(f"{ref}..HEAD")
     if behind is None:
         print("UPDATE_BLOCKED: no pude determinar el estado remoto.")
         return 2
@@ -1216,9 +1236,10 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
         return 1
     old = short_sha()
     print(f"Novedades ({behind} commits):")
-    print(git("log", "--oneline", "HEAD..origin/main").stdout.rstrip())
+    print(git("log", "--oneline", f"HEAD..{ref}").stdout.rstrip())
+    remote, branch = _upstream_remote_and_branch()
     try:
-        pull = git("pull", "--ff-only", timeout=180)
+        pull = git("pull", "--ff-only", remote, branch, timeout=180)
     except subprocess.TimeoutExpired:
         print("UPDATE_BLOCKED: git pull colgado (¿red o credenciales? probá `gh auth status`).")
         return 1
@@ -1239,7 +1260,8 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
 def launch_update_check():
     """Menu-open behavior: auto-update with notice, or just a badge."""
     online = fetch(timeout=6)
-    behind = rev_count("HEAD..origin/main")
+    ref = upstream_ref()
+    behind = rev_count(f"HEAD..{ref}")
     if not online and behind is None:
         return "sin red o sin acceso (probá `gh auth status`)"
     if not behind:
@@ -1248,7 +1270,7 @@ def launch_update_check():
         # F-09: "Actualizar" is the actual menu item label -- "opción [2]" is a numbered-grid
         # reference that stopped being true the day the grid was replaced by the arrow selector.
         return f"{behind} commits nuevos (auto-update off → Actualizar)"
-    if not tree_clean() or rev_count("origin/main..HEAD"):
+    if not tree_clean() or rev_count(f"{ref}..HEAD"):
         return f"{behind} commits nuevos (repo local con cambios → Actualizar)"
     print(bold(f"Actualización disponible ({behind} commits) — aplicando automáticamente…"))
     cmd_update(yes=True, assume_fetched=True)
@@ -3122,7 +3144,7 @@ def vault_menu():
     with tui.TerminalSession():
         target_result = tui.run_picker(
             (), freetext_allowed=True, style=style, header=_VAULT_INTRO,
-            prompt="Directorio de la empresa (ej ~/iey; Esc vuelve):",
+            prompt="Directorio de la empresa (ej ~/acme; Esc vuelve):",
         )
         target = target_result.value.strip() if isinstance(target_result, tui.FreeText) else ""
         if not target:
