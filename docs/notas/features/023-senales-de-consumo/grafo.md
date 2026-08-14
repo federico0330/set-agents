@@ -32,6 +32,7 @@ subgraph sg_023_senales_de_consumo["023-senales-de-consumo"]
   end
   subgraph sg_023_senales_de_consumo_b4_estimado_nunca_dato_del_proveedor["B4-estimado-nunca-dato-del-proveedor"]
     package_023_senales_de_consumo_b4_estimado_nunca_dato_del_proveedor_1["package: B4-estimado-nunca-dato-del-proveedor"]
+    spawn_023_senales_de_consumo_b4_estimado_nunca_dato_del_proveedor_1["SPAWN-001 implementer Que ningun numero estimado viaje sin su base, su ventana y su cobertura, y que sin presupuesto no…"]
   end
 end
 review_023_senales_de_consumo_b3_ventana_y_rollup_1 -->|produjo| finding_023_senales_de_consumo_b3_ventana_y_rollup_1

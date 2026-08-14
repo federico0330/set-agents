@@ -1620,6 +1620,18 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(columns[:len(declared)], ["usage_" + field for field in declared])
         self.assertEqual(columns[len(declared):], ["cost_micros", "usage_status"])
 
+    def test_cost_report_day_ms_matches_store(self):
+        """023-senales-de-consumo PKG-B4 (AC-08): `cost-report.py`'s Section 3 buckets its
+        "estimado" window by the SAME UTC-calendar-day boundary `usage_rollups.window_start`
+        was actually written under (`store.py:_rollup_usage_in`'s `_DAY_MS`) -- duplicated
+        rather than imported (AC-16, `cost-report.py` has zero repo-local imports), pinned
+        here so the two constants cannot silently drift apart and misname the window.
+        """
+        source = (ROOT / "ai/scripts/cost-report.py").read_text()
+        day_ms = re.search(r"^_DAY_MS = (\d+)", source, re.M)
+        self.assertIsNotNone(day_ms, "cost-report.py:_DAY_MS moved or changed shape")
+        self.assertEqual(int(day_ms.group(1)), routing_store._DAY_MS)
+
     def test_normalize_ddl_is_the_only_normalizer(self):
         """AC-01, proved by source count rather than by patching the function.
 

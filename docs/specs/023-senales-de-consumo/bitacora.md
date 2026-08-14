@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-14T02:10:06+00:00
+Actualizado: 2026-08-14T05:09:03+00:00
 
 [2026-08-13T15:39:35+00:00] B1-registro-que-no-miente · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el harness registre de verdad cuanto gasta cada agente, que hoy no lo hace.
@@ -31,3 +31,7 @@ Ingeniería: B3-F01 critical: close_exhausted no escribe rollup y la guarda EXIS
 [2026-08-14T02:10:06+00:00] B3-ventana-y-rollup · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
 Cliente: Un tercer revisor confirma que los dos agujeros por los que se perdian registros quedaron cerrados.
 Ingeniería: Reparador claude-code/anthropic/opus (run1_26d316ee). Delta reviewer en codex, proveedor distinto. El orquestador ya verifico los seis en el codigo y ademas encontro y cerro un hueco propio: B3-F02 estaba arreglado sin test que lo protegiera.
+
+[2026-08-14T04:11:49+00:00] B4-estimado-nunca-dato-del-proveedor · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que cuando el harness te diga cuanto gastaste, te diga tambien de donde saco el numero y cuanto de eso midio de verdad.
+Ingeniería: AC-08/09/10, ultimo paquete de 023. usage_rollups (schema 9) ya trae suma Y conteo de reportados por metrica, que es la cobertura. Ningun proveedor expone cuota restante: sin presupuesto declarado se muestra 'consumido en la ventana', no 'restante'. Guard test al estilo del candado de DDL que nacio de la regresion de B3.

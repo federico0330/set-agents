@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-14T02:10:06+00:00
+Actualizado: 2026-08-14T05:09:03+00:00
 
 ## Features
 
@@ -27,7 +27,7 @@ Actualizado: 2026-08-14T02:10:06+00:00
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 | 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
-| 023-senales-de-consumo | scoped | DELTA_REVIEW | B3-ventana-y-rollup (delta_review_required) | 2/4 | 7/8 | 1/2 | 0 | - | - | 2026-08-14T02:10:06+00:00 record-spawn |
+| 023-senales-de-consumo | scoped | INTEGRATION | B4-estimado-nunca-dato-del-proveedor (accepted) | 4/4 | 8/8 | 1/2 | 0 | - | DONE | 2026-08-14T05:09:03+00:00 transition |
 | 024-listo-para-terceros | scoped | PACKAGE_PLANNING | C4-higiene-de-repo-publico (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:19:15+00:00 create-package |
 | 025-consola-minima-y-flexible | scoped | PACKAGE_PLANNING | D5-vault-en-todo-spawn (planned) | 0/5 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:20:00+00:00 create-package |
 | 026-orquestador-elige-modelo | scoped | DONE | P2-modelo-por-instancia (accepted) | 2/2 | 2/8 | 1/2 | 0 | - | - | 2026-08-13T15:35:37+00:00 transition |
@@ -41,6 +41,10 @@ Actualizado: 2026-08-14T02:10:06+00:00
 - [2026-07-30T01:22:33+00:00] P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, guardando el directorio real del repo en vez del symlink del lado del vault. vault_doctor_report reportaba health=drift para siempre en todo proyecto hybrid recién linkeado. Fix: normalizar resolviendo solo el padre (parent.resolve()/name), nunca el componente final. Encontrado migrando ~/iey de verdad. — archivos: ai/scripts/set_agents_app.py, tests/test_harness.py — gate: 331 tests verdes, verify.sh VERIFY_PASS, build.sh --check SELF_SCAFFOLD_SYNC_OK, git diff --check limpio, package-reviewer pass — resultado: done
 
 ## Bitácora (últimos 15)
+
+[2026-08-14T04:11:49+00:00] B4-estimado-nunca-dato-del-proveedor · implementer · started · modelo anthropic/opus · effort medium
+Cliente: Que cuando el harness te diga cuanto gastaste, te diga tambien de donde saco el numero y cuanto de eso midio de verdad.
+Ingeniería: AC-08/09/10, ultimo paquete de 023. usage_rollups (schema 9) ya trae suma Y conteo de reportados por metrica, que es la cobertura. Ningun proveedor expone cuota restante: sin presupuesto declarado se muestra 'consumido en la ventana', no 'restante'. Guard test al estilo del candado de DDL que nacio de la regresion de B3.
 
 [2026-08-14T02:10:06+00:00] B3-ventana-y-rollup · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
 Cliente: Un tercer revisor confirma que los dos agujeros por los que se perdian registros quedaron cerrados.
@@ -97,8 +101,4 @@ Ingeniería: P4 de 022 (AC-11..15). Medicion clave del pack: el bloque ollama de
 [2026-08-13T06:21:25+00:00] P3-liveness-real · delta-reviewer · started · modelo openai-codex/gpt-5.6-terra · effort high
 Cliente: Ultima verificacion independiente antes de dar por bueno el paquete.
 Ingeniería: Reparador claude-code/anthropic/opus (run1_ccfef5c2). Delta reviewer codex/openai-codex/gpt-5.6-terra, dec1_686d1590, independence_verified=true. Es el segundo y ultimo ciclo de review del presupuesto.
-
-[2026-08-13T05:44:21+00:00] P3-liveness-real · repair-agent · started · modelo anthropic/opus · effort medium
-Cliente: Cerrar el ultimo agujero del mismo tipo: un archivo de credenciales con forma rara que el harness daba por bueno.
-Ingeniería: P3-F03 critical: pi_auth_provider_keys acepta {'openai-codex': []} y hasta {'proveedor-inventado': {...}}, devolviendo keyset y firma no vacios. Ultimo ciclo de review disponible (1 de 2 consumido). Se pide ademas barrida sistematica: toda funcion que lea credenciales valida forma, todo test que diga cubrir 'foreign shape' cubre objetos.
 

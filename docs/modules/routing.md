@@ -13,6 +13,8 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 
 ## Últimos cambios estructurales
 
+- 2026-08-14 023-senales-de-consumo/B4-estimado-nunca-dato-del-proveedor — Todo numero estimado viaja con base, ventana y cobertura, y sin presupuesto declarado no existe 'restante'
+- 2026-08-14 023-senales-de-consumo/B3-ventana-y-rollup — usage_rollups por ventana en la misma transaccion que close_run, retencion de dispatches, y un candado que impide cambiar un DDL sin bumpear el esquema
 - 2026-08-13 023-senales-de-consumo/B2-el-reporte-dice-de-donde-sale — Los adaptadores de spawn traducen su forma al vocabulario del store, y el reporte separa las dos fuentes
 - 2026-08-13 023-senales-de-consumo/B1-registro-que-no-miente — La doctrina exige --usage al cerrar un run y hay un normalizador unico con la muestra real del cable por runtime
 - 2026-08-13 026-orquestador-elige-modelo/P2-modelo-por-instancia — El descriptor de ruteo acepta model_request: preferencia de modelo por instancia, efimera
@@ -21,8 +23,6 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 - 2026-08-13 022-disponibilidad-real/P5-altas-y-bajas-automaticas — Verificacion empirica del CLI id, liveness real en --provider-verify y separacion listed/usable en tres superficies
 - 2026-08-13 022-disponibilidad-real/P1-registro-de-proveedores — Las siete tablas de proveedores pasan a derivarse de provider_registry.PROVIDERS
 - 2026-08-13 022-disponibilidad-real/P2-techo-catalogo-tri-estado — [catalog].opencode_zen/go pasa a tri-estado: lista = techo, [] = veto, ausente = auto
-- 2026-08-12 019-harness-evolution/P1-provider-auto-adoption — El catalogo de rutas dejo de ser exclusivamente curado. resolve_discovered_providers (routing_core/catalog.py) resuelve la politica discovered_providers = 'auto' dentro de build_effective_snapshot, y…
-- 2026-08-12 019-harness-evolution/P2-billing-aware-ordering — El sort key de seleccion incorporo billing_rank entre TIER_ORDER y _bias_rank (routing_core/service.py:382), alimentado por PROVIDER_BILLING_KIND en catalog.py. A igual tier gana suscripcion o free s…
 
 _Debajo de esta línea la prosa es mantenida a mano — contrastala con la fecha del último cambio estructural._
 <!-- /notas:auto -->

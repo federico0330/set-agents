@@ -33,8 +33,19 @@ section prints only its OWN total; this report never prints one total across sec
 
 Tokens only — subscription plans have no meaningful dollar-per-token, what matters is quota.
 
+Section 3 -- ESTIMATED REMAINING QUOTA (023-senales-de-consumo PKG-B4, AC-08/AC-09/AC-10,
+ADR-0046): reads `usage_rollups` (schema 9, PKG-B3) for the current UTC-calendar-day window
+and, per token FIELD, prints what was actually MEASURED (raw sum) plus its COVERAGE
+(`usage_<field>_reported_count` of `run_count` runs actually reported that field -- never
+averaged over the runs that did not, which would silently treat "did not report" as "reported
+zero"). No provider exposes remaining quota (ADR-0046) -- a "restante" line only ever appears
+for a FIELD the caller declared with `--budget FIELD=N`, and it is always labeled `ESTIMADO`
+with `provider_reported: false` and its `basis`. A field with no declared budget shows only
+what was measured, never a guessed remainder (AC-10).
+
 Usage:
   cost-report.py [--project DIR] [--since YYYY-MM-DD] [--md] [--deep] [--home DIR]
+                  [--budget FIELD=N ...]
 """
 
 import argparse
@@ -46,11 +57,17 @@ import re
 import sqlite3
 import stat
 import sys
+import time
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
 FIELDS = ("input", "output", "cache_read", "cache_write", "reasoning")
+# 023-senales-de-consumo PKG-B3: the same UTC-calendar-day boundary
+# `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+# Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+# never imports repo-local code) -- pinned against the real constant by a test instead.
+_DAY_MS = 86400000
 
 
 def parse_args():
@@ -70,6 +87,12 @@ def parse_args():
     parser.add_argument("--md", action="store_true", help="markdown output")
     parser.add_argument("--deep", action="store_true", help="Codex: parse rollouts for cached/reasoning split")
     parser.add_argument("--home", default=str(Path.home()), help=argparse.SUPPRESS)
+    parser.add_argument("--budget", action="append", default=[], metavar="FIELD=N",
+                        help="AC-10: declare a quota for one token FIELD (input/output/"
+                             "cache_read/cache_write/reasoning) so Section 3 may show a "
+                             "\"restante\" for it, always labeled ESTIMADO -- a FIELD with "
+                             "no --budget only ever shows what was measured")
+    parser.add_argument("--window-start", type=int, default=None, help=argparse.SUPPRESS)
     return parser.parse_args()
 
 
@@ -381,6 +404,158 @@ def collect_pi(report, home, project, since_ms):
         conn.close()
 
 
+# ---------------------------------------------------------------------------------------
+# 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) -- ESTIMATED remaining quota,
+# read from `usage_rollups` (schema 9, PKG-B3). Tokens only, same "what matters is quota"
+# doctrine the module docstring already states for Sections 1/2 -- no cost_micros budget.
+# ---------------------------------------------------------------------------------------
+
+def parse_budgets(items):
+    """`FIELD=N`, FIELD in FIELDS. AC-10 exists so that a "restante" only ever appears for a
+    budget the caller EXPLICITLY declared for a real field -- a typo silently ignored would
+    make that declaration silently vanish, which is the same silent-invention AC-10
+    forbids, just moved into argument parsing. Dies loudly instead.
+    """
+    budgets = {}
+    for item in items:
+        field, sep, value = item.partition("=")
+        if not sep or field not in FIELDS:
+            raise SystemExit(
+                f"cost-report.py: --budget {item!r} -- FIELD must be one of "
+                f"{', '.join(FIELDS)}, given as FIELD=N")
+        try:
+            n = int(value)
+        except ValueError:
+            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be an integer")
+        if n < 0:
+            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be >= 0")
+        budgets[field] = n
+    return budgets
+
+
+def window_bounds(now_ms=None):
+    """The exact UTC-calendar-day window `usage_rollups.window_start` buckets a close into
+    (`routing_core/store.py:_rollup_usage_in`) -- `_DAY_MS` above is pinned against that
+    module's own constant by a test, so this cannot silently drift from what a row here
+    was actually summed under.
+    """
+    if now_ms is None:
+        now_ms = int(time.time() * 1000)
+    start = (now_ms // _DAY_MS) * _DAY_MS
+    return start, start + _DAY_MS
+
+
+def window_label(start_ms, end_ms):
+    """AC-08: the window NAMED BY ITS DEFINITION -- the exact range, never a relative
+    phrase like "last week"."""
+    start = dt.datetime.fromtimestamp(start_ms / 1000, tz=dt.timezone.utc).isoformat()
+    end = dt.datetime.fromtimestamp(end_ms / 1000, tz=dt.timezone.utc).isoformat()
+    return f"{start} to {end} (UTC calendar day, usage_rollups.window_start)"
+
+
+def collect_estimate(home, project, window_start_ms):
+    """Reads `usage_rollups` for exactly ONE UTC-day window and returns, per token FIELD,
+    the raw measured sum and how many of the window's runs actually REPORTED that field --
+    the coverage pair the schema itself already carries (023-senales-de-consumo PKG-B3),
+    never averaged over the runs that did not report (the trap this package's context pack
+    names explicitly: 12-of-40 coverage presented as if the other 28 reported zero).
+
+    Returns `None` (with a stderr message, same discipline as `collect_pi`) when the store
+    is absent, `usage_rollups` does not exist yet (a database still on an older schema), or
+    `--project` names an identity this module cannot trust -- never a silent zero.
+    """
+    db = home / ".local/state/set-agentes/routing-v2/routing.db"
+    if not db.exists():
+        return None
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "usage_rollups" not in tables:
+            print("estimate: routing.db has no usage_rollups table yet (older schema) -- skipping",
+                  file=sys.stderr)
+            return None
+        args = [window_start_ms]
+        query = ("SELECT COALESCE(SUM(run_count),0), " + ", ".join(
+            f"COALESCE(SUM(usage_{field}_sum),0), COALESCE(SUM(usage_{field}_reported_count),0)"
+            for field in FIELDS
+        ) + " FROM usage_rollups WHERE window_start=?")
+        if project:
+            try:
+                args.append(_pi_project_key(Path(project).resolve()))
+            except _ProjectIdentityError:
+                print(f"estimate: invalid project identity at {project} -- skipping", file=sys.stderr)
+                return None
+            query += " AND project_key=?"
+        row = conn.execute(query, args).fetchone()
+    finally:
+        conn.close()
+    run_count = row[0]
+    fields = {}
+    for i, field in enumerate(FIELDS):
+        fields[field] = {"sum": row[1 + i * 2], "reported": row[2 + i * 2]}
+    return {"run_count": run_count, "fields": fields}
+
+
+def format_metric_estimate(field, measured, run_count, window_label_text, budget=None):
+    """AC-08/AC-09: the ONLY place in this module that ever writes a "restante" line --
+    pinned by `test_cost_report_restante_has_exactly_one_render_site` (counts this exact
+    marker's occurrences in this file's source), so a future call site that prints its own
+    ad hoc "restante" without the four required elements below fails the gate the moment it
+    is added, not the next time someone happens to notice.
+
+    AC-10: `budget` is `None` for every field the caller did not declare with `--budget` --
+    and then this function NEVER writes a "restante" line at all, only "consumido en la
+    ventana" (the measured sum), because `budget - consumed` needs a budget or it is
+    invented, and this harness does not invent.
+    """
+    consumed = measured["sum"]
+    reported = measured["reported"]
+    coverage = f"{reported}/{run_count} runs reportaron {field} en esta ventana"
+    lines = [
+        f"{field}: consumido en la ventana = {consumed} (medido, no proyectado)",
+        f"  ventana: {window_label_text}",
+        f"  cobertura: {coverage}",
+    ]
+    if budget is not None:
+        remaining = budget - consumed
+        lines.append(
+            f"  restante estimado: {remaining} -- ESTIMADO, provider_reported: false, "
+            f"basis: presupuesto declarado ({budget}) menos {field} consumido y medido en "
+            f"la ventana ({consumed}); cobertura {coverage}; nunca proyectado sobre los "
+            f"runs que no reportaron"
+        )
+    return "\n".join(lines)
+
+
+_ESTIMATE_DISCLAIMER = (
+    "No provider exposes remaining quota (measured -- the permitted commands answer "
+    "authenticated yes/no and which models list, nothing about quota). Every \"restante\" "
+    "line above is an ESTIMATE computed from this harness's OWN measured consumption "
+    "against a budget YOU declared with --budget FIELD=N -- never data the provider "
+    "reported (ADR-0046). A field with no --budget shows only what was measured, never a "
+    "guessed remainder (AC-10)."
+)
+
+
+def render_estimate(estimate, md, budgets, window_label_text):
+    heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+    if md:
+        print(f"## {heading}")
+    else:
+        print(heading)
+        print("=" * len(heading))
+    if estimate is None:
+        print("No usage_rollups data matched.")
+        print()
+        return
+    for field in FIELDS:
+        print(format_metric_estimate(field, estimate["fields"][field], estimate["run_count"],
+                                      window_label_text, budgets.get(field)))
+    print()
+    print(_ESTIMATE_DISCLAIMER)
+    print()
+
+
 def fmt(n):
     if n >= 10**9:
         return f"{n / 10**9:.1f}G"
@@ -453,6 +628,10 @@ def main():
     args = parse_args()
     home = Path(args.home)
     since_ms = since_epoch_ms(args.since)
+    # Validated FIRST, before any output: a malformed --budget should never let this run
+    # print two whole sections and then die -- fail loudly, up front, same discipline
+    # `parse_budgets` itself already documents.
+    budgets = parse_budgets(args.budget)
 
     cli_native = defaultdict(new_bucket)
     collect_opencode(cli_native, home, args.project, since_ms)
@@ -465,6 +644,16 @@ def main():
     render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
     render(harness_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
     print(_NEVER_SUM_DISCLAIMER)
+    print()
+
+    # 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10): a THIRD, separate surface -- never
+    # folded into the "two sections, never summed" disclaimer above, because Section 3 is
+    # not a third measurement of the same overlapping spend, it is an ESTIMATE derived from
+    # Section 2's own store (`usage_rollups`), always labeled as such.
+    window_start_ms, window_end_ms = window_bounds(args.window_start)
+    label = window_label(window_start_ms, window_end_ms)
+    estimate = collect_estimate(home, args.project, window_start_ms)
+    render_estimate(estimate, args.md, budgets, label)
 
 
 if __name__ == "__main__":

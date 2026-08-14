@@ -83,6 +83,46 @@ def run_graph(root, *feature_ids, out=None):
     return run(*args, check=False)
 
 
+def write_routing_db_for_estimate(home, window_start, project_key, run_count, per_field):
+    """023-senales-de-consumo PKG-B4: a minimal `routing.db` with both `dispatches` (empty --
+    `collect_pi` still queries it on every `cost-report.py` run) and `usage_rollups` (schema
+    9's real column set), one row for ONE window/identity. `per_field` maps a subset of
+    `cost_report.FIELDS` to `(sum, reported_count)`; fields not given default to `(0, 0)` --
+    the honest "never reported" shape, never omitted from the table entirely.
+    """
+    routing_root = Path(home) / ".local/state/set-agentes/routing-v2"
+    routing_root.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(routing_root / "routing.db")
+    conn.execute(
+        "CREATE TABLE dispatches (project_key TEXT, actual_model TEXT, role TEXT, usage_status TEXT,"
+        " usage_input INT, usage_output INT, usage_cache_read INT, usage_cache_write INT,"
+        " usage_reasoning INT, updated_at INT)"
+    )
+    conn.execute("""CREATE TABLE usage_rollups (
+        window_start INTEGER NOT NULL, project_key TEXT NOT NULL, route_key TEXT NOT NULL,
+        runtime TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL,
+        outcome TEXT NOT NULL, usage_status TEXT NOT NULL, run_count INTEGER NOT NULL,
+        usage_input_sum INTEGER NOT NULL, usage_input_reported_count INTEGER NOT NULL,
+        usage_output_sum INTEGER NOT NULL, usage_output_reported_count INTEGER NOT NULL,
+        usage_cache_read_sum INTEGER NOT NULL, usage_cache_read_reported_count INTEGER NOT NULL,
+        usage_cache_write_sum INTEGER NOT NULL, usage_cache_write_reported_count INTEGER NOT NULL,
+        usage_reasoning_sum INTEGER NOT NULL, usage_reasoning_reported_count INTEGER NOT NULL,
+        cost_micros_sum INTEGER NOT NULL, cost_micros_reported_count INTEGER NOT NULL)""")
+    values = []
+    for field in ("input", "output", "cache_read", "cache_write", "reasoning"):
+        s, r = per_field.get(field, (0, 0))
+        values += [s, r]
+    bound = (window_start, project_key, "route-1", "pi", "anthropic", "claude", "claude",
+             "success", "ok", run_count, *values)
+    placeholders = ",".join("?" * len(bound))
+    conn.execute(
+        f"INSERT INTO usage_rollups VALUES ({placeholders},0,0)",  # cost_micros_sum/count: unused by this package
+        bound,
+    )
+    conn.commit()
+    conn.close()
+
+
 class HarnessTests(unittest.TestCase):
     def run_state(self, state, *args, check=True):
         return run("python3", str(FEATURE_STATE), *args, "--state-file", str(state), check=check)
@@ -7865,6 +7905,102 @@ class HarnessTests(unittest.TestCase):
         # F-PR-03 (review panel RP-01, upheld by finding-verifier): the discard is named,
         # not mute -- a status column only the store could see before is now visible here.
         self.assertIn("1 absent", result.stderr)
+
+    # ---- 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) — Section 3 estimate
+
+    def test_estimate_reports_measured_consumption_with_named_window_and_coverage(self):
+        """AC-08 baseline: with NO --budget, Section 3 still prints, per token field, the
+        raw measured sum AND its coverage as reported_count/run_count (the exact pair
+        `usage_rollups` carries, 023 PKG-B3) -- never an average silently treating the
+        uncovered runs as zero -- plus the window named by its exact ISO range, not a
+        relative phrase. The trap this package's context pack names by name: 12 of 40 runs
+        reporting `input` must show as "12/40", never folded into a per-run average over 40.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            window_start = 19000 * 86400000
+            write_routing_db_for_estimate(
+                home, window_start, "proj1_" + "a" * 32, run_count=40,
+                per_field={"input": (120000, 12), "output": (60000, 12)},
+            )
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--window-start", str(window_start))
+        self.assertIn("Section 3", result.stdout)
+        self.assertIn("ESTIMADO", result.stdout)
+        # The raw measured sum, not a projection over the 28 runs that never reported.
+        self.assertIn("consumido en la ventana = 120000", result.stdout)
+        # Coverage as the exact pair, never silently completed to 40/40.
+        self.assertIn("12/40 runs reportaron input", result.stdout)
+        self.assertNotIn("40/40 runs reportaron input", result.stdout)
+        # The window is its exact definition, not a relative phrase.
+        window_iso = datetime.fromtimestamp(window_start / 1000, tz=timezone.utc).isoformat()
+        self.assertIn(window_iso, result.stdout)
+        self.assertNotIn("última semana", result.stdout)
+        self.assertNotIn("last week", result.stdout)
+
+    def test_estimate_shows_remaining_only_with_declared_budget_labeled_estimado(self):
+        """AC-08/AC-09 positive path: a "restante" line appears ONLY for a field the caller
+        declared with --budget, and it always carries its basis, `provider_reported: false`,
+        and the coverage figure in the SAME line -- never one without the other three.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            window_start = 19001 * 86400000
+            write_routing_db_for_estimate(
+                home, window_start, "proj1_" + "b" * 32, run_count=40,
+                per_field={"input": (120000, 12)},
+            )
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--window-start", str(window_start), "--budget", "input=1000000")
+        lines = [l for l in result.stdout.splitlines() if "restante estimado" in l]
+        self.assertEqual(len(lines), 1, result.stdout)
+        line = lines[0]
+        self.assertIn("880000", line)  # 1000000 - 120000, computed from the raw measured sum
+        self.assertIn("ESTIMADO", line)
+        self.assertIn("provider_reported: false", line)
+        self.assertIn("basis:", line)
+        self.assertIn("12/40", line)  # coverage travels WITH the remaining figure, not apart
+
+    def test_estimate_never_shows_remaining_without_declared_budget(self):
+        """AC-10, the other bite: with NO --budget for a field, no ACTUAL "restante" figure
+        ever appears for it -- only "consumido en la ventana" (measured, not estimated).
+        The disclaimer paragraph legitimately mentions the word "restante" in prose to
+        explain the rule (never a number attached to it) -- what this test pins is the
+        VALUE-BEARING marker `format_metric_estimate` itself writes
+        (`test_cost_report_restante_has_exactly_one_render_site`'s own marker), which must
+        be structurally absent, not merely the bare word. Together with the previous test,
+        this is the guard's bite in both directions: the labeled figure WITH a budget, no
+        figure AT ALL without one.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            window_start = 19002 * 86400000
+            write_routing_db_for_estimate(
+                home, window_start, "proj1_" + "c" * 32, run_count=40,
+                per_field={"input": (120000, 12), "reasoning": (500, 3)},
+            )
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--window-start", str(window_start))
+        self.assertNotIn("restante estimado:", result.stdout)
+        self.assertIn("consumido en la ventana", result.stdout)
+
+    def test_cost_report_restante_has_exactly_one_render_site(self):
+        """AC-09 guard, DDL-fingerprint style (`test_canonical_ddl_is_pinned_to_schema`
+        precedent, tests/test_routing.py:1424): a structural ratchet, not a comment asking
+        nicely. `format_metric_estimate` is the only function allowed to write a "restante"
+        line, and it always writes it WITH its basis/provider_reported/coverage in the same
+        f-string (verified by the two tests above). This test pins that no SECOND call site
+        can ever print its own ad hoc "restante" without those four elements -- the moment
+        one is added anywhere else in this file, the count below moves and the gate fails
+        immediately, not the next time someone happens to notice the label went missing.
+        """
+        source = COST_REPORT.read_text()
+        self.assertEqual(
+            source.count('"  restante estimado: '), 1,
+            "a new site writes \"restante\" text outside format_metric_estimate -- AC-09's "
+            "whole point is that this is caught here, not discovered later on a live "
+            "surface missing its label/basis"
+        )
 
     def test_init_mode_sets_physical_budgets(self):
         with tempfile.TemporaryDirectory() as td:

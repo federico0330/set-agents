@@ -26,10 +26,18 @@
     "max_spawns_per_package": 8,
     "max_verifications_per_package": 6
   },
-  "current_package_id": "B3-ventana-y-rollup",
+  "current_package_id": "B4-estimado-nunca-dato-del-proveedor",
   "feature_id": "023-senales-de-consumo",
   "final_state": null,
-  "global_gates": [],
+  "global_gates": [
+    {
+      "at": "2026-08-14T05:09:24+00:00",
+      "evidence": "Corrida del orquestador sobre el arbol integrado de 023: Ran 1107 tests, OK (skipped=3), GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=4, BUILD_CHECK_PASS, VERIFY_PASS. Base al abrir la feature: 1080. Cierre: 1107 (+27).",
+      "name": "verify-sh",
+      "required": true,
+      "status": "pass"
+    }
+  ],
   "history": [
     {
       "actor": "orchestrator",
@@ -1194,12 +1202,388 @@
       "package_id": "B3-ventana-y-rollup",
       "timestamp": "2026-08-14T04:10:45+00:00",
       "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:06+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:06+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:06+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:06+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:06+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:07+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:07+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:07+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:07+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:07+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:07+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:08+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:08+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:08+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:08+00:00",
+      "to": "PACKAGE_PLANNING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_PLANNING",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:08+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-spawn",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "client": "Que cuando el harness te diga cuanto gastaste, te diga tambien de donde saco el numero y cuanto de eso midio de verdad.",
+        "effort": "medium",
+        "model": "opus",
+        "provider": "anthropic",
+        "purpose": "Que ningun numero estimado viaje sin su base, su ventana y su cobertura, y que sin presupuesto no exista 'restante'",
+        "role": "implementer",
+        "route_id": "run1_3d6812bc5e71422d4a3dbbec86712b86",
+        "spawn_id": "SPAWN-001",
+        "spawns": 1,
+        "tech": "AC-08/09/10, ultimo paquete de 023. usage_rollups (schema 9) ya trae suma Y conteo de reportados por metrica, que es la cobertura. Ningun proveedor expone cuota restante: sin presupuesto declarado se muestra 'consumido en la ventana', no 'restante'. Guard test al estilo del candado de DDL que nacio de la regresion de B3."
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T04:11:49+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "basis, provider_reported false, ventana nombrada por su definicion y cobertura (AC-08)",
+        "validations": [
+          "unittest: 1107 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Guard test: una superficie sin etiqueta falla el gate (AC-09)",
+        "validations": [
+          "unittest: 1107 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "complete-task",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "task_id": "Sin presupuesto declarado no se muestra restante, se muestra consumido (AC-10)",
+        "validations": [
+          "unittest: 1107 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check BUILD_CHECK_PASS"
+        ]
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:24+00:00",
+      "to": "PACKAGE_IMPLEMENTATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_IMPLEMENTATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:24+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "unittest-suite",
+        "status": "pass"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:24+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:24+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "build-check",
+        "status": "pass"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:25+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "global": false,
+        "name": "git-diff-check",
+        "status": "pass"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:25+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "update-package",
+      "from": "PACKAGE_GATES",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:25+00:00",
+      "to": "PACKAGE_GATES"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_GATES",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:05:25+00:00",
+      "to": "PACKAGE_REVIEW"
+    },
+    {
+      "actor": "package-reviewer",
+      "event": "record-review",
+      "from": "PACKAGE_REVIEW",
+      "metadata": {
+        "finding_count": 0,
+        "verdict": "pass"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:09:03+00:00",
+      "to": "PACKAGE_TESTING"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-testing",
+      "from": "PACKAGE_TESTING",
+      "metadata": {
+        "commands": [
+          "python3 -m unittest discover -s tests",
+          "./ai/scripts/verify.sh"
+        ],
+        "status": "pass"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:09:03+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-runtime-qa",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "status": "pass",
+        "url": ""
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:09:03+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-module-impact",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {
+        "module": "routing"
+      },
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:09:03+00:00",
+      "to": "PACKAGE_RUNTIME_QA"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "accept-package",
+      "from": "PACKAGE_RUNTIME_QA",
+      "metadata": {},
+      "package_id": "B4-estimado-nunca-dato-del-proveedor",
+      "timestamp": "2026-08-14T05:09:03+00:00",
+      "to": "PACKAGE_ACCEPTED"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "PACKAGE_ACCEPTED",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-14T05:09:03+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "record-gate",
+      "from": "INTEGRATION",
+      "metadata": {
+        "global": true,
+        "name": "verify-sh",
+        "status": "pass"
+      },
+      "package_id": null,
+      "timestamp": "2026-08-14T05:09:24+00:00",
+      "to": "INTEGRATION"
     }
   ],
   "metrics": {
     "delta_reviews": 1,
     "human_questions_after_approval": 0,
-    "package_reviews": 3,
+    "package_reviews": 4,
     "repair_batches": 1,
     "task_deep_reviews": 0,
     "verifications": 1
@@ -2027,29 +2411,134 @@
         "AC-09",
         "AC-10"
       ],
-      "approved_exceptions": [],
+      "approved_exceptions": [
+        {
+          "path": "ai/scripts/set_agents_app.py",
+          "reason": "AC-08/09/10: la superficie que muestra consumo.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/cost-report.py",
+          "reason": "AC-08: etiquetas y cobertura.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/store.py",
+          "reason": "Heredado de B3; se consume usage_rollups, no se modifica.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/routing_core/usage.py",
+          "reason": "Heredado de B1/B2.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/claude_code_spawn.py",
+          "reason": "Heredado de B2.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/scripts/opencode_spawn.py",
+          "reason": "Heredado de B2.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0046-estimado-es-estimado.md",
+          "reason": "AC-08 pide ADR-0046.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/README.md",
+          "reason": "Indice.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/adr/0045-consumo-vocabulario-en-el-borde.md",
+          "reason": "Heredado de B1/B2/B3.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/STATUS.md",
+          "reason": "Estado.",
+          "status": "approved"
+        },
+        {
+          "path": "ai/state/decisions-log.jsonl",
+          "reason": "Log.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/notas/00 - Proyecto.md",
+          "reason": "Nota regenerada.",
+          "status": "approved"
+        },
+        {
+          "path": "docs/specs/023-senales-de-consumo/spec.md",
+          "reason": "Enmendada dos veces antes de los paquetes.",
+          "status": "approved"
+        }
+      ],
       "attempts": {
-        "deep_review_cycles": 0,
+        "deep_review_cycles": 1,
         "repair_batches": 0,
-        "spawns": 0,
+        "spawns": 1,
         "subdivisions": 0,
         "verification_waivers": 0,
         "verifications": 0
       },
       "candidate_identity": null,
       "complexity": "medium",
-      "context_pack": null,
+      "context_pack": "docs/specs/023-senales-de-consumo/context/B4-estimado-nunca-dato-del-proveedor.md",
       "delta_reviews": [],
       "dependencies": [
         "B3-ventana-y-rollup"
       ],
-      "diff_ref": null,
+      "diff_ref": "working-tree @ 133c32a (023/B4: cost-report.py:413-527 ventana/cobertura/estimado, tests +5, ADR-0046 nuevo)",
       "findings": [],
-      "gates": [],
-      "integrated": false,
+      "gates": [
+        {
+          "at": "2026-08-14T05:05:24+00:00",
+          "evidence": "",
+          "name": "unittest-suite",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-14T05:05:24+00:00",
+          "evidence": "",
+          "name": "verify-sh",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-14T05:05:25+00:00",
+          "evidence": "",
+          "name": "build-check",
+          "required": true,
+          "status": "pass"
+        },
+        {
+          "at": "2026-08-14T05:05:25+00:00",
+          "evidence": "",
+          "name": "git-diff-check",
+          "required": true,
+          "status": "pass"
+        }
+      ],
+      "integrated": true,
       "late_reviews": [],
       "module_impact_waiver": null,
-      "module_impacts": [],
+      "module_impacts": [
+        {
+          "actor": "orchestrator",
+          "at": "2026-08-14T05:09:03+00:00",
+          "cambio": "Todo numero estimado viaja con base, ventana y cobertura, y sin presupuesto declarado no existe 'restante'",
+          "feature_id": "023-senales-de-consumo",
+          "modelo_mental": "El harness dice que midio y cuanto de eso midio de verdad, en vez de presentar un promedio sobre runs que nunca reportaron",
+          "module": "routing",
+          "package_id": "B4-estimado-nunca-dato-del-proveedor"
+        }
+      ],
       "objective": "Que ningun numero estimado viaje sin su base, su ventana y su cobertura",
       "owned_paths": [
         "ai/scripts",
@@ -2062,43 +2551,93 @@
       "repair_ceiling": null,
       "repairs": [],
       "review_panels": [],
-      "reviews": [],
+      "reviews": [
+        {
+          "actor": "package-reviewer",
+          "at": "2026-08-14T05:09:03+00:00",
+          "evidence": "Reviewer independiente codex/openai-codex/gpt-5.6-terra, proveedor distinto del writer (anthropic/opus). VEREDICTO approved, sin hallazgos. Punto 1: corrio cost-report.py con y sin --budget; sin presupuesto no aparece ninguna linea de restante, y con presupuesto lleva ESTIMADO, provider_reported: false, base explicita y cobertura. Punto 2: la cobertura sale del conteo real de reportados, no de run_count. Punto 3: mordidas sobre el guard test y otro test nuevo, rojo y verde.",
+          "findings": [],
+          "verdict": "pass"
+        }
+      ],
       "risks": [],
       "routing_reason": null,
-      "runtime_qa": [],
+      "runtime_qa": [
+        {
+          "at": "2026-08-14T05:09:03+00:00",
+          "browser": "",
+          "checks": [
+            "Sin presupuesto declarado no se muestra ningun restante",
+            "Todo estimado lleva base, ventana definida y cobertura real"
+          ],
+          "evidence": "Salida literal del implementer, confirmada por el reviewer con proceso real: 'cobertura: 12/40 runs reportaron input en esta ventana' y 'restante estimado: 880000 -- ESTIMADO, provider_reported: false, basis: presupuesto declarado (1000000) menos input consumido y medido en la ventana (120000); nunca proyectado sobre los runs que no reportaron'. Sin --budget esa linea no existe.",
+          "screenshots": [],
+          "status": "pass",
+          "url": ""
+        }
+      ],
       "runtime_surface": true,
       "selected_model": null,
       "selected_role": null,
       "shared_paths": [],
-      "spawns": [],
-      "status": "planned",
+      "spawns": [
+        {
+          "at": "2026-08-14T04:11:49+00:00",
+          "client": "Que cuando el harness te diga cuanto gastaste, te diga tambien de donde saco el numero y cuanto de eso midio de verdad.",
+          "effort": "medium",
+          "model": "opus",
+          "provider": "anthropic",
+          "purpose": "Que ningun numero estimado viaje sin su base, su ventana y su cobertura, y que sin presupuesto no exista 'restante'",
+          "role": "implementer",
+          "route_id": "run1_3d6812bc5e71422d4a3dbbec86712b86",
+          "spawn_id": "SPAWN-001",
+          "tech": "AC-08/09/10, ultimo paquete de 023. usage_rollups (schema 9) ya trae suma Y conteo de reportados por metrica, que es la cobertura. Ningun proveedor expone cuota restante: sin presupuesto declarado se muestra 'consumido en la ventana', no 'restante'. Guard test al estilo del candado de DDL que nacio de la regresion de B3."
+        }
+      ],
+      "status": "accepted",
       "strict_tdd": false,
       "tasks": [
         {
           "blockers": [],
           "id": "basis, provider_reported false, ventana nombrada por su definicion y cobertura (AC-08)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1107 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "Guard test: una superficie sin etiqueta falla el gate (AC-09)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1107 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         },
         {
           "blockers": [],
           "id": "Sin presupuesto declarado no se muestra restante, se muestra consumido (AC-10)",
-          "local_validations": [],
-          "status": "planned"
+          "local_validations": [
+            "unittest: 1107 OK / 3 skips (orquestador); verify.sh VERIFY_PASS; build.sh --check BUILD_CHECK_PASS"
+          ],
+          "status": "completed"
         }
       ],
-      "testing": [],
+      "testing": [
+        {
+          "at": "2026-08-14T05:09:03+00:00",
+          "commands": [
+            "python3 -m unittest discover -s tests",
+            "./ai/scripts/verify.sh"
+          ],
+          "evidence": "1107 OK / 3 skips. Base 1102 -> 1107: 5 tests nuevos, incluido el guard estructural de un unico sitio de render del restante.",
+          "status": "pass"
+        }
+      ],
       "verifications": []
     }
   ],
-  "phase": "PACKAGE_ACCEPTED",
-  "revision": 98,
+  "phase": "INTEGRATION",
+  "revision": 132,
   "schema_version": 1,
   "spec_amendments": [
     {
@@ -2122,5 +2661,5 @@
       "reason": "AC-04a agregado a PKG-2: cablear los adaptadores de spawn a routing_core/usage.py. El implementer de B1 midio que claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row no reconoce. El endurecimiento de AC-02 las convierte en 'invalid' contado en vez de 'ok' con NULLs silencioso, pero no las traduce. Sin AC-04a, B1 deja el descarte visible y el dato sigue perdido."
     }
   ],
-  "updated_at": "2026-08-14T04:10:45+00:00"
+  "updated_at": "2026-08-14T05:09:24+00:00"
 }

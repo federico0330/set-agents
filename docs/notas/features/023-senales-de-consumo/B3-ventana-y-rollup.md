@@ -27,6 +27,9 @@
 - review: repair_required (6 hallazgos)
 - verificación: 0 refutados, 6 sostenidos
 - repair: B3-F01, B3-F02, B3-F03, B3-F04, B3-F05, B3-F06 → 2 archivos
+- delta review: pass
+- testing: pass
+- runtime QA: pass
 - gate `unittest-suite`: pass
 - gate `verify-sh`: pass
 - gate `build-check`: pass

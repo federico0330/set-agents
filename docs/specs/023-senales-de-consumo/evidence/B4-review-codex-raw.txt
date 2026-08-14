@@ -1,0 +1,1737 @@
+Reading additional input from stdin...
+OpenAI Codex v0.147.0
+--------
+workdir: /home/federico/SET-AGENTES
+model: gpt-5.6-terra
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: high
+reasoning summaries: none
+session id: 019ffea9-2bdb-7430-bd35-30fcfc0bc256
+--------
+user
+Sos package-reviewer independiente en /home/federico/SET-AGENTES. Read-only sobre codigo de produccion.
+HACE LA REVISION VOS MISMO: no delegues. NUNCA escribas bajo ~ fuera de /tmp.
+
+NO LEAS TODO. Solo:
+- ai/scripts/cost-report.py zonas 405-530
+- tests/test_harness.py: test_cost_report_restante_has_exactly_one_render_site (:7987)
+- los tests nuevos en tests/test_routing.py
+- git diff -- ai/scripts/cost-report.py
+
+Contexto: ningun proveedor expone cuota restante. El paquete hace que todo numero estimado viaje con
+su base, su ventana nombrada por su definicion, y su COBERTURA (cuantos de los runs de la ventana
+reportaron de verdad); y que sin presupuesto declarado NO se muestre "restante" sino "consumido".
+
+Revisa EXACTAMENTE estos tres puntos.
+
+PUNTO 1 - Se puede mostrar un "restante" sin etiqueta?
+Es el corazon. Corre cost-report.py contra fixtures, CON y SIN --budget, y pega las dos salidas.
+Sin --budget no puede aparecer ninguna linea de "restante". Con --budget, el restante tiene que
+llevar ESTIMADO, provider_reported: false, la base explicita y la cobertura.
+Busca ademas si hay ALGUNA otra ruta de codigo que imprima un restante sin pasar por ese unico
+punto. Si la hay, es hallazgo critical.
+
+PUNTO 2 - La cobertura es real o cosmetica?
+usage_rollups trae suma Y conteo de reportados por metrica. Verifica que la cobertura sale del
+conteo real y no de run_count. Construi un fixture donde 12 de 40 runs reporten input y confirma que
+dice 12/40, no 40/40 ni un promedio sobre 40. Si promedia sobre los que no reportaron, es hallazgo
+critical: seria inventar con cara de dato.
+
+PUNTO 3 - MORDIDA, y la sexta guarda hueca.
+En este proyecto ya aparecieron CINCO tests que decian cubrir algo que no miraban. El guard test de
+AC-09 dice que hay un unico sitio de render. Rompelo: agrega un segundo sitio que imprima "restante"
+sin etiqueta y confirma que el test se pone ROJO. Y eligi otro test nuevo y rompe lo que dice
+proteger. Con cp a /tmp y restauracion por cp; NO uses git checkout/restore/stash.
+Pega rojo y verde literales. Si alguno pasa en verde con el codigo roto, es hallazgo critical.
+
+REGLAS:
+- Cada bloque literal, o marcado como recortado. Si no lo corriste, "sin verificar".
+- `pytest` NO esta instalado. python3 -m unittest dirigido.
+- NO corras la suite entera: el orquestador ya la corrio, 1107 OK / 3 skips, VERIFY_PASS.
+
+FORMATO DE SALIDA (al final, texto plano):
+VEREDICTO: approved | revision_required
+Por cada hallazgo: ID / SEVERIDAD / DONDE (file:line) / QUE / PRUEBA (comando y salida literal).
+Si no hay hallazgos, decilo y mostra igual la evidencia de los tres puntos.
+codex
+Voy a hacer una revisión independiente y acotada, usando el flujo de triage y revisión de paquete para registrar evidencia reproducible. No voy a delegar ni modificar código de producción; las mutaciones de prueba serán copias temporales con restauración por `cp`.
+exec
+/bin/bash -lc "sed -n '1,240p' /home/federico/SET-AGENTES/AGENTS.md && sed -n '1,260p' /home/federico/.codex/skills/request-triage/SKILL.md && sed -n '1,320p' /home/federico/.codex/skills/package-review/SKILL.md && sed -n '1,260p' /home/federico/.codex/skills/audit-diff/SKILL.md" in /home/federico/SET-AGENTES
+ exited 2 in 0ms:
+sed: can't read /home/federico/SET-AGENTES/AGENTS.md: No such file or directory
+
+exec
+/bin/bash -lc "sed -n '1,260p' /home/federico/.codex/skills/request-triage/SKILL.md; sed -n '1,360p' /home/federico/.codex/skills/package-review/SKILL.md; sed -n '1,260p' /home/federico/.codex/skills/audit-diff/SKILL.md" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+---
+name: request-triage
+description: Intake + mode selection for the orchestrator — classify an incoming request into an execution mode (consult/analysis, feature/SDD, scoped-feature, quick-fix, or incident/break-glass), ask scoping questions BEFORE starting, and know which normally-dormant agents (security-auditor, brainstormer, ux-ui-designer) to pull in and when. Load at the START of every user request, before delegating anything.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator
+---
+
+# Request Triage
+
+## When to use
+At the very start of EVERY user request, before any delegation. Classify the request, decide the mode, ask
+what you must, then run the matching flow. Do not dive into the SDD pipeline reflexively — that is exactly the
+failure this skill exists to prevent (applying the heavy flow to a problem that needed a fast, clever fix).
+
+## Step 0 — intake (always, before delegating)
+1. Restate the request in one line and name the **mode** you are choosing + why.
+2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
+   original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
+   scoping doubt one of those already answers is resolved with `log-decision`, not asked.
+3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+   questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
+   cart".
+4. Only then delegate the first action of the chosen mode.
+
+## The five modes
+
+### 0. Consult / analysis — thinking together, no pipeline (check this FIRST)
+Triggers: "qué opinás", "cómo encararías", "analizame esta idea", comparisons, design questions — any request
+where the user wants analysis or a recommendation, not a code change. This is a first-class mode, not a
+misclassified feature.
+Flow: NO `init`, NO state file, NO pipeline. Delegate in parallel (these spawns are allowed and cheap):
+- `brainstormer` — 3-6 genuinely different options with tradeoffs,
+- `architect` — read-only pass over the three axes (relational vs non-relational vs vector store, API Gateway,
+  deploy platform) plus design patterns / clean-architecture shape; NO ADR unless the user asks,
+- `security-auditor` — design-level threat sketch, only when the idea touches auth/money/PII/external input.
+Then SYNTHESIZE yourself into ONE multi-lens analysis: data model, architecture/patterns, security,
+algorithms/complexity — ending with a recommendation plus runner-up. Close by asking: "¿Lo convierto en spec
+(feature) o en scoped?". A consult NEVER starts the pipeline on its own; if durable learning surfaced,
+delegate a `memory-scribe` note to the domain knowledge.
+
+### 1. Feature / build — full SDD (opt-in; only when the work truly demands it)
+Triggers — full SDD is chosen ONLY when at least one of these holds; otherwise drop to scoped-feature (if a
+concrete risk signal is present) or quick-fix (the default lane):
+- a net-new system or module (not an addition to established infrastructure),
+- genuinely multi-package work (several coherent packages with dependencies),
+- the request touches one of the three architecture axes (data store type, API Gateway, deploy platform)
+  with no ADR covering it.
+Before code, **run the scoping interrogation** (load `system-design-decisions`): what future/scale do you
+expect? where centralized vs decentralized? what must be secure day one? and name these three axes
+explicitly, not generically — **does persistence need vector/semantic search or does relational cover it?
+does this need an API Gateway or is it a monolith with one client? where does it deploy and why (Vercel/PaaS
+vs VPS/IaaS vs managed)?** Then the rigorous
+**SDD → BDD → package workflow → regression tests** flow: spec → design+ADR (SDD) → acceptance
+Given-When-Then (BDD) → spec challenge → user approval → package planning → package implementation with local
+validations → package gates → one deep package review → consolidated repair → delta review → regression tests →
+integration → judge → release → memory. Tests do NOT approve implementation; the independent package reviewer
+does. This order is mandatory in feature mode; the three lanes below are the only
+exceptions (scoped-feature / quick-fix / incident).
+
+### 2. Scoped-feature — for bounded work that shows a concrete risk signal
+Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
+present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
+multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
+change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
+the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
+Flow: SDD-lite (spec + acceptance Given-When-Then; an ADR only if there is a genuinely new architectural
+decision) → BDD connection point with the user → one or more coherent packages → package gates → **ONE
+consolidated package review over the complete package diff** → `security-auditor` when the package
+touches that surface → regression tests → `adversarial-judge` → release → memory.
+What is cut: deep review does NOT run after each task or each trivial repair. Security guarantee is preserved by
+reviewing the complete relevant package/diff once, then delta-reviewing repairs. Escalate to feature mode only
+when one of feature mode's explicit triggers appears (net-new system, multi-package, uncovered architecture
+axis) — "this feels big" is a reason to scope the package better, not to escalate.
+
+### 3. Quick-fix — the DEFAULT for small and medium bounded work
+Triggers: any small-or-medium, well-understood change with a clear blast radius — a bugfix, a bounded behavior
+tweak, a change across 1-3 files, copy/config, one function or one component. This is the write-side half of
+the same 1-3 number `orchestrator.md`'s "Direct-read vs. delegated-explore threshold" (ADR-0020) uses for the
+read side — the two are kept as one cross-referenced constant, not two independent numbers. This is the default lane: most
+day-to-day requests land here unless a concrete scoped/feature trigger is present. Flow: implement →
+`gate-runner` verify → done. Skip spec/design/ADR and the full audit panel — UNLESS the diff itself turns out
+to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
+or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
+`python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
+— quick-fixes with no trace are how the development thread gets lost.
+
+### 4. Incident / break-glass — production is broken NOW
+Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
+prod user needs a password reset and there is no forgot-password flow → a one-shot `psql` script, done).
+Flow: fastest correct + ingenious fix, minimal ceremony, delegate the actual change to `debugger`/`implementer`
+(you still never implement yourself). MANDATORY afterward — never skip: (a) write down exactly what was done,
+(b) open a follow-up task to do it properly, (c) delegate a memory note. Break-glass is a conscious, logged
+exception to the rigor default — not a licence to abandon it.
+
+Ambiguous which mode? Ask. Otherwise pick the LIGHTEST mode that covers the risk actually observed in the
+request and the code — not the hypothetical risk. Escalate only when you find a concrete signal from the
+lists above, and name that signal in the narration. Downgrading is equally legitimate: if mid-scoped the
+planner or implementer establishes the change is smaller than assumed (no signal actually present), degrade
+to quick-fix and record why with `log-decision` — escalation is not a one-way ratchet.
+
+## Physical budgets per mode (enforced by the state CLI, not by prose)
+
+The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
+`feature-state.py init` via `--mode`:
+
+| Mode | `--mode` | Spawns/package | Deep review cycles | Gate failures |
+|---|---|---|---|---|
+| Feature / SDD | `feature` (opt-in) | 12 | 2 | 3 |
+| Scoped-feature | `scoped` (default) | 8 | 2 | 3 |
+| Quick-fix | `quick-fix` | 4 | 1 | 2 |
+| Incident | `incident` | 6 | 1 | 2 |
+
+Two physical waivers keep light modes light without prose exceptions:
+- `record-repair --skip-delta` skips the delta review ONLY when every repaired finding is ≤ medium severity
+  and the repair touched ≤ 3 files (the CLI rejects it otherwise, and the waiver is recorded in the event).
+- `create-package --runtime-surface false` (planner declaration) lets a package with no observable runtime
+  surface become accept-ready after testing, without spawning `app-runner`/`runtime-verifier`. Default is
+  `true` — fail-safe.
+
+`record-spawn` blocks the feature when the spawn budget is exhausted. If a quick-fix genuinely needs more
+than 4 spawns, that is the signal it was misclassified — re-triage to `scoped`/`feature` (a conscious,
+logged decision), do not fight the budget.
+
+## Architecture red-flags (transversal — check in EVERY mode, including quick-fix)
+Before delegating in ANY mode, check the request against the three named axes above: **data store type
+(including vector vs relational)**, **API Gateway**, and **deploy platform (Vercel/PaaS vs VPS/IaaS)**. The
+check fires on EVIDENCE, not plausibility: the request or the files it names concretely require one of these
+axes (a new kind of persistence, a new external entry point, a deploy change) AND no existing ADR covers it.
+When it fires, do not implement directly — escalate to at least `scoped-feature` with an architecture
+checkpoint (`architect` loads `system-design-decisions`, proposes options, and the orchestrator asks the user
+per its Question policy) before any code is written. This applies even to a request that looks like a
+quick-fix on its surface ("add semantic search to the docs page" is a one-line ask, but it is a data-store
+decision). What it does NOT mean: "could hypothetically touch persistence someday" is not a red flag — an
+ordinary bugfix inside existing tables/routes/deploy stays a quick-fix. A safe default is NOT an escape
+hatch for these three axes specifically — see `orchestrator.md`'s Question policy.
+**Named-platform carve-out (ADR-0025)**: when the request itself names the platform ("deploy this to
+Vercel", "store it in Supabase"), that axis is DECIDED — record it with `log-decision` and proceed without
+asking; `architect` writes the formal ADR afterwards. The red-flag question is only for an axis the user
+left genuinely open.
+
+## Waking the dormant agents (concrete triggers, not "by risk")
+These agents are permitted but easy to forget — pull them in on these triggers. The trigger is evidence in
+the plan or the diff (the concrete files/paths the package owns: auth/, payments/, migrations/, ui
+components, .env-adjacent config), not the topic of the request in the abstract; `package-planner` justifies
+each entry in `required_reviewers` with the paths that demand it:
+- **auth / money / PII / any external input** → `security-auditor` is MANDATORY before the judge (its report
+  covers the attack path AND the hardening/detection plan in one pass — no separate hand-off agent).
+- **any user-facing surface / new UI** → `ux-ui-designer` (brand-grade, accessible; not generic defaults).
+- **the approach is genuinely open / multiple viable designs** → `brainstormer` before committing.
+- **queries / lists / transactions / migrations** → covered by `package-reviewer`'s own data-integrity/
+  scalability checklist (already mandatory, no separate agent).
+
+**Cadence by mode:** in package workflow, specialized reviewers run when the package touches their surface, or
+when a repair changes that surface. They do not run after every ordinary task. A final evidence pass before
+`adversarial-judge` is mandatory.
+
+## Hard logic → hosted implementer (never the local leaf)
+Concurrency, atomic transactions, money/financial rules, and security-critical logic must NOT be implemented by
+the local leaf model (the cheap 8B) — a weak first draft on exactly this logic triggers more strong-auditor
+rework than it saves. When a task touches these, pin implementation to a **hosted** model (e.g. `openai/gpt-5.4`)
+rather than the local `implementer`. Route such implementation deliberately from the package plan. The
+local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then reviews.
+
+## Output of triage
+State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
+incident mode, also name the follow-up task you will open once the fire is out.
+
+The first delegation is announced with the dual-register narration block from `orchestrator.md`
+(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
+parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
+since a consult has no feature state file.
+---
+name: package-review
+description: Deep independent review of a complete package diff against approved spec, package criteria, gates, integration behavior, and relevant risk surfaces.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: package-reviewer, delta-reviewer, adversarial-judge
+---
+
+# Package Review
+
+## Inputs
+Approved spec/version, package plan, diff, gate results, assumptions, and known risks.
+
+## Checks
+- Correctness against covered acceptance criteria.
+- Integration with existing contracts.
+- Architecture and maintainability with real impact.
+- Security/data/performance surfaces when touched.
+- Failure paths and edge cases.
+- Test gaps that would leave accepted behavior unprotected.
+
+## Cadence
+One deep review per integrated package. A second pass is focused on repair delta. Full re-review only when repair
+changes architecture, public contracts, or risk surface substantially.
+
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).
+---
+name: audit-diff
+description: Read-only diff audit against spec/package/acceptance — scope control, test integrity, edge cases, and a golden catalog of cheap-but-compounding mistakes. Load for focused audits or package review support.
+license: MIT
+compatibility: opencode
+metadata:
+  enabled_for: orchestrator, package-reviewer, security-auditor, adversarial-judge
+---
+
+# Audit Diff
+
+## Posture — you supervise a cheaper implementer
+You review the work of a faster, cheaper implementer that WILL make the mistakes below. Assume it did. Walk the
+whole catalog every time, even when the code compiles and the tests pass — "it runs" is not "it's correct". Your
+job is to catch the small, cheap-to-fix failures that quietly become debt and vulnerabilities.
+
+## When to use
+After package implementation and gates, before a package is accepted; also for focused checkpoints.
+
+## Inputs
+`git diff`, approved spec, package/task scope, acceptance criteria, verification output, project rules.
+
+## Procedure
+1. Read the task and acceptance criteria FIRST — you audit the implementation against the spec/design/acceptance,
+   NOT against a passing test suite. This is the guardrail: does the code actually return what the spec expects?
+2. Inspect the diff in context, not files in isolation.
+3. Scope control: no opportunistic refactors, no unrelated churn.
+4. Test integrity — local validations are expected during package implementation; end-stage regression tests are
+   checked once they exist after package convergence. Judge correctness against the spec/package contract, not a
+   green suite alone.
+5. Failure paths and edge cases covered.
+6. **Walk the golden failure catalog below** — for anything the diff touches.
+7. Produce ONLY actionable findings.
+
+## Golden failure catalog (the cheap mistakes a fast implementer makes)
+Each is a blocking problem when present, even if the app runs. Load the linked skill for the full checklist.
+1. **Pagination in memory / none** — `ToListAsync()` then `Skip/Take` in app code. Fix: `Skip/Take` + `CountAsync`
+   in SQL, `AsNoTracking`, return `{data,total,page,pageSize}`. → `performance-scalability`.
+2. **Non-atomic multi-write** — several `SaveChanges`/commits for writes that must succeed together. Fix: ONE
+   `BeginTransaction/Commit/Rollback`. → `db-integrity`.
+3. **Concurrency that never fires** — `Version++` after `SaveChanges` (dead code). Fix: atomic conditional
+   `UPDATE ... WHERE Id=@id AND Version=@read`; 0 rows affected ⇒ conflict. → `db-integrity`.
+4. **Wrong error status** — conflict returns 500 + stack trace, or every exception collapses to a generic 400/409.
+   Fix: typed domain exceptions (Conflict→409, NotFound→404) mapped in ONE global middleware; never leak stack in
+   prod. → `error-handling-http`.
+5. **Unaudited failed attempt** — the audit `AddAsync` sits inside the rolled-back transaction / has no
+   `SaveChanges`, so failures vanish. Fix: record the failed attempt in its OWN unit of work + `SaveChanges`.
+   → `db-integrity`.
+6. **Data antipatterns** — `DateTime.Now` in business logic (use `UtcNow`); N+1 (use `Include`/projection);
+   missing `AsNoTracking` on read-only queries; magic numbers (use named `const`/config). → `performance-scalability`.
+7. **Frontend error UX** — native `alert()` instead of the app's toast; no state refresh after a 409 (stale view).
+   Fix: app notification + reload the affected state; centralize status→message mapping. → `frontend-error-ux`.
+8. **Secrets / repo hygiene** — committed connection strings/secrets; tracked `bin/`, `obj/`, `*.user`,
+   `appsettings.Development.json`; dead scaffolding (`Class1.cs`, `WeatherForecast.cs`); commented-out blocks.
+   Fix: `.gitignore` + `git rm -r --cached`. → `secrets-hygiene`.
+9. **SOLID / clean architecture (cross-cutting)** — god-functions, duplicated logic, presentation mixed with
+   data/business logic, dependencies pointing outward, missing an obvious pattern. → `clean-architecture`.
+
+## Anti-deferral rule (the reason things slip through)
+A cheap-to-fix structural failure (pagination, `AsNoTracking`, N+1, broken SOLID, missing pattern, non-atomic
+transaction, wrong status code, unaudited failure) is a finding to **fix now**, NOT to wave through as
+"acceptable for V1" or "not blocking". You may exclude something ONLY if an acceptance criterion explicitly puts
+it out of scope — and even then you record it as a finding with that justification, never a silent pass. When in
+doubt, it is a finding: it is cheaper to fix now than to let it become a vulnerability.
+
+## Nits vs. findings
+Ignore cosmetic nits (formatting, name bikeshedding, subjective style). The catalog items are NOT nits — they are
+must-fix. A finding IS a blocking problem (1); no findings = `AUDIT_PASS` (0). Do not grade severity.
+
+## Finding schema
+```
+- id: AUD-001
+  file: path/to/file.ext:line
+  evidence: exact code/behavior
+  impact: why it blocks (debt/vulnerability it becomes)
+  minimal_fix: smallest safe change
+  verification: command/test/check that proves the fix
+```
+
+## Long-running commands you run yourself
+Never pipe a gate/suite you are verifying through a `tail -N` pipe while waiting — silence trips the
+runtime's stall watchdog. Run it as `ai/scripts/heartbeat-run.py --interval N -- <command>` (ADR-0041, see
+`spawn-prompt/SKILL.md`).
+
+## Rule
+Never patch code here. Never approve on the implementer's word. Vague comments are not findings.
+
+codex
+Modo: revisión focalizada. El alcance y los criterios están completamente definidos por tu pedido: voy a inspeccionar sólo los fragmentos y diffs indicados, más una búsqueda mecánica de rutas de renderizado de “restante” necesaria para el Punto 1.
+exec
+/bin/bash -lc "sed -n '405,530p' ai/scripts/cost-report.py; sed -n '7970,8025p' tests/test_harness.py; git diff -- ai/scripts/cost-report.py; git diff -- tests/test_routing.py; git status --short" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+
+
+# ---------------------------------------------------------------------------------------
+# 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) -- ESTIMATED remaining quota,
+# read from `usage_rollups` (schema 9, PKG-B3). Tokens only, same "what matters is quota"
+# doctrine the module docstring already states for Sections 1/2 -- no cost_micros budget.
+# ---------------------------------------------------------------------------------------
+
+def parse_budgets(items):
+    """`FIELD=N`, FIELD in FIELDS. AC-10 exists so that a "restante" only ever appears for a
+    budget the caller EXPLICITLY declared for a real field -- a typo silently ignored would
+    make that declaration silently vanish, which is the same silent-invention AC-10
+    forbids, just moved into argument parsing. Dies loudly instead.
+    """
+    budgets = {}
+    for item in items:
+        field, sep, value = item.partition("=")
+        if not sep or field not in FIELDS:
+            raise SystemExit(
+                f"cost-report.py: --budget {item!r} -- FIELD must be one of "
+                f"{', '.join(FIELDS)}, given as FIELD=N")
+        try:
+            n = int(value)
+        except ValueError:
+            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be an integer")
+        if n < 0:
+            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be >= 0")
+        budgets[field] = n
+    return budgets
+
+
+def window_bounds(now_ms=None):
+    """The exact UTC-calendar-day window `usage_rollups.window_start` buckets a close into
+    (`routing_core/store.py:_rollup_usage_in`) -- `_DAY_MS` above is pinned against that
+    module's own constant by a test, so this cannot silently drift from what a row here
+    was actually summed under.
+    """
+    if now_ms is None:
+        now_ms = int(time.time() * 1000)
+    start = (now_ms // _DAY_MS) * _DAY_MS
+    return start, start + _DAY_MS
+
+
+def window_label(start_ms, end_ms):
+    """AC-08: the window NAMED BY ITS DEFINITION -- the exact range, never a relative
+    phrase like "last week"."""
+    start = dt.datetime.fromtimestamp(start_ms / 1000, tz=dt.timezone.utc).isoformat()
+    end = dt.datetime.fromtimestamp(end_ms / 1000, tz=dt.timezone.utc).isoformat()
+    return f"{start} to {end} (UTC calendar day, usage_rollups.window_start)"
+
+
+def collect_estimate(home, project, window_start_ms):
+    """Reads `usage_rollups` for exactly ONE UTC-day window and returns, per token FIELD,
+    the raw measured sum and how many of the window's runs actually REPORTED that field --
+    the coverage pair the schema itself already carries (023-senales-de-consumo PKG-B3),
+    never averaged over the runs that did not report (the trap this package's context pack
+    names explicitly: 12-of-40 coverage presented as if the other 28 reported zero).
+
+    Returns `None` (with a stderr message, same discipline as `collect_pi`) when the store
+    is absent, `usage_rollups` does not exist yet (a database still on an older schema), or
+    `--project` names an identity this module cannot trust -- never a silent zero.
+    """
+    db = home / ".local/state/set-agentes/routing-v2/routing.db"
+    if not db.exists():
+        return None
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "usage_rollups" not in tables:
+            print("estimate: routing.db has no usage_rollups table yet (older schema) -- skipping",
+                  file=sys.stderr)
+            return None
+        args = [window_start_ms]
+        query = ("SELECT COALESCE(SUM(run_count),0), " + ", ".join(
+            f"COALESCE(SUM(usage_{field}_sum),0), COALESCE(SUM(usage_{field}_reported_count),0)"
+            for field in FIELDS
+        ) + " FROM usage_rollups WHERE window_start=?")
+        if project:
+            try:
+                args.append(_pi_project_key(Path(project).resolve()))
+            except _ProjectIdentityError:
+                print(f"estimate: invalid project identity at {project} -- skipping", file=sys.stderr)
+                return None
+            query += " AND project_key=?"
+        row = conn.execute(query, args).fetchone()
+    finally:
+        conn.close()
+    run_count = row[0]
+    fields = {}
+    for i, field in enumerate(FIELDS):
+        fields[field] = {"sum": row[1 + i * 2], "reported": row[2 + i * 2]}
+    return {"run_count": run_count, "fields": fields}
+
+
+def format_metric_estimate(field, measured, run_count, window_label_text, budget=None):
+    """AC-08/AC-09: the ONLY place in this module that ever writes a "restante" line --
+    pinned by `test_cost_report_restante_has_exactly_one_render_site` (counts this exact
+    marker's occurrences in this file's source), so a future call site that prints its own
+    ad hoc "restante" without the four required elements below fails the gate the moment it
+    is added, not the next time someone happens to notice.
+
+    AC-10: `budget` is `None` for every field the caller did not declare with `--budget` --
+    and then this function NEVER writes a "restante" line at all, only "consumido en la
+    ventana" (the measured sum), because `budget - consumed` needs a budget or it is
+    invented, and this harness does not invent.
+    """
+    consumed = measured["sum"]
+    reported = measured["reported"]
+    coverage = f"{reported}/{run_count} runs reportaron {field} en esta ventana"
+    lines = [
+        f"{field}: consumido en la ventana = {consumed} (medido, no proyectado)",
+        f"  ventana: {window_label_text}",
+        f"  cobertura: {coverage}",
+    ]
+    if budget is not None:
+        remaining = budget - consumed
+        lines.append(
+            f"  restante estimado: {remaining} -- ESTIMADO, provider_reported: false, "
+            f"basis: presupuesto declarado ({budget}) menos {field} consumido y medido en "
+            f"la ventana ({consumed}); cobertura {coverage}; nunca proyectado sobre los "
+            f"runs que no reportaron"
+        )
+    return "\n".join(lines)
+
+
+_ESTIMATE_DISCLAIMER = (
+        (`test_cost_report_restante_has_exactly_one_render_site`'s own marker), which must
+        be structurally absent, not merely the bare word. Together with the previous test,
+        this is the guard's bite in both directions: the labeled figure WITH a budget, no
+        figure AT ALL without one.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            window_start = 19002 * 86400000
+            write_routing_db_for_estimate(
+                home, window_start, "proj1_" + "c" * 32, run_count=40,
+                per_field={"input": (120000, 12), "reasoning": (500, 3)},
+            )
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--window-start", str(window_start))
+        self.assertNotIn("restante estimado:", result.stdout)
+        self.assertIn("consumido en la ventana", result.stdout)
+
+    def test_cost_report_restante_has_exactly_one_render_site(self):
+        """AC-09 guard, DDL-fingerprint style (`test_canonical_ddl_is_pinned_to_schema`
+        precedent, tests/test_routing.py:1424): a structural ratchet, not a comment asking
+        nicely. `format_metric_estimate` is the only function allowed to write a "restante"
+        line, and it always writes it WITH its basis/provider_reported/coverage in the same
+        f-string (verified by the two tests above). This test pins that no SECOND call site
+        can ever print its own ad hoc "restante" without those four elements -- the moment
+        one is added anywhere else in this file, the count below moves and the gate fails
+        immediately, not the next time someone happens to notice the label went missing.
+        """
+        source = COST_REPORT.read_text()
+        self.assertEqual(
+            source.count('"  restante estimado: '), 1,
+            "a new site writes \"restante\" text outside format_metric_estimate -- AC-09's "
+            "whole point is that this is caught here, not discovered later on a live "
+            "surface missing its label/basis"
+        )
+
+    def test_init_mode_sets_physical_budgets(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--ac", "AC-1", "--mode", "quick-fix")
+            self.run_state(
+                state, "create-package", "PKG-01", "Fix",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            data = json.loads(state.read_text())
+            self.assertEqual(data["mode"], "quick-fix")
+            self.assertEqual(data["budgets"]["max_spawns_per_package"], 4)
+            self.assertEqual(data["budgets"]["max_deep_review_cycles"], 1)
+            for role in ("implementer", "gate-runner", "gate-runner", "debugger"):
+                self.run_state(state, "record-spawn", "PKG-01", role)
+            result = self.run_state(state, "record-spawn", "PKG-01", "package-reviewer", check=False)
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(data["phase"], "BLOCKED")
+        # explicit flag still wins over the mode default
+        with tempfile.TemporaryDirectory() as td:
+diff --git i/ai/scripts/cost-report.py w/ai/scripts/cost-report.py
+index da808e3..bc2ee81 100755
+--- i/ai/scripts/cost-report.py
++++ w/ai/scripts/cost-report.py
+@@ -33,8 +33,19 @@ section prints only its OWN total; this report never prints one total across sec
+ 
+ Tokens only — subscription plans have no meaningful dollar-per-token, what matters is quota.
+ 
++Section 3 -- ESTIMATED REMAINING QUOTA (023-senales-de-consumo PKG-B4, AC-08/AC-09/AC-10,
++ADR-0046): reads `usage_rollups` (schema 9, PKG-B3) for the current UTC-calendar-day window
++and, per token FIELD, prints what was actually MEASURED (raw sum) plus its COVERAGE
++(`usage_<field>_reported_count` of `run_count` runs actually reported that field -- never
++averaged over the runs that did not, which would silently treat "did not report" as "reported
++zero"). No provider exposes remaining quota (ADR-0046) -- a "restante" line only ever appears
++for a FIELD the caller declared with `--budget FIELD=N`, and it is always labeled `ESTIMADO`
++with `provider_reported: false` and its `basis`. A field with no declared budget shows only
++what was measured, never a guessed remainder (AC-10).
++
+ Usage:
+   cost-report.py [--project DIR] [--since YYYY-MM-DD] [--md] [--deep] [--home DIR]
++                  [--budget FIELD=N ...]
+ """
+ 
+ import argparse
+@@ -46,11 +57,17 @@ import re
+ import sqlite3
+ import stat
+ import sys
++import time
+ import unicodedata
+ from collections import defaultdict
+ from pathlib import Path
+ 
+ FIELDS = ("input", "output", "cache_read", "cache_write", "reasoning")
++# 023-senales-de-consumo PKG-B3: the same UTC-calendar-day boundary
++# `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
++# Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
++# never imports repo-local code) -- pinned against the real constant by a test instead.
++_DAY_MS = 86400000
+ 
+ 
+ def parse_args():
+@@ -70,6 +87,12 @@ def parse_args():
+     parser.add_argument("--md", action="store_true", help="markdown output")
+     parser.add_argument("--deep", action="store_true", help="Codex: parse rollouts for cached/reasoning split")
+     parser.add_argument("--home", default=str(Path.home()), help=argparse.SUPPRESS)
++    parser.add_argument("--budget", action="append", default=[], metavar="FIELD=N",
++                        help="AC-10: declare a quota for one token FIELD (input/output/"
++                             "cache_read/cache_write/reasoning) so Section 3 may show a "
++                             "\"restante\" for it, always labeled ESTIMADO -- a FIELD with "
++                             "no --budget only ever shows what was measured")
++    parser.add_argument("--window-start", type=int, default=None, help=argparse.SUPPRESS)
+     return parser.parse_args()
+ 
+ 
+@@ -381,6 +404,158 @@ def collect_pi(report, home, project, since_ms):
+         conn.close()
+ 
+ 
++# ---------------------------------------------------------------------------------------
++# 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) -- ESTIMATED remaining quota,
++# read from `usage_rollups` (schema 9, PKG-B3). Tokens only, same "what matters is quota"
++# doctrine the module docstring already states for Sections 1/2 -- no cost_micros budget.
++# ---------------------------------------------------------------------------------------
++
++def parse_budgets(items):
++    """`FIELD=N`, FIELD in FIELDS. AC-10 exists so that a "restante" only ever appears for a
++    budget the caller EXPLICITLY declared for a real field -- a typo silently ignored would
++    make that declaration silently vanish, which is the same silent-invention AC-10
++    forbids, just moved into argument parsing. Dies loudly instead.
++    """
++    budgets = {}
++    for item in items:
++        field, sep, value = item.partition("=")
++        if not sep or field not in FIELDS:
++            raise SystemExit(
++                f"cost-report.py: --budget {item!r} -- FIELD must be one of "
++                f"{', '.join(FIELDS)}, given as FIELD=N")
++        try:
++            n = int(value)
++        except ValueError:
++            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be an integer")
++        if n < 0:
++            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be >= 0")
++        budgets[field] = n
++    return budgets
++
++
++def window_bounds(now_ms=None):
++    """The exact UTC-calendar-day window `usage_rollups.window_start` buckets a close into
++    (`routing_core/store.py:_rollup_usage_in`) -- `_DAY_MS` above is pinned against that
++    module's own constant by a test, so this cannot silently drift from what a row here
++    was actually summed under.
++    """
++    if now_ms is None:
++        now_ms = int(time.time() * 1000)
++    start = (now_ms // _DAY_MS) * _DAY_MS
++    return start, start + _DAY_MS
++
++
++def window_label(start_ms, end_ms):
++    """AC-08: the window NAMED BY ITS DEFINITION -- the exact range, never a relative
++    phrase like "last week"."""
++    start = dt.datetime.fromtimestamp(start_ms / 1000, tz=dt.timezone.utc).isoformat()
++    end = dt.datetime.fromtimestamp(end_ms / 1000, tz=dt.timezone.utc).isoformat()
++    return f"{start} to {end} (UTC calendar day, usage_rollups.window_start)"
++
++
++def collect_estimate(home, project, window_start_ms):
++    """Reads `usage_rollups` for exactly ONE UTC-day window and returns, per token FIELD,
++    the raw measured sum and how many of the window's runs actually REPORTED that field --
++    the coverage pair the schema itself already carries (023-senales-de-consumo PKG-B3),
++    never averaged over the runs that did not report (the trap this package's context pack
++    names explicitly: 12-of-40 coverage presented as if the other 28 reported zero).
++
++    Returns `None` (with a stderr message, same discipline as `collect_pi`) when the store
++    is absent, `usage_rollups` does not exist yet (a database still on an older schema), or
++    `--project` names an identity this module cannot trust -- never a silent zero.
++    """
++    db = home / ".local/state/set-agentes/routing-v2/routing.db"
++    if not db.exists():
++        return None
++    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
++    try:
++        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
++        if "usage_rollups" not in tables:
++            print("estimate: routing.db has no usage_rollups table yet (older schema) -- skipping",
++                  file=sys.stderr)
++            return None
++        args = [window_start_ms]
++        query = ("SELECT COALESCE(SUM(run_count),0), " + ", ".join(
++            f"COALESCE(SUM(usage_{field}_sum),0), COALESCE(SUM(usage_{field}_reported_count),0)"
++            for field in FIELDS
++        ) + " FROM usage_rollups WHERE window_start=?")
++        if project:
++            try:
++                args.append(_pi_project_key(Path(project).resolve()))
++            except _ProjectIdentityError:
++                print(f"estimate: invalid project identity at {project} -- skipping", file=sys.stderr)
++                return None
++            query += " AND project_key=?"
++        row = conn.execute(query, args).fetchone()
++    finally:
++        conn.close()
++    run_count = row[0]
++    fields = {}
++    for i, field in enumerate(FIELDS):
++        fields[field] = {"sum": row[1 + i * 2], "reported": row[2 + i * 2]}
++    return {"run_count": run_count, "fields": fields}
++
++
++def format_metric_estimate(field, measured, run_count, window_label_text, budget=None):
++    """AC-08/AC-09: the ONLY place in this module that ever writes a "restante" line --
++    pinned by `test_cost_report_restante_has_exactly_one_render_site` (counts this exact
++    marker's occurrences in this file's source), so a future call site that prints its own
++    ad hoc "restante" without the four required elements below fails the gate the moment it
++    is added, not the next time someone happens to notice.
++
++    AC-10: `budget` is `None` for every field the caller did not declare with `--budget` --
++    and then this function NEVER writes a "restante" line at all, only "consumido en la
++    ventana" (the measured sum), because `budget - consumed` needs a budget or it is
++    invented, and this harness does not invent.
++    """
++    consumed = measured["sum"]
++    reported = measured["reported"]
++    coverage = f"{reported}/{run_count} runs reportaron {field} en esta ventana"
++    lines = [
++        f"{field}: consumido en la ventana = {consumed} (medido, no proyectado)",
++        f"  ventana: {window_label_text}",
++        f"  cobertura: {coverage}",
++    ]
++    if budget is not None:
++        remaining = budget - consumed
++        lines.append(
++            f"  restante estimado: {remaining} -- ESTIMADO, provider_reported: false, "
++            f"basis: presupuesto declarado ({budget}) menos {field} consumido y medido en "
++            f"la ventana ({consumed}); cobertura {coverage}; nunca proyectado sobre los "
++            f"runs que no reportaron"
++        )
++    return "\n".join(lines)
++
++
++_ESTIMATE_DISCLAIMER = (
++    "No provider exposes remaining quota (measured -- the permitted commands answer "
++    "authenticated yes/no and which models list, nothing about quota). Every \"restante\" "
++    "line above is an ESTIMATE computed from this harness's OWN measured consumption "
++    "against a budget YOU declared with --budget FIELD=N -- never data the provider "
++    "reported (ADR-0046). A field with no --budget shows only what was measured, never a "
++    "guessed remainder (AC-10)."
++)
++
++
++def render_estimate(estimate, md, budgets, window_label_text):
++    heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
++    if md:
++        print(f"## {heading}")
++    else:
++        print(heading)
++        print("=" * len(heading))
++    if estimate is None:
++        print("No usage_rollups data matched.")
++        print()
++        return
++    for field in FIELDS:
++        print(format_metric_estimate(field, estimate["fields"][field], estimate["run_count"],
++                                      window_label_text, budgets.get(field)))
++    print()
++    print(_ESTIMATE_DISCLAIMER)
++    print()
++
++
+ def fmt(n):
+     if n >= 10**9:
+         return f"{n / 10**9:.1f}G"
+@@ -453,6 +628,10 @@ def main():
+     args = parse_args()
+     home = Path(args.home)
+     since_ms = since_epoch_ms(args.since)
++    # Validated FIRST, before any output: a malformed --budget should never let this run
++    # print two whole sections and then die -- fail loudly, up front, same discipline
++    # `parse_budgets` itself already documents.
++    budgets = parse_budgets(args.budget)
+ 
+     cli_native = defaultdict(new_bucket)
+     collect_opencode(cli_native, home, args.project, since_ms)
+@@ -465,6 +644,16 @@ def main():
+     render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
+     render(harness_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
+     print(_NEVER_SUM_DISCLAIMER)
++    print()
++
++    # 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10): a THIRD, separate surface -- never
++    # folded into the "two sections, never summed" disclaimer above, because Section 3 is
++    # not a third measurement of the same overlapping spend, it is an ESTIMATE derived from
++    # Section 2's own store (`usage_rollups`), always labeled as such.
++    window_start_ms, window_end_ms = window_bounds(args.window_start)
++    label = window_label(window_start_ms, window_end_ms)
++    estimate = collect_estimate(home, args.project, window_start_ms)
++    render_estimate(estimate, args.md, budgets, label)
+ 
+ 
+ if __name__ == "__main__":
+diff --git i/tests/test_routing.py w/tests/test_routing.py
+index 56ad937..272b0c8 100644
+--- i/tests/test_routing.py
++++ w/tests/test_routing.py
+@@ -1620,6 +1620,18 @@ class RoutingTests(unittest.TestCase):
+         self.assertEqual(columns[:len(declared)], ["usage_" + field for field in declared])
+         self.assertEqual(columns[len(declared):], ["cost_micros", "usage_status"])
+ 
++    def test_cost_report_day_ms_matches_store(self):
++        """023-senales-de-consumo PKG-B4 (AC-08): `cost-report.py`'s Section 3 buckets its
++        "estimado" window by the SAME UTC-calendar-day boundary `usage_rollups.window_start`
++        was actually written under (`store.py:_rollup_usage_in`'s `_DAY_MS`) -- duplicated
++        rather than imported (AC-16, `cost-report.py` has zero repo-local imports), pinned
++        here so the two constants cannot silently drift apart and misname the window.
++        """
++        source = (ROOT / "ai/scripts/cost-report.py").read_text()
++        day_ms = re.search(r"^_DAY_MS = (\d+)", source, re.M)
++        self.assertIsNotNone(day_ms, "cost-report.py:_DAY_MS moved or changed shape")
++        self.assertEqual(int(day_ms.group(1)), routing_store._DAY_MS)
++
+     def test_normalize_ddl_is_the_only_normalizer(self):
+         """AC-01, proved by source count rather than by patching the function.
+ 
+ M ai/scripts/cost-report.py
+ M ai/state/STATUS.md
+ M ai/state/features/023-senales-de-consumo.json
+ M docs/adr/README.md
+ M docs/modules/routing.md
+ M "docs/notas/00 - Proyecto.md"
+ M docs/notas/features/023-senales-de-consumo.md
+ M docs/notas/features/023-senales-de-consumo/B3-ventana-y-rollup.md
+ M docs/notas/features/023-senales-de-consumo/B4-estimado-nunca-dato-del-proveedor.md
+ M docs/notas/features/023-senales-de-consumo/grafo.md
+ M docs/specs/023-senales-de-consumo/bitacora.md
+ M tests/test_harness.py
+ M tests/test_routing.py
+?? docs/adr/0046-estimado-es-estimado.md
+?? docs/specs/023-senales-de-consumo/evidence/B4-implementer.md
+
+exec
+/bin/bash -lc "rg -n -i 'restante' ai/scripts/cost-report.py; command -v sqlite3; python3 -m unittest discover -s tests -p 'test_harness.py' -k cost_report_restante_has_exactly_one_render_site; python3 -m unittest discover -s tests -p 'test_routing.py' -k cost_report_day_ms_matches_store" in /home/federico/SET-AGENTES
+ succeeded in 134ms:
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+exec
+/bin/bash -lc 'fixture_dir=$(mktemp -d /tmp/cost-review.XXXXXX)
+mkdir -p "$fixture_dir/home/.local/state/set-agentes/routing-v2"
+sqlite3 "$fixture_dir/home/.local/state/set-agentes/routing-v2/routing.db" '"'CREATE TABLE usage_rollups (window_start INTEGER, project_key TEXT, run_count INTEGER, usage_input_sum INTEGER, usage_input_reported_count INTEGER, usage_output_sum INTEGER, usage_output_reported_count INTEGER, usage_cache_read_sum INTEGER, usage_cache_read_reported_count INTEGER, usage_cache_write_sum INTEGER, usage_cache_write_reported_count INTEGER, usage_reasoning_sum INTEGER, usage_reasoning_reported_count INTEGER); INSERT INTO usage_rollups VALUES (1641772800000, \"fixture\", 40, 120000, 12, 0, 0, 0, 0, 0, 0, 0, 0);'
+printf '%s\\n' \""'$fixture_dir"' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+Parse error in 2nd command line argument: no such column: "fixture" - should this be a string literal in single-quotes?
+  INSERT INTO usage_rollups VALUES (1641772800000, "fixture", 40, 120000, 12, 0,
+                                     error here ---^
+/tmp/cost-review.FfM7gZ
+
+exec
+/bin/bash -lc 'sqlite3 "Parse error in 2nd command line argument: no such column: "fixture" - should this be a string literal in single-quotes?
+  INSERT INTO usage_rollups VALUES (1641772800000, "fixture", 40, 120000, 12, 0,
+                                     error here ---''^
+/tmp/cost-review.FfM7gZ/home/.local/state/set-agentes/routing-v2/routing.db" '"'INSERT INTO usage_rollups VALUES (1641772800000, NULL, 40, 120000, 12, 0, 0, 0, 0, 0, 0, 0, 0);'
+python3 ai/scripts/cost-report.py --home \"Parse error in 2nd command line argument: no such column: \"fixture\" - should this be a string literal in single-quotes?
+  INSERT INTO usage_rollups VALUES (1641772800000, \"fixture\", 40, 120000, 12, 0,
+                                     error here ---"'^
+/tmp/cost-review.FfM7gZ/home" --window-start 1641772800000
+python3 ai/scripts/cost-report.py --home "Parse error in 2nd command line argument: no such column: "fixture" - should this be a string literal in single-quotes?
+  INSERT INTO usage_rollups VALUES (1641772800000, "fixture", 40, 120000, 12, 0,
+                                     error here ---''^
+/tmp/cost-review.FfM7gZ/home" --window-start 1641772800000 --budget input=200000' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+exec
+/bin/bash -lc 'fixture_dir=$(mktemp -d /tmp/cost-review.XXXXXX)
+mkdir -p "$fixture_dir/home/.local/state/set-agentes/routing-v2"
+sqlite3 "$fixture_dir/home/.local/state/set-agentes/routing-v2/routing.db" '"'CREATE TABLE usage_rollups (window_start INTEGER, project_key TEXT, run_count INTEGER, usage_input_sum INTEGER, usage_input_reported_count INTEGER, usage_output_sum INTEGER, usage_output_reported_count INTEGER, usage_cache_read_sum INTEGER, usage_cache_read_reported_count INTEGER, usage_cache_write_sum INTEGER, usage_cache_write_reported_count INTEGER, usage_reasoning_sum INTEGER, usage_reasoning_reported_count INTEGER); INSERT INTO usage_rollups (window_start, run_count, usage_input_sum, usage_input_reported_count, usage_output_sum, usage_output_reported_count, usage_cache_read_sum, usage_cache_read_reported_count, usage_cache_write_sum, usage_cache_write_reported_count, usage_reasoning_sum, usage_reasoning_reported_count) VALUES (1641772800000, 40, 120000, 12, 0, 0, 0, 0, 0, 0, 0, 0);'
+printf '%s\\n' \""'$fixture_dir"' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+/tmp/cost-review.ne48DN
+
+exec
+/bin/bash -lc 'python3 ai/scripts/cost-report.py --home "/tmp/cost-review.ne48DN/home" --window-start 1641772800000
+python3 ai/scripts/cost-report.py --home "/tmp/cost-review.ne48DN/home" --window-start 1641772800000 --budget input=200000' in /home/federico/SET-AGENTES
+ exited 1 in 1ms:
+exec
+/bin/bash -lc "sqlite3 \"/tmp/cost-review.ne48DN/home/.local/state/set-agentes/routing-v2/routing.db\" 'CREATE TABLE dispatches (id INTEGER);'
+python3 ai/scripts/cost-report.py --home \"/tmp/cost-review.ne48DN/home\" --window-start 1641772800000" in /home/federico/SET-AGENTES
+ exited 1 in 0ms:
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/ai/scripts/cost-report.py", line 660, in <module>
+    main()
+    ~~~~^^
+  File "/home/federico/SET-AGENTES/ai/scripts/cost-report.py", line 642, in main
+    collect_pi(harness_registry, home, args.project, since_ms)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/federico/SET-AGENTES/ai/scripts/cost-report.py", line 352, in collect_pi
+    for model, role, t_in, t_out, t_cr, t_cw, t_re, updated in conn.execute(query, args):
+                                                               ~~~~~~~~~~~~^^^^^^^^^^^^^
+sqlite3.OperationalError: no such column: actual_model
+
+exec
+/bin/bash -lc "sqlite3 \"/tmp/cost-review.ne48DN/home/.local/state/set-agentes/routing-v2/routing.db\" 'ALTER TABLE dispatches ADD COLUMN actual_model TEXT; ALTER TABLE dispatches ADD COLUMN role TEXT; ALTER TABLE dispatches ADD COLUMN usage_input INTEGER; ALTER TABLE dispatches ADD COLUMN usage_output INTEGER; ALTER TABLE dispatches ADD COLUMN usage_cache_read INTEGER; ALTER TABLE dispatches ADD COLUMN usage_cache_write INTEGER; ALTER TABLE dispatches ADD COLUMN usage_reasoning INTEGER; ALTER TABLE dispatches ADD COLUMN updated_at INTEGER;'
+python3 ai/scripts/cost-report.py --home \"/tmp/cost-review.ne48DN/home\" --window-start 1641772800000" in /home/federico/SET-AGENTES
+ exited 1 in 0ms:
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/ai/scripts/cost-report.py", line 660, in <module>
+    main()
+    ~~~~^^
+  File "/home/federico/SET-AGENTES/ai/scripts/cost-report.py", line 642, in main
+    collect_pi(harness_registry, home, args.project, since_ms)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/federico/SET-AGENTES/ai/scripts/cost-report.py", line 352, in collect_pi
+    for model, role, t_in, t_out, t_cr, t_cw, t_re, updated in conn.execute(query, args):
+                                                               ~~~~~~~~~~~~^^^^^^^^^^^^^
+sqlite3.OperationalError: no such column: usage_status
+
+exec
+/bin/bash -lc "sqlite3 \"/tmp/cost-review.ne48DN/home/.local/state/set-agentes/routing-v2/routing.db\" 'ALTER TABLE dispatches ADD COLUMN usage_status TEXT;'
+python3 ai/scripts/cost-report.py --home \"/tmp/cost-review.ne48DN/home\" --window-start 1641772800000
+python3 ai/scripts/cost-report.py --home \"/tmp/cost-review.ne48DN/home\" --window-start 1641772800000 --budget input=200000" in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+Section 1 -- CLI-native stores (source: opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting))
+================================================================================================================================
+No sessions matched.
+
+Section 2 -- harness dispatch registry (source: routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime))
+===============================================================================================================================================
+No sessions matched.
+
+These two sections measure OVERLAPPING spend from different vantage points -- a run this harness dispatches through the claude-code or opencode lane is counted in BOTH sections above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows together; each section's own total is the only total this report ever prints (AC-05).
+
+Section 3 -- ESTIMADO (source: routing.db usage_rollups, window 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start))
+======================================================================================================================================================================
+input: consumido en la ventana = 120000 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 12/40 runs reportaron input en esta ventana
+output: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron output en esta ventana
+cache_read: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_read en esta ventana
+cache_write: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_write en esta ventana
+reasoning: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron reasoning en esta ventana
+
+No provider exposes remaining quota (measured -- the permitted commands answer authenticated yes/no and which models list, nothing about quota). Every "restante" line above is an ESTIMATE computed from this harness's OWN measured consumption against a budget YOU declared with --budget FIELD=N -- never data the provider reported (ADR-0046). A field with no --budget shows only what was measured, never a guessed remainder (AC-10).
+
+Section 1 -- CLI-native stores (source: opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting))
+================================================================================================================================
+No sessions matched.
+
+Section 2 -- harness dispatch registry (source: routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime))
+===============================================================================================================================================
+No sessions matched.
+
+These two sections measure OVERLAPPING spend from different vantage points -- a run this harness dispatches through the claude-code or opencode lane is counted in BOTH sections above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows together; each section's own total is the only total this report ever prints (AC-05).
+
+Section 3 -- ESTIMADO (source: routing.db usage_rollups, window 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start))
+======================================================================================================================================================================
+input: consumido en la ventana = 120000 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 12/40 runs reportaron input en esta ventana
+  restante estimado: 80000 -- ESTIMADO, provider_reported: false, basis: presupuesto declarado (200000) menos input consumido y medido en la ventana (120000); cobertura 12/40 runs reportaron input en esta ventana; nunca proyectado sobre los runs que no reportaron
+output: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron output en esta ventana
+cache_read: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_read en esta ventana
+cache_write: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_write en esta ventana
+reasoning: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron reasoning en esta ventana
+
+No provider exposes remaining quota (measured -- the permitted commands answer authenticated yes/no and which models list, nothing about quota). Every "restante" line above is an ESTIMATE computed from this harness's OWN measured consumption against a budget YOU declared with --budget FIELD=N -- never data the provider reported (ADR-0046). A field with no --budget shows only what was measured, never a guessed remainder (AC-10).
+
+
+codex
+La ejecución sobre un fixture de 40 corridas ya confirma la cobertura observada `12/40` y el cambio de vocabulario según haya presupuesto. Sigo con la prueba de mordida: voy a introducir dos defectos sólo de forma temporal, correr los dos tests dirigidos y restaurar cada archivo desde `/tmp` con `cp`.
+exec
+/bin/bash -lc 'cp ai/scripts/cost-report.py /tmp/cost-report.py.package-review.bak
+cp tests/test_routing.py /tmp/test_routing.py.package-review.bak' in /home/federico/SET-AGENTES
+ succeeded in 0ms:
+apply patch
+patch: completed
+/home/federico/SET-AGENTES/ai/scripts/cost-report.py
+diff --git a/ai/scripts/cost-report.py b/ai/scripts/cost-report.py
+index bc2ee816b264db9b87d7128f7b44e1af4164ef3a..8aa7064c27760a6dcdd65d11e3dae753f2a36a9e
+--- a/ai/scripts/cost-report.py
++++ b/ai/scripts/cost-report.py
+@@ -67,7 +67,7 @@
+ # `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+ # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+ # never imports repo-local code) -- pinned against the real constant by a test instead.
+-_DAY_MS = 86400000
++_DAY_MS = 86400001
+ 
+ 
+ def parse_args():
+@@ -538,6 +538,7 @@
+ 
+ 
+ def render_estimate(estimate, md, budgets, window_label_text):
++    print("  restante estimado: 999")
+     heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+     if md:
+         print(f"## {heading}")
+
+diff --git a/ai/scripts/cost-report.py b/ai/scripts/cost-report.py
+index bc2ee816b264db9b87d7128f7b44e1af4164ef3a..8aa7064c27760a6dcdd65d11e3dae753f2a36a9e
+--- a/ai/scripts/cost-report.py
++++ b/ai/scripts/cost-report.py
+@@ -67,7 +67,7 @@
+ # `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+ # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+ # never imports repo-local code) -- pinned against the real constant by a test instead.
+-_DAY_MS = 86400000
++_DAY_MS = 86400001
+ 
+ 
+ def parse_args():
+@@ -538,6 +538,7 @@
+ 
+ 
+ def render_estimate(estimate, md, budgets, window_label_text):
++    print("  restante estimado: 999")
+     heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+     if md:
+         print(f"## {heading}")
+
+exec
+/bin/bash -lc "python3 -m unittest discover -s tests -p 'test_harness.py' -k cost_report_restante_has_exactly_one_render_site
+python3 -m unittest discover -s tests -p 'test_routing.py' -k cost_report_day_ms_matches_store" in /home/federico/SET-AGENTES
+ exited 1 in 132ms:
+F
+======================================================================
+FAIL: test_cost_report_day_ms_matches_store (test_routing.RoutingTests.test_cost_report_day_ms_matches_store)
+023-senales-de-consumo PKG-B4 (AC-08): `cost-report.py`'s Section 3 buckets its
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/federico/SET-AGENTES/tests/test_routing.py", line 1633, in test_cost_report_day_ms_matches_store
+    self.assertEqual(int(day_ms.group(1)), routing_store._DAY_MS)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 86400001 != 86400000
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+
+diff --git a/ai/scripts/cost-report.py b/ai/scripts/cost-report.py
+index bc2ee816b264db9b87d7128f7b44e1af4164ef3a..8aa7064c27760a6dcdd65d11e3dae753f2a36a9e
+--- a/ai/scripts/cost-report.py
++++ b/ai/scripts/cost-report.py
+@@ -67,7 +67,7 @@
+ # `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+ # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+ # never imports repo-local code) -- pinned against the real constant by a test instead.
+-_DAY_MS = 86400000
++_DAY_MS = 86400001
+ 
+ 
+ def parse_args():
+@@ -538,6 +538,7 @@
+ 
+ 
+ def render_estimate(estimate, md, budgets, window_label_text):
++    print("  restante estimado: 999")
+     heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+     if md:
+         print(f"## {heading}")
+
+exec
+/bin/bash -lc "cp /tmp/cost-report.py.package-review.bak ai/scripts/cost-report.py
+cp /tmp/test_routing.py.package-review.bak tests/test_routing.py
+python3 -m unittest discover -s tests -p 'test_harness.py' -k cost_report_restante_has_exactly_one_render_site
+python3 -m unittest discover -s tests -p 'test_routing.py' -k cost_report_day_ms_matches_store
+git diff --exit-code -- ai/scripts/cost-report.py tests/test_routing.py" in /home/federico/SET-AGENTES
+ exited 1 in 216ms:
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+diff --git i/ai/scripts/cost-report.py w/ai/scripts/cost-report.py
+index da808e3..bc2ee81 100755
+--- i/ai/scripts/cost-report.py
++++ w/ai/scripts/cost-report.py
+@@ -33,8 +33,19 @@ section prints only its OWN total; this report never prints one total across sec
+ 
+ Tokens only — subscription plans have no meaningful dollar-per-token, what matters is quota.
+ 
++Section 3 -- ESTIMATED REMAINING QUOTA (023-senales-de-consumo PKG-B4, AC-08/AC-09/AC-10,
++ADR-0046): reads `usage_rollups` (schema 9, PKG-B3) for the current UTC-calendar-day window
++and, per token FIELD, prints what was actually MEASURED (raw sum) plus its COVERAGE
++(`usage_<field>_reported_count` of `run_count` runs actually reported that field -- never
++averaged over the runs that did not, which would silently treat "did not report" as "reported
++zero"). No provider exposes remaining quota (ADR-0046) -- a "restante" line only ever appears
++for a FIELD the caller declared with `--budget FIELD=N`, and it is always labeled `ESTIMADO`
++with `provider_reported: false` and its `basis`. A field with no declared budget shows only
++what was measured, never a guessed remainder (AC-10).
++
+ Usage:
+   cost-report.py [--project DIR] [--since YYYY-MM-DD] [--md] [--deep] [--home DIR]
++                  [--budget FIELD=N ...]
+ """
+ 
+ import argparse
+@@ -46,11 +57,17 @@ import re
+ import sqlite3
+ import stat
+ import sys
++import time
+ import unicodedata
+ from collections import defaultdict
+ from pathlib import Path
+ 
+ FIELDS = ("input", "output", "cache_read", "cache_write", "reasoning")
++# 023-senales-de-consumo PKG-B3: the same UTC-calendar-day boundary
++# `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
++# Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
++# never imports repo-local code) -- pinned against the real constant by a test instead.
++_DAY_MS = 86400000
+ 
+ 
+ def parse_args():
+@@ -70,6 +87,12 @@ def parse_args():
+     parser.add_argument("--md", action="store_true", help="markdown output")
+     parser.add_argument("--deep", action="store_true", help="Codex: parse rollouts for cached/reasoning split")
+     parser.add_argument("--home", default=str(Path.home()), help=argparse.SUPPRESS)
++    parser.add_argument("--budget", action="append", default=[], metavar="FIELD=N",
++                        help="AC-10: declare a quota for one token FIELD (input/output/"
++                             "cache_read/cache_write/reasoning) so Section 3 may show a "
++                             "\"restante\" for it, always labeled ESTIMADO -- a FIELD with "
++                             "no --budget only ever shows what was measured")
++    parser.add_argument("--window-start", type=int, default=None, help=argparse.SUPPRESS)
+     return parser.parse_args()
+ 
+ 
+@@ -381,6 +404,158 @@ def collect_pi(report, home, project, since_ms):
+         conn.close()
+ 
+ 
++# ---------------------------------------------------------------------------------------
++# 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) -- ESTIMATED remaining quota,
++# read from `usage_rollups` (schema 9, PKG-B3). Tokens only, same "what matters is quota"
++# doctrine the module docstring already states for Sections 1/2 -- no cost_micros budget.
++# ---------------------------------------------------------------------------------------
++
++def parse_budgets(items):
++    """`FIELD=N`, FIELD in FIELDS. AC-10 exists so that a "restante" only ever appears for a
++    budget the caller EXPLICITLY declared for a real field -- a typo silently ignored would
++    make that declaration silently vanish, which is the same silent-invention AC-10
++    forbids, just moved into argument parsing. Dies loudly instead.
++    """
++    budgets = {}
++    for item in items:
++        field, sep, value = item.partition("=")
++        if not sep or field not in FIELDS:
++            raise SystemExit(
++                f"cost-report.py: --budget {item!r} -- FIELD must be one of "
++                f"{', '.join(FIELDS)}, given as FIELD=N")
++        try:
++            n = int(value)
++        except ValueError:
++            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be an integer")
++        if n < 0:
++            raise SystemExit(f"cost-report.py: --budget {item!r} -- N must be >= 0")
++        budgets[field] = n
++    return budgets
++
++
++def window_bounds(now_ms=None):
++    """The exact UTC-calendar-day window `usage_rollups.window_start` buckets a close into
++    (`routing_core/store.py:_rollup_usage_in`) -- `_DAY_MS` above is pinned against that
++    module's own constant by a test, so this cannot silently drift from what a row here
++    was actually summed under.
++    """
++    if now_ms is None:
++        now_ms = int(time.time() * 1000)
++    start = (now_ms // _DAY_MS) * _DAY_MS
++    return start, start + _DAY_MS
++
++
++def window_label(start_ms, end_ms):
++    """AC-08: the window NAMED BY ITS DEFINITION -- the exact range, never a relative
++    phrase like "last week"."""
++    start = dt.datetime.fromtimestamp(start_ms / 1000, tz=dt.timezone.utc).isoformat()
++    end = dt.datetime.fromtimestamp(end_ms / 1000, tz=dt.timezone.utc).isoformat()
++    return f"{start} to {end} (UTC calendar day, usage_rollups.window_start)"
++
++
++def collect_estimate(home, project, window_start_ms):
++    """Reads `usage_rollups` for exactly ONE UTC-day window and returns, per token FIELD,
++    the raw measured sum and how many of the window's runs actually REPORTED that field --
++    the coverage pair the schema itself already carries (023-senales-de-consumo PKG-B3),
++    never averaged over the runs that did not report (the trap this package's context pack
++    names explicitly: 12-of-40 coverage presented as if the other 28 reported zero).
++
++    Returns `None` (with a stderr message, same discipline as `collect_pi`) when the store
++    is absent, `usage_rollups` does not exist yet (a database still on an older schema), or
++    `--project` names an identity this module cannot trust -- never a silent zero.
++    """
++    db = home / ".local/state/set-agentes/routing-v2/routing.db"
++    if not db.exists():
++        return None
++    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
++    try:
++        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
++        if "usage_rollups" not in tables:
++            print("estimate: routing.db has no usage_rollups table yet (older schema) -- skipping",
++                  file=sys.stderr)
++            return None
++        args = [window_start_ms]
++        query = ("SELECT COALESCE(SUM(run_count),0), " + ", ".join(
++            f"COALESCE(SUM(usage_{field}_sum),0), COALESCE(SUM(usage_{field}_reported_count),0)"
++            for field in FIELDS
++        ) + " FROM usage_rollups WHERE window_start=?")
++        if project:
++            try:
++                args.append(_pi_project_key(Path(project).resolve()))
++            except _ProjectIdentityError:
++                print(f"estimate: invalid project identity at {project} -- skipping", file=sys.stderr)
++                return None
++            query += " AND project_key=?"
++        row = conn.execute(query, args).fetchone()
++    finally:
++        conn.close()
++    run_count = row[0]
++    fields = {}
++    for i, field in enumerate(FIELDS):
++        fields[field] = {"sum": row[1 + i * 2], "reported": row[2 + i * 2]}
++    return {"run_count": run_count, "fields": fields}
++
++
++def format_metric_estimate(field, measured, run_count, window_label_text, budget=None):
++    """AC-08/AC-09: the ONLY place in this module that ever writes a "restante" line --
++    pinned by `test_cost_report_restante_has_exactly_one_render_site` (counts this exact
++    marker's occurrences in this file's source), so a future call site that prints its own
++    ad hoc "restante" without the four required elements below fails the gate the moment it
++    is added, not the next time someone happens to notice.
++
++    AC-10: `budget` is `None` for every field the caller did not declare with `--budget` --
++    and then this function NEVER writes a "restante" line at all, only "consumido en la
++    ventana" (the measured sum), because `budget - consumed` needs a budget or it is
++    invented, and this harness does not invent.
++    """
++    consumed = measured["sum"]
++    reported = measured["reported"]
++    coverage = f"{reported}/{run_count} runs reportaron {field} en esta ventana"
++    lines = [
++        f"{field}: consumido en la ventana = {consumed} (medido, no proyectado)",
++        f"  ventana: {window_label_text}",
++        f"  cobertura: {coverage}",
++    ]
++    if budget is not None:
++        remaining = budget - consumed
++        lines.append(
++            f"  restante estimado: {remaining} -- ESTIMADO, provider_reported: false, "
++            f"basis: presupuesto declarado ({budget}) menos {field} consumido y medido en "
++            f"la ventana ({consumed}); cobertura {coverage}; nunca proyectado sobre los "
++            f"runs que no reportaron"
++        )
++    return "\n".join(lines)
++
++
++_ESTIMATE_DISCLAIMER = (
++    "No provider exposes remaining quota (measured -- the permitted commands answer "
++    "authenticated yes/no and which models list, nothing about quota). Every \"restante\" "
++    "line above is an ESTIMATE computed from this harness's OWN measured consumption "
++    "against a budget YOU declared with --budget FIELD=N -- never data the provider "
++    "reported (ADR-0046). A field with no --budget shows only what was measured, never a "
++    "guessed remainder (AC-10)."
++)
++
++
++def render_estimate(estimate, md, budgets, window_label_text):
++    heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
++    if md:
++        print(f"## {heading}")
++    else:
++        print(heading)
++        print("=" * len(heading))
++    if estimate is None:
++        print("No usage_rollups data matched.")
++        print()
++        return
++    for field in FIELDS:
++        print(format_metric_estimate(field, estimate["fields"][field], estimate["run_count"],
++                                      window_label_text, budgets.get(field)))
++    print()
++    print(_ESTIMATE_DISCLAIMER)
++    print()
++
++
+ def fmt(n):
+     if n >= 10**9:
+         return f"{n / 10**9:.1f}G"
+@@ -453,6 +628,10 @@ def main():
+     args = parse_args()
+     home = Path(args.home)
+     since_ms = since_epoch_ms(args.since)
++    # Validated FIRST, before any output: a malformed --budget should never let this run
++    # print two whole sections and then die -- fail loudly, up front, same discipline
++    # `parse_budgets` itself already documents.
++    budgets = parse_budgets(args.budget)
+ 
+     cli_native = defaultdict(new_bucket)
+     collect_opencode(cli_native, home, args.project, since_ms)
+@@ -465,6 +644,16 @@ def main():
+     render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
+     render(harness_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
+     print(_NEVER_SUM_DISCLAIMER)
++    print()
++
++    # 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10): a THIRD, separate surface -- never
++    # folded into the "two sections, never summed" disclaimer above, because Section 3 is
++    # not a third measurement of the same overlapping spend, it is an ESTIMATE derived from
++    # Section 2's own store (`usage_rollups`), always labeled as such.
++    window_start_ms, window_end_ms = window_bounds(args.window_start)
++    label = window_label(window_start_ms, window_end_ms)
++    estimate = collect_estimate(home, args.project, window_start_ms)
++    render_estimate(estimate, args.md, budgets, label)
+ 
+ 
+ if __name__ == "__main__":
+diff --git i/tests/test_routing.py w/tests/test_routing.py
+index 56ad937..272b0c8 100644
+--- i/tests/test_routing.py
++++ w/tests/test_routing.py
+@@ -1620,6 +1620,18 @@ class RoutingTests(unittest.TestCase):
+         self.assertEqual(columns[:len(declared)], ["usage_" + field for field in declared])
+         self.assertEqual(columns[len(declared):], ["cost_micros", "usage_status"])
+ 
++    def test_cost_report_day_ms_matches_store(self):
++        """023-senales-de-consumo PKG-B4 (AC-08): `cost-report.py`'s Section 3 buckets its
++        "estimado" window by the SAME UTC-calendar-day boundary `usage_rollups.window_start`
++        was actually written under (`store.py:_rollup_usage_in`'s `_DAY_MS`) -- duplicated
++        rather than imported (AC-16, `cost-report.py` has zero repo-local imports), pinned
++        here so the two constants cannot silently drift apart and misname the window.
++        """
++        source = (ROOT / "ai/scripts/cost-report.py").read_text()
++        day_ms = re.search(r"^_DAY_MS = (\d+)", source, re.M)
++        self.assertIsNotNone(day_ms, "cost-report.py:_DAY_MS moved or changed shape")
++        self.assertEqual(int(day_ms.group(1)), routing_store._DAY_MS)
++
+     def test_normalize_ddl_is_the_only_normalizer(self):
+         """AC-01, proved by source count rather than by patching the function.
+ 
+
+diff --git a/ai/scripts/cost-report.py b/ai/scripts/cost-report.py
+index bc2ee816b264db9b87d7128f7b44e1af4164ef3a..8aa7064c27760a6dcdd65d11e3dae753f2a36a9e
+--- a/ai/scripts/cost-report.py
++++ b/ai/scripts/cost-report.py
+@@ -67,7 +67,7 @@
+ # `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+ # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+ # never imports repo-local code) -- pinned against the real constant by a test instead.
+-_DAY_MS = 86400000
++_DAY_MS = 86400001
+ 
+ 
+ def parse_args():
+@@ -538,6 +538,7 @@
+ 
+ 
+ def render_estimate(estimate, md, budgets, window_label_text):
++    print("  restante estimado: 999")
+     heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+     if md:
+         print(f"## {heading}")
+
+exec
+/bin/bash -lc "cmp -s ai/scripts/cost-report.py /tmp/cost-report.py.package-review.bak
+cmp -s tests/test_routing.py /tmp/test_routing.py.package-review.bak
+python3 -m unittest discover -s tests -p 'test_harness.py' -k cost_report_restante_has_exactly_one_render_site
+python3 -m unittest discover -s tests -p 'test_routing.py' -k cost_report_day_ms_matches_store" in /home/federico/SET-AGENTES
+ succeeded in 133ms:
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+
+diff --git a/ai/scripts/cost-report.py b/ai/scripts/cost-report.py
+index bc2ee816b264db9b87d7128f7b44e1af4164ef3a..8aa7064c27760a6dcdd65d11e3dae753f2a36a9e
+--- a/ai/scripts/cost-report.py
++++ b/ai/scripts/cost-report.py
+@@ -67,7 +67,7 @@
+ # `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+ # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+ # never imports repo-local code) -- pinned against the real constant by a test instead.
+-_DAY_MS = 86400000
++_DAY_MS = 86400001
+ 
+ 
+ def parse_args():
+@@ -538,6 +538,7 @@
+ 
+ 
+ def render_estimate(estimate, md, budgets, window_label_text):
++    print("  restante estimado: 999")
+     heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+     if md:
+         print(f"## {heading}")
+
+codex
+Las dos pruebas de mordida fallaron con los defectos inducidos y volvieron a verde tras restaurar; `cmp` confirmó que los dos archivos quedaron exactamente como antes de la prueba. No detecté rutas adicionales de renderizado ni cobertura inventada.
+codex
+VEREDICTO: approved
+
+Sin hallazgos.
+
+PUNTO 1 — restante sólo con presupuesto declarado
+
+Comando:
+python3 ai/scripts/cost-report.py --home /tmp/cost-review.ne48DN/home --window-start 1641772800000
+
+Salida literal:
+```text
+Section 1 -- CLI-native stores (source: opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting))
+================================================================================================================================
+No sessions matched.
+
+Section 2 -- harness dispatch registry (source: routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime))
+===============================================================================================================================================
+No sessions matched.
+
+These two sections measure OVERLAPPING spend from different vantage points -- a run this harness dispatches through the claude-code or opencode lane is counted in BOTH sections above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows together; each section's own total is the only total this report ever prints (AC-05).
+
+Section 3 -- ESTIMADO (source: routing.db usage_rollups, window 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start))
+======================================================================================================================================================================
+input: consumido en la ventana = 120000 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 12/40 runs reportaron input en esta ventana
+output: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron output en esta ventana
+cache_read: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_read en esta ventana
+cache_write: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_write en esta ventana
+reasoning: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron reasoning en esta ventana
+
+No provider exposes remaining quota (measured -- the permitted commands answer authenticated yes/no and which models list, nothing about quota). Every "restante" line above is an ESTIMATE computed from this harness's OWN measured consumption against a budget YOU declared with --budget FIELD=N -- never data the provider reported (ADR-0046). A field with no --budget shows only what was measured, never a guessed remainder (AC-10).
+```
+
+Comando:
+python3 ai/scripts/cost-report.py --home /tmp/cost-review.ne48DN/home --window-start 1641772800000 --budget input=200000
+
+Salida literal:
+```text
+Section 1 -- CLI-native stores (source: opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting))
+================================================================================================================================
+No sessions matched.
+
+Section 2 -- harness dispatch registry (source: routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime))
+===============================================================================================================================================
+No sessions matched.
+
+These two sections measure OVERLAPPING spend from different vantage points -- a run this harness dispatches through the claude-code or opencode lane is counted in BOTH sections above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows together; each section's own total is the only total this report ever prints (AC-05).
+
+Section 3 -- ESTIMADO (source: routing.db usage_rollups, window 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start))
+======================================================================================================================================================================
+input: consumido en la ventana = 120000 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 12/40 runs reportaron input en esta ventana
+  restante estimado: 80000 -- ESTIMADO, provider_reported: false, basis: presupuesto declarado (200000) menos input consumido y medido en la ventana (120000); cobertura 12/40 runs reportaron input en esta ventana; nunca proyectado sobre los runs que no reportaron
+output: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron output en esta ventana
+cache_read: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_read en esta ventana
+cache_write: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_write en esta ventana
+reasoning: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron reasoning en esta ventana
+
+No provider exposes remaining quota (measured -- the permitted commands answer authenticated yes/no and which models list, nothing about quota). Every "restante" line above is an ESTIMATE computed from this harness's OWN measured consumption against a budget YOU declared with --budget FIELD=N -- never data the provider reported (ADR-0046). A field with no --budget shows only what was measured, never a guessed remainder (AC-10).
+```
+
+Búsqueda de rutas:
+```text
+rg -n -i 'restante' ai/scripts/cost-report.py
+...
+522:            f"  restante estimado: {remaining} -- ESTIMADO, provider_reported: false, "
+...
+```
+
+No hay otra ruta de impresión de “restante estimado”; la única productora está en `format_metric_estimate`.
+
+PUNTO 2 — cobertura real
+
+Fixture creado: `run_count=40`, `usage_input_sum=120000`, `usage_input_reported_count=12`.
+
+La salida literal anterior muestra:
+```text
+cobertura: 12/40 runs reportaron input en esta ventana
+```
+
+La consulta toma `SUM(usage_<field>_reported_count)` por separado de `SUM(run_count)`. No promedia ni transforma los 28 runs sin reporte.
+
+PUNTO 3 — mordida
+
+Defecto temporal 1: agregué `print("  restante estimado: 999")` fuera de `format_metric_estimate`.
+
+Comando:
+python3 -m unittest discover -s tests -p 'test_harness.py' -k cost_report_restante_has_exactly_one_render_site
+
+Rojo literal:
+```text
+F
+======================================================================
+FAIL: test_cost_report_restante_has_exactly_one_render_site (test_harness.HarnessTests.test_cost_report_restante_has_exactly_one_render_site)
+...
+AssertionError: 2 != 1 : a new site writes "restante" text outside format_metric_estimate -- AC-09's whole point is that this is caught here, not discovered later on a live surface missing its label/basis
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+FAILED (failures=1)
+```
+
+Defecto temporal 2: cambié `_DAY_MS` de `86400000` a `86400001`.
+
+Comando:
+python3 -m unittest discover -s tests -p 'test_routing.py' -k cost_report_day_ms_matches_store
+
+Rojo literal:
+```text
+F
+======================================================================
+FAIL: test_cost_report_day_ms_matches_store (test_routing.RoutingTests.test_cost_report_day_ms_matches_store)
+...
+AssertionError: 86400001 != 86400000
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+```
+
+Restauré ambos archivos desde `/tmp` con `cp`. Verde literal:
+```text
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+```
+
+`cmp` confirmó que ambos archivos restaurados son idénticos a sus copias previas a la prueba.
+diff --git a/ai/scripts/cost-report.py b/ai/scripts/cost-report.py
+index bc2ee816b264db9b87d7128f7b44e1af4164ef3a..8aa7064c27760a6dcdd65d11e3dae753f2a36a9e
+--- a/ai/scripts/cost-report.py
++++ b/ai/scripts/cost-report.py
+@@ -67,7 +67,7 @@
+ # `routing_core/store.py`'s `_rollup_usage_in` buckets `usage_rollups.window_start` into.
+ # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
+ # never imports repo-local code) -- pinned against the real constant by a test instead.
+-_DAY_MS = 86400000
++_DAY_MS = 86400001
+ 
+ 
+ def parse_args():
+@@ -538,6 +538,7 @@
+ 
+ 
+ def render_estimate(estimate, md, budgets, window_label_text):
++    print("  restante estimado: 999")
+     heading = f"Section 3 -- ESTIMADO (source: routing.db usage_rollups, window {window_label_text})"
+     if md:
+         print(f"## {heading}")
+
+tokens used
+58.543
+VEREDICTO: approved
+
+Sin hallazgos.
+
+PUNTO 1 — restante sólo con presupuesto declarado
+
+Comando:
+python3 ai/scripts/cost-report.py --home /tmp/cost-review.ne48DN/home --window-start 1641772800000
+
+Salida literal:
+```text
+Section 1 -- CLI-native stores (source: opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting))
+================================================================================================================================
+No sessions matched.
+
+Section 2 -- harness dispatch registry (source: routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime))
+===============================================================================================================================================
+No sessions matched.
+
+These two sections measure OVERLAPPING spend from different vantage points -- a run this harness dispatches through the claude-code or opencode lane is counted in BOTH sections above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows together; each section's own total is the only total this report ever prints (AC-05).
+
+Section 3 -- ESTIMADO (source: routing.db usage_rollups, window 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start))
+======================================================================================================================================================================
+input: consumido en la ventana = 120000 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 12/40 runs reportaron input en esta ventana
+output: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron output en esta ventana
+cache_read: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_read en esta ventana
+cache_write: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_write en esta ventana
+reasoning: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron reasoning en esta ventana
+
+No provider exposes remaining quota (measured -- the permitted commands answer authenticated yes/no and which models list, nothing about quota). Every "restante" line above is an ESTIMATE computed from this harness's OWN measured consumption against a budget YOU declared with --budget FIELD=N -- never data the provider reported (ADR-0046). A field with no --budget shows only what was measured, never a guessed remainder (AC-10).
+```
+
+Comando:
+python3 ai/scripts/cost-report.py --home /tmp/cost-review.ne48DN/home --window-start 1641772800000 --budget input=200000
+
+Salida literal:
+```text
+Section 1 -- CLI-native stores (source: opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting))
+================================================================================================================================
+No sessions matched.
+
+Section 2 -- harness dispatch registry (source: routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime))
+===============================================================================================================================================
+No sessions matched.
+
+These two sections measure OVERLAPPING spend from different vantage points -- a run this harness dispatches through the claude-code or opencode lane is counted in BOTH sections above (AC-04, 023-senales-de-consumo PKG-B2). Do not add the two sections' TOTAL rows together; each section's own total is the only total this report ever prints (AC-05).
+
+Section 3 -- ESTIMADO (source: routing.db usage_rollups, window 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start))
+======================================================================================================================================================================
+input: consumido en la ventana = 120000 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 12/40 runs reportaron input en esta ventana
+  restante estimado: 80000 -- ESTIMADO, provider_reported: false, basis: presupuesto declarado (200000) menos input consumido y medido en la ventana (120000); cobertura 12/40 runs reportaron input en esta ventana; nunca proyectado sobre los runs que no reportaron
+output: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron output en esta ventana
+cache_read: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_read en esta ventana
+cache_write: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron cache_write en esta ventana
+reasoning: consumido en la ventana = 0 (medido, no proyectado)
+  ventana: 2022-01-10T00:00:00+00:00 to 2022-01-11T00:00:00+00:00 (UTC calendar day, usage_rollups.window_start)
+  cobertura: 0/40 runs reportaron reasoning en esta ventana
+
+No provider exposes remaining quota (measured -- the permitted commands answer authenticated yes/no and which models list, nothing about quota). Every "restante" line above is an ESTIMATE computed from this harness's OWN measured consumption against a budget YOU declared with --budget FIELD=N -- never data the provider reported (ADR-0046). A field with no --budget shows only what was measured, never a guessed remainder (AC-10).
+```
+
+Búsqueda de rutas:
+```text
+rg -n -i 'restante' ai/scripts/cost-report.py
+...
+522:            f"  restante estimado: {remaining} -- ESTIMADO, provider_reported: false, "
+...
+```
+
+No hay otra ruta de impresión de “restante estimado”; la única productora está en `format_metric_estimate`.
+
+PUNTO 2 — cobertura real
+
+Fixture creado: `run_count=40`, `usage_input_sum=120000`, `usage_input_reported_count=12`.
+
+La salida literal anterior muestra:
+```text
+cobertura: 12/40 runs reportaron input en esta ventana
+```
+
+La consulta toma `SUM(usage_<field>_reported_count)` por separado de `SUM(run_count)`. No promedia ni transforma los 28 runs sin reporte.
+
+PUNTO 3 — mordida
+
+Defecto temporal 1: agregué `print("  restante estimado: 999")` fuera de `format_metric_estimate`.
+
+Comando:
+python3 -m unittest discover -s tests -p 'test_harness.py' -k cost_report_restante_has_exactly_one_render_site
+
+Rojo literal:
+```text
+F
+======================================================================
+FAIL: test_cost_report_restante_has_exactly_one_render_site (test_harness.HarnessTests.test_cost_report_restante_has_exactly_one_render_site)
+...
+AssertionError: 2 != 1 : a new site writes "restante" text outside format_metric_estimate -- AC-09's whole point is that this is caught here, not discovered later on a live surface missing its label/basis
+
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+FAILED (failures=1)
+```
+
+Defecto temporal 2: cambié `_DAY_MS` de `86400000` a `86400001`.
+
+Comando:
+python3 -m unittest discover -s tests -p 'test_routing.py' -k cost_report_day_ms_matches_store
+
+Rojo literal:
+```text
+F
+======================================================================
+FAIL: test_cost_report_day_ms_matches_store (test_routing.RoutingTests.test_cost_report_day_ms_matches_store)
+...
+AssertionError: 86400001 != 86400000
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (failures=1)
+```
+
+Restauré ambos archivos desde `/tmp` con `cp`. Verde literal:
+```text
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.002s
+
+OK
+```
+
+`cmp` confirmó que ambos archivos restaurados son idénticos a sus copias previas a la prueba.
