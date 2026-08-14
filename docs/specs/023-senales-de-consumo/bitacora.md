@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-14T05:09:03+00:00
+Actualizado: 2026-08-14T05:10:03+00:00
 
 [2026-08-13T15:39:35+00:00] B1-registro-que-no-miente · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el harness registre de verdad cuanto gasta cada agente, que hoy no lo hace.

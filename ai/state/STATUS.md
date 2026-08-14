@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py` en cada mutación de estado. No editar a mano._
 
-Actualizado: 2026-08-14T05:09:03+00:00
+Actualizado: 2026-08-14T05:10:03+00:00
 
 ## Features
 
@@ -27,7 +27,7 @@ Actualizado: 2026-08-14T05:09:03+00:00
 | 020-honest-dashboard | feature | DONE | P2-anclas-verificables (accepted) | 2/2 | 4/12 | 1/2 | 1 | - | - | 2026-08-12T11:19:21+00:00 transition |
 | 021-gates-que-no-mienten-ni-callan | feature | DONE | P2-gates-que-no-callan (accepted) | 2/2 | 6/12 | 2/2 | 0 | - | - | 2026-08-12T21:09:05+00:00 transition |
 | 022-disponibilidad-real | feature | DONE | P5-altas-y-bajas-automaticas (accepted) | 5/5 | 16/12 | 1/2 | 0 | - | - | 2026-08-13T13:40:43+00:00 transition |
-| 023-senales-de-consumo | scoped | INTEGRATION | B4-estimado-nunca-dato-del-proveedor (accepted) | 4/4 | 8/8 | 1/2 | 0 | - | DONE | 2026-08-14T05:09:03+00:00 transition |
+| 023-senales-de-consumo | scoped | DONE | B4-estimado-nunca-dato-del-proveedor (accepted) | 4/4 | 8/8 | 1/2 | 0 | - | - | 2026-08-14T05:10:03+00:00 transition |
 | 024-listo-para-terceros | scoped | PACKAGE_PLANNING | C4-higiene-de-repo-publico (planned) | 0/4 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:19:15+00:00 create-package |
 | 025-consola-minima-y-flexible | scoped | PACKAGE_PLANNING | D5-vault-en-todo-spawn (planned) | 0/5 | 0/8 | 0/2 | 0 | - | PACKAGE_IMPLEMENTATION | 2026-08-13T15:20:00+00:00 create-package |
 | 026-orquestador-elige-modelo | scoped | DONE | P2-modelo-por-instancia (accepted) | 2/2 | 2/8 | 1/2 | 0 | - | - | 2026-08-13T15:35:37+00:00 transition |

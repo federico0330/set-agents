@@ -4,7 +4,6 @@
     "AC-02",
     "AC-03",
     "AC-04",
-    "AC-04a",
     "AC-05",
     "AC-06",
     "AC-07",
@@ -13,8 +12,8 @@
     "AC-10"
   ],
   "approved_spec": {
-    "approved_at": "2026-08-13T17:00:16+00:00",
-    "hash": "6b9ce1f94aa2f34232f4a32f23e85b28a54ec7b7ea380cad4e0068b822f5cadf",
+    "approved_at": "2026-08-14T05:10:03+00:00",
+    "hash": "47997907be45ea3d6a8073648ff0040c67715e472507eae8e1c7bf7c70535eea",
     "path": "docs/specs/023-senales-de-consumo/spec.md"
   },
   "blockers": [],
@@ -28,7 +27,7 @@
   },
   "current_package_id": "B4-estimado-nunca-dato-del-proveedor",
   "feature_id": "023-senales-de-consumo",
-  "final_state": null,
+  "final_state": "DONE",
   "global_gates": [
     {
       "at": "2026-08-14T05:09:24+00:00",
@@ -1578,6 +1577,30 @@
       "package_id": null,
       "timestamp": "2026-08-14T05:09:24+00:00",
       "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "amend-spec",
+      "from": "INTEGRATION",
+      "metadata": {
+        "approved_by": "federico (capa B aprobada; correccion de numeracion del orquestador, sin cambio de alcance)",
+        "new_hash": "47997907be45ea3d6a8073648ff0040c67715e472507eae8e1c7bf7c70535eea",
+        "reason": "Correccion de bookkeeping del orquestador, sin cambio de alcance ni de trabajo entregado. Durante B1 se detecto que los adaptadores de spawn mandaban formas que el store descartaba, y el orquestador agrego ese trabajo a la spec como 'AC-04a' cuando el paquete PKG-2 ya estaba creado con AC-04 y AC-05. El trabajo se implemento, se gateo y se REVISO dentro de B2 -el reviewer verifico el cableado con dispatch real por lane- pero el AC quedo sin asignar a ningun paquete y bloqueo el cierre de la feature con 'not all acceptance criteria are covered'. Se pliega a AC-04 como su primera mitad, que es donde siempre vivio. Ninguna linea de codigo cambia."
+      },
+      "package_id": null,
+      "timestamp": "2026-08-14T05:10:03+00:00",
+      "to": "INTEGRATION"
+    },
+    {
+      "actor": "orchestrator",
+      "event": "transition",
+      "from": "INTEGRATION",
+      "metadata": {
+        "reason": ""
+      },
+      "package_id": null,
+      "timestamp": "2026-08-14T05:10:03+00:00",
+      "to": "DONE"
     }
   ],
   "metrics": {
@@ -2636,8 +2659,8 @@
       "verifications": []
     }
   ],
-  "phase": "INTEGRATION",
-  "revision": 132,
+  "phase": "DONE",
+  "revision": 134,
   "schema_version": 1,
   "spec_amendments": [
     {
@@ -2659,7 +2682,17 @@
       "old_path": "docs/specs/023-senales-de-consumo/spec.md",
       "path": "docs/specs/023-senales-de-consumo/spec.md",
       "reason": "AC-04a agregado a PKG-2: cablear los adaptadores de spawn a routing_core/usage.py. El implementer de B1 midio que claude_code_spawn.py:602-605 y opencode_spawn.py:318-321 ya adjuntan --usage con formas que _usage_row no reconoce. El endurecimiento de AC-02 las convierte en 'invalid' contado en vez de 'ok' con NULLs silencioso, pero no las traduce. Sin AC-04a, B1 deja el descarte visible y el dato sigue perdido."
+    },
+    {
+      "actor": "orchestrator",
+      "approved_by": "federico (capa B aprobada; correccion de numeracion del orquestador, sin cambio de alcance)",
+      "at": "2026-08-14T05:10:03+00:00",
+      "hash": "47997907be45ea3d6a8073648ff0040c67715e472507eae8e1c7bf7c70535eea",
+      "old_hash": "6b9ce1f94aa2f34232f4a32f23e85b28a54ec7b7ea380cad4e0068b822f5cadf",
+      "old_path": "docs/specs/023-senales-de-consumo/spec.md",
+      "path": "docs/specs/023-senales-de-consumo/spec.md",
+      "reason": "Correccion de bookkeeping del orquestador, sin cambio de alcance ni de trabajo entregado. Durante B1 se detecto que los adaptadores de spawn mandaban formas que el store descartaba, y el orquestador agrego ese trabajo a la spec como 'AC-04a' cuando el paquete PKG-2 ya estaba creado con AC-04 y AC-05. El trabajo se implemento, se gateo y se REVISO dentro de B2 -el reviewer verifico el cableado con dispatch real por lane- pero el AC quedo sin asignar a ningun paquete y bloqueo el cierre de la feature con 'not all acceptance criteria are covered'. Se pliega a AC-04 como su primera mitad, que es donde siempre vivio. Ninguna linea de codigo cambia."
     }
   ],
-  "updated_at": "2026-08-14T05:09:24+00:00"
+  "updated_at": "2026-08-14T05:10:03+00:00"
 }

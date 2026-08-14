@@ -3,8 +3,9 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `INTEGRATION` · modo: scoped · revisión 131
-- spec: `docs/specs/023-senales-de-consumo/spec.md` (hash `6b9ce1f94aa2`)
+- fase: `DONE` · modo: scoped · revisión 134
+- estado final: **DONE**
+- spec: `docs/specs/023-senales-de-consumo/spec.md` (hash `47997907be45`)
 
 ## Criterios de aceptación
 
@@ -12,7 +13,6 @@
 - AC-02
 - AC-03
 - AC-04
-- AC-04a
 - AC-05
 - AC-06
 - AC-07
@@ -40,7 +40,7 @@
 
 ## Qué falta
 
-- → `DONE` — run final global gates first
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -48,7 +48,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/023-senales-de-consumo/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/023-senales-de-consumo/bitacora.md`
 
-_Actualizado: 2026-08-14T05:09:03+00:00_
+_Actualizado: 2026-08-14T05:10:03+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

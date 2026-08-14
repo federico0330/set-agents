@@ -58,18 +58,20 @@ ventana", que es medición y no adivinanza.
 
 ### PKG-2 — `el-reporte-dice-de-donde-sale`
 
-**Alcance ampliado durante B1** (nota de decisión `correccion-el-plan-tenia-razon-a-medias-y-el-
-orquestador-tambien`): el implementer de B1 encontró que `claude_code_spawn.py:602-605` y
+**Alcance ampliado durante B1** (nota de decisión `correccion-el-plan-tenia-razon-a-medias-y-el-orquestador-tambien`).
+Se numeró primero como `AC-04a` y se plegó a **AC-04** al cerrar la feature: era una
+sub-numeración inventada a mitad de vuelo para trabajo que ya vivía en PKG-2, no un criterio
+nuevo: el implementer de B1 encontró que `claude_code_spawn.py:602-605` y
 `opencode_spawn.py:318-321` **ya adjuntan** `--usage` en cada dispatch, con las formas
 `{"total_cost_usd", "modelUsage"}` y `{"tokens"}`, que `_usage_row` **no reconoce**. Antes del
 endurecimiento de AC-02 eso producía exactamente lo que el plan describía: `usage_status='ok'` con
 todo en NULL. Ahora produce `'invalid'`, que es un descarte **contado** — mejor, pero sigue sin ser
 el dato.
 
-- **AC-04a**: los adaptadores de spawn se cablean a `routing_core/usage.py`, para que la forma que
+- **AC-04 · primera mitad (el cableado)**: los adaptadores de spawn se cablean a `routing_core/usage.py`, para que la forma que
   ya mandan se **traduzca** en vez de descartarse. Prueba: un dispatch por lane que hoy da
   `'invalid'` pasa a dar columnas no-NULL, con `status_counts` antes y después.
-- **AC-04**: el riesgo real **no** es la etiqueta `"pi"` de `cost-report.py:312`: es el **doble
+- **AC-04 · segunda mitad (el doble conteo)**: el riesgo real **no** es la etiqueta `"pi"` de `cost-report.py:312`: es el **doble
   conteo** con los stores propios de los CLIs. Dos secciones nombradas por su fuente, que **nunca
   se suman entre sí**.
 - **AC-05**: ninguna superficie puede presentar un total sin decir de qué fuente salió.
