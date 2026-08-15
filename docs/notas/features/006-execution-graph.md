@@ -39,7 +39,7 @@
 
 ## Qué falta
 
-- → `PACKAGE_ACCEPTED` — P3-graph-view: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
+- → P3-graph-view: falta declarar el impacto de módulo o marcarlo como exento
 
 ## Presupuestos
 

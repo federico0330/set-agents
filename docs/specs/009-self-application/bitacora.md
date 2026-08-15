@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-12T21:09:06+00:00
+Actualizado: 2026-08-15T12:56:16+00:00
 
 [2026-07-28T16:26:03+00:00] spec-challenger · started
 Cliente: Antes de tocar nada, mando a un revisor independiente a buscarle agujeros al contrato de la feature 009. Es el único de los contratos que nunca pasó por esa instancia, y justo es el contrato que dice que el arnés no se aplica sus propias reglas. Ya le encontré yo un error de diagnóstico sin buscarlo, así que hay motivo para mirar el resto.

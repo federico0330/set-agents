@@ -43,6 +43,7 @@
 
 ## Qué falta
 
+- → corresponde tu decisión (ver Blocker)
 - ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
 - 5 hallazgos abiertos
 

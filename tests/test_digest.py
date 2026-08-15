@@ -265,6 +265,337 @@ class HonestPredicateTests(unittest.TestCase):
         self.assertIn("003-blocked", falta)
 
 
+def _status_cell(text: str, feature_id: str, column: str) -> str:
+    """Pull one markdown-table cell out of STATUS.md by (feature_id, column header).
+    Fixtures below never put a literal '|' inside the cells under test, so a plain
+    split is exact -- the escaping `render_status.summarize_feature` applies for a
+    hostile blocker/reason is exercised by `test_harness.py`'s injected-heading test,
+    untouched by this package."""
+    header_line = next(line for line in text.splitlines() if line.startswith("| Feature "))
+    headers = [h.strip() for h in header_line.strip("|").split("|")]
+    idx = headers.index(column)
+    row_line = next(line for line in text.splitlines() if line.startswith(f"| {feature_id} "))
+    cells = [c.strip() for c in row_line.strip("|").split("|")]
+    return cells[idx]
+
+
+def _write_feature(state_dir: Path, feature_id: str, payload: dict) -> None:
+    (state_dir / "features").mkdir(parents=True, exist_ok=True)
+    (state_dir / "features" / f"{feature_id}.json").write_text(
+        json.dumps({"feature_id": feature_id, **payload}, ensure_ascii=False)
+    )
+
+
+class NextStepTranslationTests(unittest.TestCase):
+    """028/N3a AC-11 x AC-17: STATUS.md's "Próximo paso" carries `next_transition`'s
+    `reason`, translated -- never the bare `next` phase name it used to show
+    (`next_transition(data).get("next") or "-"`, D-4a), and the four states AC-17
+    names get an explicit, tested contract."""
+
+    def _render(self, tmp, **features):
+        state_dir = tmp / "ai/state"
+        for feature_id, payload in features.items():
+            _write_feature(state_dir, feature_id, payload)
+        result = subprocess.run(
+            [sys.executable, str(FEATURE_STATE), "render-status", "--state-dir", str(state_dir)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return (state_dir / "STATUS.md").read_text(encoding="utf-8")
+
+    def test_mordida_a_regression_to_bare_next_would_show_the_raw_phase_name_here(self):
+        """The specific bite the package brief asked for: a state whose `next` and
+        `reason` clearly diverge (PACKAGE_IMPLEMENTATION, all tasks done -> `next` is
+        the bare phase "PACKAGE_GATES", `reason` is "all package tasks completed").
+        `next_transition(data).get("next") or "-"` would print the literal string
+        "PACKAGE_GATES" in the cell; `describe_next_step` prints translated prose that
+        never contains it. If someone reverts render_status.py to the old one-liner,
+        this test goes red on the `assertNotIn` below -- proven by neutralizing the
+        fix in this very test run (see the package evidence for the red/green pair)."""
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._render(tmp, **{
+                "700-impl-done": {
+                    "phase": "PACKAGE_IMPLEMENTATION", "current_package_id": "P1",
+                    "packages": [{"package_id": "P1", "status": "in_progress",
+                                  "tasks": [{"id": "T-001", "status": "completed"}]}],
+                    "history": [], "blockers": [], "updated_at": "2026-08-15T00:00:00+00:00",
+                },
+            })
+        cell = _status_cell(text, "700-impl-done", "Próximo paso")
+        self.assertNotEqual(cell, "PACKAGE_GATES")
+        self.assertNotIn("PACKAGE_GATES", cell)
+        self.assertIn("gates", cell)
+
+    def test_ac17_terminal_done_shows_a_dash_never_the_word_terminal(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._render(tmp, **{
+                "701-done": {
+                    "phase": "DONE", "final_state": "DONE", "packages": [],
+                    "history": [], "blockers": [], "updated_at": "2026-01-01T00:00:00+00:00",
+                },
+            })
+        cell = _status_cell(text, "701-done", "Próximo paso")
+        self.assertEqual(cell, "—")
+        self.assertNotIn("terminal", cell)
+
+    def test_ac17_blocked_names_it_as_the_humans_turn_not_a_bare_dash(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._render(tmp, **{
+                "702-blocked": {
+                    "phase": "BLOCKED", "final_state": "BLOCKED", "packages": [],
+                    "history": [],
+                    "blockers": [{"reason": "HUMAN_DECISION_REQUIRED: x", "at": "2026-08-10T00:00:00+00:00"}],
+                    "updated_at": "2026-08-10T00:00:00+00:00",
+                },
+            })
+        cell = _status_cell(text, "702-blocked", "Próximo paso")
+        self.assertNotEqual(cell, "—")
+        self.assertNotEqual(cell, "-")
+        self.assertNotIn("terminal", cell)
+        self.assertIn("decisión", cell)
+
+    def test_ac17_no_package_branch_is_translated_never_the_raw_fallback_string(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._render(tmp, **{
+                "703-no-package": {
+                    "phase": "PACKAGE_GATES", "packages": [],
+                    "history": [], "blockers": [], "updated_at": "2026-08-15T00:00:00+00:00",
+                },
+            })
+        cell = _status_cell(text, "703-no-package", "Próximo paso")
+        self.assertNotIn("record required event before continuing", cell)
+        self.assertIn("registrar el evento pendiente", cell)
+
+    def test_ac17_a_stale_live_feature_is_flagged_as_possibly_interrupted(self):
+        old = (datetime.now(timezone.utc) - timedelta(days=9)).replace(microsecond=0).isoformat()
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._render(tmp, **{
+                "704-stale": {
+                    "phase": "PACKAGE_IMPLEMENTATION", "current_package_id": "P1",
+                    "packages": [{"package_id": "P1", "status": "in_progress",
+                                  "tasks": [{"id": "T-001", "status": "planned"}]}],
+                    "history": [], "blockers": [], "updated_at": old,
+                },
+            })
+        cell = _status_cell(text, "704-stale", "Próximo paso")
+        self.assertIn("interrumpido", cell)
+        self.assertIn("9 días", cell)
+
+
+class DigestPlainLanguageTests(unittest.TestCase):
+    """028/N3a AC-12: the digest's "Qué falta" bit stops publishing raw flags, command
+    names, and English task-id dumps -- D-4b/D-4c's own cited examples, run against
+    today's code."""
+
+    def _digest(self, tmp, **features):
+        state_dir = tmp / "ai/state"
+        for feature_id, payload in features.items():
+            _write_feature(state_dir, feature_id, payload)
+        result = subprocess.run(
+            [sys.executable, str(FEATURE_STATE), "digest", "--state-dir", str(state_dir),
+             "--since", "2020-01-01"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return (tmp / "docs/notas/BUENOS-DIAS.md").read_text(encoding="utf-8")
+
+    def test_module_impact_reason_never_leaks_the_cli_flags_d4b(self):
+        """D-4b, reproduced verbatim: a `PACKAGE_ACCEPTED` feature with an accepted
+        package that never recorded (or waived) a module impact used to publish
+        "→ `PACKAGE_ACCEPTED` — P3-graph-view: module impact required
+        (record-module-impact) or waived (--module-impact-waived --reason)" straight
+        into the digest."""
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._digest(tmp, **{
+                "705-accepted": {
+                    "phase": "PACKAGE_ACCEPTED",
+                    "packages": [{"package_id": "P3-graph-view", "status": "accepted"}],
+                    "history": [], "blockers": [], "updated_at": "2026-08-15T00:00:00+00:00",
+                },
+            })
+        falta = text.split("## Qué falta", 1)[1].split("##", 1)[0]
+        self.assertNotIn("record-module-impact", falta)
+        self.assertNotIn("--module-impact-waived", falta)
+        self.assertNotIn("PACKAGE_ACCEPTED", falta)
+        self.assertIn("P3-graph-view", falta)
+        self.assertIn("impacto de módulo", falta)
+
+    def test_pending_tasks_show_a_count_never_the_raw_english_titles_d4c(self):
+        """D-4c: `task["id"]` has held free-form English titles in real history
+        ("additive schema/migration and invariants, narrow classifier + Pi terminal
+        plumbing…") -- the digest must stop dumping them raw."""
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            text = self._digest(tmp, **{
+                "706-pending": {
+                    "phase": "PACKAGE_IMPLEMENTATION", "current_package_id": "P1",
+                    "packages": [{
+                        "package_id": "P1", "status": "in_progress",
+                        "tasks": [
+                            {"id": "additive schema/migration and invariants", "status": "planned"},
+                            {"id": "narrow classifier + Pi terminal plumbing", "status": "planned"},
+                        ],
+                    }],
+                    "history": [], "blockers": [], "updated_at": "2026-08-15T00:00:00+00:00",
+                },
+            })
+        falta = text.split("## Qué falta", 1)[1].split("##", 1)[0]
+        self.assertNotIn("additive schema/migration", falta)
+        self.assertNotIn("narrow classifier", falta)
+        self.assertIn("2 tareas pendientes en P1", falta)
+
+
+class DigestNoMidSentenceTruncationTests(unittest.TestCase):
+    """028/N3a AC-13: the three truncation points in `cmd_digest` (blockers 120,
+    closes 300, decisions 200) stop cutting mid-sentence. Criterio de cierre: cero
+    `…` al final de línea en esas tres secciones."""
+
+    LONG = (
+        "Esta es una narración deliberadamente larga, sin ningún punto ni coma antes "
+        "del viejo límite de caracteres, escrita así a propósito para que un corte por "
+        "cantidad de caracteres caiga a mitad de una palabra o de una oración y así "
+        "se pueda comprobar que el corte silencioso ya no ocurre en esta sección del "
+        "digest, sin importar cuán larga sea la narración original que un agente haya "
+        "escrito en su cierre."
+    )
+
+    def test_blocker_reason_in_necesita_tu_decision_is_never_cut(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_dir = tmp / "ai/state"
+            _write_feature(state_dir, "707-blocked-long", {
+                "phase": "BLOCKED", "final_state": "BLOCKED", "packages": [], "history": [],
+                "blockers": [{"reason": self.LONG, "at": "2026-08-10T00:00:00+00:00"}],
+                "updated_at": "2026-08-10T00:00:00+00:00",
+            })
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "digest", "--state-dir", str(state_dir),
+                 "--since", "2020-01-01"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            text = (tmp / "docs/notas/BUENOS-DIAS.md").read_text(encoding="utf-8")
+        headline = text.split("## Necesita tu decisión", 1)[1].split("##", 1)[0]
+        self.assertIn(self.LONG, headline)
+        for line in headline.splitlines():
+            self.assertFalse(line.rstrip().endswith("…"), line)
+
+    def test_closing_narration_in_que_quedo_listo_is_never_cut(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_dir = tmp / "ai/state"
+            _write_feature(state_dir, "708-active", {
+                "phase": "PACKAGE_PLANNING", "packages": [], "history": [], "blockers": [],
+                "updated_at": "2026-08-15T00:00:00+00:00",
+            })
+            _write_jsonl(state_dir / "narrative-log.jsonl", [
+                {"at": "2026-08-15T00:00:00+00:00", "feature_id": "708-active", "package_id": "-",
+                 "role": "implementer", "result": "done", "client": self.LONG,
+                 "tech": "x", "actor": "orchestrator"},
+            ])
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "digest", "--state-dir", str(state_dir),
+                 "--since", "2020-01-01"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            text = (tmp / "docs/notas/BUENOS-DIAS.md").read_text(encoding="utf-8")
+        section = text.split("## Qué quedó listo", 1)[1].split("##", 1)[0]
+        self.assertIn(self.LONG, section)
+        for line in section.splitlines():
+            self.assertFalse(line.rstrip().endswith("…"), line)
+
+    def test_decision_text_in_decisiones_nuevas_is_never_cut(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_dir = tmp / "ai/state"
+            _write_feature(state_dir, "709-any", {
+                "phase": "PACKAGE_PLANNING", "packages": [], "history": [], "blockers": [],
+                "updated_at": "2026-08-15T00:00:00+00:00",
+            })
+            _write_jsonl(state_dir / "decisions-log.jsonl", [
+                {"at": "2026-08-15T00:00:00+00:00", "slug": "una-decision-larga",
+                 "title": "Una decisión larga", "context": "c", "decision": self.LONG,
+                 "actor": "orchestrator"},
+            ])
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "digest", "--state-dir", str(state_dir),
+                 "--since", "2020-01-01"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            text = (tmp / "docs/notas/BUENOS-DIAS.md").read_text(encoding="utf-8")
+        section = text.split("## Decisiones nuevas", 1)[1].split("##", 1)[0]
+        self.assertIn(self.LONG, section)
+        for line in section.splitlines():
+            self.assertFalse(line.rstrip().endswith("…"), line)
+
+
+class DigestRegenerationCadenceTests(unittest.TestCase):
+    """028/N3a AC-14: the digest regenerates at phase/turn close (`sync-notes`, its
+    own docstring's "run it at phase close and end of turn"), never on every
+    per-mutation write (`log-narrative`/`log-quickfix`)."""
+
+    def test_sync_notes_alone_produces_a_fresh_digest_with_matching_timestamps(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_dir = tmp / "ai/state"
+            _write_feature(state_dir, "710-any", {
+                "phase": "PACKAGE_PLANNING", "packages": [], "history": [], "blockers": [],
+                "updated_at": "2026-08-15T00:00:00+00:00",
+            })
+            digest_path = tmp / "docs/notas/BUENOS-DIAS.md"
+            self.assertFalse(digest_path.exists(), "no digest before sync-notes ever ran")
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "sync-notes", "--state-dir", str(state_dir)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("NOTES_SYNCED", result.stdout)
+            self.assertTrue(digest_path.exists(), "sync-notes must regenerate the digest by itself")
+            status_text = (state_dir / "STATUS.md").read_text(encoding="utf-8")
+            digest_text = digest_path.read_text(encoding="utf-8")
+            status_ts = status_text.splitlines()[4].split("Actualizado: ", 1)[1].strip()
+            digest_ts = digest_text.splitlines()[3].split("generado ", 1)[1].strip("_ ")
+            status_dt = datetime.fromisoformat(status_ts)
+            digest_dt = datetime.fromisoformat(digest_ts)
+            self.assertLessEqual(
+                abs((status_dt - digest_dt).total_seconds()), 5,
+                "AC-14's measurable criterion: BUENOS-DIAS.md's 'generado' must never "
+                "trail STATUS.md's 'Actualizado' -- both come from the same sync-notes call",
+            )
+
+    def test_log_narrative_alone_never_writes_the_digest(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state_dir = tmp / "ai/state"
+            _write_feature(state_dir, "711-any", {
+                "phase": "PACKAGE_PLANNING", "packages": [], "history": [], "blockers": [],
+                "updated_at": "2026-08-15T00:00:00+00:00",
+            })
+            digest_path = tmp / "docs/notas/BUENOS-DIAS.md"
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "log-narrative",
+                 "--client", "avanzamos", "--tech", "avance tecnico",
+                 "--feature-id", "711-any", "--result", "done",
+                 "--log-file", str(state_dir / "narrative-log.jsonl")],
+                cwd=tmp, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse(
+                digest_path.exists(),
+                "AC-14: a single narrated close is not a phase/turn close -- the "
+                "tracked BUENOS-DIAS.md must not move on every mutation (024/C1 + "
+                "027's owned-paths hardening)",
+            )
+
+
 class DoctrineTests(unittest.TestCase):
     def test_milestone_narration_is_doctrine_in_all_shared_files(self):
         for path in ("Global/_shared/CLAUDE.md", "Global/_shared/AGENTS.opencode.md",

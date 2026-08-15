@@ -15,6 +15,7 @@ Deriva STATUS.md, bitácora y docs/notas/ (Obsidian-ready) del estado en cada mu
 
 ## Últimos cambios estructurales
 
+- 2026-08-14 024-listo-para-terceros/C4-higiene-de-repo-publico — LICENSE MIT, CONTRIBUTING, CHANGELOG, SECURITY, matriz de soporte medida y upstream re-apuntable
 - 2026-08-14 024-listo-para-terceros/C1-estado-fuera-del-producto — El estado deja de viajar en el clon: historial a docs/historia, ai/state gitignoreado y sembrado
 - 2026-08-12 020-honest-dashboard/P2-anclas-verificables — Nuevo motor check_anchors.py y comando feature-state.py check-anchors: extrae las referencias file:line de docs/modules/, resuelve el basename SOLO dentro de los paths que el modulo declara en module…
 - 2026-08-12 020-honest-dashboard/P1-digest-no-esconde — Un unico predicado compartido en model.py (feature_is_live, open_blocker, blocked_days, stale_days, feature_is_stale, STALE_THRESHOLD_DAYS) reemplazo las dos copias mal escritas que tenian cmd_digest…

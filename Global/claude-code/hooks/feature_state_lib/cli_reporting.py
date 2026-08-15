@@ -158,6 +158,22 @@ def cmd_sync_notes(args: argparse.Namespace) -> int:
     from feature_state_lib.render_modules import render_modules  # deferred: see module docstring
     written += render_modules(anchor, force=True)
     _warn_check_anchors_never_raises(state_dir)
+    # AC-14 (028/N3a): this docstring already says "run it at phase close and end of
+    # turn" -- that is precisely the cadence AC-14 wants for the digest too, and
+    # nowhere else. `log-narrative`/`log-quickfix` (every per-mutation write) call
+    # `render_status`/`render_bitacora`/`render_notes` directly and deliberately never
+    # reach here, so a package mid-flight never touches the git-tracked
+    # `BUENOS-DIAS.md` (024/C1 + 027's owned-paths hardening — see this AC's own
+    # rationale in the spec). Regenerating BOTH dashboards in the same command call is
+    # also what keeps their two "as of" timestamps from drifting apart (measurable
+    # criterion: `BUENOS-DIAS.md`'s "generado" must never trail STATUS.md's
+    # "Actualizado" — D-5 measured a 3-day gap under the old "nobody remembers to run
+    # digest" regime). Best-effort: a digest hiccup must never break sync-notes' own
+    # "always renders everything" contract.
+    try:
+        cmd_digest(argparse.Namespace(state_dir=str(state_dir), notes_dir=str(notes_dir), since=None))
+    except Exception as exc:
+        print(f"DIGEST_SKIPPED error={exc}")
     print(f"NOTES_SYNCED n={len(written)}")
     print_json({"ok": True, "notes_dir": str(notes_dir), "written": written})
     return 0
@@ -216,8 +232,15 @@ def cmd_digest(args: argparse.Namespace) -> int:
     if needs_decision:
         for data, blocker in needs_decision:
             days = model.days_since(blocker.get("at"))
+            # AC-13 (028/N3a): this is "Necesita tu decisión" -- the FIRST section of
+            # the digest, the one that answers Federico's actual question. Truncating it
+            # at 120 chars mid-sentence (the old default `_short` limit) is the D-4d
+            # example verbatim: "...five high findings remain and P1 exhau…". `limit=None`
+            # renders the reason whole; option (b) from AC-13 ("a short form written on
+            # purpose") is not attempted here because a blocker's reason IS already the
+            # short form an agent chose to write.
             lines.append(
-                f"- **{data.get('feature_id')}** — {_short(blocker.get('reason', ''))} (hace {days} días)"
+                f"- **{data.get('feature_id')}** — {_short(blocker.get('reason', ''), None)} (hace {days} días)"
             )
     else:
         lines.append("- _nada pendiente de tu decisión_ ✅")
@@ -229,7 +252,10 @@ def cmd_digest(args: argparse.Namespace) -> int:
         for entry in finished[-20:]:
             head = " · ".join(p for p in (entry.get("feature_id"), entry.get("package_id"),
                                           entry.get("role")) if p and p != "-")
-            lines.append(f"- **{head}** — {_short(entry.get('client') or entry.get('tech'), 300)}")
+            # AC-13 (028/N3a): "Qué quedó listo" — full text, never a 300-char mid-
+            # sentence cut (D-3-style example: `bitacora.md` closes routinely run past
+            # 300 chars and today lose the second half of the sentence to `…`).
+            lines.append(f"- **{head}** — {_short(entry.get('client') or entry.get('tech'), None)}")
     else:
         lines.append("- _sin cierres registrados en la ventana_")
 
@@ -257,9 +283,12 @@ def cmd_digest(args: argparse.Namespace) -> int:
         # same truncation, zero new information (3rd mention). Every OTHER bit
         # (`_pending_bits` also renders open findings / pending tasks) is new information
         # and stays: only the literal blocker-duplicate line is dropped, never the feature.
+        # 028/N3a, same principle: `describe_next_step` on a BLOCKED feature is
+        # "corresponde tu decisión (ver Blocker)" -- zero information beyond the headline
+        # this feature is already under, so it gets the same treatment as `⛔ bloqueo:`.
         headlined = model.open_blocker(data) is not None
         for bit in _pending_bits(data):
-            if headlined and bit.startswith("⛔ bloqueo:"):
+            if headlined and (bit.startswith("⛔ bloqueo:") or bit.startswith("→ corresponde tu decisión")):
                 continue
             lines.append(f"- **{data.get('feature_id')}** {bit}")
             pending_any = True
@@ -298,7 +327,11 @@ def cmd_digest(args: argparse.Namespace) -> int:
     if decisions:
         lines += ["", "## Decisiones nuevas", ""]
         for entry in decisions:
-            lines.append(f"- **{entry.get('title', '')}** — {_short(entry.get('decision', ''), 200)}")
+            # AC-13 (028/N3a): "Decisiones nuevas" — the 18-of-18 case the spec measured
+            # (`_short(..., 200)`). D-4d: a decision's "por qué" is conventionally
+            # written LAST, so a head-truncation at 200 chars is not a neutral cut, it is
+            # specifically the part this feature exists to stop losing. Full text.
+            lines.append(f"- **{entry.get('title', '')}** — {_short(entry.get('decision', ''), None)}")
 
     quickfixes = [e for e in _read(out_dir / "quickfix-log.jsonl") if e.get("at", "") >= since]
     if quickfixes:

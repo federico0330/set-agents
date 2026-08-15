@@ -34,11 +34,12 @@
 - [2026-08-14] implementer: AC-01..03. Medido: MENU_ITEMS son 10 items con emoji (set_agents_app.py:3523-3534), y dos de ellos ya llevan DOS espacios en vez de uno porque sus glifos miden distinto -la prueba…
 - decisión: [[decisiones/2026-08-15 actualizar-le-repone-los-cuatro-CLIs-al-que-instalo-uno|Defecto latente: cmd_update ignora install-targets.json y reinstala los cuatro arboles]]
 - decisión: [[decisiones/2026-08-15 RDD-ya-existe-en-el-repo-con-otra-acepcion|RDD no es un termino a definir: ya esta en uso instalado, con otro significado]]
+- decisión: [[decisiones/2026-08-15 numeracion-de-ADRs-de-025-desempatada-a-favor-de-los-context-packs|Los numeros de ADR de la spec 025 estaban viejos y se corrigieron a favor de los context packs]]
 
 ## Qué falta
 
-- → `PACKAGE_IMPLEMENTATION` — continue local implementation
-- tareas pendientes en D1-superficie-humana: Menu sin emoji, jerarquia por espaciado y peso (AC-01), Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02), Texto humano por default en los comandos de routing, --json para la maquina (AC-03)
+- → sigue la implementación local del paquete
+- 3 tareas pendientes en D1-superficie-humana
 
 ## Presupuestos
 

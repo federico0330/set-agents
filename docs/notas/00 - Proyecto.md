@@ -30,15 +30,18 @@
 
 ## Qué falta
 
+- **002-adaptive-pi-orchestration** → corresponde tu decisión (ver Blocker)
 - **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
-- **006-execution-graph** → `PACKAGE_ACCEPTED` — P3-graph-view: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
-- **010-spawn-provenance** → `PACKAGE_ACCEPTED` — P1-spawn-provenance: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
+- **006-execution-graph** → P3-graph-view: falta declarar el impacto de módulo o marcarlo como exento
+- **010-spawn-provenance** → P1-spawn-provenance: falta declarar el impacto de módulo o marcarlo como exento
+- **011-quota-failover** → corresponde tu decisión (ver Blocker)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
-- **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
+- **011-quota-failover** 5 tareas pendientes en P1-quota-failover
+- **024-listo-para-terceros** → corresponde tu decisión (ver Blocker)
 - **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
-- **025-consola-minima-y-flexible** → `PACKAGE_IMPLEMENTATION` — continue local implementation
-- **025-consola-minima-y-flexible** tareas pendientes en D1-superficie-humana: Menu sin emoji, jerarquia por espaciado y peso (AC-01), Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02), Texto humano por default en los comandos de routing, --json para la maquina (AC-03)
+- **025-consola-minima-y-flexible** → sigue la implementación local del paquete
+- **025-consola-minima-y-flexible** 3 tareas pendientes en D1-superficie-humana
 
 ## Quick-fixes recientes
 
@@ -50,14 +53,14 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-15 dos-comandos-que-el-fix-de-seguridad-dejo-afuera|El fix del RCE deja fuera 'git show HEAD:ruta' y './build.sh --output', medido]]
+- [[decisiones/2026-08-15 el-RCE-quedo-cerrado-y-el-harness-sigue-funcionando|El RCE de la allowlist quedo cerrado: 24 ataques bloqueados, 25 comandos legitimos intactos]]
+- [[decisiones/2026-08-15 cinco-agentes-muertos-a-la-vez-por-limite-de-sesion-de-anthropic|Corte de cuota: los cinco agentes concurrentes murieron simultaneamente]]
+- [[decisiones/2026-08-15 por-que-el-CI-esta-rojo-desde-agosto-tres-causas-distintas|El CI lleva doce dias en rojo por tres causas independientes, una por sistema operativo]]
+- [[decisiones/2026-08-15 el-mismo-invariante-vive-en-cuatro-copias-y-solo-una-recibio-el-parche|CRITICO: los guardas de shell son cuatro copias del mismo invariante, con agujeros distintos cada una]]
+- [[decisiones/2026-08-15 la-allowlist-de-comandos-es-un-prefix-match-y-eso-es-RCE|CRITICO: coord_policy.allowed() es un prefix match, y desde el rol read-only se ejecuta codigo arbitrario]]
+- [[decisiones/2026-08-15 numeracion-de-ADRs-de-025-desempatada-a-favor-de-los-context-packs|Los numeros de ADR de la spec 025 estaban viejos y se corrigieron a favor de los context packs]]
 - [[decisiones/2026-08-15 cuatro-huecos-de-la-guarda-de-escritura-para-una-feature-de-seguimiento|P2-F12 a P2-F15: la guarda cierra los casos nombrados, no las clases]]
-- [[decisiones/2026-08-15 la-guarda-de-escritura-es-ciega-al-bytecode-de-los-hijos|P2-F11: run_gate filtra el entorno y el hijo escribe bytecode en el repo real, sin bwrap]]
-- [[decisiones/2026-08-15 log-decision-deduplica-sin-mirar-de-que-feature-viene|Defecto: la clave de idempotencia de log-decision no incluye feature_id]]
-- [[decisiones/2026-08-15 un-freeze-que-no-midio-nada-se-vuelve-techo-cero|Defecto: freeze-candidate compara HEAD contra HEAD y el techo de reparacion queda en cero para siempre]]
-- [[decisiones/2026-08-15 cinco-decisiones-de-la-narracion-resueltas-sin-despertar-a-federico|Las cinco preguntas del desafio a 028, resueltas con doctrina vigente]]
-- [[decisiones/2026-08-15 RDD-ya-existe-en-el-repo-con-otra-acepcion|RDD no es un termino a definir: ya esta en uso instalado, con otro significado]]
-- [[decisiones/2026-08-15 actualizar-le-repone-los-cuatro-CLIs-al-que-instalo-uno|Defecto latente: cmd_update ignora install-targets.json y reinstala los cuatro arboles]]
-- [[decisiones/2026-08-15 narracion-que-explica-en-vez-de-apuntar|La narracion del orquestador tiene que ensenar, no apuntar a un identificador]]
 
 ## Referencias
 

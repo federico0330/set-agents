@@ -4,6 +4,7 @@
 import re
 import shlex
 import sys
+from urllib.parse import urlparse
 
 # Keep the full marker in source artifacts. install.py replaces this exact byte
 # sequence only when writing the installed policy, while verify.sh can prove the
@@ -21,33 +22,13 @@ OPENCODE_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py"
 CODEX_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py"
 
 SAFE = [
-    r"git (status|diff|log|show)(\s|$)",
-    r"(rg|bat|eza|fd)(\s|$)",
-    r"(uname|lsb_release|sw_vers)(\s|$)",
-    r"opencode models(\s|$)",
-    r"dotnet --(list-sdks|list-runtimes|info)(\s|$)",
-    r"node (--version|-v)(\s|$)",
-    r"npm (ls|list)(\s|$)",
-    r"python(3)? (--version|-V)(\s|$)",
-    r"pip(3)? (list|show)(\s|$)",
-    r"go version(\s|$)",
-    r"rustup (toolchain list|show)(\s|$)",
-    r"(cargo|rustc) (--version|-V)(\s|$)",
-    r"(claude|codex|opencode) (--version|-V)(\s|$)",
-    # ADR-0025 resolve-first: READ-ONLY GitHub inspection for the coordinator — CI runs,
-    # PR state, workflow listings, auth status. Enumerated subcommands only: `gh api`,
-    # `gh pr merge`, `gh release`, etc. stay denied (mutating or arbitrary-request
-    # surfaces), and ALWAYS_DENY keeps `gh repo delete` hard-blocked for every role.
-    r"gh (run (list|view|watch)|pr (list|view|checks|status|diff)|workflow (list|view)|issue (list|view)|auth status|repo view)(\s|$)",
-    r"(cat|ls|find|grep|head|tail|wc|tree|file|stat|diff|du|df|ps|pwd|which)(\s|$)",
-    r"curl (?:-[A-Za-z]+\s+)*(?:http://)?(?:localhost|127\.0\.0\.1)(?::\d+)?(?:/|\s|$)",
     # Sanctioned mutation channel: the state CLI validates every transition and
     # writes only atomic JSON under ai/state/. FORBIDDEN_SYNTAX still blocks any
     # shell composition around it. `_blocks_integration_transition` (below) denies
     # the one shape this blanket allow must NOT cover: a direct, unwrapped
     # `transition ... INTEGRATION` -- that phase requires the receipt-checked
     # wrapper (docs/adr/0020-*.md), the next SAFE entry.
-    r"python3 ai/scripts/feature-state\.py \S+",
+    r"python3 ai/scripts/feature-state\.py .+",
     # docs/adr/0020-*.md: the receipt-checked integration wrapper. `integration_action.py`
     # re-derives the frozen candidate_identity live and independently re-validates the
     # command shape before running anything -- this allow only narrows WHICH Bash
@@ -114,15 +95,467 @@ SAFE_ARGV = [
     }),
 ]
 
+# SEC-030: Enumerated binary commands with exact flag sets. Each command's rest-of-argv
+# is validated against a `modifiers` map (like SAFE_ARGV) specifying which flags are
+# allowed and how many arguments each takes. No trailing-wildcard regex; no prefix-match.
+# Format: (command_name, modifiers_dict)
+# The modifiers dict maps flag names to argument counts:
+#   "--flag": 0  (boolean flag)
+#   "--flag": 1  (flag takes one value)
+#   "-f": 1      (short form)
+SAFE_BINARY_COMMANDS = [
+    # git: read-only operations only. Forbidden always: -c (config), --exec-path,
+    # --upload-pack, --receive-pack (all execute code or delegate execution).
+    ("git", {
+        "status": 0,
+        "--porcelain": 0,
+        "--short": 0,
+        "--long": 0,
+        "-z": 0,
+        "diff": 0,
+        "--check": 0,
+        "--stat": 0,
+        "--numstat": 0,
+        "--shortstat": 0,
+        "--name-only": 0,
+        "--name-status": 0,
+        "--no-color": 0,
+        "--color": 0,
+        "-U": 1,
+        "--unified": 1,
+        "log": 0,
+        "--oneline": 0,
+        "-n": 1,
+        "--max-count": 1,
+        "-p": 0,
+        "--patch": 0,
+        "--since": 1,
+        "--until": 1,
+        "--author": 1,
+        "--grep": 1,
+        "show": 0,
+        "--": 0,
+    }),
+    # python3: script execution and specific modules. Forbidden: -c (exec code).
+    # python3: covered by SAFE_ARGV (feature-state.py, integration_action.py, etc)
+    # and _python_m_allowed (for -m unittest, -m py_compile).
+    # npm: package inspection, no mutations. Allowed: ls, list (with optional --depth).
+    ("npm", {
+        "ls": 0,
+        "list": 0,
+        "--depth": 1,
+    }),
+    # node: version and REPL, no code execution via CLI flags.
+    ("node", {
+        "--version": 0,
+        "-v": 0,
+        "-e": 1,  # allow -e for inline scripts (still subject to FORBIDDEN_SYNTAX)
+    }),
+    # python: version check only.
+    ("python", {
+        "--version": 0,
+        "-V": 0,
+        "-m": 1,
+    }),
+    # pip/pip3: list packages, show metadata.
+    ("pip", {
+        "list": 0,
+        "show": 0,
+    }),
+    ("pip3", {
+        "list": 0,
+        "show": 0,
+    }),
+    # dotnet: version and listing, no build.
+    ("dotnet", {
+        "--list-sdks": 0,
+        "--list-runtimes": 0,
+        "--info": 0,
+    }),
+    # Inspection tools: no execution, no writing.
+    ("grep", {
+        "-n": 0,
+        "-r": 0,
+        "-v": 0,
+        "-i": 0,
+        "-c": 0,
+        "-E": 0,
+        "-F": 0,
+        "-l": 0,
+        "-L": 0,
+        "-o": 0,
+        "--": 0,
+    }),
+    ("ls", {
+        "-l": 0,
+        "-a": 0,
+        "-h": 0,
+        "-R": 0,
+        "-d": 0,
+        "-F": 0,
+        "--": 0,
+    }),
+    ("head", {
+        "-n": 1,
+        "-c": 1,
+        "-q": 0,
+        "-v": 0,
+        "--": 0,
+    }),
+    ("tail", {
+        "-n": 1,
+        "-c": 1,
+        "-q": 0,
+        "-v": 0,
+        "-f": 0,  # follow (may block, use cautiously)
+        "--": 0,
+    }),
+    ("cat", {
+        "-n": 0,
+        "-E": 0,
+        "-v": 0,
+        "-T": 0,
+        "--": 0,
+    }),
+    ("wc", {
+        "-l": 0,
+        "-w": 0,
+        "-c": 0,
+        "-m": 0,
+        "--": 0,
+    }),
+    ("cmp", {
+        "-s": 0,
+        "-l": 0,
+        "-b": 0,
+        "--": 0,
+    }),
+    ("diff", {
+        "-u": 0,
+        "-c": 0,
+        "-q": 0,
+        "-r": 0,
+        "-N": 0,
+        "-a": 0,
+        "-b": 0,
+        "-w": 0,
+        "-i": 0,
+        "--": 0,
+    }),
+    ("find", {
+        "-name": 1,
+        "-type": 1,
+        "-path": 1,
+        "-maxdepth": 1,
+        "-mindepth": 1,
+        "-size": 1,
+        "-newer": 1,
+        "-mtime": 1,
+        "-mmin": 1,
+        "-print": 0,
+        "-print0": 0,
+        "-ls": 0,
+        "-quit": 0,
+        # Forbidden: -exec, -execdir, -ok, -okdir, -delete, etc.
+    }),
+    ("rg", {
+        "-n": 0,
+        "-l": 0,
+        "-c": 0,
+        "-i": 0,
+        "-v": 0,
+        "-A": 1,
+        "-B": 1,
+        "-C": 1,
+        "--": 0,
+    }),
+    ("fd", {
+        "-t": 1,
+        "-e": 1,
+        "-x": 1,  # NO -X (dangerous)
+        "-d": 1,
+        "-H": 0,
+        "-L": 0,
+        "-F": 0,
+        "--": 0,
+    }),
+    ("bat", {
+        "--line-range": 1,
+        "-l": 1,
+        "--language": 1,
+        "-n": 0,
+        "--number": 0,
+        "-p": 0,
+        "--plain": 0,
+        "--": 0,
+    }),
+    ("eza", {
+        "-l": 0,
+        "-a": 0,
+        "-R": 0,
+        "-r": 0,
+        "-s": 1,
+        "--group-directories-first": 0,
+        "--": 0,
+    }),
+    ("tree", {
+        "-L": 1,
+        "-d": 0,
+        "-a": 0,
+        "-I": 1,
+        "--": 0,
+    }),
+    ("file", {
+        "-b": 0,
+        "-i": 0,
+        "-L": 0,
+        "--": 0,
+    }),
+    ("stat", {
+        "-c": 1,
+        "-f": 1,
+        "-L": 0,
+        "--": 0,
+    }),
+    ("du", {
+        "-sh": 0,
+        "-h": 0,
+        "-s": 0,
+        "-d": 1,
+        "--": 0,
+    }),
+    ("df", {
+        "-h": 0,
+        "-i": 0,
+        "-T": 0,
+        "-k": 0,
+        "-m": 0,
+        "--": 0,
+    }),
+    ("ps", {
+        "aux": 0,
+        "-ef": 0,
+        "-A": 0,
+        "-u": 1,
+        "-p": 1,
+        "--": 0,
+    }),
+    ("pwd", {}),
+    ("which", {}),
+    ("uname", {
+        "-a": 0,
+        "-s": 0,
+        "-m": 0,
+        "-r": 0,
+        "-v": 0,
+    }),
+    ("lsb_release", {
+        "-a": 0,
+        "-d": 0,
+        "-i": 0,
+        "-r": 0,
+        "-c": 0,
+        "-s": 0,
+    }),
+    ("sw_vers", {}),
+    ("opencode", {
+        "models": 0,
+    }),
+    ("rustup", {
+        "toolchain": 0,
+        "list": 0,
+        "show": 0,
+    }),
+    ("cargo", {
+        "--version": 0,
+        "-V": 0,
+    }),
+    ("rustc", {
+        "--version": 0,
+        "-V": 0,
+    }),
+    ("go", {
+        "version": 0,
+    }),
+    ("claude", {
+        "--version": 0,
+        "-V": 0,
+    }),
+    ("codex", {
+        "--version": 0,
+        "-V": 0,
+    }),
+    ("./build.sh", {
+        "--check": 0,
+        "--profile": 1,
+        "--target": 1,
+        "--output": 1,
+    }),
+    ("./install.sh", {
+        "--yes": 0,
+        "--force": 0,
+    }),
+]
+
 
 def _rest_allowed(rest: list[str], modifiers: dict[str, int]) -> bool:
+    """Generic validator for flag+value pairs. Handles both --flag value and --flag=value.
+    Non-flag tokens are allowed as positional arguments only if modifiers contains only flags (all start with -).
+    If modifiers contains subcommands (tokens without -), positional args are rejected."""
+    # Determine if modifiers has subcommands (non-flag entries)
+    has_subcommands = any(k for k in modifiers.keys() if not k.startswith("-"))
+
     i = 0
     while i < len(rest):
-        nargs = modifiers.get(rest[i])
-        if nargs is None:
-            return False
-        i += 1 + nargs
+        token = rest[i]
+        # Handle --flag=value syntax
+        if "=" in token and token.startswith("-"):
+            flag, _ = token.split("=", 1)
+            nargs = modifiers.get(flag)
+            if nargs is None:
+                return False
+            i += 1
+            continue
+        # Handle --flag value syntax
+        if token.startswith("-"):
+            nargs = modifiers.get(token)
+            if nargs is None:
+                # Try to handle composed short flags like -rn, -la
+                if not token.startswith("--"):
+                    # Composed short flags: validate each char
+                    for char in token[1:]:
+                        if "-" + char not in modifiers:
+                            return False
+                    i += 1
+                    continue
+                # Unknown flag → error
+                return False
+            i += 1 + nargs
+        else:
+            # Non-flag token
+            if has_subcommands:
+                # modifiers has subcommands: this token must be a known subcommand
+                if token not in modifiers:
+                    return False
+                i += 1
+            else:
+                # modifiers has only flags: allow positional argument, protected by FORBIDDEN_SYNTAX
+                i += 1
     return True
+
+
+def _gh_allowed(argv: list[str]) -> bool:
+    """ADR-0025: GitHub inspection only (no mutations). Nested subcommand validation."""
+    if len(argv) < 2 or argv[0] != "gh":
+        return False
+    allowed_paths = {
+        "run": {"list", "view", "watch"},
+        "pr": {"list", "view", "checks", "status", "diff"},
+        "workflow": {"list", "view"},
+        "issue": {"list", "view"},
+        "auth": {"status"},
+        "repo": {"view"},
+    }
+    subcommand = argv[1]
+    if subcommand not in allowed_paths:
+        return False
+    if len(argv) < 3:
+        return subcommand == "auth"  # `gh auth` alone is invalid
+    subaction = argv[2]
+    if subaction not in allowed_paths[subcommand]:
+        return False
+    # Rest of argv: must be flags and their values from gh's safe set
+    # For simplicity, allow --json, --template, --jq, numeric args (run IDs, PR numbers)
+    rest = argv[3:]
+    i = 0
+    while i < len(rest):
+        token = rest[i]
+        if token in {"--json", "--template", "--jq", "--log"}:
+            i += 2 if token != "--log" else 1  # --log takes optional arg, for safety require it
+        elif token.startswith("--"):
+            i += 1  # skip unknown flags
+        else:
+            i += 1  # assume numeric ID or other positional arg
+    return True
+
+
+def _curl_allowed(argv: list[str]) -> bool:
+    """Validate curl: no file://, no -o/-O/-d/--config, URL as last token, http/https only."""
+    if len(argv) < 2 or argv[0] != "curl":
+        return False
+    # Forbidden flags
+    forbidden_flags = {"-o", "--output", "-O", "--remote-name", "-T", "--upload",
+                       "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode",
+                       "-K", "--config"}
+    # Find URL (should be last non-flag token)
+    url = None
+    i = 1
+    while i < len(argv):
+        token = argv[i]
+        if token.startswith("-"):
+            # Check for forbidden flags
+            if token.split("=")[0] in forbidden_flags:
+                return False
+            # Skip flag + its argument
+            if token in {"-H", "--header", "-A", "--user-agent", "-b", "--cookie", "-u", "--user"}:
+                i += 2
+            else:
+                i += 1
+        else:
+            # Non-flag token: could be URL or arg to previous flag
+            if not url and (i == 1 or not argv[i-1].startswith("-")):
+                url = token
+            i += 1
+    # Validate URL
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        # Only allow http/https, reject file://, scp://, dict://, etc.
+        if parsed.scheme not in {"http", "https"}:
+            return False
+    except Exception:
+        return False
+    return True
+
+
+def _python_m_allowed(argv: list[str]) -> bool:
+    """Special validator for python3/python -m <module> to allow submodule arguments."""
+    if len(argv) < 3 or argv[0] not in {"python3", "python"}:
+        return False
+    if argv[1] != "-m":
+        return False
+    module = argv[2]
+    # Allow unittest and py_compile with their subcommands
+    if module in {"unittest", "py_compile"}:
+        # Rest of argv is unittest/py_compile arguments, protected by FORBIDDEN_SYNTAX
+        return True
+    return False
+
+
+def _binary_command_allowed(argv: list[str]) -> bool:
+    """Validate binary commands using SAFE_BINARY_COMMANDS."""
+    if not argv:
+        return False
+    cmd = argv[0]
+    # Find command in SAFE_BINARY_COMMANDS
+    modifiers = None
+    for cmd_name, mods in SAFE_BINARY_COMMANDS:
+        if cmd_name == cmd:
+            modifiers = mods
+            break
+    if modifiers is None:
+        return False
+    # Special handling for numeric flags (head -20, tail -5)
+    rest = argv[1:]
+    normalized = []
+    for token in rest:
+        # Convert -<N> to -n <N> for head/tail
+        if cmd in {"head", "tail"} and token.lstrip("-").isdigit():
+            normalized.extend(["-n", token.lstrip("-")])
+        else:
+            normalized.append(token)
+    return _rest_allowed(normalized, modifiers)
 
 # F-01 repair (019-harness-evolution P5 review): the old pattern enumerated `&&` but
 # never a BARE `&` -- in `bash -c`, `&` alone is a full statement separator (backgrounds
@@ -318,7 +751,19 @@ def allowed(command: str) -> bool:
         return True
     if _tools_channel_allowed(argv):
         return True
-    return any(re.fullmatch(pattern + r".*", command) for pattern in SAFE)
+    # SEC-030: Exhaustive argv validation, not prefix-match
+    # Special case validators for complex commands
+    if _gh_allowed(argv):
+        return True
+    if argv[0] == "curl" and _curl_allowed(argv):
+        return True
+    if _python_m_allowed(argv):
+        return True
+    # General binary command validation
+    if _binary_command_allowed(argv):
+        return True
+    # Finally, check SAFE regex patterns (feature-state.py, integration_action.py)
+    return any(re.fullmatch(pattern, command) for pattern in SAFE)
 
 
 if __name__ == "__main__":

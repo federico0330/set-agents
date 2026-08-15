@@ -4,6 +4,11 @@
 import json
 import shlex
 import sys
+from pathlib import Path
+
+# Add ai/scripts to path to import coord_policy
+sys.path.insert(0, str(Path(__file__).parent))
+from coord_policy import FORBIDDEN_SYNTAX
 
 
 SCRIPTS = {"ai/scripts/feature-state.py", "ai/scripts/check-owned-paths.py"}
@@ -21,7 +26,7 @@ try:
 except (json.JSONDecodeError, AttributeError, ValueError):
     blocked()
 
-if not command or "\n" in command or any(token.startswith(".env") or ".env" in token for token in argv):
+if not command or "\n" in command or FORBIDDEN_SYNTAX.search(command) or any(token.startswith(".env") or ".env" in token for token in argv):
     blocked()
 
 allowed = (

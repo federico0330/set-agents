@@ -40,6 +40,7 @@
 
 ## Qué falta
 
+- → corresponde tu decisión (ver Blocker)
 - ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
 
 ## Presupuestos

@@ -5,11 +5,28 @@
   Y quita/oculta las opciones que al usuario no le agregan nada"*, más la expansión de menú y
   flexibilidad que dio por escrito.
 - **Decisión ya tomada**: las flags internas **se ocultan del `--help` y siguen funcionando**.
-- **ADRs**: 0049 (superficie humana), 0050 (posturas de autonomía).
+- **ADRs**: 0050 (D1 superficie humana), 0053 (D2 trabajo visible), 0054 (D3 posturas de
+  autonomía), 0055 (D4 harness por CLI), 0056 (D5 vault en todo spawn).
+
+  > **Corrección de numeración, 2026-08-15.** Esta línea decía *"0049 (superficie humana), 0050
+  > (posturas de autonomía)"*, y los dos números estaban mal: `0049` ya lo había tomado 024/C3
+  > (`primer-arranque-honesto`) antes de que este paquete arrancara, y `0051`/`0052` los tomó 027
+  > mientras 025 estaba detenida. Los context packs de D1 a D5, escritos después, asignaron el
+  > bloque contiguo correcto y son los que siguieron los implementers. El orquestador desempató
+  > a favor de los context packs. Registrado en `decisions-log.jsonl`.
 
 ## Estado medido
 
-El menú son **10 ítems, todos con emoji**. El CLI expone **67 flags, 31 de diagnóstico interno**.
+> **Números remedidos el 2026-08-15**, contra el estado del repo de hoy. Los originales de esta
+> sección venían de una exploración del 2026-08-12 y quedaron viejos.
+
+El menú son **10 ítems, todos con emoji**. El CLI expone **68 flags**. De cuántas son "de
+diagnóstico interno" esta spec ya no da un número: el original decía 31, sin criterio escrito, y
+el review independiente de D1 midió que las que un humano usa de verdad en su terminal son **15**,
+con **22** si se incluyen las de diagnóstico defendibles. El corte lo decide el paquete con
+evidencia por flag —menciones en documentación dirigida a humanos contra menciones en prompts de
+agentes y en `coord_policy.SAFE_ARGV`—, no una cuota heredada.
+
 `tui.py` tiene un picker sólido con detección de TTY pero **ningún spinner, animación ni progreso**.
 
 De la skill `ui-ux-pro-max` —scopeada a web y mobile, cuyo grueso no aplica a una terminal—

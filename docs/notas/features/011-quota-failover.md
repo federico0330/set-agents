@@ -33,8 +33,9 @@
 
 ## Qué falta
 
+- → corresponde tu decisión (ver Blocker)
 - ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
-- tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
+- 5 tareas pendientes en P1-quota-failover
 
 ## Presupuestos
 

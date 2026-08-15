@@ -30,7 +30,7 @@
 
 ## Qué falta
 
-- → `PACKAGE_ACCEPTED` — P1-spawn-provenance: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
+- → P1-spawn-provenance: falta declarar el impacto de módulo o marcarlo como exento
 
 ## Presupuestos
 

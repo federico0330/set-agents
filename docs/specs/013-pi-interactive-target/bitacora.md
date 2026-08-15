@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-12T21:09:06+00:00
+Actualizado: 2026-08-15T12:56:16+00:00
 
 [2026-08-02T15:04:27+00:00] package-planner · started
 Cliente: Un planificador esta partiendo el contrato aprobado del objetivo interactivo de Pi en paquetes de trabajo manejables, cada uno con sus criterios y riesgos.

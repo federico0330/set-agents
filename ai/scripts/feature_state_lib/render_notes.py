@@ -11,8 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from feature_state_lib.model import now, package_by_id, TERMINAL_FINDING_STATUSES
-from feature_state_lib.transitions import next_transition
-from feature_state_lib.render_status import status_root
+from feature_state_lib.render_status import status_root, describe_next_step
 
 
 # ------------------------------------------------------------ living notes ---
@@ -77,14 +76,23 @@ def write_note(path: Path, title: str, body: str) -> bool:
     return True
 
 
-def _short(text: Any, limit: int = 120) -> str:
+def _short(text: Any, limit: int | None = 120) -> str:
+    """`limit=None` means "render the full text, never a mid-sentence cut" — AC-13
+    (028/N3a): the digest's three truncation points (blockers, closes, decisions) must
+    stop emitting a trailing `…` that eats the "why" (D-4d: a `why` is conventionally
+    written last, so a head-truncation keeps the "what" and throws away exactly the part
+    this whole feature exists to surface). Every OTHER caller keeps its numeric limit
+    unchanged — this is additive, not a relaxation of the existing truncation contract.
+    """
     text = " ".join(str(text or "").split())
     # `merge_note` splits on the FIRST NOTES_AUTO_END, so a generated body able to emit
     # that terminator moves the machine/human boundary permanently: the text below it is
     # promoted into the human-owned region and re-promoted on every regeneration.  Every
     # agent-authored field rendered from state passes through here — neutralize once.
     text = text.replace("<!--", "‹!--").replace("-->", "--›")
-    return text if len(text) <= limit else text[: limit - 1] + "…"
+    if limit is None or len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
 
 
 def _decision_name(entry: dict[str, Any]) -> str:
@@ -143,11 +151,18 @@ def _note_packages(data: dict[str, Any]) -> list[dict[str, Any]]:
 def _pending_bits(data: dict[str, Any]) -> list[str]:
     bits = []
     try:
-        step = next_transition(data)
+        # AC-12 (028/N3a): never the raw `next` phase name nor the raw `reason` string
+        # (D-4b: `reason` can carry literal flags, e.g. "record-module-impact",
+        # "--module-impact-waived"). `describe_next_step` re-derives the same state in
+        # Spanish prose and is the SAME function STATUS.md's "Próximo paso" column uses
+        # (AC-11 x AC-12's own conflict resolution: one function, two surfaces).
+        # mark_stale=False: this digest surface already marks staleness once, in "Qué
+        # se está haciendo" -- see `describe_next_step`'s own docstring.
+        step_text = describe_next_step(data, mark_stale=False)
     except Exception:  # legacy states may predate the transition schema
-        step = {}
-    if step.get("next"):
-        bits.append(f"→ `{step['next']}` — {step.get('reason', '')}")
+        step_text = None
+    if step_text and step_text != "—":
+        bits.append(f"→ {step_text}")
     for blocker in data.get("blockers", []):
         if isinstance(blocker, dict):
             if not blocker.get("resolved_at"):
@@ -169,7 +184,15 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
     if package:
         pending = [t.get("id", "?") for t in package.get("tasks", []) if t.get("status") != "completed"]
         if pending:
-            bits.append(f"tareas pendientes en {package.get('package_id')}: {', '.join(pending)}")
+            # AC-12 (028/N3a, D-4c): `task["id"]` has held free-form English task titles
+            # in real history (`render_notes.py`, pre-fix), not short codes — dumping them
+            # raw here is exactly the "IDs de tarea en inglés" the digest must stop
+            # publishing. The count plus the package id (evidence, AC-04b's carve-out in
+            # the sibling narration-guard spec) says what's needed without the English
+            # blob; the full list still lives in the package note itself (`_package_body`).
+            n = len(pending)
+            noun = "tarea" if n == 1 else "tareas"
+            bits.append(f"{n} {noun} pendientes en {package.get('package_id')}")
     return bits
 
 
