@@ -23,9 +23,10 @@
 - [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `DONE` · paquetes 4/4 · **DONE**
-- [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `PACKAGE_REVIEW` · paquetes 3/4
-- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_PLANNING` · paquetes 0/5
+- [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `BLOCKED` · paquetes 4/4 · **BLOCKED**
+- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/5
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
+- [[features/027-controles-que-miran|027-controles-que-miran]] — fase `PACKAGE_REVIEW` · paquetes 0/3
 
 ## Qué falta
 
@@ -35,8 +36,9 @@
 - **010-spawn-provenance** → `PACKAGE_ACCEPTED` — P1-spawn-provenance: module impact required (record-module-impact) or waived (--module-impact-waived --reason)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** tareas pendientes en P1-quota-failover: additive schema/migration and invariants, narrow classifier + Pi terminal plumbing, BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion, deterministic routing/migration/concurrency tests, credential-gated real exhausted-provider E2E runner/evidence
-- **025-consola-minima-y-flexible** → `PACKAGE_IMPLEMENTATION` — plan next coherent package
-- **025-consola-minima-y-flexible** tareas pendientes en D5-vault-en-todo-spawn: Medir en un spawn REAL que parte de ADR-0012 se cumple hoy, antes de asumir nada (AC-12), Cerrar la brecha entre lo que el ADR declara y lo que el spawn hace (AC-12)
+- **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
+- **025-consola-minima-y-flexible** → `PACKAGE_IMPLEMENTATION` — continue local implementation
+- **025-consola-minima-y-flexible** tareas pendientes en D1-superficie-humana: Menu sin emoji, jerarquia por espaciado y peso (AC-01), Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02), Texto humano por default en los comandos de routing, --json para la maquina (AC-03)
 
 ## Quick-fixes recientes
 
@@ -62,7 +64,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-14T11:04:56+00:00_
+_Actualizado: 2026-08-14T15:45:31+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

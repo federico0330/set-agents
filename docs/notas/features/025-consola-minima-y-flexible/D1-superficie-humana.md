@@ -13,6 +13,12 @@
 - [ ] Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02) (planned)
 - [ ] Texto humano por default en los comandos de routing, --json para la maquina (AC-03) (planned)
 
+## Spawns
+
+- SPAWN-001 implementer · modelo anthropic/sonnet · effort medium · route run1_9a9d617d4b6885d58de13f800a9afd95
+
+context pack: `docs/specs/025-consola-minima-y-flexible/context/D1-superficie-humana.md`
+
 ↩ [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]]
 <!-- /notas:auto -->
 

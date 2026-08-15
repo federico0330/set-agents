@@ -7,6 +7,7 @@ subgraph sg_025_consola_minima_y_flexible["025-consola-minima-y-flexible"]
   feature_025_consola_minima_y_flexible_1["feature: 025-consola-minima-y-flexible"]
   subgraph sg_025_consola_minima_y_flexible_d1_superficie_humana["D1-superficie-humana"]
     package_025_consola_minima_y_flexible_d1_superficie_humana_1["package: D1-superficie-humana"]
+    spawn_025_consola_minima_y_flexible_d1_superficie_humana_1["SPAWN-001 implementer Menu sin emoji, flags internas ocultas pero vivas, y salida humana en vez de JSON crudo #91;sonnet#93;"]
   end
   subgraph sg_025_consola_minima_y_flexible_d2_trabajo_visible["D2-trabajo-visible"]
     package_025_consola_minima_y_flexible_d2_trabajo_visible_1["package: D2-trabajo-visible"]

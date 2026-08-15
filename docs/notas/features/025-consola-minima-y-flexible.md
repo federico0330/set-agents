@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_PLANNING` · modo: scoped · revisión 5
+- fase: `PACKAGE_IMPLEMENTATION` · modo: scoped · revisión 16
 - spec: `docs/specs/025-consola-minima-y-flexible/spec.md` (hash `1ff81af48729`)
 
 ## Criterios de aceptación
@@ -23,24 +23,28 @@
 
 ## Paquetes
 
-- [[features/025-consola-minima-y-flexible/D1-superficie-humana|D1-superficie-humana]] — planned · Menu sin emoji, 31 flags internas ocultas pero vivas, y salida humana en vez de JSON crudo
+- [[features/025-consola-minima-y-flexible/D1-superficie-humana|D1-superficie-humana]] — package_implementation · Menu sin emoji, 31 flags internas ocultas pero vivas, y salida humana en vez de JSON crudo
 - [[features/025-consola-minima-y-flexible/D2-trabajo-visible|D2-trabajo-visible]] — planned · Que se vea que el harness esta trabajando, sin romper pipes ni CI
 - [[features/025-consola-minima-y-flexible/D3-posturas-de-autonomia|D3-posturas-de-autonomia]] — planned · Que el usuario elija cuanta autonomia le da al harness, y que cada postura cambie algo ob…
 - [[features/025-consola-minima-y-flexible/D4-harness-por-CLI|D4-harness-por-CLI]] — planned · Instalar y desinstalar el harness por CLI, sin tocar los otros
 - [[features/025-consola-minima-y-flexible/D5-vault-en-todo-spawn|D5-vault-en-todo-spawn]] — planned · Que cada spawn de proyecto use Obsidian, verificando primero que se cumple hoy en un spaw…
 
+## Approach y decisiones
+
+- [2026-08-14] implementer: AC-01..03. Medido: MENU_ITEMS son 10 items con emoji (set_agents_app.py:3523-3534), y dos de ellos ya llevan DOS espacios en vez de uno porque sus glifos miden distinto -la prueba…
+
 ## Qué falta
 
-- → `PACKAGE_IMPLEMENTATION` — plan next coherent package
-- tareas pendientes en D5-vault-en-todo-spawn: Medir en un spawn REAL que parte de ADR-0012 se cumple hoy, antes de asumir nada (AC-12), Cerrar la brecha entre lo que el ADR declara y lo que el spawn hace (AC-12)
+- → `PACKAGE_IMPLEMENTATION` — continue local implementation
+- tareas pendientes en D1-superficie-humana: Menu sin emoji, jerarquia por espaciado y peso (AC-01), Ocultar las 31 flags internas del --help sin romperlas, con --help --avanzado (AC-02), Texto humano por default en los comandos de routing, --json para la maquina (AC-03)
 
 ## Presupuestos
 
-- spawns: 0 (máx 8/paquete) · deep review máx 2 ciclos
+- spawns: 1 (máx 8/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/025-consola-minima-y-flexible/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/025-consola-minima-y-flexible/bitacora.md`
 
-_Actualizado: 2026-08-13T15:20:00+00:00_
+_Actualizado: 2026-08-14T11:11:13+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

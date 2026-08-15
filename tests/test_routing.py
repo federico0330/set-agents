@@ -2068,9 +2068,9 @@ class RoutingTests(unittest.TestCase):
     def _probe_stubs(self, td):
         bins=Path(td)/"bin"; bins.mkdir(); log=Path(td)/"probes.log"
         scripts={
-            "codex": '#!/bin/sh\necho "$0 $@" >> %s\necho "Logged in using ChatGPT" 1>&2\n' % log,
-            "claude": '#!/bin/sh\necho "$0 $@" >> %s\necho \'{"loggedIn": true}\'\n' % log,
-            "opencode": ('#!/bin/sh\necho "$0 $@" >> %s\n'
+            "codex": '#!/bin/sh\n(echo "$0 $@" >> %s) 2>/dev/null || :\necho "Logged in using ChatGPT" 1>&2\n' % log,
+            "claude": '#!/bin/sh\n(echo "$0 $@" >> %s) 2>/dev/null || :\necho \'{"loggedIn": true}\'\n' % log,
+            "opencode": ('#!/bin/sh\n(echo "$0 $@" >> %s) 2>/dev/null || :\n'
                          'if [ "$1" = "auth" ]; then printf "\\342\\227\\217  OpenAI oauth\\n"; exit 0; fi\n'
                          'if [ "$2" = "openai" ]; then echo "openai/gpt-5.6-sol"; exit 0; fi\n'
                          'echo "Error: Provider not found: $2"; exit 0\n') % log,
@@ -2078,6 +2078,21 @@ class RoutingTests(unittest.TestCase):
         for name, body in scripts.items():
             path=bins/name; path.write_text(body); path.chmod(0o755)
         return bins, log
+
+    def test_route_probe_fixture_reaches_stubs_inside_descendant_boundary(self):
+        """P2-F01 regression: the private checkout must retain nested probe visibility."""
+        with tempfile.TemporaryDirectory() as td:
+            bins, log = self._probe_stubs(td)
+            env = self._cli_env(Path(td) / "routing-root", bins)
+            script = (
+                "import sys; sys.path.insert(0, 'ai/scripts'); import models_config; "
+                "from routing_core.catalog import probe_inventory; "
+                "print(probe_inventory(models_config.load_config(), fresh=True))"
+            )
+            result = subprocess.run([sys.executable, "-c", script], cwd=ROOT, text=True, capture_output=True, env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("('codex', 'openai-codex')", result.stdout)
+            self.assertTrue(log.exists(), result.stdout)
 
     def test_probe_cache_is_filtering_only_redacted_and_invalidated(self):
         from routing_core import catalog as cat
@@ -3416,10 +3431,12 @@ class RoutingTests(unittest.TestCase):
         # accepted and dropped.
         with tempfile.TemporaryDirectory() as td:
             routing_root=Path(td)/"routing-root"
-            env=self._cli_env(routing_root)
+            bins, log = self._probe_stubs(td)
+            env=self._cli_env(routing_root, bins)
             descriptor=json.dumps({"role":"implementer","task_class":"mechanical","selected_runtime":"codex"})
-            decide=self._cli_run(["--route-decide","-","--json"],env,descriptor)
-            self.assertEqual(decide.returncode,0,(decide.stdout,decide.stderr))
+            decide=self._cli_run(["--route-decide","-","--fresh-probes","--json"],env,descriptor)
+            self.assertEqual(decide.returncode,0,(decide.stdout,decide.stderr,log.read_text()))
+            self.assertTrue(log.exists(), "fresh route decision must execute fixture-local probes")
             run_id=json.loads(decide.stdout)["data"]["run_id"]
             dispatched=self._cli_run(["--route-dispatched",run_id,"--json"],env)
             self.assertEqual(dispatched.returncode,0,(dispatched.stdout,dispatched.stderr))
@@ -3445,10 +3462,12 @@ class RoutingTests(unittest.TestCase):
         # still close the run to terminal state.
         with tempfile.TemporaryDirectory() as td:
             routing_root=Path(td)/"routing-root"
-            env=self._cli_env(routing_root)
+            bins, log = self._probe_stubs(td)
+            env=self._cli_env(routing_root, bins)
             descriptor=json.dumps({"role":"implementer","task_class":"mechanical","selected_runtime":"codex"})
-            decide=self._cli_run(["--route-decide","-","--json"],env,descriptor)
+            decide=self._cli_run(["--route-decide","-","--fresh-probes","--json"],env,descriptor)
             self.assertEqual(decide.returncode,0,(decide.stdout,decide.stderr))
+            self.assertTrue(log.exists(), "fresh route decision must execute fixture-local probes")
             run_id=json.loads(decide.stdout)["data"]["run_id"]
             dispatched=self._cli_run(["--route-dispatched",run_id,"--json"],env)
             self.assertEqual(dispatched.returncode,0,(dispatched.stdout,dispatched.stderr))
@@ -5953,21 +5972,21 @@ class RoutingTests(unittest.TestCase):
         # `load_model_preference`, `_config_with_model_preference`,
         # `config["_model_preference"]`, `RoutingService.__init__` -- actually flips the
         # live-probed provider selection end to end, never the hermetic `_for_tests` seam
-        # alone (already covered above). Self-adapting to whichever two providers this
-        # machine actually has authenticated, per AC-01(i)'s own "exactly one
-        # independence-eligible provider on a two-provider catalog" precedent.
+        # alone (already covered above). The two authenticated providers are declared by
+        # local probe stubs rather than inherited from the machine's HOME or CLI sessions.
         with tempfile.TemporaryDirectory() as td:
-            env = dict(os.environ)
-            env["SET_AGENTS_ROUTING_TEST_ROOT"] = str(Path(td) / "routing")
+            bins, log = self._probe_stubs(td)
+            env = self._cli_env(Path(td) / "routing", bins)
             env["SET_AGENTS_STATE"] = str(Path(td) / "state")
             descriptor = json.dumps({"role": "product-analyst", "task_class": "documentation", "selected_runtime": "codex"})
 
             def decide():
-                result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", "--route-decide", "-", "--json"],
+                result = subprocess.run([sys.executable, "ai/scripts/set_agents_app.py", "--route-decide", "-", "--fresh-probes", "--json"],
                                         cwd=ROOT, text=True, capture_output=True, env=env, input=descriptor)
                 return json.loads(result.stdout)
 
             baseline = decide()
+            self.assertTrue(log.exists(), "fresh route decision must execute fixture-local probes")
             baseline_provider = baseline["data"]["provider"]
             self.assertFalse(baseline["data"]["preference_configured"])
             self.assertIsNotNone(baseline_provider, baseline)

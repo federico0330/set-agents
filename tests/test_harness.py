@@ -17,16 +17,25 @@ import threading
 import time
 import tomllib
 import unittest
+import uuid
 import filecmp
 import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
+import tests
+
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE_STATE = ROOT / "PROYECTO/ai/scripts/feature-state.py"
 CHECK_OWNED = ROOT / "PROYECTO/ai/scripts/check-owned-paths.py"
 COST_REPORT = ROOT / "ai/scripts/cost-report.py"
+
+# P1-F01 (027): a private sentinel, never a real sys.modules value, so
+# HarnessTests._import() can tell "the key was absent" apart from "the key was present
+# with value None" (sys.modules[name] = None is Python's own way of recording an
+# import that is blocked/failed -- a legitimate third state, not a synonym for absent).
+_SYS_MODULES_ABSENT = object()
 
 
 def run(*args, env=None, check=True):
@@ -181,20 +190,41 @@ class HarnessTests(unittest.TestCase):
     def test_build_check_detects_global_drift_and_names_the_file(self):
         # AC-01/AC-03 (021/P1, ADR-0041): --check generated a STAGING tree and then only ever
         # compared two self-scaffold files (feature-state.py, check-owned-paths.py) -- the fresh
-        # STAGING was never diffed against Global/, so a dirtied Global/ file passed rc=0. Dirty
-        # with a plain write (the AC-03 fixture equivalent of `cp`, never `git`) and restore the
-        # same way, so this test cannot leave the working tree changed on any exit path.
-        target = ROOT / "Global/opencode/AGENTS.md"
-        original = target.read_bytes()
-        try:
-            clean = run("./build.sh", "--check", check=False)
+        # STAGING was never diffed against Global/, so a dirtied Global/ file passed rc=0.
+        # AC-04/05 (027/P2) prohibit fixtures from ever mutating the shared checkout, so make a
+        # sufficient temporary copy and exercise the exact same build command there instead.
+        # Excluding Git and local credentials is safe: --check neither needs repository metadata
+        # nor may inspect credentials, while the copied Global/ and generator inputs preserve the
+        # real drift contract.
+        with tempfile.TemporaryDirectory(prefix="set-agentes-build-check-") as td:
+            guest = Path(td) / "repo"
+            shutil.copytree(
+                ROOT,
+                guest,
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".env", ".env.*", "secrets"),
+            )
+            target = guest / "Global/opencode/AGENTS.md"
+            original = target.read_bytes()
+            clean = subprocess.run(
+                ["bash", str(guest / "build.sh"), "--check"],
+                cwd=guest,
+                env=os.environ.copy(),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
             self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
             target.write_bytes(original + b"\nDIRT-MARKER-AC-03\n")
-            dirty = run("./build.sh", "--check", check=False)
+            dirty = subprocess.run(
+                ["bash", str(guest / "build.sh"), "--check"],
+                cwd=guest,
+                env=os.environ.copy(),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
             self.assertNotEqual(dirty.returncode, 0, "build.sh --check must fail on a dirtied Global/ file")
             self.assertIn("AGENTS.md", dirty.stdout + dirty.stderr)
-        finally:
-            target.write_bytes(original)
 
     def test_shell_scripts_parse(self):
         scripts = sorted(
@@ -270,7 +300,54 @@ class HarnessTests(unittest.TestCase):
         import importlib.util
         spec = importlib.util.spec_from_file_location(name, ROOT / "ai/scripts" / f"{name}.py")
         module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        # AC-02 (027/P1), a second isolation bug found while fixing the first one, not the
+        # one the context pack named. set_agents_app.py:32 does
+        # `sys.modules.setdefault("set_agents_app", sys.modules[__name__])`, which REQUIRES
+        # sys.modules[__name__] (== sys.modules["set_agents_app"] here) to already exist --
+        # true for a normal `import set_agents_app` (Python registers the module before
+        # running its body, precisely so self-referential lookups like that one work), false
+        # for a bare module_from_spec()+exec_module() that never registers it. Under
+        # `discover` alone (`tests.test_harness` run by itself), this stayed invisible:
+        # some OTHER test module's plain `import set_agents_app` populated sys.modules
+        # first, as an accident, same shape as the sys.path accident tests/__init__.py now
+        # fixes structurally.
+        #
+        # A naive fix -- register and leave it, the pattern this file's TuiTests._import
+        # already uses for tui.py -- broke the FULL suite instead: routing_cli.py's
+        # `_resolve_context_pack`/`_validate_context_pack_path` do a LAZY `import
+        # set_agents_app` inside their own bodies (see set_agents_app.py's module
+        # docstring), resolved via sys.modules at CALL time. Leaving this helper's
+        # freshly-`exec`ed module sitting in sys.modules["set_agents_app"] after returning
+        # meant `tests.test_routing`'s OWN top-level `import set_agents_app` -- and any
+        # later lazy self-import from routing_cli.py -- picked up THAT stale module
+        # instead of a canonical one, under `python3 -m unittest discover` where both
+        # files share one process. Caught by the full-suite gate, not a targeted test:
+        # `test_resolve_context_pack_*`/`test_validate_context_pack_path_*` in
+        # tests/test_routing.py started failing with paths resolved against this
+        # process's real ROOT instead of each test's own temp dir.
+        #
+        # The fix scopes the registration to the duration of exec_module only: whatever
+        # sys.modules[name] held before this call (present or absent) is restored
+        # afterward, success or failure, so nothing leaks to a test in another file that
+        # expects a stable, canonically-imported module.
+        #
+        # P1-F01 (027/P1): `previous is None` collapsed two distinct prior states into
+        # one -- "the key was absent" and "the key was present with value None" (Python's
+        # own spelling for a blocked/failed import, e.g. after a prior ImportError
+        # cached that way) both read as `previous is None`, so the `else` branch never
+        # fired for the second one and restore silently popped a key that should have
+        # stayed, set to None. `sys.modules.get(name, _SYS_MODULES_ABSENT)` plus an
+        # `is _SYS_MODULES_ABSENT` check tells the two apart with a sentinel that is
+        # never itself a legitimate sys.modules value.
+        previous = sys.modules.get(name, _SYS_MODULES_ABSENT)
+        sys.modules[name] = module
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            if previous is _SYS_MODULES_ABSENT:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
         return module
 
     def _models_fixture(self, td, mutate=None):
@@ -678,7 +755,10 @@ class HarnessTests(unittest.TestCase):
 
     def test_install_sh_creates_set_agents_link(self):
         with tempfile.TemporaryDirectory() as td:
-            env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex"))
+            # `--no-install` keeps agent CLIs declarative, but the installer still
+            # warms Pi through `pnpm dlx`. Stub that runtime too: otherwise this
+            # fixture falls through to the machine's pnpm and waits on the network.
+            env, _ = self._bootstrap_env(td, ("opencode", "claude", "codex", "pnpm"))
             result = run("bash", "install.sh", "--dry-run", env=env)
             self.assertIn("BOOTSTRAP_PLAN set-agents-link", result.stdout)
             result = run(
@@ -8464,6 +8544,291 @@ class HarnessTests(unittest.TestCase):
         self.assertNotIn("Global/_canonical/agents/orchestrator.md", payload["out_of_scope"])
         self.assertIn("unrelated/file.txt", payload["out_of_scope"])
         self.assertNotIn("unrelated/file.txt", payload["read_only_violations"])
+
+    def test_unittest_write_guard_allows_private_temporary_directory(self):
+        """AC-05 green: ordinary fixture output remains possible inside the run sandbox."""
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "fixture.txt"
+            target.write_text("allowed", encoding="utf-8")
+            self.assertEqual(target.read_text(encoding="utf-8"), "allowed")
+
+    def test_unittest_write_guard_rejects_home_and_cli_destinations_before_mutation(self):
+        """AC-04/05: destination, rather than writer identity, decides the rejection."""
+        # The non-existent parent is intentional: when the guard is temporarily removed for
+        # the required red bite, each attempted write raises FileNotFoundError instead of
+        # creating anything below the caller's real home.
+        absent_parent = tests._ORIGINAL_HOME / f"p2-write-guard-{uuid.uuid4()}"
+        targets = [
+            absent_parent / "home.txt",
+            absent_parent / ".local/state/set-agentes/config.toml",
+            absent_parent / ".claude/settings.json",
+            absent_parent / ".codex/config.toml",
+            absent_parent / ".pi/agent/auth.json",
+            absent_parent / ".config/opencode/opencode.json",
+        ]
+        for target in targets:
+            resolved = target.resolve(strict=False)
+            self.assertFalse(target.parent.exists(), f"fixture parent must remain absent: {target.parent}")
+            with self.assertRaisesRegex(PermissionError, re.escape(str(resolved))):
+                target.write_text("must not escape", encoding="utf-8")
+            self.assertFalse(target.exists(), f"guard must reject before mutating {resolved}")
+
+    def test_unittest_descendant_cannot_open_an_external_absolute_path_for_writing(self):
+        """P2-F01: the OS boundary, not a parent-only audit hook, confines children."""
+        target = Path("/etc/hosts")
+        original = target.read_bytes()
+        script = "import os, sys; os.open(sys.argv[1], os.O_WRONLY)"
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(target)], cwd=ROOT, text=True, capture_output=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(target.read_bytes(), original)
+
+    def test_unittest_descendant_preserves_fixture_path_inside_private_sandbox(self):
+        """The F01 boundary keeps fixture-local executable probes available to children."""
+        with tempfile.TemporaryDirectory() as td:
+            tool = Path(td) / "fixture-probe"
+            tool.write_text("#!/bin/sh\nprintf fixture-probe\n")
+            tool.chmod(0o755)
+            result = subprocess.run(
+                [sys.executable, "-c", "import subprocess; subprocess.run(['fixture-probe'], check=True)"],
+                env={**os.environ, "PATH": f"{tool.parent}:{os.environ['PATH']}"},
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "fixture-probe")
+
+    def test_unittest_write_guard_rejects_symlink_parent_for_remove_rename_and_dir_fd(self):
+        """P2-F02: final-link preservation must still resolve an escaping parent."""
+        link = tests._TEST_SANDBOX / "p2-escaping-parent"
+        link.symlink_to(ROOT, target_is_directory=True)
+        direct = link / "never-remove"
+        with self.assertRaisesRegex(PermissionError, re.escape(str(ROOT / "never-remove"))):
+            os.remove(direct)
+        fd = os.open(tests._TEST_SANDBOX, os.O_RDONLY)
+        try:
+            with self.assertRaisesRegex(PermissionError, re.escape(str(ROOT / "never-remove"))):
+                os.remove("p2-escaping-parent/never-remove", dir_fd=fd)
+            with self.assertRaisesRegex(PermissionError, re.escape(str(ROOT / "never-rename"))):
+                os.rename("p2-escaping-parent/never-rename", "safe", src_dir_fd=fd, dst_dir_fd=fd)
+        finally:
+            os.close(fd)
+
+    def test_unittest_child_home_implicitly_moves_state_to_that_fixture_home(self):
+        """P2-F03: HOME-only fixture overrides never inherit the suite-global state."""
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "fixture-home"
+            home.mkdir()
+            result = subprocess.run(
+                [sys.executable, "-c", "import os; print(os.environ['HOME']); print(os.environ['SET_AGENTS_STATE'])"],
+                env={**os.environ, "HOME": str(home)}, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), [str(home), str(home / ".local/state/set-agentes")])
+
+    def test_owned_paths_gate_sees_untracked_new_files(self):
+        # AC-01 (027/P1). `git diff --name-only <baseline> --` NEVER lists untracked
+        # files -- that is exactly how 022/P1's `provider_registry.py` (its own central
+        # file) sailed through this gate in silence: a brand-new file, never staged,
+        # outside `owned_paths`, and the gate's own default invocation (no
+        # `--changed-file`, real orchestrator usage per generate.py:177) never saw it.
+        # No `--changed-file` here either -- this pins the git-derived default path,
+        # not the explicit-list path the other owned-paths tests already cover.
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td)
+            self._init_real_git_repo_with_one_commit(repo)
+            state = repo / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": ["src/**"],
+                    "shared_paths": [],
+                    "read_only_paths": [],
+                    "approved_exceptions": [],
+                }]
+            }))
+            (repo / "danger.py").write_text("# untracked, never staged, out of owned_paths\n")
+            result = subprocess.run(
+                ["python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01",
+                 "--baseline", "HEAD"],
+                cwd=str(repo), capture_output=True, text=True,
+            )
+            payload, _ = json.JSONDecoder().raw_decode(result.stdout)
+        self.assertIn("danger.py", payload["changed_files"],
+                       "an untracked file must be visible to the gate, same as a tracked one")
+        self.assertIn("danger.py", payload["out_of_scope"])
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("OWNERSHIP_FAIL", result.stdout)
+
+    def test_owned_paths_gate_sees_untracked_files_with_spaces_in_their_name(self):
+        # AC-01 corollary, caught while building the fix above, not asked for verbatim:
+        # plain (newline) `git status --porcelain` C-quotes any path containing a space --
+        # measured live in THIS repo (`docs/notas/00 - Proyecto.md` came back as the
+        # literal string `"00 - Proyecto.md"`, quote characters included) while `git diff
+        # --name-only` never quotes that same path. Parsing the quoted form would have fed
+        # a corrupted, unmatchable path into `matches()` -- a real file with a real space
+        # (not a synthetic edge case) would have shown up mangled in `out_of_scope` or,
+        # worse, failed to match a legitimate `owned_paths` pattern it actually satisfies.
+        # `-z` is what makes this pass; a stray reversion to plain `--porcelain` breaks it.
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td)
+            self._init_real_git_repo_with_one_commit(repo)
+            state = repo / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": ["src/**"],
+                    "shared_paths": [],
+                    "read_only_paths": [],
+                    "approved_exceptions": [],
+                }]
+            }))
+            (repo / "danger with spaces.py").write_text("# untracked, out of owned_paths\n")
+            result = subprocess.run(
+                ["python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01",
+                 "--baseline", "HEAD"],
+                cwd=str(repo), capture_output=True, text=True,
+            )
+            payload, _ = json.JSONDecoder().raw_decode(result.stdout)
+        self.assertIn("danger with spaces.py", payload["changed_files"],
+                       "the path must come through unquoted, not '\"danger with spaces.py\"'")
+        self.assertIn("danger with spaces.py", payload["out_of_scope"])
+        self.assertEqual(result.returncode, 2)
+
+    def test_owned_paths_gate_still_sees_ordinary_tracked_changes(self):
+        # AC-01 complement: the untracked-file fix must not stop seeing the tracked
+        # changes `git diff` already caught -- a modified, committed-then-edited file
+        # outside scope must still fail, same as before this package touched anything.
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td)
+            self._init_real_git_repo_with_one_commit(repo)
+            (repo / "seed.txt").write_text("seed, but edited\n")
+            state = repo / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": ["src/**"],
+                    "shared_paths": [],
+                    "read_only_paths": [],
+                    "approved_exceptions": [],
+                }]
+            }))
+            result = subprocess.run(
+                ["python3", str(CHECK_OWNED), "--state-file", str(state), "--package-id", "PKG-01",
+                 "--baseline", "HEAD"],
+                cwd=str(repo), capture_output=True, text=True,
+            )
+            payload, _ = json.JSONDecoder().raw_decode(result.stdout)
+        self.assertIn("seed.txt", payload["changed_files"])
+        self.assertIn("seed.txt", payload["out_of_scope"])
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("OWNERSHIP_FAIL", result.stdout)
+
+    def test_module_isolation_gate_fails_if_the_sys_path_fix_regresses(self):
+        # AC-03 (027/P1). AC-02's whole fix is one insertion in tests/__init__.py: it puts
+        # ai/scripts/ on sys.path before ANY submodule of the `tests` package is imported,
+        # so `python3 -m unittest tests.test_harness` no longer depends on some OTHER test
+        # module (alphabetically first) having already done that as a side effect.
+        # This test re-runs the real regression command against a single target method
+        # that only passes because of that fix (`self._import("models_config")` ->
+        # `models_config.py` -> bare `import provider_registry`), exactly as
+        # `python3 -m unittest tests.test_harness` runs it for real, in a subprocess with
+        # no test module import order help. If tests/__init__.py's sys.path insertion is
+        # ever removed, this goes back to ModuleNotFoundError and fails loudly.
+        result = subprocess.run(
+            ["python3", "-m", "unittest",
+             "tests.test_harness.HarnessTests.test_models_config_resolves_area_and_role_override"],
+            cwd=ROOT, text=True, capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("ModuleNotFoundError", result.stderr)
+        self.assertIn("OK", result.stderr)
+
+    def test_module_isolation_gate_fails_if_the_set_agents_app_registration_regresses(self):
+        # AC-03 complement: a SECOND isolation bug, found while building the AC-02 fix, not
+        # named by the context pack (which only measured the ModuleNotFoundError count).
+        # set_agents_app.py:32 does
+        # `sys.modules.setdefault("set_agents_app", sys.modules[__name__])`, which requires
+        # `sys.modules[__name__]` to already exist -- true for a normal `import
+        # set_agents_app` (Python registers a module before running its body precisely so
+        # self-referential lookups like that one work), false for this class's own
+        # `_import()` helper (~200 call sites) before it was fixed to register the module
+        # first, matching the pattern this file's `TuiTests._import` already used for
+        # tui.py. Under `discover` this stayed invisible: some other test module's plain
+        # `import set_agents_app` populated `sys.modules` first, as an accident, same shape
+        # as the sys.path accident `tests/__init__.py` fixes structurally above. Re-runs the
+        # real regression command against a target method known to call
+        # `self._import("set_agents_app")`.
+        result = subprocess.run(
+            ["python3", "-m", "unittest",
+             "tests.test_harness.HarnessTests.test_app_config_writers_never_clobber_each_other"],
+            cwd=ROOT, text=True, capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("KeyError", result.stderr)
+        self.assertIn("OK", result.stderr)
+
+    def test_import_helper_leaves_sys_modules_exactly_as_it_found_it(self):
+        # AC-02 corollary (027/P1), found validating the fix above under the FULL suite,
+        # not any single-file isolation run. A first version of the fix registered
+        # sys.modules[name] and left it there on success (the pattern this file's
+        # TuiTests._import already uses for tui.py) -- that broke
+        # tests/test_routing.py: routing_cli.py's `_resolve_context_pack`/
+        # `_validate_context_pack_path` do a LAZY `import set_agents_app` inside their own
+        # bodies, resolved via sys.modules at call time, and test_routing.py's own
+        # top-level `import set_agents_app` also only re-resolves sys.modules if the name
+        # is absent. Leaving this helper's freshly-exec'd (possibly env-mocked) module
+        # sitting in sys.modules["set_agents_app"] after returning meant BOTH picked up
+        # that stale copy instead of a canonical one under `python3 -m unittest discover`,
+        # where every test file shares one process -- test_resolve_context_pack_* started
+        # resolving paths against this process's real ROOT instead of each test's own
+        # temp dir. Pins the actual invariant directly, in-process, both directions: a
+        # pre-existing sys.modules entry survives untouched, and an absent one stays
+        # absent, regardless of what _import() does internally.
+        import types
+        sentinel = types.ModuleType("set_agents_app")
+        previous = sys.modules.get("set_agents_app")
+        sys.modules["set_agents_app"] = sentinel
+        try:
+            self._import("set_agents_app")
+            self.assertIs(sys.modules.get("set_agents_app"), sentinel,
+                           "_import() must restore a pre-existing sys.modules entry, not leave its own copy")
+        finally:
+            if previous is None:
+                sys.modules.pop("set_agents_app", None)
+            else:
+                sys.modules["set_agents_app"] = previous
+
+        saved_absent = sys.modules.pop("set_agents_app", None)
+        try:
+            self._import("set_agents_app")
+            self.assertNotIn("set_agents_app", sys.modules,
+                              "_import() must not leave a module registered when there was none before")
+        finally:
+            if saved_absent is not None:
+                sys.modules["set_agents_app"] = saved_absent
+
+        # P1-F01 (027/P1): a THIRD prior state, distinct from both of the above.
+        # sys.modules[name] = None is Python's own spelling for "import blocked/failed"
+        # (see PEP 328 / importlib docs), not a synonym for "never imported" -- yet
+        # `previous = sys.modules.get(name)` followed by `if previous is None: pop()`
+        # reads both the same way, so restore silently turned a present-with-None key
+        # into an absent one. Bitten in both directions at once: the key must still be
+        # IN sys.modules (presence) AND its value must still be exactly None (value) --
+        # either assertion alone would miss half of what `previous is None` gets wrong.
+        saved_none_previous = sys.modules.get("set_agents_app", _SYS_MODULES_ABSENT)
+        sys.modules["set_agents_app"] = None
+        try:
+            self._import("set_agents_app")
+            self.assertIn("set_agents_app", sys.modules,
+                           "_import() must restore a sys.modules[name] = None entry as present, not pop it")
+            self.assertIsNone(sys.modules.get("set_agents_app"),
+                               "_import() must restore sys.modules[name] = None exactly, not leave its own module")
+        finally:
+            if saved_none_previous is _SYS_MODULES_ABSENT:
+                sys.modules.pop("set_agents_app", None)
+            else:
+                sys.modules["set_agents_app"] = saved_none_previous
 
     def test_active_docs_do_not_teach_task_by_task_deep_audit(self):
         active = "\n".join([

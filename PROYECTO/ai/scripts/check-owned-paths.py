@@ -46,7 +46,40 @@ def changed_files_from_git(baseline: str) -> list[str]:
     )
     if result.returncode != 0:
         raise SystemExit(f"GIT_DIFF_FAILED: {result.stderr.strip()}")
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    tracked = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+    # `git diff --name-only <baseline> --` only ever compares tracked content against
+    # <baseline>; a brand-new file that was never `git add`-ed is invisible to it, so a
+    # package could create an out-of-scope file and this gate would stay silent (that is
+    # exactly how 022/P1's provider_registry.py sailed through unseen). `git status
+    # --porcelain --untracked-files=all` is the one call that lists untracked files
+    # individually (not collapsed to their containing directory), so it is added here as
+    # a second, independent source rather than replacing the diff above -- the diff still
+    # owns tracked renames/edits, this only fills the untracked gap. `-z` is load-bearing,
+    # not cosmetic: plain (newline) `--porcelain` C-quotes any path containing a space
+    # (measured live in this repo: `docs/notas/00 - Proyecto.md` -> `"00 - Proyecto.md"`,
+    # literal quote characters included) while `git diff --name-only` never quotes that
+    # same path -- parsing the quoted form here would have fed a corrupted, unmatchable
+    # path into `matches()`. `-z` guarantees NUL-separated, always-unquoted paths.
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "-z", "--untracked-files=all"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if status.returncode != 0:
+        raise SystemExit(f"GIT_STATUS_FAILED: {status.stderr.strip()}")
+    untracked = [
+        entry[3:]
+        for entry in status.stdout.split("\0")
+        if entry.startswith("??") and entry[3:]
+    ]
+
+    changed = list(tracked)
+    for path in untracked:
+        if path not in changed:
+            changed.append(path)
+    return changed
 
 
 def main() -> int:

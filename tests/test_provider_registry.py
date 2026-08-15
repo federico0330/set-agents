@@ -471,7 +471,13 @@ class InstallProviderRenderTests(unittest.TestCase):
             build_staging(staging)
             run("python3", "ai/scripts/install.py", "--staging", staging, "--home", str(home), "--target", "opencode")
             self.assertIn("ollama", live_provider_block(home))
-            removed = run("python3", "ai/scripts/set_agents_app.py", "--provider-remove", "ollama", env={"HOME": str(home)})
+            # The installer seeded this fixture's registry below `home`; name that same
+            # temporary state explicitly instead of inheriting SET_AGENTS_STATE from the
+            # process-wide hermetic guard.
+            removed = run(
+                "python3", "ai/scripts/set_agents_app.py", "--provider-remove", "ollama",
+                env={"HOME": str(home), "SET_AGENTS_STATE": str(home / ".local/state/set-agentes")},
+            )
             self.assertIn("PROVIDER_REMOVED", removed.stdout)
             # Still present right after removal -- removal only touches providers.toml,
             # never opencode.json directly (documented CLI contract).

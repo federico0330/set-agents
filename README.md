@@ -8,38 +8,136 @@ con backup/rollback, auto-update, y catálogo de herramientas y MCPs.
 > 📖 **Leé la sección de tu sistema operativo antes de instalar** — ahí está exactamente
 > qué vas a ver en pantalla, para que nada te sorprenda.
 
+## Qué hace distinto a un CLI de IA suelto
+
+Claude Code, Codex, Cursor, OpenCode y pi son excelentes escribiendo código. Este harness no
+compite con ellos: **los usa**. Lo que agrega es el proceso alrededor, y ese proceso existe por
+una razón concreta.
+
+Cuando le pedís algo a un CLI de IA, el mismo modelo que escribió el código te dice que está
+bien. Casi siempre lo está. El problema es el "casi": un modelo no puede auditar su propio
+trabajo, porque el error que cometió y el criterio con el que lo revisa vienen del mismo lugar.
+
+Este harness parte de ahí. Cuatro reglas, y las cuatro están en código, no en un prompt:
+
+**El que escribe no aprueba.** Cada paquete lo revisa otro agente, en **otro proveedor** — es
+una exclusión dura en el router (`service.py`), no una sugerencia: si el reviewer comparte
+proveedor con quien escribió, la decisión se niega con `REVIEWER_INDEPENDENCE_UNAVAILABLE` y no
+hay forma de saltearla desde el prompt.
+
+**Nada se afirma sin fuente.** Un `archivo:línea` del repo, la salida de un comando que se
+corrió de verdad, o un documento actual con su URL. La memoria del modelo sobre blancos móviles
+—APIs, precios, límites, versiones— **no es fuente**. Cuando no hay fuente, se escribe "sin
+verificar": una suposición marcada es honesta, una sin marcar es un defecto.
+
+**Cada test tiene que demostrar que sirve.** Antes de aceptarlo se rompe a propósito lo que dice
+proteger y se comprueba que se pone rojo. Suena excesivo hasta que ves cuántos no lo hacen.
+
+**El estado vive en archivos, no en la conversación.** Specs, criterios de aceptación, gates,
+hallazgos y decisiones quedan en el repo. Si la sesión se corta, se agota la cuota o cambiás de
+máquina, el trabajo se retoma donde estaba en vez de reconstruirse de memoria.
+
+### Qué encuentra eso que un CLI solo no encuentra
+
+No es teoría. En una sola sesión de trabajo sobre este mismo repo, el proceso encontró:
+
+- **Cinco tests que decían cubrir algo que no miraban** — pasaban en verde con el código roto.
+  Uno de ellos "protegía" contra un registro corrupto comparándolo consigo mismo.
+- **Un gate que informaba OK sin verificar nada**: `build.sh --check` decía "sin drift" y
+  comparaba dos archivos de scaffold, nunca los cuatro árboles generados. Decenas de gates se
+  habían registrado con esa evidencia.
+- **Un control de alcance que no ve los archivos nuevos**, porque usa `git diff` — que sólo
+  lista trackeados. Un paquete creó su archivo central y el control guardó silencio.
+- **Un instalador que hacía 3153 llamadas en cinco segundos** y nunca terminaba con `--yes`.
+- **Un cambio de esquema sin subir la versión** que dejó el ruteo caído — introducido por la
+  *reparación* de un hallazgo, no por el hallazgo.
+
+Ninguno salió de leer código con atención. Los cinco salieron de que un eslabón volviera a
+correr lo que el anterior afirmaba.
+
+### El flujo, en una línea
+
+```
+spec → desafío independiente → aprobación tuya → paquetes → gates → review en otro proveedor
+     → reparación consolidada → delta review → aceptación → integración
+```
+
+Con presupuestos por paquete —dos ciclos de review, dos reparaciones por hallazgo— para que un
+bucle de "arreglo y rompo" no se vuelva infinito, y una parada explícita
+(`HUMAN_DECISION_REQUIRED`) cuando los criterios se contradicen o hay que tocar algo
+irreversible.
+
+### Cuándo NO lo quieras
+
+Es más lento y más caro que pedirle el cambio a un CLI y listo. Para un script de diez líneas,
+un experimento o algo que vas a tirar mañana, el ciclo completo es puro peso muerto — y el
+propio harness tiene una lane de quick-fix para eso.
+
+Esto sirve cuando **equivocarse sale caro**: código que otros van a mantener, cambios que tocan
+datos o dinero, o trabajo largo donde perdés el hilo entre sesiones.
+
 ## Acceso
 
-El repo es **privado**: solo pueden clonar/actualizar los invitados como collaborators
-(se invita desde GitHub → Settings → Collaborators, rol Read). Cada usuario se autentica
-una única vez con `gh auth login`; el auto-update reutiliza esas credenciales. Si se revoca
-el acceso, la próxima actualización de esa persona falla — así de simple.
+El repo es **público**: cualquiera puede clonarlo y usarlo. No hace falta invitación ni
+`gh auth login` para instalar — `gh` sólo se usa para el auto-update por HTTPS y podés
+reemplazarlo por `git pull` normal.
+
+Si lo forkeás, apuntá el upstream con `SET_AGENTS_UPSTREAM=<remoto>/<rama>`; sin esa variable
+el default sigue siendo `origin/main`.
 
 ## Instalación
 
+### Lo que necesitás, en cualquier sistema
+
+| Requisito | Por qué | Si falta |
+|---|---|---|
+| **Python ≥ 3.11** | los scripts usan `tomllib`, que entró en 3.11 | el instalador lo ofrece |
+| **Node ≥ 18** | los CLIs de IA se instalan por npm | el instalador lo ofrece |
+| **git** y **bash** | clonar, versionar, correr el instalador | preinstalados en Linux/macOS |
+| `gh` *(opcional)* | sólo para el auto-update por HTTPS | podés usar `git pull` |
+
+El instalador **detecta lo que falta y te lo ofrece**; no instala nada por su cuenta sin
+preguntar, salvo que le pases `--yes`.
+
 | Tu sistema | Camino |
 |---|---|
-| Linux (Arch/CachyOS, Debian/Ubuntu) | nativo |
-| WSL con cualquier distro | nativo (igual que Linux) |
-| macOS | nativo (necesita [Homebrew](https://brew.sh)) |
+| Linux (Arch/CachyOS, Debian/Ubuntu, Fedora) | nativo |
+| WSL con cualquier distro | nativo, igual que Linux |
+| macOS (Intel y Apple Silicon) | nativo, necesita [Homebrew](https://brew.sh) |
 | Windows 10/11 | `install.ps1` → WSL administrado (no hace falta saber qué es WSL) |
 
-### Linux / macOS / WSL
+Los tres sistemas se prueban en CI en cada cambio: `ubuntu-latest`, `macos-latest` y
+`windows-latest` (`.github/workflows/ci.yml`).
+
+### Linux, macOS y WSL
 
 ```bash
-# si no tenés gh: pacman -S github-cli / apt install gh / brew install gh
-gh auth login                                        # una vez
-gh repo clone federico0330/SET-AGENTS ~/SET-AGENTS
-cd ~/SET-AGENTS && ./set-agents                      # menú → "Instalar / Reparar"
+git clone https://github.com/federico0330/set-agents.git ~/SET-AGENTS
+cd ~/SET-AGENTS && ./set-agents        # menú → "Instalar / Reparar"
 ```
 
-### Windows 10/11
+En **Debian/Ubuntu**, el `node` de los repos suele ser viejo; si el instalador falla ahí, usá
+[NodeSource](https://github.com/nodesource/distributions).
 
-Con el archivo `install.ps1` (te lo pasan, o lo bajás del repo desde el navegador):
+En **macOS** necesitás Homebrew antes de empezar: el instalador lo usa para `python3` y `node`.
+
+Si preferís no usar el menú, `./install.sh` acepta `--yes`, `--update`, `--dry-run`,
+`--skip-auth`, `--skip-deps`, `--no-install` y `--harness claude|opencode|codex|pi|all`.
+
+### Windows 10/11
 
 ```powershell
 .\install.ps1
 ```
+
+Bajás `install.ps1` del repo desde el navegador y lo corrés. Instala WSL, crea tu usuario de
+Linux y sigue desde adentro — la sección de abajo te dice **exactamente** qué vas a ver, incluido
+el diálogo de permisos y el posible reinicio.
+
+### No querés instalar todo
+
+`./set-agents` → "Instalar / Reparar" te deja elegir **a qué CLI** aplicarle el harness. Podés
+usarlo sólo sobre OpenCode y dejar los demás vírgenes.
 
 Detalle completo por sistema en [INSTALACION.md](INSTALACION.md).
 
@@ -87,10 +185,17 @@ Al abrir `set-agents`, la app chequea el repo: si hay novedades las muestra y la
 sola (siempre con backup y rollback automático ante fallas). Nunca toca un repo con
 cambios locales sin commitear. Para desactivarlo: `set-agents --auto-update off`.
 
-**Modelo de confianza, sin vueltas**: el auto-update ejecuta lo que esté en `main` del repo
-privado — solo Federico tiene acceso de escritura; los invitados son solo-lectura. Los CLIs
-(opencode/claude/codex, gcloud) se instalan con sus instaladores oficiales vía
-`curl | bash` sin pinning de versión: es el mecanismo oficial de cada vendor y se acepta
+**Modelo de confianza, sin vueltas**: el auto-update **ejecuta lo que esté en `main` del
+upstream al que apuntes**. El repo es público —cualquiera puede leerlo y forkearlo— pero el
+acceso de escritura a `main` de este upstream es sólo de su dueño. En criollo: al dejar el
+auto-update prendido estás confiando en quien controla esa rama, igual que con cualquier
+gestor de paquetes.
+
+Si eso no te cierra, tenés dos salidas: `set-agents --auto-update off`, o forkear y apuntar
+`SET_AGENTS_UPSTREAM` a **tu** fork, donde el que controla `main` sos vos.
+
+Los CLIs (opencode/claude/codex, gcloud) se instalan con sus instaladores oficiales vía
+`curl | bash` **sin pinning de versión**: es el mecanismo oficial de cada vendor y se acepta
 ese riesgo a cambio de recibir siempre la última versión.
 
 **Perfil de permisos (OpenCode)**: el repo se distribuye en modo **yolo** — los agentes y la
