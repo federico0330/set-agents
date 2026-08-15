@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 # AC-02 (027/P1). Dozens of test modules do `import provider_registry` (and siblings)
@@ -38,6 +39,16 @@ _NON_MUTATING_DEVICE = Path(os.devnull).resolve(strict=False)
 _REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 _TEST_CHECKOUT = _TEST_SANDBOX / "checkout"
 _DESCENDANT_BOUNDARY_ACTIVE = os.environ.get("SET_AGENTS_TEST_SANDBOXED") == "1"
+# 027/P2 portability repair: detect the Bubblewrap boundary's availability exactly
+# once, by lookup rather than the hardcoded "/usr/bin/bwrap" (NixOS and Homebrew do
+# not install it there). Absent bwrap (macOS, Windows, or a bwrap-less Linux), the
+# descendant-confinement layer below degrades to a no-op and only the in-process
+# audit hook -- which is what AC-04/AC-05 actually require -- stays enforced. A
+# degraded run says so exactly once instead of silently dropping a guard.
+_BWRAP = None if os.environ.get("SET_AGENTS_TEST_NO_BWRAP") == "1" else shutil.which("bwrap")
+_TEST_CHECKOUT_READY = False
+if _BWRAP is None and not _DESCENDANT_BOUNDARY_ACTIVE:
+    print("descendant-boundary: off (bwrap not found)", file=sys.stderr)
 for _directory in (_TEST_HOME, _TEST_STATE_DIR, _TEST_TMPDIR, _TEST_CHILD_TMPDIR):
     _directory.mkdir(mode=0o700)
 os.environ.update({
@@ -57,13 +68,27 @@ _WRITE_GUARD_ENABLED = True
 # the host is read-only, only this run's sandbox is writable, and the canonical repository
 # location names a copy inside that sandbox. This preserves child commands/cwds while making
 # a write that appears to target ROOT harmlessly private, never a host-repository mutation.
-shutil.copytree(
-    _REPOSITORY_ROOT,
-    _TEST_CHECKOUT,
-    symlinks=True,
-    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".env", ".env.*", "secrets"),
-)
 _ORIGINAL_POPEN = subprocess.Popen
+
+
+def _ensure_test_checkout():
+    """Populate the private checkout the first time a bwrap-confined descendant
+    actually needs it (never at import). A ~1809s-vs-~1050s suite regression traced
+    to this copytree running unconditionally for every process that imports this
+    package, whether or not it ever spawns a bwrap-confined child -- see
+    docs/specs/027-controles-que-miran/evidence/P2-gates-retry.md. Hosts without
+    bwrap, or a process only ever running already-boundary-active descendants, now
+    never pay this ~31MB copy at all."""
+    global _TEST_CHECKOUT_READY
+    if _TEST_CHECKOUT_READY:
+        return
+    shutil.copytree(
+        _REPOSITORY_ROOT,
+        _TEST_CHECKOUT,
+        symlinks=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".env", ".env.*", "secrets"),
+    )
+    _TEST_CHECKOUT_READY = True
 
 
 class _SandboxPopen(_ORIGINAL_POPEN):
@@ -88,7 +113,9 @@ def _child_environment(env):
 
 def _sandboxed_popen(args, *popen_args, **popen_kwargs):
     """Run descendants behind the private checkout boundary, preserving Popen semantics."""
-    if popen_kwargs.get("executable") or args and isinstance(args, (tuple, list)) and args[0] == "/usr/bin/bwrap":
+    if popen_kwargs.get("executable") or (
+        _BWRAP and args and isinstance(args, (tuple, list)) and args[0] == _BWRAP
+    ):
         return _ORIGINAL_POPEN(args, *popen_args, **popen_kwargs)
     if _DESCENDANT_BOUNDARY_ACTIVE:
         # Guest tests run inside their caller's already-private Bubblewrap boundary. They
@@ -96,6 +123,15 @@ def _sandboxed_popen(args, *popen_args, **popen_kwargs):
         # guest checkout reliably and adds no confinement.
         popen_kwargs["env"] = _child_environment(popen_kwargs.get("env"))
         return _ORIGINAL_POPEN(args, *popen_args, **popen_kwargs)
+    if _BWRAP is None:
+        # Portable degradation (Federico, 2026-08-14): no Bubblewrap on this host
+        # (macOS, Windows, or a bwrap-less Linux). The OS-level descendant boundary
+        # (P2-F01) is unavailable here, but AC-04/AC-05 do not require it -- the
+        # in-process audit hook below still rejects this interpreter's own escaping
+        # writes. Relocated HOME/TMPDIR/SET_AGENTS_STATE (P2-F03) still apply.
+        popen_kwargs["env"] = _child_environment(popen_kwargs.get("env"))
+        return _ORIGINAL_POPEN(args, *popen_args, **popen_kwargs)
+    _ensure_test_checkout()
     requested_cwd = popen_kwargs.pop("cwd", None)
     child_cwd = Path(requested_cwd or os.getcwd()).resolve(strict=False)
     popen_kwargs["env"] = _child_environment(popen_kwargs.get("env"))
@@ -113,7 +149,7 @@ def _sandboxed_popen(args, *popen_args, **popen_kwargs):
     except ValueError:
         checkout_mount = ("--bind", str(_TEST_CHECKOUT), str(_REPOSITORY_ROOT))
     boundary = (
-        "/usr/bin/bwrap", "--die-with-parent",
+        _BWRAP, "--die-with-parent",
         "--ro-bind", "/", "/",
         "--dev", "/dev",
         "--bind", str(_TEST_SANDBOX), str(_TEST_SANDBOX),
@@ -155,8 +191,7 @@ def _resolved_write_target(value, *, dir_fd=None, follow_final_symlink=True):
         return None
 
 
-def _reject_write_outside_sandbox(value, *, dir_fd=None, follow_final_symlink=True):
-    target = _resolved_write_target(value, dir_fd=dir_fd, follow_final_symlink=follow_final_symlink)
+def _deny_if_outside_sandbox(target):
     if target is None:
         return
     if target == _NON_MUTATING_DEVICE:
@@ -167,10 +202,64 @@ def _reject_write_outside_sandbox(value, *, dir_fd=None, follow_final_symlink=Tr
         raise PermissionError(f"test write outside private sandbox denied: {target}")
 
 
+def _reject_write_outside_sandbox(value, *, dir_fd=None, follow_final_symlink=True):
+    target = _resolved_write_target(value, dir_fd=dir_fd, follow_final_symlink=follow_final_symlink)
+    _deny_if_outside_sandbox(target)
+
+
+def _resolved_sqlite_target(database):
+    """P2-F07: `sqlite3.connect` never calls `open()`/`os.*` -- it talks to the
+    filesystem through SQLite's own C library, so none of the events above ever fire
+    for it, and it was a live, silent escape hatch for exactly the state this package
+    exists to protect (`ai/scripts/routing_core/store.py`, `ai/scripts/
+    provider_registry.py`, and `ai/scripts/cost-report.py` all open a `routing.db`
+    below `STATE_DIR` via sqlite3). ``sqlite3.connect`` raises its own dedicated audit
+    event, `"sqlite3.connect"`, with the exact `database` argument as given -- before
+    the file is created/opened, so a reject here is still before-mutation.
+    `:memory:`/`""` (private, never touch disk) are not destinations to classify. The
+    SQLite URI form (``sqlite3.connect("file:...", uri=True)``) is also handled,
+    including its own explicit ``mode=ro`` (a real read-only open never creates or
+    mutates a file, so it is not a destination this guard needs to reject)."""
+    if not isinstance(database, (str, bytes, os.PathLike)):
+        return None
+    text = database if isinstance(database, str) else os.fsdecode(database)
+    if text in ("", ":memory:"):
+        return None
+    if text.startswith("file:"):
+        parsed = urllib.parse.urlsplit(text)
+        if urllib.parse.parse_qs(parsed.query).get("mode") == ["ro"]:
+            return None
+        text = urllib.parse.unquote(parsed.path or parsed.netloc)
+        if not text:
+            return None
+    try:
+        return Path(text).resolve(strict=False)
+    except (OSError, ValueError):
+        return None
+
+
 def _test_write_audit(event, args):
     if not _WRITE_GUARD_ENABLED:
         return
-    if event == "open":
+    if event == "sqlite3.connect":
+        _deny_if_outside_sandbox(_resolved_sqlite_target(args[0] if args else None))
+    elif event == "open":
+        # P2-F08 (027 repair pass 2, declared/measured limitation, NOT fixed): unlike
+        # "os.remove"/"os.rename"/"os.mkdir"/etc. below, CPython's "open" audit event
+        # carries only `(path, mode, flags)` -- it never transmits a `dir_fd`, even
+        # when the caller passed one (verified: `sys.addaudithook` prints the exact
+        # same `(path, None, flags)` tuple with or without `dir_fd=` on the real
+        # `os.open` call). So `_reject_write_outside_sandbox` below resolves a relative
+        # `path` against this process's cwd, which can be inside the sandbox, while the
+        # real `openat()` syscall the kernel actually performs honors `dir_fd` and can
+        # land anywhere that file descriptor points. Measured, concretely: with cwd set
+        # to the private sandbox and `dir_fd` opened on an external directory,
+        # `os.open("relative.txt", os.O_WRONLY | os.O_CREAT, dir_fd=<external fd>)`
+        # passed this guard and created a real file outside the sandbox -- this gap is
+        # not closeable from the "open" event itself; CPython exposes no dir_fd-aware
+        # variant of it. `remove`/`rename`/`mkdir`/`chmod`/`chown`/`utime`/`link`/
+        # `symlink` below ARE dir_fd-aware (P2-F02) because THEIR audit events do carry
+        # the fd.
         path, _mode, flags = args
         write_flags = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
         if flags & write_flags:

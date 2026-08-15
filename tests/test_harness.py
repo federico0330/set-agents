@@ -49,6 +49,232 @@ def run(*args, env=None, check=True):
     )
 
 
+def _generate_output():
+    """027/P2 (AC-04/05, coordinator follow-up 2026-08-14): `run("./build.sh")` with no
+    `--output` regenerates `ROOT/Global/*` in place -- safe only behind the bwrap
+    boundary (which redirects `ROOT` into a private checkout), unsafe without it.
+    Callers that only ever needed to READ the regenerated content use this instead:
+    `build.sh --output DIR` writes the four harness trees (opencode/claude-code/
+    codex/pi) under `DIR`, never touching the real `Global/`. `tempfile.mkdtemp()`
+    already resolves under this run's relocated `TMPDIR` (tests/__init__.py), so the
+    output lives inside the private sandbox like every other test fixture -- no
+    context-manager cleanup is added on purpose, matching the many other ad hoc
+    `tempfile.mkdtemp()`-less patterns in this file; the whole sandbox is torn down
+    with the run regardless."""
+    return Path(tempfile.mkdtemp(prefix="build-output-"))
+
+
+# P2-F05 (027 repair pass 2): the static counterproof below used to (a) inspect only
+# `HarnessTests` via `inspect.getsource`, leaving TuiTests and every other tests/*.py
+# module blind; (b) accept a bare `--output` flag without ever looking at what its
+# VALUE resolved to, so `run("./build.sh", "--output", str(ROOT / "Global"))` passed
+# the lint while it actually deleted and regenerated the real Global/ tree in place --
+# measured against `generate.py --output ROOT/Global` locally: 568 real files gone,
+# `_canonical/`/`_shared/` included; (c) only recognized the `run(...)` test helper, so
+# a direct `subprocess.run([...], cwd=ROOT, ...)` bypass was invisible. This section
+# fixes all three: it is imported by every module's scan below, not just this file's
+# own class.
+_BUILD_SH_SAFE_FLAGS = {"--output", "--check", "--diff", "--install"}
+_BUILD_SH_TEMP_SOURCES = {"mkdtemp", "mkstemp", "TemporaryDirectory", "_generate_output"}
+_BUILD_SH_BODY_FIELDS = {"body", "orelse", "finalbody"}
+
+
+def _resolve_expr(expr, local_vars, depth=0):
+    """Best-effort, single-function-scope static resolution of a fixture expression.
+
+    Returns `(free_names, string_literals, is_known_temp_source)`: `free_names` are
+    identifiers that never resolved to a local assignment/`with`-binding (for example
+    the module-level `ROOT`); `string_literals` are every string constant reached along
+    the way; `is_known_temp_source` is True once the chain passes through a call this
+    file recognizes as producing a private, per-run temporary path
+    (`tempfile.mkdtemp`/`mkstemp`/`TemporaryDirectory`, or this file's own
+    `_generate_output()`)."""
+    names, strings, temp = set(), set(), False
+    if expr is None or depth > 8:
+        return names, strings, temp
+
+    def _merge(sub):
+        nonlocal names, strings, temp
+        n, s, t = _resolve_expr(sub, local_vars, depth + 1)
+        names |= n
+        strings |= s
+        temp = temp or t
+
+    if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+        strings.add(expr.value)
+    elif isinstance(expr, ast.Name):
+        if expr.id in local_vars:
+            _merge(local_vars[expr.id])
+        else:
+            names.add(expr.id)
+    elif isinstance(expr, ast.Attribute):
+        if expr.attr in _BUILD_SH_TEMP_SOURCES:
+            temp = True
+        _merge(expr.value)
+    elif isinstance(expr, ast.Call):
+        func = expr.func
+        func_id = func.id if isinstance(func, ast.Name) else (
+            func.attr if isinstance(func, ast.Attribute) else None
+        )
+        if func_id in _BUILD_SH_TEMP_SOURCES:
+            temp = True
+        _merge(func)
+        for sub in expr.args:
+            _merge(sub)
+        for kw in expr.keywords:
+            _merge(kw.value)
+    elif isinstance(expr, ast.BinOp):
+        _merge(expr.left)
+        _merge(expr.right)
+    elif isinstance(expr, (ast.List, ast.Tuple, ast.Set)):
+        for sub in expr.elts:
+            _merge(sub)
+    elif isinstance(expr, ast.JoinedStr):
+        for sub in expr.values:
+            _merge(sub)
+    elif isinstance(expr, ast.FormattedValue):
+        _merge(expr.value)
+    return names, strings, temp
+
+
+def _output_value_is_unsafe(value_expr, local_vars):
+    """A `--output` VALUE is safe only when it demonstrably never reaches `ROOT` and
+    traces to a recognized temporary source. A value that resolves through an
+    unresolved free name (a function parameter, e.g. `def build_staging(staging_dir)`)
+    is given the benefit of the doubt -- this lint cannot see the caller's contract --
+    but `ROOT` itself, or a fully-literal/computed path with no temp source and no free
+    name at all, is rejected."""
+    names, strings, temp = _resolve_expr(value_expr, local_vars)
+    if "ROOT" in names:
+        return True
+    if temp:
+        return False
+    if not names:
+        return True
+    return False
+
+
+def _command_lacks_safe_guard(token_exprs, local_vars):
+    """`token_exprs` are the build.sh invocation's command-line tokens (everything but
+    the interpreter argv[0] itself, when relevant). Require at least one recognized
+    safe flag; when a standalone `--output` token is present, additionally require its
+    paired value to pass `_output_value_is_unsafe`."""
+    resolved = [_resolve_expr(tok, local_vars) for tok in token_exprs]
+    all_strings = {s for _, strings, _ in resolved for s in strings}
+    if not any(flag in s for s in all_strings for flag in _BUILD_SH_SAFE_FLAGS):
+        return True
+    for index, (_, strings, _) in enumerate(resolved):
+        if strings == {"--output"}:
+            if index + 1 >= len(resolved):
+                return True
+            return _output_value_is_unsafe(token_exprs[index + 1], local_vars)
+    return False
+
+
+def _is_unsafe_build_sh_call(call, local_vars):
+    """Recognize both the `run(...)` test helper (`cwd=ROOT` hardcoded,
+    tests/test_harness.py) and a direct `subprocess.run`/`subprocess.Popen`/
+    `os.system` bypass of it."""
+    func = call.func
+    if isinstance(func, ast.Name) and func.id == "run":
+        if not call.args:
+            return False
+        _, strings, _ = _resolve_expr(call.args[0], local_vars)
+        if "./build.sh" not in strings:
+            return False
+        return _command_lacks_safe_guard(call.args[1:], local_vars)
+    if isinstance(func, ast.Attribute):
+        is_subprocess = (
+            func.attr in {"run", "Popen"}
+            and isinstance(func.value, ast.Name) and func.value.id == "subprocess"
+        )
+        is_os_system = (
+            func.attr == "system"
+            and isinstance(func.value, ast.Name) and func.value.id == "os"
+        )
+        if not (is_subprocess or is_os_system):
+            return False
+        if not call.args:
+            return False
+        command = call.args[0]
+        elements = command.elts if isinstance(command, (ast.List, ast.Tuple)) else [command]
+        resolved = [_resolve_expr(e, local_vars) for e in elements]
+        mentions_build_sh = any("build.sh" in s for _, strings, _ in resolved for s in strings)
+        if not mentions_build_sh:
+            return False
+        if not _command_lacks_safe_guard(elements, local_vars):
+            return False
+        cwd_kw = next((kw for kw in call.keywords if kw.arg == "cwd"), None)
+        if cwd_kw is None:
+            return True  # no explicit cwd: subprocess defaults to this process's cwd,
+                         # which for this suite is always ROOT.
+        cwd_names, _, _ = _resolve_expr(cwd_kw.value, local_vars)
+        return "ROOT" in cwd_names
+    return False
+
+
+def _own_calls(stmt):
+    """Every `ast.Call` reachable from `stmt`'s own fields, excluding nested statement
+    bodies (`body`/`orelse`/`finalbody`) -- those are walked separately, in source
+    order, by `_scan_function_body_for_build_sh` so a variable a nested block assigns
+    is never mistaken as visible before it runs."""
+    calls = []
+    for field_name, value in ast.iter_fields(stmt):
+        if field_name in _BUILD_SH_BODY_FIELDS:
+            continue
+        nodes = value if isinstance(value, list) else [value]
+        for item in nodes:
+            if isinstance(item, ast.AST):
+                calls.extend(n for n in ast.walk(item) if isinstance(n, ast.Call))
+    return calls
+
+
+def _scan_function_body_for_build_sh(stmts, local_vars, unsafe_out, qualname):
+    for stmt in stmts:
+        if (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1
+                and isinstance(stmt.targets[0], ast.Name)):
+            local_vars[stmt.targets[0].id] = stmt.value
+        elif isinstance(stmt, (ast.With, ast.AsyncWith)):
+            for item in stmt.items:
+                if isinstance(item.optional_vars, ast.Name):
+                    local_vars[item.optional_vars.id] = item.context_expr
+        for call in _own_calls(stmt):
+            if _is_unsafe_build_sh_call(call, local_vars):
+                unsafe_out.add(qualname)
+        for field in _BUILD_SH_BODY_FIELDS:
+            block = getattr(stmt, field, None)
+            if block:
+                _scan_function_body_for_build_sh(block, local_vars, unsafe_out, qualname)
+
+
+@contextlib.contextmanager
+def _external_probe_directory():
+    """P2-F06 (027 repair pass 2): a scratch directory OUTSIDE `tests._TEST_SANDBOX`,
+    created directly under the OS temp root, used only to prove the bwrap boundary
+    confines a child (writable for an unconfined process; covered by `--ro-bind / /`,
+    hence read-only, for a confined one). Created/removed via `tests._ORIGINAL_POPEN`
+    (the real, unwrapped `Popen`) rather than `os.mkdir`/`shutil.rmtree`, because THIS
+    interpreter's own P2 audit hook -- correctly -- rejects any write outside the
+    sandbox from the parent process itself; only a genuinely separate child process can
+    create scratch state here without disabling that guard."""
+    path = Path("/var/tmp") / f"set-agentes-unittest-external-probe-{uuid.uuid4().hex}"
+    tests._ORIGINAL_POPEN(["mkdir", str(path)]).wait()
+    try:
+        yield path
+    finally:
+        tests._ORIGINAL_POPEN(["rm", "-rf", str(path)]).wait()
+
+
+def _find_build_sh_writes(tree, module_label):
+    """Scan every function (method or module-level) in one module's AST for a
+    build.sh invocation that would rewrite the real `Global/` tree in place."""
+    unsafe = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            _scan_function_body_for_build_sh(node.body, {}, unsafe, f"{module_label}.{node.name}")
+    return sorted(unsafe)
+
+
 def init_state(state, *extra, feature_id="feat", body="# contract\n", check=True):
     """`init` with a spec that really does hash to the hash it is handed.
 
@@ -176,16 +402,52 @@ class HarnessTests(unittest.TestCase):
 
     def test_check_and_native_codex_agents(self):
         run("./build.sh", "--check")
-        run("./build.sh")
-        agents = sorted((ROOT / "Global/codex/agents").glob("*.toml"))
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        agents = sorted((generated / "codex/agents").glob("*.toml"))
         self.assertGreaterEqual(len(agents), 21)
         for path in agents:
             data = tomllib.loads(path.read_text())
             self.assertEqual(data["name"], path.stem)
             self.assertIn(data["sandbox_mode"], {"read-only", "workspace-write"})
             self.assertTrue(data["developer_instructions"].strip())
-        gate_runner = tomllib.loads((ROOT / "Global/codex/agents/gate-runner.toml").read_text())
+        gate_runner = tomllib.loads((generated / "codex/agents/gate-runner.toml").read_text())
         self.assertEqual(gate_runner["sandbox_mode"], "read-only")
+
+    def test_no_build_sh_call_writes_to_root_without_output_or_a_readonly_flag(self):
+        # Coordinator follow-up (2026-08-14, docs/specs/027-controles-que-miran/evidence/
+        # P2-portabilidad.md), hardened by P2-F04/F05 (027 repair pass 2): `run()`
+        # hardcodes `cwd=ROOT` (tests/test_harness.py's own `run` helper), and `build.sh`
+        # with no `--output` (its default MODE="generate") does
+        # `rm -rf "$ROOT/Global/$harness"; cp -a "$STAGING/$harness" "$ROOT/Global/$harness"`
+        # for all four harnesses -- a real write to the real repo, safe only behind the
+        # (now-optional) bwrap boundary. Measured: exactly that pattern, across 18 call
+        # sites in this file, regenerated 19 real Global/ files on a no-bwrap run; a 19th
+        # call site in tests/test_routing.py (P2-F04) escaped the original version of this
+        # lint entirely, because it only ever inspected `HarnessTests`'s own source. This
+        # now scans every `tests/*.py` module (every class and every module-level
+        # function in it, not one hardcoded class), recognizes a build.sh invocation
+        # reached through a local variable alias (not only the literal
+        # `run("./build.sh", ...)` call shape), recognizes a direct
+        # `subprocess.run`/`subprocess.Popen`/`os.system` bypass of the `run()` helper
+        # (not only `run(...)` itself), and rejects a `--output` value that is not
+        # evidently temporary -- `--output` being *present* is no longer sufficient by
+        # itself (see `_output_value_is_unsafe`, above): a value derived from `ROOT`, or a
+        # fully literal/computed path that never traces through
+        # `tempfile.mkdtemp`/`mkstemp`/`TemporaryDirectory`/`_generate_output()`, fails.
+        tests_dir = ROOT / "tests"
+        unsafe = []
+        for path in sorted(tests_dir.glob("*.py")):
+            module_tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            unsafe.extend(_find_build_sh_writes(module_tree, path.stem))
+        self.assertEqual(
+            unsafe, [],
+            "these tests/*.py functions invoke build.sh (via the run() helper, an "
+            "aliased/variable command, or a direct subprocess.run/Popen/os.system call) "
+            "with cwd implicitly or explicitly ROOT and none of "
+            "--output/--check/--diff/--install guarding it, or an --output value that is "
+            f"not evidently temporary -- this rewrites the real Global/ tree in place: {unsafe}",
+        )
 
     def test_build_check_detects_global_drift_and_names_the_file(self):
         # AC-01/AC-03 (021/P1, ADR-0041): --check generated a STAGING tree and then only ever
@@ -225,6 +487,47 @@ class HarnessTests(unittest.TestCase):
             )
             self.assertNotEqual(dirty.returncode, 0, "build.sh --check must fail on a dirtied Global/ file")
             self.assertIn("AGENTS.md", dirty.stdout + dirty.stderr)
+
+    def test_build_sh_generate_mode_regenerates_global_and_installs_the_drift_hook(self):
+        # P2-F10 (027 repair pass 2): converting every real `run("./build.sh")` call
+        # site to `--output <tmp>` (P2-portabilidad.md's seam repair, plus P2-F04's 19th
+        # site above) left build.sh's own default MODE="generate" branch
+        # (`rm -rf "$ROOT/Global/$harness"; cp -a "$STAGING/$harness"
+        # "$ROOT/Global/$harness"`, build.sh:137-144) and `ensure_drift_hook`
+        # (build.sh:62-71) with ZERO remaining coverage -- every other exerciser now
+        # passes --output/--check/--install and never takes this branch. Same
+        # guest-copy pattern as test_build_check_detects_global_drift_and_names_the_file,
+        # above: a private copy, never the real checkout, so the real `rm -rf
+        # Global/<harness>` this branch performs stays confined to the guest.
+        with tempfile.TemporaryDirectory(prefix="set-agentes-build-generate-") as td:
+            guest = Path(td) / "repo"
+            shutil.copytree(
+                ROOT,
+                guest,
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".env", ".env.*", "secrets"),
+            )
+            # ensure_drift_hook only checks this directory exists -- never that it is a
+            # real git repository -- so a minimal stand-in is sufficient and keeps this
+            # fixture from depending on `git init`.
+            (guest / ".git/hooks").mkdir(parents=True)
+            target = guest / "Global/opencode/AGENTS.md"
+            target.write_bytes(target.read_bytes() + b"\nDIRT-MARKER-AC-03\n")
+            result = subprocess.run(
+                ["bash", str(guest / "build.sh")],
+                cwd=guest, env=os.environ.copy(), text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for harness in ("opencode", "claude-code", "codex", "pi"):
+                self.assertTrue((guest / "Global" / harness).is_dir(), harness)
+            self.assertNotIn(
+                b"DIRT-MARKER-AC-03", target.read_bytes(),
+                "generate mode's rm -rf + cp -a must overwrite the dirtied file wholesale, "
+                "not merely leave the old content appended to",
+            )
+            hook = guest / ".git/hooks/post-commit"
+            self.assertTrue(hook.is_file(), "ensure_drift_hook must install the managed hook")
+            self.assertIn("set-agentes drift check", hook.read_text())
+            self.assertTrue(os.access(hook, os.X_OK), "the installed hook must be executable")
 
     def test_shell_scripts_parse(self):
         scripts = sorted(
@@ -4044,13 +4347,14 @@ class HarnessTests(unittest.TestCase):
         # The user reads the harness through OpenCode, Claude Code, Codex and pi.
         # generate.py copies the canonical body verbatim into all four, so this
         # is the test that proves the transparency protocol is not OpenCode-only.
-        run("./build.sh")
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
         artifacts = [
-            (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
-            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
-            (ROOT / "Global/codex/agents/orchestrator.toml").read_text(encoding="utf-8"),
-            (ROOT / "Global/pi/agents/orchestrator.md").read_text(encoding="utf-8"),
-            (ROOT / "Global/pi/AGENTS.md").read_text(encoding="utf-8"),
+            (generated / "opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (generated / "claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (generated / "codex/agents/orchestrator.toml").read_text(encoding="utf-8"),
+            (generated / "pi/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (generated / "pi/AGENTS.md").read_text(encoding="utf-8"),
         ]
         for text in artifacts:
             self.assertIn("▸ Instancio", text)
@@ -4070,10 +4374,11 @@ class HarnessTests(unittest.TestCase):
     def test_context_is_allowlisted_read_only_across_all_three_runtimes(self):
         # ADR-0012/AC-19: --context is a THIRD sanctioned channel, distinct from the mutating
         # state/routing CLIs, wired through generate.py into all three runtimes' permission config.
-        run("./build.sh")
-        opencode = (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8")
-        claude = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(encoding="utf-8")
-        codex = (ROOT / "Global/codex/agents/orchestrator.toml").read_text(encoding="utf-8")
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        opencode = (generated / "opencode/agents/orchestrator.md").read_text(encoding="utf-8")
+        claude = (generated / "claude-code/agents/orchestrator.md").read_text(encoding="utf-8")
+        codex = (generated / "codex/agents/orchestrator.toml").read_text(encoding="utf-8")
         self.assertIn('--context*": allow', opencode)
         for text in (opencode, claude, codex):
             self.assertIn("--context", text)
@@ -4094,13 +4399,14 @@ class HarnessTests(unittest.TestCase):
         # returning subagent reads as a turn boundary and the user has to type
         # "dale, continuá". These are the rules that close it; the Codex body is
         # read through tomllib so the assertion also proves it survived escaping.
-        run("./build.sh")
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
         codex = tomllib.loads(
-            (ROOT / "Global/codex/agents/orchestrator.toml").read_text(encoding="utf-8")
+            (generated / "codex/agents/orchestrator.toml").read_text(encoding="utf-8")
         )["developer_instructions"]
         artifacts = [
-            (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
-            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (generated / "opencode/agents/orchestrator.md").read_text(encoding="utf-8"),
+            (generated / "claude-code/agents/orchestrator.md").read_text(encoding="utf-8"),
             codex,
         ]
         for text in artifacts:
@@ -4317,8 +4623,8 @@ class HarnessTests(unittest.TestCase):
         # (opencode/claude-code/codex), a fourth (`Global/pi/...`) once
         # 013-pi-interactive-target lands, generically discovered so this test cannot
         # silently stop covering a newly-added harness copy.
-        run("./build.sh")
-        harness_root = ROOT / "Global"
+        harness_root = _generate_output()
+        run("./build.sh", "--output", str(harness_root))
         generated = sorted(
             path for path in harness_root.glob("*/agents/orchestrator.*")
             if path.parent.parent.name != "_canonical"
@@ -4385,8 +4691,8 @@ class HarnessTests(unittest.TestCase):
         # command per runtime, never a "you may pass --usage" menu (ADR-0041's lesson).
         # Checked across every generated harness copy, generically discovered, same
         # pattern as test_orchestrator_doctrine_branches_on_route_decide_reason_taxonomy.
-        run("./build.sh")
-        harness_root = ROOT / "Global"
+        harness_root = _generate_output()
+        run("./build.sh", "--output", str(harness_root))
         generated = sorted(
             path for path in harness_root.glob("*/agents/orchestrator.*")
             if path.parent.parent.name != "_canonical"
@@ -4422,8 +4728,9 @@ class HarnessTests(unittest.TestCase):
         # itself and asserts the specific allow-lines are present -- the gap that let a
         # deny-by-default Bash policy silently refuse the exact command the doctrine
         # instructed, on the one lane where the branch is actually selectable.
-        run("./build.sh")
-        text = (ROOT / "Global/opencode/agents/orchestrator.md").read_text(encoding="utf-8")
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        text = (generated / "opencode/agents/orchestrator.md").read_text(encoding="utf-8")
         bash_section = text[text.index("  bash:"):]
         self.assertIn(
             '    "python3 __SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py --dispatch-writer*": allow',
@@ -5024,17 +5331,19 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("models.toml", result.stderr)
 
     def test_generated_mcp_is_off(self):
-        run("./build.sh")
-        data = json.loads((ROOT / "Global/opencode/opencode.json").read_text())
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        data = json.loads((generated / "opencode/opencode.json").read_text())
         self.assertTrue(data["mcp"])
         self.assertTrue(all(not item["enabled"] for item in data["mcp"].values()))
-        overlay = json.loads((ROOT / "Global/claude-code/settings.overlay.json").read_text())
+        overlay = json.loads((generated / "claude-code/settings.overlay.json").read_text())
         self.assertFalse(overlay["enabledPlugins"]["engram@engram"])
 
     def test_orchestrator_delegation_graph_is_broad_but_state_governed(self):
-        run("./build.sh")
-        oc = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
-        claude = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        oc = (generated / "opencode/agents/orchestrator.md").read_text()
+        claude = (generated / "claude-code/agents/orchestrator.md").read_text()
         allowed = ["spec-challenger", "package-planner", "implementer", "package-reviewer", "repair-agent", "delta-reviewer", "integrator"]
         specialists = ["security-auditor"]
         for role in allowed:
@@ -5047,10 +5356,11 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("record-subreview", oc)
 
     def test_runtime_verifier_can_manage_browser_mcp_gate(self):
-        run("./build.sh")
-        oc = (ROOT / "Global/opencode/agents/runtime-verifier.md").read_text()
-        claude = (ROOT / "Global/claude-code/agents/runtime-verifier.md").read_text()
-        codex = tomllib.loads((ROOT / "Global/codex/agents/runtime-verifier.toml").read_text())["developer_instructions"]
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        oc = (generated / "opencode/agents/runtime-verifier.md").read_text()
+        claude = (generated / "claude-code/agents/runtime-verifier.md").read_text()
+        codex = tomllib.loads((generated / "codex/agents/runtime-verifier.toml").read_text())["developer_instructions"]
         for text in (oc, claude, codex):
             self.assertIn("mcp.sh browser-gate auto", text)
             self.assertIn("Do not ask the user to toggle MCP", text)
@@ -5151,10 +5461,11 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("blocked", blocked.stderr.lower())
 
     def test_release_harnesses_require_gated_wrapper(self):
-        run("./build.sh")
-        oc = (ROOT / "Global/opencode/agents/github-release-manager.md").read_text()
-        claude = (ROOT / "Global/claude-code/agents/github-release-manager.md").read_text()
-        codex = tomllib.loads((ROOT / "Global/codex/agents/github-release-manager.toml").read_text())
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        oc = (generated / "opencode/agents/github-release-manager.md").read_text()
+        claude = (generated / "claude-code/agents/github-release-manager.md").read_text()
+        codex = tomllib.loads((generated / "codex/agents/github-release-manager.toml").read_text())
         self.assertIn('"gh repo delete*": deny', oc)
         self.assertIn('"python3 ~/.config/opencode/hooks/release_action.py*": allow', oc)
         self.assertIn("release_action.py", oc)
@@ -5223,7 +5534,8 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(gitignore.read_text(), "# custom rules\n", "never overwrite an existing .gitignore")
 
     def test_domain_knowledge_is_wired_through_the_canon(self):
-        run("./build.sh")
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
         wiring = {
             "security-auditor": "docs/ai/knowledge/security.md",
             "package-reviewer": "docs/ai/knowledge/data.md",
@@ -5234,12 +5546,12 @@ class HarnessTests(unittest.TestCase):
             "ux-ui-designer": "docs/ai/knowledge/frontend.md",
         }
         for agent, reference in wiring.items():
-            text = (ROOT / "Global/claude-code/agents" / f"{agent}.md").read_text()
+            text = (generated / "claude-code/agents" / f"{agent}.md").read_text()
             self.assertIn(reference, text, agent)
-        scribe = (ROOT / "Global/claude-code/agents/memory-scribe.md").read_text()
+        scribe = (generated / "claude-code/agents/memory-scribe.md").read_text()
         self.assertIn("ONLY writer", scribe)
         self.assertIn("docs/ai/knowledge/", scribe)
-        orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        orchestrator = (generated / "claude-code/agents/orchestrator.md").read_text()
         self.assertIn("MANDATORY at feature close", orchestrator)
         for domain in ("security", "data", "architecture", "algorithms", "frontend"):
             self.assertTrue((ROOT / "PROYECTO/docs/ai/knowledge" / f"{domain}.md").exists(), domain)
@@ -5765,7 +6077,8 @@ class HarnessTests(unittest.TestCase):
         # feature exists to close, one level up. So the convention is declared in the
         # command prompt -- and the two examples it gives are executable, checked against
         # the live pattern, so doc and enforcer cannot drift apart in silence.
-        run("./build.sh")
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
         canonical = (ROOT / "Global/_canonical/commands/feature-batch.md").read_text()
         self.assertIn("check-feature-state.py", canonical)
 
@@ -5782,22 +6095,23 @@ class HarnessTests(unittest.TestCase):
         self.assertIsNone(guard.DELIVERY_SUBJECT.match(not_delivery), not_delivery)
 
         for harness in ("opencode", "claude-code"):
-            generated = (ROOT / "Global" / harness / "commands/feature-batch.md").read_text()
-            self.assertIn(f"`{delivery}`", generated, harness)
-            self.assertIn("check-feature-state.py", generated, harness)
+            generated_text = (generated / harness / "commands/feature-batch.md").read_text()
+            self.assertIn(f"`{delivery}`", generated_text, harness)
+            self.assertIn("check-feature-state.py", generated_text, harness)
 
     def test_consult_mode_is_wired_and_never_starts_pipeline(self):
-        run("./build.sh")
-        triage = (ROOT / "Global/claude-code/skills/request-triage/SKILL.md").read_text()
-        orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        triage = (generated / "claude-code/skills/request-triage/SKILL.md").read_text()
+        orchestrator = (generated / "claude-code/agents/orchestrator.md").read_text()
         self.assertIn("Consult / analysis", triage)
         self.assertIn("NEVER starts the pipeline", triage)
         self.assertIn("NO `init`, NO state file, NO pipeline", triage)
         self.assertIn("## Consult mode", orchestrator)
         self.assertIn("NEVER starts the pipeline", orchestrator)
         for harness in ("opencode", "claude-code"):
-            self.assertTrue((ROOT / "Global" / harness / "commands/consult.md").exists(), harness)
-            self.assertTrue((ROOT / "Global" / harness / "commands/status.md").exists(), harness)
+            self.assertTrue((generated / harness / "commands/consult.md").exists(), harness)
+            self.assertTrue((generated / harness / "commands/status.md").exists(), harness)
         # quick-fix is the default lane; scoped needs a concrete risk signal; full SDD stays opt-in.
         self.assertIn("Quick-fix — the DEFAULT".lower(), triage.lower())
         self.assertIn("concrete risk signal", triage)
@@ -5806,12 +6120,13 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("opt-in", triage)
 
     def test_architecture_gate_is_wired_through_the_canon(self):
-        run("./build.sh")
-        orchestrator = (ROOT / "Global/claude-code/agents/orchestrator.md").read_text()
-        architect = (ROOT / "Global/claude-code/agents/architect.md").read_text()
-        spec_challenger = (ROOT / "Global/claude-code/agents/spec-challenger.md").read_text()
-        design_skill = (ROOT / "Global/claude-code/skills/system-design-decisions/SKILL.md").read_text()
-        triage_skill = (ROOT / "Global/claude-code/skills/request-triage/SKILL.md").read_text()
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        orchestrator = (generated / "claude-code/agents/orchestrator.md").read_text()
+        architect = (generated / "claude-code/agents/architect.md").read_text()
+        spec_challenger = (generated / "claude-code/agents/spec-challenger.md").read_text()
+        design_skill = (generated / "claude-code/skills/system-design-decisions/SKILL.md").read_text()
+        triage_skill = (generated / "claude-code/skills/request-triage/SKILL.md").read_text()
         # The orchestrator must recognize a missing architecture ADR as a question-worthy category that
         # overrides "a safe default exists, so continue".
         self.assertIn("vector vs relational", orchestrator)
@@ -6043,12 +6358,13 @@ class HarnessTests(unittest.TestCase):
         # default-deny discipline, the 15 permission keys, ordering) against those
         # placeholders instead of the removed literals, and additionally enforces
         # AC-08 going forward: no client-specific literal is ever allowed to reappear.
-        run("./build.sh")
-        agent = ROOT / "Global/opencode/agents/package-gate-runner.md"
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        agent = generated / "opencode/agents/package-gate-runner.md"
         text = agent.read_text()
         self.assertTrue(agent.exists())
-        self.assertFalse((ROOT / "Global/claude-code/agents/package-gate-runner.md").exists())
-        self.assertFalse((ROOT / "Global/codex/agents/package-gate-runner.toml").exists())
+        self.assertFalse((generated / "claude-code/agents/package-gate-runner.md").exists())
+        self.assertFalse((generated / "codex/agents/package-gate-runner.toml").exists())
 
         # AC-08: the frontmatter's `permission` block keeps exactly its 15 top-level
         # keys, in order, after the cleanup -- the genericization touched only leaf
@@ -6110,16 +6426,16 @@ class HarnessTests(unittest.TestCase):
         ):
             self.assertNotIn(literal, lowered)
 
-        orchestrator = (ROOT / "Global/opencode/agents/orchestrator.md").read_text()
+        orchestrator = (generated / "opencode/agents/orchestrator.md").read_text()
         self.assertIn('    "package-gate-runner": allow', orchestrator)
         self.assertIn("For `replenishment-v2` package `RPL-P0A` only", orchestrator)
         self.assertNotIn(
             "package-gate-runner",
-            (ROOT / "Global/claude-code/agents/orchestrator.md").read_text(),
+            (generated / "claude-code/agents/orchestrator.md").read_text(),
         )
         self.assertNotIn(
             "package-gate-runner",
-            tomllib.loads((ROOT / "Global/codex/agents/orchestrator.toml").read_text())["developer_instructions"],
+            tomllib.loads((generated / "codex/agents/orchestrator.toml").read_text())["developer_instructions"],
         )
 
     # --------------------------------------------------- 010-spawn-provenance / AC-04
@@ -8552,6 +8868,72 @@ class HarnessTests(unittest.TestCase):
             target.write_text("allowed", encoding="utf-8")
             self.assertEqual(target.read_text(encoding="utf-8"), "allowed")
 
+    def test_unittest_write_guard_rejects_sqlite3_connect_outside_the_sandbox_before_mutation(self):
+        """P2-F07 (027 repair pass 2): `sqlite3.connect` never calls `open()`/`os.*` --
+        it talks to SQLite's own C library, so none of the `open`/`os.*` audit events
+        this guard already listened for ever fired for it. That mattered for real:
+        `ai/scripts/routing_core/store.py` and `ai/scripts/provider_registry.py` both
+        open a `routing.db`/`providers.toml`-adjacent sqlite database below `STATE_DIR`
+        via sqlite3 -- a fixture that (accidentally or otherwise) pointed one at the
+        real `STATE_DIR` would have mutated the user's actual state with this guard
+        saying nothing, degrading AC-04/AC-05's one remaining layer after the
+        portability decision (docs/specs/027-controles-que-miran/evidence/
+        P2-portabilidad.md) made the OS-level bwrap boundary optional."""
+        # Same non-existent-parent-under-real-HOME pattern as
+        # test_unittest_write_guard_rejects_home_and_cli_destinations_before_mutation,
+        # above: the guard must reject before any real filesystem operation happens, so
+        # a parent that does not even exist proves the rejection is not merely "sqlite3
+        # itself failed to find the directory".
+        absent_parent = tests._ORIGINAL_HOME / f"p2-f07-sqlite-{uuid.uuid4()}"
+        external = absent_parent / "escape.db"
+        self.assertFalse(absent_parent.exists(), f"fixture parent must remain absent: {absent_parent}")
+        resolved = external.resolve(strict=False)
+        with self.assertRaisesRegex(PermissionError, re.escape(str(resolved))):
+            sqlite3.connect(str(external))
+        self.assertFalse(external.exists(), f"guard must reject before the database file is created: {external}")
+
+        # `:memory:` never touches disk -- must stay unaffected.
+        memory_conn = sqlite3.connect(":memory:")
+        memory_conn.execute("CREATE TABLE t (x INT)")
+        memory_conn.close()
+
+        # A sqlite3 URI naming an EXPLICIT read-only open never creates/mutates a file,
+        # so it is not a destination this guard needs to reject either -- it simply
+        # fails as sqlite3's own "no such file" error, never a PermissionError.
+        with self.assertRaises(sqlite3.OperationalError):
+            sqlite3.connect(f"file:{resolved}?mode=ro", uri=True)
+        self.assertFalse(external.exists())
+
+        # The private sandbox itself remains a green destination.
+        inside = tests._TEST_SANDBOX / f"p2-f07-{uuid.uuid4()}.db"
+        allowed_conn = sqlite3.connect(str(inside))
+        allowed_conn.execute("CREATE TABLE t (x INT)")
+        allowed_conn.commit()
+        allowed_conn.close()
+        self.assertTrue(inside.exists())
+
+    def test_unittest_write_guard_degrades_portably_without_bwrap(self):
+        """027/P2 portability repair (Federico, 2026-08-14): AC-04/05 are enforced by the
+        in-process audit hook, not by bwrap. Forcing bwrap absent must (a) still reject an
+        escaping write, naming the destination, and (b) never trigger the ~31MB repository
+        copytree that a bwrap-confined descendant would otherwise need."""
+        with mock.patch.object(tests, "_BWRAP", None), \
+             mock.patch.object(tests, "_TEST_CHECKOUT_READY", False), \
+             mock.patch.object(shutil, "copytree") as copytree:
+            absent_parent = tests._ORIGINAL_HOME / f"p2-degraded-{uuid.uuid4()}"
+            target = absent_parent / "home.txt"
+            resolved = target.resolve(strict=False)
+            self.assertFalse(target.parent.exists(), f"fixture parent must remain absent: {target.parent}")
+            with self.assertRaisesRegex(PermissionError, re.escape(str(resolved))):
+                target.write_text("must not escape", encoding="utf-8")
+            self.assertFalse(target.exists(), f"guard must reject before mutating {resolved}")
+            result = subprocess.run(
+                [sys.executable, "-c", "print('degraded-ok')"], cwd=ROOT, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "degraded-ok")
+            copytree.assert_not_called()
+
     def test_unittest_write_guard_rejects_home_and_cli_destinations_before_mutation(self):
         """AC-04/05: destination, rather than writer identity, decides the rejection."""
         # The non-existent parent is intentional: when the guard is temporarily removed for
@@ -8573,30 +8955,64 @@ class HarnessTests(unittest.TestCase):
                 target.write_text("must not escape", encoding="utf-8")
             self.assertFalse(target.exists(), f"guard must reject before mutating {resolved}")
 
+    @unittest.skipUnless(tests._BWRAP, "P2-F01 descendant boundary requires bwrap (portable degradation, 2026-08-14)")
     def test_unittest_descendant_cannot_open_an_external_absolute_path_for_writing(self):
-        """P2-F01: the OS boundary, not a parent-only audit hook, confines children."""
-        target = Path("/etc/hosts")
-        original = target.read_bytes()
-        script = "import os, sys; os.open(sys.argv[1], os.O_WRONLY)"
-        result = subprocess.run(
-            [sys.executable, "-c", script, str(target)], cwd=ROOT, text=True, capture_output=True, check=False,
-        )
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(target.read_bytes(), original)
+        """P2-F01: the OS boundary, not a parent-only audit hook, confines children.
 
+        P2-F06 (027 repair pass 2): the previous target, /etc/hosts, is unwritable by a
+        plain non-root user with or without the bwrap boundary -- its "ok" result was
+        never evidence of confinement. Measured: with tests/__init__.py's
+        `subprocess.Popen = _sandboxed_popen` override deleted entirely (the whole P2-F01
+        layer, not merely bwrap absent), this test still passed. A directory created
+        directly under the OS temp root via `dir="/var/tmp"` (bypassing this run's own
+        relocated `tempfile.tempdir`) sits OUTSIDE `_TEST_SANDBOX` -- world-writable for
+        an unconfined process, but covered by bwrap's blanket `--ro-bind / /` for a
+        confined child, since only `_TEST_SANDBOX` itself (a distinct, sibling path) is
+        separately re-bound writable. That is a real discriminator, not merely a
+        different unwritable path: a child WOULD succeed here without the boundary and
+        fails with it (see the red-bite evidence in P2-repair-2.md)."""
+        with _external_probe_directory() as external_probe_dir:
+            target = external_probe_dir / "escape.txt"
+            script = "import os, sys; os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT)"
+            result = subprocess.run(
+                [sys.executable, "-c", script, str(target)], cwd=ROOT, text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse(target.exists(), f"the boundary must block creation, not merely stay empty: {target}")
+
+    @unittest.skipUnless(tests._BWRAP, "P2-F01 descendant boundary requires bwrap (portable degradation, 2026-08-14)")
     def test_unittest_descendant_preserves_fixture_path_inside_private_sandbox(self):
-        """The F01 boundary keeps fixture-local executable probes available to children."""
-        with tempfile.TemporaryDirectory() as td:
+        """The F01 boundary keeps fixture-local executable probes available to children
+        -- while STILL confining them.
+
+        P2-F06 (027 repair pass 2): before this repair, this test asserted only the
+        availability half. Measured: with the whole `_sandboxed_popen` boundary deleted
+        from tests/__init__.py, it still passed -- the real, unwrapped `Popen` also
+        honors a fixture PATH override just fine, so its green result was never
+        evidence the boundary did anything. The same child now also attempts an
+        absolute write outside the sandbox (same external, non-home, non-repo
+        `/var/tmp` sibling directory as the sibling test above); asserting that fails,
+        in the same process that successfully found and ran the fixture probe via
+        PATH, is the actual discriminator: legitimate PATH-based execution keeps
+        working, but escaping writes do not."""
+        with tempfile.TemporaryDirectory() as td, _external_probe_directory() as external_probe_dir:
             tool = Path(td) / "fixture-probe"
             tool.write_text("#!/bin/sh\nprintf fixture-probe\n")
             tool.chmod(0o755)
+            external_target = external_probe_dir / "escape.txt"
+            script = (
+                "import os, subprocess, sys\n"
+                "subprocess.run(['fixture-probe'], check=True)\n"
+                "os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT)\n"
+            )
             result = subprocess.run(
-                [sys.executable, "-c", "import subprocess; subprocess.run(['fixture-probe'], check=True)"],
+                [sys.executable, "-c", script, str(external_target)],
                 env={**os.environ, "PATH": f"{tool.parent}:{os.environ['PATH']}"},
                 text=True, capture_output=True, check=False,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "fixture-probe")
+            self.assertEqual(result.stdout, "fixture-probe", result.stdout + result.stderr)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse(external_target.exists(), f"the boundary must block the write: {external_target}")
 
     def test_unittest_write_guard_rejects_symlink_parent_for_remove_rename_and_dir_fd(self):
         """P2-F02: final-link preservation must still resolve an escaping parent."""
@@ -8723,6 +9139,314 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("seed.txt", payload["out_of_scope"])
         self.assertEqual(result.returncode, 2)
         self.assertIn("OWNERSHIP_FAIL", result.stdout)
+
+    def test_owned_paths_directory_declaration_covers_its_descendant_files(self):
+        # AC-08 (027/P4). `matches()` used to hand bare `owned_paths` entries straight to
+        # `fnmatch`, which never treats a directory declaration as covering the files
+        # inside it: `matches("tests/test_harness.py", ["tests"])` measured `False` on the
+        # unpatched script (see docs/specs/027-controles-que-miran/evidence/P4-implementer.md
+        # for the literal red-state run). This is the mirror of P1's bug: P1 made the gate
+        # SEE new files; this closed the false positive that seeing them exposed -- 18
+        # in-scope files (including this module) were reported `out_of_scope`. Covers a
+        # bare directory declaration and its trailing-slash spelling.
+        for declared, changed_file in (
+            ("tests", "tests/test_harness.py"),
+            ("tests/", "tests/test_harness.py"),
+            ("docs/adr", "docs/adr/0051-x.md"),
+        ):
+            with self.subTest(declared=declared, changed_file=changed_file):
+                with tempfile.TemporaryDirectory() as td:
+                    state = Path(td) / "feature.json"
+                    state.write_text(json.dumps({
+                        "packages": [{
+                            "package_id": "PKG-01",
+                            "owned_paths": [declared],
+                            "shared_paths": [],
+                            "read_only_paths": [],
+                            "approved_exceptions": [],
+                        }]
+                    }))
+                    result = run(
+                        "python3", str(CHECK_OWNED), "--state-file", str(state),
+                        "--package-id", "PKG-01", "--changed-file", changed_file,
+                    )
+                self.assertIn("OWNERSHIP_PASS", result.stdout)
+                self.assertEqual(result.returncode, 0)
+
+    def test_owned_paths_directory_declaration_never_matches_a_prefix_lookalike_or_a_true_outsider(self):
+        # AC-09 (027/P4) -- the prefix trap. Directory-descendant matching must require a
+        # real path-segment boundary, never a bare `str.startswith(pattern)`: with
+        # `owned_paths: ["tests"]`, `tests-extra/x.py` LOOKS like it starts with "tests"
+        # but is a sibling directory, not a descendant, and a wholly unrelated
+        # `outside/x.py` must never pass either. Both retain `OWNERSHIP_FAIL` / exit 2
+        # after the fix -- this is the mandatory negative coverage the context pack names,
+        # and it was already red-state-confirmed as correctly failing before the fix too
+        # (see evidence file), so this test pins that the fix does not accidentally widen
+        # the boundary while adding the positive case above.
+        for changed_file in ("tests-extra/x.py", "outside/x.py"):
+            with self.subTest(changed_file=changed_file):
+                with tempfile.TemporaryDirectory() as td:
+                    state = Path(td) / "feature.json"
+                    state.write_text(json.dumps({
+                        "packages": [{
+                            "package_id": "PKG-01",
+                            "owned_paths": ["tests"],
+                            "shared_paths": [],
+                            "read_only_paths": [],
+                            "approved_exceptions": [],
+                        }]
+                    }))
+                    result = run(
+                        "python3", str(CHECK_OWNED), "--state-file", str(state),
+                        "--package-id", "PKG-01", "--changed-file", changed_file,
+                        check=False,
+                    )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("OWNERSHIP_FAIL", result.stdout)
+                self.assertIn(changed_file, json.JSONDecoder().raw_decode(result.stdout)[0]["out_of_scope"])
+
+    def test_owned_paths_directory_descendant_rejects_path_traversal_through_the_boundary(self):
+        # P4-F01 repair (delta review, 027/P4). The prefix-trap test above pins a LOOK-ALIKE
+        # sibling (`tests-extra/`); it says nothing about a `..` segment, because
+        # `_is_directory_descendant` used to compare the raw, un-normalized text:
+        # `"tests/../ai/scripts/pwn.py".startswith("tests/")` is `True`, so a package
+        # declaring `owned_paths: ["tests"]` could "own" a file that, once the `..` is
+        # resolved, is not under `tests/` at all -- measured live by the orchestrator against
+        # the unpatched script: `tests/../ai/scripts/pwn.py` and `tests/../../etc/passwd`
+        # both came back `OWNERSHIP_PASS` (rc=0), a genuine relaxation AC-09 forbids, one this
+        # same diff introduced (the pre-existing `fnmatch`-only code rejected both). The two
+        # negative controls alongside them must keep their pre-fix verdicts: a real in-scope
+        # file (`tests/real.py`) still passes, and the prefix-trap sibling
+        # (`tests-extra/x.py`) still fails -- fixing the traversal must not re-break either.
+        cases = (
+            ("tests/../ai/scripts/pwn.py", 2),
+            ("tests/../../etc/passwd", 2),
+            ("tests/real.py", 0),
+            ("tests-extra/x.py", 2),
+        )
+        for changed_file, expected_rc in cases:
+            with self.subTest(changed_file=changed_file):
+                with tempfile.TemporaryDirectory() as td:
+                    state = Path(td) / "feature.json"
+                    state.write_text(json.dumps({
+                        "packages": [{
+                            "package_id": "PKG-01",
+                            "owned_paths": ["tests"],
+                            "shared_paths": [],
+                            "read_only_paths": [],
+                            "approved_exceptions": [],
+                        }]
+                    }))
+                    result = run(
+                        "python3", str(CHECK_OWNED), "--state-file", str(state),
+                        "--package-id", "PKG-01", "--changed-file", changed_file,
+                        check=False,
+                    )
+                self.assertEqual(result.returncode, expected_rc, result.stdout)
+                if expected_rc == 2:
+                    self.assertIn("OWNERSHIP_FAIL", result.stdout)
+                    self.assertIn(changed_file, json.JSONDecoder().raw_decode(result.stdout)[0]["out_of_scope"])
+                else:
+                    self.assertIn("OWNERSHIP_PASS", result.stdout)
+
+    def test_owned_paths_directory_declaration_normalizes_leading_slash_dot_slash_double_slash_and_backslash_spellings(self):
+        # P4-F04 repair (delta review, 027/P4). `matches()` already normalizes a CHANGED
+        # path's backslashes (`path.replace("\\", "/")`), and its literal-fnmatch branch
+        # already tolerates a leading-slash-style DECLARATION via
+        # `fnmatch("/" + normalized, pattern)` -- but `_is_directory_descendant` read the
+        # raw declaration text verbatim, so `/tests`, `./tests`, `docs//adr` and `tests\sub`
+        # each failed to cover their own descendants even though `tests`, `tests/` and
+        # `docs/adr` (the equivalent, "plain" spellings) did. Every row here fails toward the
+        # strict side pre-fix (never a false PASS), which is why the finding was `low`, but
+        # `feature_state_lib/cli_lifecycle.py:277` stores `args.owned_path` verbatim, so any
+        # of these spellings can reach a real package declaration. All five must be
+        # `OWNERSHIP_PASS` once the declaration is canonicalized the same way the path is.
+        cases = (
+            ("/tests", "tests/x.py"),
+            ("./tests", "tests/x.py"),
+            ("docs//adr", "docs/adr/x.md"),
+            ("tests//", "tests/x.py"),
+            ("tests\\sub", "tests/sub/x.py"),
+        )
+        for declared, changed_file in cases:
+            with self.subTest(declared=declared, changed_file=changed_file):
+                with tempfile.TemporaryDirectory() as td:
+                    state = Path(td) / "feature.json"
+                    state.write_text(json.dumps({
+                        "packages": [{
+                            "package_id": "PKG-01",
+                            "owned_paths": [declared],
+                            "shared_paths": [],
+                            "read_only_paths": [],
+                            "approved_exceptions": [],
+                        }]
+                    }))
+                    result = run(
+                        "python3", str(CHECK_OWNED), "--state-file", str(state),
+                        "--package-id", "PKG-01", "--changed-file", changed_file,
+                    )
+                self.assertIn("OWNERSHIP_PASS", result.stdout, result.stdout)
+                self.assertEqual(result.returncode, 0)
+
+    def test_owned_paths_directory_descendant_rule_does_not_relax_existing_glob_patterns(self):
+        # AC-08 control, repaired (P4-F03, delta review, 027/P4). The original version of
+        # this test used `src/**` for both its positive case and its "lookalike" negative
+        # case (`src-legacy/app.py`) -- but `fnmatch`'s `*` already matches across `/`
+        # (`fnmatch.translate` turns it into `.*`), so BOTH cases already passed/failed
+        # correctly through plain `fnmatch` alone, with or without the metacharacter
+        # carve-out this test claims to pin. Measured live: replacing
+        # `_is_bare_directory_pattern`'s body with `return bool(pattern)` (deleting the
+        # carve-out entirely) still left this test green, 5/5 -- a hollow guard. The
+        # adversarial case below is the one shape that only the carve-out prevents: a
+        # changed-path string that literally contains the pattern's glob text as a path
+        # segment (`config/*.json/evil/x.py` against declared `config/*.json`). Plain
+        # `fnmatch` correctly rejects it (the string does not end in `.json`), but a
+        # `path.startswith(pattern.rstrip("/") + "/")` directory-descendant check -- if it
+        # were allowed to run on a pattern that still has metacharacters -- would wrongly
+        # accept it, because the raw text `"config/*.json/evil/x.py".startswith("config/*.json/")`
+        # is `True`. Bitten live: with the carve-out deleted, this exact case flips from
+        # `OWNERSHIP_FAIL` to `OWNERSHIP_PASS`; restored, it is `OWNERSHIP_FAIL` again (see
+        # evidence file for the literal before/after run). The original `src/**` case is
+        # kept as a plain sanity check, not as the control anymore.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": ["src/**", "config/*.json"],
+                    "shared_paths": [],
+                    "read_only_paths": [],
+                    "approved_exceptions": [],
+                }]
+            }))
+            in_scope = run(
+                "python3", str(CHECK_OWNED), "--state-file", str(state),
+                "--package-id", "PKG-01", "--changed-file", "src/nested/app.py",
+            )
+            lookalike = run(
+                "python3", str(CHECK_OWNED), "--state-file", str(state),
+                "--package-id", "PKG-01", "--changed-file", "src-legacy/app.py",
+                check=False,
+            )
+            adversarial = run(
+                "python3", str(CHECK_OWNED), "--state-file", str(state),
+                "--package-id", "PKG-01", "--changed-file", "config/*.json/evil/x.py",
+                check=False,
+            )
+        self.assertIn("OWNERSHIP_PASS", in_scope.stdout)
+        self.assertEqual(lookalike.returncode, 2)
+        self.assertIn("OWNERSHIP_FAIL", lookalike.stdout)
+        self.assertEqual(adversarial.returncode, 2, adversarial.stdout)
+        self.assertIn("OWNERSHIP_FAIL", adversarial.stdout)
+        self.assertIn(
+            "config/*.json/evil/x.py",
+            json.JSONDecoder().raw_decode(adversarial.stdout)[0]["out_of_scope"],
+        )
+
+    def test_owned_paths_directory_descendant_never_overrides_read_only_precedence(self):
+        # AC-09 trap #3 (027/P4): read-only checks win over ownership scope at
+        # check-owned-paths.py:~101-104 BEFORE this package's fix; directory-descendant
+        # matching must not flip a read-only violation into an ownership pass just because
+        # the same directory is also declared `owned_paths`. `tests/frozen` is declared
+        # both owned (via the broader `tests` entry) and read-only; a file below the
+        # read-only subdirectory must stay a `read_only_violations` failure, never slip
+        # into `out_of_scope: []` / OWNERSHIP_PASS through the new descendant rule.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": ["tests"],
+                    "shared_paths": [],
+                    "read_only_paths": ["tests/frozen"],
+                    "approved_exceptions": [],
+                }]
+            }))
+            result = run(
+                "python3", str(CHECK_OWNED), "--state-file", str(state),
+                "--package-id", "PKG-01", "--changed-file", "tests/frozen/legacy.py",
+                check=False,
+            )
+            payload, _ = json.JSONDecoder().raw_decode(result.stdout)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("OWNERSHIP_FAIL", result.stdout)
+        self.assertIn("tests/frozen/legacy.py", payload["read_only_violations"])
+        self.assertNotIn("tests/frozen/legacy.py", payload["out_of_scope"])
+
+    def test_approved_exception_directory_declaration_widens_to_cover_descendants_by_design(self):
+        # AC-08/09 trap #2 (027/P4), explicit and tested rather than discovered later:
+        # `matches()` feeds THREE call sites (owned at :104ish, read_only at :101ish, and
+        # `approved_exception` at :107ish via a single-pattern `matches(path, [pattern])`
+        # call). Applying the same normalized directory-descendant rule inside the one
+        # shared `matches()` makes it MORE strict for read_only (test above) but MORE
+        # permissive for `approved_exceptions`: a human-approved exception declared over a
+        # bare directory now also approves everything below that directory, not just an
+        # exact path match. DECISION: this is accepted, not an oversight. An
+        # `approved_exception` is already a human-reviewed, package-specific override
+        # (`status: approved`) -- widening it to directory-descendant semantics keeps it
+        # CONSISTENT with `owned_paths`' new semantics rather than leaving the same pattern
+        # string mean two different things depending which of the three call sites reads
+        # it. A reviewer who wants a narrower exception still has fnmatch's exact/glob
+        # matching available (declare the file itself, or a `dir/*` glob, which is
+        # untouched by this rule per the control test above). This test pins the widened
+        # behavior so a future change to `matches()` cannot silently narrow or drop it
+        # without failing a named assertion. It covers the `owned_paths`-empty case only --
+        # see the test below for the `read_only_paths` interaction this one does NOT cover.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": [],
+                    "shared_paths": [],
+                    "read_only_paths": [],
+                    "approved_exceptions": [{"path": "generated", "status": "approved"}],
+                }]
+            }))
+            result = run(
+                "python3", str(CHECK_OWNED), "--state-file", str(state),
+                "--package-id", "PKG-01", "--changed-file", "generated/sub/out.txt",
+            )
+        self.assertIn("OWNERSHIP_PASS", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
+    def test_approved_exception_directory_declaration_also_cancels_read_only_violation_for_descendants(self):
+        # P4-F02 repair (delta review, 027/P4). The evidence's original reason #4 claimed a
+        # directory-wide `approved_exception` "can only pull a file OUT of `out_of_scope`,
+        # never out of `read_only_violations`" -- that reasoning is wrong, and this is the
+        # test that was missing to catch it: `check-owned-paths.py`'s loop is
+        # `if matches(path, read_only) and not approved_exception(...)`, so the exception
+        # DOES cancel a read-only match too, for any descendant of the declared directory,
+        # the same widening the test above already accepts for `owned_paths`. Measured live
+        # by the orchestrator against this package's shape: `read_only_paths: ["Global"]`
+        # plus an approved exception on the bare directory `"Global"` turns
+        # `Global/claude-code/settings.json` from `read_only_violations` (pre-P4) into a
+        # silent `OWNERSHIP_PASS` (`out_of_scope: []`, `read_only_violations: []`) -- the
+        # package's own read-only-path declaration, entirely defeated for that subtree by a
+        # single directory-shaped exception. The orchestrator accepts this as the SAME
+        # widening decision as the test above (one shared `matches()`, one semantics per
+        # pattern, `approved_exceptions` already require human review) -- this test exists
+        # so the effect is pinned and named, not just narratively asserted in the ADR.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            state.write_text(json.dumps({
+                "packages": [{
+                    "package_id": "PKG-01",
+                    "owned_paths": [],
+                    "shared_paths": [],
+                    "read_only_paths": ["Global"],
+                    "approved_exceptions": [{"path": "Global", "status": "approved"}],
+                }]
+            }))
+            result = run(
+                "python3", str(CHECK_OWNED), "--state-file", str(state),
+                "--package-id", "PKG-01", "--changed-file", "Global/claude-code/settings.json",
+            )
+            payload, _ = json.JSONDecoder().raw_decode(result.stdout)
+        self.assertIn("OWNERSHIP_PASS", result.stdout)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(payload["read_only_violations"], [])
+        self.assertEqual(payload["out_of_scope"], [])
 
     def test_module_isolation_gate_fails_if_the_sys_path_fix_regresses(self):
         # AC-03 (027/P1). AC-02's whole fix is one insertion in tests/__init__.py: it puts
@@ -9876,10 +10600,11 @@ class HarnessTests(unittest.TestCase):
         # Generated codex/pi trees never receive Global/_canonical/commands (no commands
         # dir there); the shared doctrine files ARE what those two runtimes get, so their
         # generated AGENTS.md must carry the mirror after a build.
-        run("./build.sh")
-        for path in ("Global/codex/AGENTS.md", "Global/pi/AGENTS.md",
-                     "Global/opencode/AGENTS.md", "Global/claude-code/CLAUDE.md"):
-            text = (ROOT / path).read_text()
+        generated = _generate_output()
+        run("./build.sh", "--output", str(generated))
+        for path in ("codex/AGENTS.md", "pi/AGENTS.md",
+                     "opencode/AGENTS.md", "claude-code/CLAUDE.md"):
+            text = (generated / path).read_text()
             self.assertIn("Resolvé antes de preguntar (ADR-0037)", text, path)
 
     def test_ac28_explicar_is_read_only_no_state_and_names_the_staleness_mitigant(self):
@@ -9903,17 +10628,18 @@ class HarnessTests(unittest.TestCase):
         # pi via generate_pi_prompts (agent: -> subagent() call); codex has no commands/
         # tree at all (same precedent as /consult), so its coverage is the skill, which
         # DOES propagate to codex like every other skill -- that is the 4-tree claim.
-        run("./build.sh")
+        generated_root = _generate_output()
+        run("./build.sh", "--output", str(generated_root))
         canonical_skill = (ROOT / "Global/_canonical/skills/explicar/SKILL.md").read_text()
         for harness in ("opencode", "claude-code", "codex", "pi"):
-            generated = (ROOT / "Global" / harness / "skills/explicar/SKILL.md").read_text()
-            self.assertEqual(generated, canonical_skill, harness)
+            generated_skill = (generated_root / harness / "skills/explicar/SKILL.md").read_text()
+            self.assertEqual(generated_skill, canonical_skill, harness)
         for harness in ("opencode", "claude-code"):
-            generated = (ROOT / "Global" / harness / "commands/explicar.md").read_text()
-            self.assertEqual(generated, (ROOT / "Global/_canonical/commands/explicar.md").read_text(), harness)
-        pi_prompt = (ROOT / "Global/pi/prompts/explicar.md").read_text()
+            generated_command = (generated_root / harness / "commands/explicar.md").read_text()
+            self.assertEqual(generated_command, (ROOT / "Global/_canonical/commands/explicar.md").read_text(), harness)
+        pi_prompt = (generated_root / "pi/prompts/explicar.md").read_text()
         self.assertIn('subagent({ agent: "orchestrator"', pi_prompt)
-        self.assertFalse((ROOT / "Global/codex/commands").exists())
+        self.assertFalse((generated_root / "codex/commands").exists())
 
     def test_ac29_roles_tsv_unchanged_by_explicar(self):
         # AC-29: /explicar is a command the orchestrator runs, not a new role.

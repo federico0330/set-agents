@@ -17,6 +17,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import tests
+
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"ai/scripts"))
 import claude_code_spawn
@@ -1190,8 +1192,18 @@ class RoutingTests(unittest.TestCase):
             # the CROSS-LANE branch specifically -- not the same-lane branch, not the
             # true-off-lane degrade -- is the one whose condition this decision's own
             # (runtime, provider) satisfies.
-            subprocess.run(["./build.sh"], cwd=ROOT, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            orchestrator_text = (ROOT / "Global" / host_harness / "agents" / "orchestrator.md").read_text(encoding="utf-8")
+            # P2-F04 (027 repair pass 2): a bare `./build.sh` with no `--output` regenerates
+            # `ROOT/Global/*` in place (MODE="generate", build.sh:137-144) -- safe only behind
+            # the (now-optional) bwrap boundary, unsafe without it, and this was the 19th call
+            # site the seam repair in P2-portabilidad.md never saw (it only greped
+            # tests/test_harness.py). `--output <tmp>` writes the four harness trees under a
+            # private directory instead, matching the pattern `_generate_output()` established
+            # in tests/test_harness.py for the other 18 sites; this test still needs the write
+            # (it reads the generated orchestrator copy), so the call cannot simply be deleted.
+            generated = Path(tempfile.mkdtemp(prefix="build-output-"))
+            subprocess.run(["./build.sh", "--output", str(generated)], cwd=ROOT, check=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            orchestrator_text = (generated / host_harness / "agents" / "orchestrator.md").read_text(encoding="utf-8")
             self.assertNotEqual(review.runtime, host_harness)  # same-lane condition: false
             self.assertEqual(review.runtime, "claude-code")  # cross-lane condition's LHS: true
             self.assertNotEqual(host_harness, "claude-code")  # cross-lane condition's guard: true
@@ -2079,6 +2091,7 @@ class RoutingTests(unittest.TestCase):
             path=bins/name; path.write_text(body); path.chmod(0o755)
         return bins, log
 
+    @unittest.skipUnless(tests._BWRAP, "P2-F01 descendant boundary requires bwrap (portable degradation, 2026-08-14)")
     def test_route_probe_fixture_reaches_stubs_inside_descendant_boundary(self):
         """P2-F01 regression: the private checkout must retain nested probe visibility."""
         with tempfile.TemporaryDirectory() as td:
@@ -3369,6 +3382,31 @@ class RoutingTests(unittest.TestCase):
             self.assertTrue(vdata["data"]["independence_verified"])
             self.assertNotEqual(vdata["data"]["provider"],"openai-codex")
 
+            # P3-F03 repair (027 PKG-3 repair round 1): end-to-end proof that the D-5/AC-07
+            # filter in `_decide_status` (routing_cli.py) is wired to what service.py
+            # ACTUALLY emits through the real CLI, not only to synthetic RouteDecision
+            # literals (test_decide_status_helper_matrix proves the helper's own string
+            # matching in isolation, never the producer). Pins role "package-reviewer" to
+            # the EXACT (provider, model) `verified` above already won on independence/tier
+            # merits alone -- the pin does not need to out-rank anything, it only needs to
+            # be honored -- so MODEL_PINNED must now be in the CLI's own `reason_codes` and
+            # the CLI's own exit code must still be 0. A drift in service.py's marker shape
+            # (e.g. no trailing space, or a different separator) would silently regress
+            # every pinned review decision back to exit 1 while the synthetic helper matrix
+            # stayed green; this assertion is the only one in this suite that would catch it.
+            pin_state = Path(td) / "state-with-pin"; pin_state.mkdir()
+            pinned_identity = f'{vdata["data"]["provider"]}/{vdata["data"]["model"]}'
+            (pin_state / "model-preference.toml").write_text(
+                f'[model_pin]\npackage-reviewer = "{pinned_identity}"\n')
+            pinned_env = dict(env); pinned_env["SET_AGENTS_STATE"] = str(pin_state)
+            pinned = self._cli_run(["--route-decide","-","--json"], pinned_env,
+                json.dumps({"role":"package-reviewer","task_class":"documentation",
+                            "selected_runtime":"claude-code","review_of_run_id":run_id}))
+            self.assertEqual(pinned.returncode,0,(pinned.stdout,pinned.stderr))
+            pdata=json.loads(pinned.stdout)
+            self.assertTrue(pdata["ok"])
+            self.assertIn(f"MODEL_PINNED {pinned_identity}",pdata["data"]["reason_codes"])
+
             # A second writer decide, closed as failure BEFORE dispatch -> abandoned (F02/F07).
             second=decide({"role":"implementer","task_class":"mechanical","selected_runtime":"codex"})
             second_run=json.loads(second.stdout)["data"]["run_id"]
@@ -3533,6 +3571,48 @@ class RoutingTests(unittest.TestCase):
             ("RUNTIME_REDIRECTED requested=opencode effective=claude-code","BILLING_RANK provider=anthropic rank=0"))),(True,0))
         self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
             ("FACTS_INCOMPLETE","BILLING_RANK provider=anthropic rank=0"))),(False,1))
+        # D-5/AC-07 (027 PKG-3): MODEL_PINNED (ADR-0032) and MODEL_REQUEST_APPLIED/
+        # MODEL_REQUEST_UNAVAILABLE (026/P2 AC-06) are the same kind of always-additive,
+        # purely observational markers service.py folds into reason_codes -- alone or
+        # alongside REVIEW_IDENTITY_UNVERIFIED they must never flip ok/exit. Red today:
+        # _decide_status filters only RUNTIME_REDIRECTED/BILLING_RANK, so these three
+        # standalone shapes fall through to (False, 1) instead of (True, 0).
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("MODEL_PINNED anthropic/claude-opus-4-8",))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("MODEL_REQUEST_APPLIED anthropic/claude-opus-4-8",))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("MODEL_REQUEST_UNAVAILABLE requested=anthropic/claude-opus-4-8 reason=OUTRANKED",))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("REVIEW_IDENTITY_UNVERIFIED","MODEL_PINNED anthropic/claude-opus-4-8"))),(True,0))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("REVIEW_IDENTITY_UNVERIFIED","MODEL_REQUEST_APPLIED anthropic/claude-opus-4-8"))),(True,0))
+        # Explicitly NOT MODEL_PIN_UNAVAILABLE. service.py:503-509 is explicit that this
+        # marker is JUST AS purely-additive as MODEL_PINNED (same `if`, same discipline as
+        # RUNTIME_REDIRECTED) -- so leaving it unfiltered is a known, measured gap, not a
+        # semantic distinction. Filtering it would exceed AC-07's approved scope (spec.md
+        # D-5 names only MODEL_PINNED and the two named MODEL_REQUEST_* codes); the gap is
+        # registered as an orchestrator decision (`log-decision`, P3-F02, 027 PKG-3 repair
+        # round 1), not invented here as a justification. Its prefix stays a real,
+        # unfiltered reason code until that decision is revisited.
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("MODEL_PIN_UNAVAILABLE anthropic/claude-opus-4-8",))),(False,1))
+        # P3-F01 repair (027 PKG-3 repair round 1): the filter matches the two NAMED
+        # MODEL_REQUEST_* codes by their full name plus a trailing space, never the bare
+        # `MODEL_REQUEST_` family prefix -- an unknown/future code in that family is a
+        # real hard failure and must stay (False, 1), never silently auto-classified as
+        # informational just because it shares the prefix.
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("MODEL_REQUEST_TOTALLY_NEW_HARD_FAILURE",))),(False,1))
+        # Complement (never an allow-all): a co-occurring HARD failure code still wins,
+        # marker alone or not. This half is already true today (not itself a red
+        # assertion) -- it guards the filter from ever widening past the closed table.
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("FACTS_INCOMPLETE","MODEL_PINNED anthropic/claude-opus-4-8"))),(False,1))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("REVIEWER_INDEPENDENCE_UNAVAILABLE","MODEL_REQUEST_APPLIED anthropic/claude-opus-4-8"))),(False,1))
+        self.assertEqual(set_agents_app._decide_status(RD(*[None]*6,False,
+            ("FACTS_INCOMPLETE","MODEL_REQUEST_UNAVAILABLE requested=anthropic/claude-opus-4-8 reason=OUTRANKED"))),(False,1))
 
     def test_validate_context_pack_path_rejects_unsafe_values(self):
         # SEC-A02: non-str, absolute, and traversal-outside-ROOT all degrade to "no pack" —
@@ -4893,6 +4973,96 @@ class RoutingTests(unittest.TestCase):
                  mock.patch.object(cat, "_pi_auth_signature", return_value=""):
                 with_creds = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
             self.assertEqual(with_creds[("pi", "openai-codex")], {"gpt-5.6-luna"})
+
+    def test_ac06_pi_invalid_credentials_never_pay_the_list_models_subprocess(self):
+        """D-4/AC-06 (027 PKG-3): today `_probe_pairs`'s pi branch runs `_run_cached` for
+        `pi --list-models` BEFORE consulting `pi_auth_provider_keys()` -- an invalid/absent
+        pi credential still pays that pinned subprocess (up to PI_PROBE_MIN_TIMEOUT_SECONDS,
+        60s) only to be excluded afterward by the fail-closed column parse. This test makes
+        `subprocess.run` a FAIL-FAST spy: any call at all is an immediate AssertionError, not
+        merely a call-count assertion after the fact, so a regression is pinpointed at the
+        exact call site instead of surfacing as a generic count mismatch. Red today: the pi
+        branch's key gate runs AFTER `_run_cached`, so the spy fires."""
+        from routing_core import catalog as cat
+        def fail_fast(argv, **kwargs):
+            raise AssertionError(
+                f"subprocess.run must never be called for a pi pair with no valid credential: {argv!r}")
+        with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset()), \
+             mock.patch.object(cat.subprocess, "run", side_effect=fail_fast) as spy:
+            result = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+        self.assertNotIn(("pi", "openai-codex"), result)
+        self.assertEqual(spy.call_count, 0)
+        # Same guarantee for the OTHER audited pi provider, and for a key-set that has
+        # entries but not the relevant one (not merely "empty").
+        with mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"anthropic"})), \
+             mock.patch.object(cat.subprocess, "run", side_effect=fail_fast) as spy2:
+            result2 = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+        self.assertNotIn(("pi", "openai-codex"), result2)
+        self.assertEqual(spy2.call_count, 0)
+
+    def test_ac06_pi_valid_credentials_still_probe_and_parse_fail_closed(self):
+        """D-4/AC-06 (027 PKG-3) complement: the belt-and-suspenders discipline is preserved
+        -- a genuinely present pi credential still invokes the pinned `--list-models`
+        subprocess and the column parser stays fail-closed for bad/nonzero/empty output.
+        This half is NOT expected to go red by the order change alone (the valid-credential
+        path runs the same subprocess either order) -- it guards against the order fix
+        accidentally skipping the call outright."""
+        from routing_core import catalog as cat
+        calls = []
+        def fake_run_ok(argv, **kwargs):
+            calls.append(argv)
+            return types.SimpleNamespace(
+                returncode=0, stdout="provider model\nopenai-codex gpt-5.6-luna\n", stderr="")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run_ok), \
+             mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"openai-codex"})):
+            result = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+        self.assertEqual(result[("pi", "openai-codex")], {"gpt-5.6-luna"})
+        self.assertTrue(calls, "the list-models subprocess must still run for a valid credential")
+        # Nonzero exit: fail-closed even with a valid credential.
+        def fake_run_nonzero(argv, **kwargs):
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="boom")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run_nonzero), \
+             mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"openai-codex"})):
+            bad = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+        self.assertNotIn(("pi", "openai-codex"), bad)
+        # Exit 0 but no matching data rows: fail-closed (empty models -> pair absent).
+        def fake_run_empty(argv, **kwargs):
+            return types.SimpleNamespace(returncode=0, stdout="provider model\n", stderr="")
+        with mock.patch.object(cat.subprocess, "run", side_effect=fake_run_empty), \
+             mock.patch.object(cat, "pi_auth_provider_keys", return_value=frozenset({"openai-codex"})):
+            empty = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+        self.assertNotIn(("pi", "openai-codex"), empty)
+
+    def test_ac06_pi_key_gate_surprise_only_drops_the_pair_never_raises(self):
+        """P3-F04 repair (027 PKG-3 repair round 1): moving the pi key-set gate BEFORE the
+        subprocess loop (AC-06 above) took the `pi_auth_provider_keys()` call OUT of the
+        `try: ... except (RoutingError, ValueError, KeyError, IndexError, TypeError):
+        continue` that used to wrap it (it sat inside the parse `try` alongside
+        `_parse_pi_models` before this ADR). `probe_inventory`'s own docstring promises
+        "Any surprise ... makes only that pair unavailable" -- this proves it still holds
+        even when `pi_auth_provider_keys()` itself misbehaves, not just its callers. Not
+        reachable in production today (the real `~/.pi/agent/auth.json` reader already
+        catches its own OSError/ValueError and the function's docstring says it never
+        raises) -- this test forces the surprise directly at the mocked call site, the
+        only way to exercise this line without faking a corrupt real credential reader.
+        Red before the repair: the exception propagates out of `probe_inventory` instead
+        of leaving `("pi", "openai-codex")` simply absent from the result."""
+        from routing_core import catalog as cat
+        for exc in (ValueError("boom"), TypeError("boom"), KeyError("boom")):
+            with mock.patch.object(cat, "pi_auth_provider_keys", side_effect=exc):
+                result = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex")], timeout=5.0)
+            self.assertNotIn(("pi", "openai-codex"), result, exc)
+        # Complement: an UNRELATED pair (codex, unaffected by this branch) is untouched by
+        # the pi gate raising -- the surprise never widens past the one pair it hit.
+        def fake_run_codex_ok(argv, **kwargs):
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+        with mock.patch.object(cat, "pi_auth_provider_keys", side_effect=ValueError("boom")), \
+             mock.patch.object(cat.subprocess, "run", side_effect=fake_run_codex_ok), \
+             mock.patch.object(cat, "_parse_codex_login", return_value=True):
+            mixed = cat.probe_inventory(self.config, pairs=[("pi", "openai-codex"), ("codex", "openai-codex")],
+                                        timeout=5.0)
+        self.assertNotIn(("pi", "openai-codex"), mixed)
+        self.assertIn(("codex", "openai-codex"), mixed)
 
     def test_adr0043_ac07_binary_signature_covers_opencode_codex_and_claude(self):
         """Generalizes the pre-existing opencode-only binary signature (ADR-0034 AC-08)

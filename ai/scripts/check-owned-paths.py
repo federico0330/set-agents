@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import posixpath
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -22,9 +23,61 @@ def package_by_id(data: dict[str, Any], package_id: str) -> dict[str, Any]:
     raise SystemExit(f"UNKNOWN_PACKAGE: {package_id}")
 
 
+def _is_bare_directory_pattern(pattern: str) -> bool:
+    """A directory declaration has no glob metacharacters. ``src/**``, ``*.py`` and other
+    wildcard patterns keep their existing fnmatch-only behavior untouched by this rule."""
+    return bool(pattern) and not any(char in pattern for char in "*?[]")
+
+
+def _normalize_slashes(value: str) -> str:
+    return value.replace("\\", "/")
+
+
+def _canonical_path(path: str) -> str:
+    """Collapse ``.``, ``..`` and duplicate ``/`` separators to the real on-disk location a
+    changed path names. Without this, a crafted ``tests/../ai/scripts/pwn.py`` (or
+    ``tests/../../etc/passwd``) borrows ``tests``'s ownership boundary from
+    ``_is_directory_descendant`` below: a bare ``str.startswith("tests/")`` treats the
+    literal ``..`` text as one more path segment nested inside ``tests``, when the file it
+    actually names lives somewhere else entirely (or outside the repo). `posixpath.normpath`
+    resolves it to the file it really is before any boundary check ever sees the raw text."""
+    normalized = _normalize_slashes(path)
+    return posixpath.normpath(normalized) if normalized else normalized
+
+
+def _canonical_declaration(pattern: str) -> str:
+    """Same collapsing as `_canonical_path`, for the declaration side, so equivalent
+    spellings of the same directory (``/tests``, ``./tests``, ``docs//adr``, ``tests\\sub``)
+    all describe the same boundary as the plain ``tests`` / ``docs/adr`` form. A leading
+    ``/`` on a declaration is a repo-root anchor, not a filesystem-absolute path -- the
+    existing literal-fnmatch branch already tolerates that spelling via
+    ``fnmatch("/" + normalized, pattern)`` -- so it is stripped before normalizing; otherwise
+    `posixpath.normpath` would keep it absolute and it would never match a relative changed
+    path."""
+    stripped = _normalize_slashes(pattern).lstrip("/")
+    return _canonical_path(stripped)
+
+
+def _is_directory_descendant(path: str, pattern: str) -> bool:
+    """Let a bare directory pattern (with or without a trailing slash, and regardless of its
+    leading-slash / dot-slash / double-slash / backslash spelling) own every path below it,
+    with a real path-segment boundary -- never a bare ``startswith`` on the raw pattern text,
+    so ``tests`` never covers a look-alike sibling like ``tests-extra``, and a ``..`` segment
+    on either side never borrows a boundary it does not really cross."""
+    directory = _canonical_declaration(pattern)
+    if not _is_bare_directory_pattern(directory):
+        return False
+    return path == directory or path.startswith(directory + "/")
+
+
 def matches(path: str, patterns: list[str]) -> bool:
-    normalized = path.replace("\\", "/")
-    return any(fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch("/" + normalized, pattern) for pattern in patterns)
+    normalized = _canonical_path(path)
+    for pattern in patterns:
+        if fnmatch.fnmatch(normalized, pattern) or fnmatch.fnmatch("/" + normalized, pattern):
+            return True
+        if _is_directory_descendant(normalized, pattern):
+            return True
+    return False
 
 
 def approved_exception(package: dict[str, Any], path: str) -> bool:

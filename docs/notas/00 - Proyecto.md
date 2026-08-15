@@ -26,7 +26,7 @@
 - [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `BLOCKED` · paquetes 4/4 · **BLOCKED**
 - [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/5
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
-- [[features/027-controles-que-miran|027-controles-que-miran]] — fase `PACKAGE_REVIEW` · paquetes 0/3
+- [[features/027-controles-que-miran|027-controles-que-miran]] — fase `DONE` · paquetes 4/4 · **DONE**
 
 ## Qué falta
 
@@ -50,21 +50,21 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-14 HUMAN-DECISION-codename-de-cliente-real-en-repo-publico|HUMAN_DECISION_REQUIRED: un codename de cliente real viaja al orchestrator.md de cada tercero, y el repo es PUBLICO]]
-- [[decisiones/2026-08-14 un-test-puede-escribir-en-el-estado-real-del-usuario|Un test sin mockear puede escribir en el estado real del usuario, y lo hizo]]
-- [[decisiones/2026-08-13 relanzo-b3-en-otro-proveedor-por-limite-de-sesion|B3 se relanza en otro proveedor por limite de sesion, no por fallar la tarea]]
-- [[decisiones/2026-08-13 correccion-el-plan-tenia-razon-a-medias-y-el-orquestador-tambien|Correccion: el plan tenia razon sobre un camino que la base no exhibia]]
-- [[decisiones/2026-08-13 los-modulos-de-test-no-pasan-aislados-preexistente|Los modulos de test no pasan aislados, y es preexistente]]
-- [[decisiones/2026-08-13 el-coordinador-deja-de-ser-gpt-en-la-lane-opencode|El coordinador deja de ser GPT en la lane de opencode]]
-- [[decisiones/2026-08-13 copilot-aparecio-solo-durante-la-noche|Copilot paso de no listable a 26 modelos durante la noche, y el harness lo adopto solo]]
-- [[decisiones/2026-08-13 desvio-de-alcance-de-p4-aprobado-con-medicion|El desvio de alcance de P4 a provider_registry.py queda aprobado, medido]]
+- [[decisiones/2026-08-15 cuatro-huecos-de-la-guarda-de-escritura-para-una-feature-de-seguimiento|P2-F12 a P2-F15: la guarda cierra los casos nombrados, no las clases]]
+- [[decisiones/2026-08-15 la-guarda-de-escritura-es-ciega-al-bytecode-de-los-hijos|P2-F11: run_gate filtra el entorno y el hijo escribe bytecode en el repo real, sin bwrap]]
+- [[decisiones/2026-08-15 log-decision-deduplica-sin-mirar-de-que-feature-viene|Defecto: la clave de idempotencia de log-decision no incluye feature_id]]
+- [[decisiones/2026-08-15 un-freeze-que-no-midio-nada-se-vuelve-techo-cero|Defecto: freeze-candidate compara HEAD contra HEAD y el techo de reparacion queda en cero para siempre]]
+- [[decisiones/2026-08-15 cinco-decisiones-de-la-narracion-resueltas-sin-despertar-a-federico|Las cinco preguntas del desafio a 028, resueltas con doctrina vigente]]
+- [[decisiones/2026-08-15 RDD-ya-existe-en-el-repo-con-otra-acepcion|RDD no es un termino a definir: ya esta en uso instalado, con otro significado]]
+- [[decisiones/2026-08-15 actualizar-le-repone-los-cuatro-CLIs-al-que-instalo-uno|Defecto latente: cmd_update ignora install-targets.json y reinstala los cuatro arboles]]
+- [[decisiones/2026-08-15 narracion-que-explica-en-vez-de-apuntar|La narracion del orquestador tiene que ensenar, no apuntar a un identificador]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-14T15:45:31+00:00_
+_Actualizado: 2026-08-15T03:40:23+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

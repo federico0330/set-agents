@@ -804,6 +804,29 @@ def _probe_pairs(config: dict, pairs, timeout: float, ran=None,
             # does not classify as "subscription" -- ceiling state never enters that map.
             models = parsed if state == "auto" else (allowed & parsed)
         else:
+            # D-4/AC-06 (027 PKG-3): the pi key-set gate now runs BEFORE any subprocess
+            # for this pair -- an invalid/absent pi credential is known cheaply (a local,
+            # read-only file check) and must never pay `_run_cached`'s pinned
+            # `pi --list-models` invocation (up to PI_PROBE_MIN_TIMEOUT_SECONDS, 60s) only
+            # to be excluded afterward. Belt-and-suspenders is PRESERVED, not removed: the
+            # column parse below stays the naturally fail-closed check for a credential
+            # that IS present (bad/nonzero/empty output still drops the pair) -- this is
+            # purely a reordering of the same two independent checks, never a semantics
+            # change for codex/claude-code (unaffected) or for a genuinely valid pi
+            # credential (still probes and parses exactly as before). P3-F04 repair (027
+            # PKG-3 repair round 1): this gate moved OUT of the try/except below that used
+            # to wrap it, so a surprise from `pi_auth_provider_keys()` would propagate
+            # instead of only dropping this pair. Not reachable today (the real
+            # `~/.pi/agent/auth.json` reader already catches OSError/ValueError itself and
+            # this function's own docstring promises it never raises) -- wrapped anyway so
+            # this pair stays the only thing that can ever go dark, same fail-closed
+            # discipline as every other branch here.
+            if runtime == "pi":
+                try:
+                    if provider not in pi_auth_provider_keys():
+                        continue
+                except (RoutingError, ValueError, KeyError, IndexError, TypeError):
+                    continue
             completed, failed = [], False
             for argv in commands:
                 completed_item = _run_cached(ran, argv, pair_timeout, probe_env)
@@ -824,11 +847,6 @@ def _probe_pairs(config: dict, pairs, timeout: float, ran=None,
                 elif runtime == "claude-code":
                     models = allowed if _parse_claude_auth(completed[0].stdout) else set()
                 else:  # pi
-                    # Belt-and-suspenders (T-305, spike Q2): the auth.json key-set is a cheap,
-                    # non-subprocess signal alongside the naturally fail-closed column-parse
-                    # below (an unauthenticated provider simply has no rows in --list-models).
-                    if provider not in pi_auth_provider_keys():
-                        continue
                     # Same guarantee as codex/claude-code above: pi's two pairs are both
                     # openai-codex/anthropic, always curated by validation.
                     models = allowed & _parse_pi_models(completed[0].stdout, provider)

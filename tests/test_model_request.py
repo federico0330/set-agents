@@ -55,14 +55,18 @@ class ModelRequestBarrierTests(unittest.TestCase):
     ever asserts through `set_agents_app._decide_status`/the CLI envelope's ok/exit
     classification -- that helper's `_DECIDE_OK_NON_EXECUTABLE_REASONS` closed-tuple
     check (routing_cli.py) only special-cases `RUNTIME_REDIRECTED`/`BILLING_RANK `
-    prefixes, not `MODEL_PINNED`/`MODEL_PIN_UNAVAILABLE` (pre-existing, ADR-0032) nor
-    this AC's own `MODEL_REQUEST_APPLIED`/`MODEL_REQUEST_UNAVAILABLE` markers -- a
-    VERIFIED review decision carrying either marker can misclassify as ok=false at the
-    CLI layer today. That gap predates this package, is out of this package's ALCANCE
-    (routing_cli.py is not a listed file), and is flagged here rather than silently
-    inherited into a passing test: every assertion below reads `RouteDecision` fields
-    directly (`.provider`, `.model`, `.exclusions`, `.reason_codes`,
-    `.independence_verified`), never the CLI's ok/exit computation."""
+    prefixes. 027 PKG-3 (D-5/AC-07) closed the gap this docstring used to describe for
+    `MODEL_PINNED` and this AC's own `MODEL_REQUEST_APPLIED`/`MODEL_REQUEST_UNAVAILABLE`
+    markers (see `tests/test_routing.py::test_decide_status_helper_matrix` and
+    `test_route_decide_cli_hermetic_matrix`) -- a VERIFIED review decision carrying any
+    of those three no longer misclassifies as ok=false at the CLI layer.
+    `MODEL_PIN_UNAVAILABLE` (pre-existing, ADR-0032) is deliberately NOT one of them: it
+    is a known, measured gap, out of 027 PKG-3's approved AC-07 scope (spec.md D-5 names
+    only `MODEL_PINNED` and the two `MODEL_REQUEST_*` codes), recorded as an
+    orchestrator decision rather than silently widened here. Every assertion below still
+    reads `RouteDecision` fields directly (`.provider`, `.model`, `.exclusions`,
+    `.reason_codes`, `.independence_verified`), never the CLI's ok/exit computation --
+    that discipline is unaffected by the gap narrowing."""
 
     def _service(self, snapshot, inventory, td):
         return routing.RoutingService._for_tests(
@@ -320,9 +324,11 @@ class ModelRequestDescriptorValidationTests(unittest.TestCase):
 class ModelRequestCliTests(unittest.TestCase):
     """AC-04 (closed key set, end to end via the real CLI) / AC-06 (the marker reaches
     the JSON envelope) / AC-07 (ephemeral: nothing written, nothing leaks into the next
-    decision) -- writer-role scenarios throughout, deliberately sidestepping the
-    pre-existing `_decide_status` review-role gap documented on
-    `ModelRequestBarrierTests` above (out of this package's ALCANCE)."""
+    decision) -- writer-role scenarios throughout. These scenarios never needed the
+    review-role `_decide_status` gap documented on `ModelRequestBarrierTests` above (that
+    gap, now narrowed to `MODEL_PIN_UNAVAILABLE` only by 027 PKG-3, only ever affected a
+    VERIFIED review-role decision, never a writer one) -- writer-role coverage here was
+    always independent of it, not a sidestep of a still-open hole."""
 
     def _probe_stubs(self, td):
         # Same fixture shape as tests/test_routing.py's `_probe_stubs`: codex/claude

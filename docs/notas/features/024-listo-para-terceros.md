@@ -3,7 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_REVIEW` · modo: scoped · revisión 121
+- fase: `BLOCKED` · modo: scoped · revisión 127
+- estado final: **BLOCKED**
 - spec: `docs/specs/024-listo-para-terceros/spec.md` (hash `f848f29b2069`)
 
 ## Criterios de aceptación
@@ -26,7 +27,7 @@
 - [[features/024-listo-para-terceros/C1-estado-fuera-del-producto|C1-estado-fuera-del-producto]] — accepted · Que el estado de Federico deje de viajar en el clon, sin mover el path
 - [[features/024-listo-para-terceros/C2-modelstoml-neutro|C2-modelstoml-neutro]] — accepted · models.toml deja de fijar las suscripciones de una persona y el usuario tiene overlay pro…
 - [[features/024-listo-para-terceros/C3-primer-arranque-honesto|C3-primer-arranque-honesto]] — accepted · Que el primer arranque de un tercero diga que hacer en vez de morir mudo
-- [[features/024-listo-para-terceros/C4-higiene-de-repo-publico|C4-higiene-de-repo-publico]] — package_review · Lo que un repo publico necesita, y una matriz de soporte medida en vez de asumida
+- [[features/024-listo-para-terceros/C4-higiene-de-repo-publico|C4-higiene-de-repo-publico]] — accepted · Lo que un repo publico necesita, y una matriz de soporte medida en vez de asumida
 
 ## Approach y decisiones
 
@@ -39,7 +40,7 @@
 
 ## Qué falta
 
-- _nada pendiente_ ✅
+- ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
 
 ## Presupuestos
 
@@ -47,7 +48,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/024-listo-para-terceros/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/024-listo-para-terceros/bitacora.md`
 
-_Actualizado: 2026-08-14T11:04:56+00:00_
+_Actualizado: 2026-08-14T11:09:17+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

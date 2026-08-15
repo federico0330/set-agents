@@ -77,10 +77,30 @@ def _decide_status(decision):
     kind of purely-observational, always-present marker (never a failure signal on its own,
     per the ADR's own "never changes success/runtime/identity/fallback") — filtered out here
     the same way, so a decision that would have been ok=true/executable before this ADR stays
-    exactly that after it. Every other (hard-failure) reason code is untouched.
+    exactly that after it. D-5/AC-07 (027 PKG-3): `MODEL_PINNED provider/model` (ADR-0032)
+    and the two NAMED `MODEL_REQUEST_*` codes — `MODEL_REQUEST_APPLIED provider/model`
+    and `MODEL_REQUEST_UNAVAILABLE requested=provider/model reason=...` (026/P2 AC-06) —
+    are the same purely-additive, always-informational shape — service.py never lets any
+    of them change success/runtime/identity/fallback, so they are filtered here too. Each
+    is matched by its full name plus a trailing space, never by the bare `MODEL_REQUEST_`
+    family prefix (P3-F01 repair, 027 PKG-3 repair round 1): the family prefix would also
+    auto-classify any future/unknown `MODEL_REQUEST_*` code as informational, which is
+    exactly the fail-open failure mode `test_decide_status_helper_matrix` now pins down —
+    see its `MODEL_REQUEST_TOTALLY_NEW_HARD_FAILURE` case. Deliberately NOT
+    `MODEL_PIN_UNAVAILABLE`: this is a known, measured gap, not a semantic claim that it is
+    "purely additive" (service.py:503-509 says otherwise for its own name). Filtering it
+    is out of AC-07's approved scope (spec.md D-5 names only MODEL_PINNED and the two named
+    MODEL_REQUEST_* codes) — the orchestrator recorded the gap with `log-decision`
+    (P3-F02 repair, 027 PKG-3 repair round 1) rather than widening this AC unreviewed. It
+    keeps participating in the closed reason table unfiltered. Every other (hard-failure)
+    reason code is untouched.
     """
     codes = tuple(code for code in decision.reason_codes
-                  if not code.startswith("RUNTIME_REDIRECTED") and not code.startswith("BILLING_RANK "))
+                  if not code.startswith("RUNTIME_REDIRECTED")
+                  and not code.startswith("BILLING_RANK ")
+                  and not code.startswith("MODEL_PINNED ")
+                  and not code.startswith("MODEL_REQUEST_APPLIED ")
+                  and not code.startswith("MODEL_REQUEST_UNAVAILABLE "))
     if decision.execution_enabled or codes in _DECIDE_OK_NON_EXECUTABLE_REASONS:
         return True, 0
     return False, 1
