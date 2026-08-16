@@ -270,7 +270,7 @@ it:
       - **True off-lane model** (step 2's true-off-lane case above). `ok=true`, `data.execution_enabled=true`,
         but `data.runtime` names neither your own host harness nor the `claude-code` cross-lane redirect. The
         routing brain DID authorize a run; no lane you can reach can dispatch it. Close it as abandoned
-        (`python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> failure`), then spawn
+        (`python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> failure --json`), then spawn
         the BASE static agent `<role>`.
       - **Router/probe unavailable.** `reason_codes == ["ROUTING_UNAVAILABLE"]` (or the CLI call itself
         failed to produce a usable decision: crash, timeout, malformed output). No run was ever authorized
@@ -302,13 +302,13 @@ it:
       hard denial (3c): halt, never degrade.
 4. **Reviewers** (`package-reviewer`, `delta-reviewer`, `security-auditor`, `finding-verifier`) are routed to a variant ONLY
    with a verified `review_of_run_id` — sourced from the package's recorded writer run in state, or from
-   `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing-recent-writers` when context was compacted and the id was
+   `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --routing-recent-writers --json` when context was compacted and the id was
    lost. Never guess or fabricate a `review_of_run_id`: omitting it yields the benign
    `REVIEW_IDENTITY_UNVERIFIED` (3b, spawn the base reviewer); submitting a wrong one risks the hard-denial
    `REVIEW_IDENTITY_INVALID` (3c, halt) — when in doubt, omit rather than guess.
 5. **Worker death.** If a spawned instance dies or is lost without reaching a terminal state, close its run
    the same way as an off-lane degrade: `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id>
-   failure`, then continue per your retry budget (Spawn economy above).
+   failure --json`, then continue per your retry budget (Spawn economy above).
 6. **Narrate the decision.** The opening narration block (`record-spawn`) and its `Ingeniería:` line must
    name the decision's `route_id`/`run_id` alongside the exact outcome: which variant/lane matched (same-lane
    or cross-lane redirect), which legitimate-degrade reason fired (3a), or — for a hard denial (3c) — the
@@ -336,7 +336,7 @@ it:
      `cacheCreationInputTokens`, `costUSD`). Run exactly:
      `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> success --usage
      '{"input": <inputTokens>, "output": <outputTokens>, "cache_read": <cacheReadInputTokens>, "cache_write":
-     <cacheCreationInputTokens>, "cost": {"total": <costUSD>}}'` — never add a `totalTokens` key here: this
+     <cacheCreationInputTokens>, "cost": {"total": <costUSD>}}' --json` — never add a `totalTokens` key here: this
      shape carries no reasoning-token field and no independent total to cross-check a derived sum against
      (`ai/scripts/routing_core/usage.py` module docstring, measured live).
    - **OpenCode host** — the subagent result's usage mirrors `opencode run --format json`'s `step_finish`
@@ -344,13 +344,13 @@ it:
      `part.cost`. Run exactly:
      `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> success --usage
      '{"input": <tokens.input>, "output": <tokens.output>, "reasoning": <tokens.reasoning>, "cache_read":
-     <tokens.cache.read>, "cache_write": <tokens.cache.write>, "cost": {"total": <part.cost>}}'` — never pass
+     <tokens.cache.read>, "cache_write": <tokens.cache.write>, "cost": {"total": <part.cost>}}' --json` — never pass
      `tokens.total` as `totalTokens`: measured live, it does not equal the sum of the other five fields, and
      `_usage_row` would discard a genuine report as `invalid` over it.
    - **Codex host** — the turn result's usage mirrors `codex exec --json`'s `turn.completed.usage`
      (`input_tokens`, `output_tokens`, `reasoning_output_tokens`). Run exactly:
      `python3 __SET_AGENTS_ROOT__/ai/scripts/set_agents_app.py --route-terminal <run_id> success --usage
-     '{"input": <input_tokens>, "output": <output_tokens>, "reasoning": <reasoning_output_tokens>}'` —
+     '{"input": <input_tokens>, "output": <output_tokens>, "reasoning": <reasoning_output_tokens>}' --json` —
      `cached_input_tokens`/`cache_write_input_tokens` are UNVERIFIED as additive versus already included in
      `input_tokens`: omit `cache_read`/`cache_write` rather than guess, and never invent a `cost` — this
      lane's JSON stream carries no dollar figure.
@@ -409,7 +409,7 @@ FALLBACK layer, not the ceiling. So, additionally:
    a simulate decision through `--dispatch-simulate` keeps that true by construction: the mode does
    ZERO routing-store bookkeeping and refuses writer/review roles outright. The advice IS
    durable now (ADR-0031): every `--route-decide`, simulate included, appends one line to the decisions
-   log — `set-agents --routing-decisions` reads it, and `feature-state.py spawns` joins it to the spawn
+   log — `set-agents --routing-decisions --json` reads it, and `feature-state.py spawns` joins it to the spawn
    records through `--route-id`.
    Include `python3 ai/scripts/check-owned-paths.py --state-file ai/state/features/<feature_id>.json --package-id <PKG> --baseline <baseline>`.
    Also run `python3 ai/scripts/feature-state.py freeze-candidate <PKG> --state-file ai/state/features/<feature_id>.json

@@ -51,3 +51,6 @@ tools.proposals.json
 # -- reconstructed by ai/scripts/seed-state.py from the tracked, empty ai/state.seed/
 # skeleton whenever ai/state/ is absent, and never touched when it already exists.
 /ai/state/
+
+# Worktrees efimeros de agentes concurrentes: nunca deben entrar al repo.
+.claude/worktrees/

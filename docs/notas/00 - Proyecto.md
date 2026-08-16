@@ -24,7 +24,7 @@
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `DONE` · paquetes 4/4 · **DONE**
 - [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `BLOCKED` · paquetes 4/4 · **BLOCKED**
-- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/5
+- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_REPAIR` · paquetes 0/5
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/027-controles-que-miran|027-controles-que-miran]] — fase `DONE` · paquetes 4/4 · **DONE**
 
@@ -40,8 +40,8 @@
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **024-listo-para-terceros** → corresponde tu decisión (ver Blocker)
 - **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
-- **025-consola-minima-y-flexible** → sigue la implementación local del paquete
-- **025-consola-minima-y-flexible** 3 tareas pendientes en D1-superficie-humana
+- **025-consola-minima-y-flexible** → hace falta verificar los hallazgos antes de reparar
+- **025-consola-minima-y-flexible** 8 hallazgos abiertos
 
 ## Quick-fixes recientes
 
@@ -53,21 +53,21 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-16 medir-en-el-worktree-no-es-medir-lo-integrado|D1 se reporto integrado sin estarlo: el exit code se leyo de head y la medicion se hizo en el lugar equivocado]]
+- [[decisiones/2026-08-16 el-reporte-de-un-implementer-no-es-evidencia-de-que-el-codigo-exista|D5 nunca produjo codigo, y el orquestador lo dio por implementado durante horas]]
 - [[decisiones/2026-08-16 RDD-es-el-modulo-de-gentle-ai-confirmado-por-federico|RDD queda definido: es el modulo strict-TDD de gentle-ai, confirmado por Federico]]
 - [[decisiones/2026-08-15 no-instalo-la-politica-nueva-sin-que-federico-decida|El fix del RCE queda commiteado pero NO instalado: esa decision es de Federico]]
 - [[decisiones/2026-08-15 dos-comandos-que-el-fix-de-seguridad-dejo-afuera|El fix del RCE deja fuera 'git show HEAD:ruta' y './build.sh --output', medido]]
 - [[decisiones/2026-08-15 el-RCE-quedo-cerrado-y-el-harness-sigue-funcionando|El RCE de la allowlist quedo cerrado: 24 ataques bloqueados, 25 comandos legitimos intactos]]
 - [[decisiones/2026-08-15 cinco-agentes-muertos-a-la-vez-por-limite-de-sesion-de-anthropic|Corte de cuota: los cinco agentes concurrentes murieron simultaneamente]]
 - [[decisiones/2026-08-15 por-que-el-CI-esta-rojo-desde-agosto-tres-causas-distintas|El CI lleva doce dias en rojo por tres causas independientes, una por sistema operativo]]
-- [[decisiones/2026-08-15 el-mismo-invariante-vive-en-cuatro-copias-y-solo-una-recibio-el-parche|CRITICO: los guardas de shell son cuatro copias del mismo invariante, con agujeros distintos cada una]]
-- [[decisiones/2026-08-15 la-allowlist-de-comandos-es-un-prefix-match-y-eso-es-RCE|CRITICO: coord_policy.allowed() es un prefix match, y desde el rol read-only se ejecuta codigo arbitrario]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-15T03:40:23+00:00_
+_Actualizado: 2026-08-16T20:18:44+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

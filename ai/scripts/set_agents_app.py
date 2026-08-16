@@ -495,6 +495,31 @@ def routing_catalog(simulation=False):
     return routing.compose(config, roster, simulate=simulation, store=None if simulation else _routing_store()), config
 
 
+def _human_render_value(value, limit=6):
+    """D1-F02: render one payload value for the human (non-`--json`) routing channel.
+    `print(f"{key}: {value}")`'s plain f-string was `repr()`-ing nested dicts/tuples
+    verbatim -- a single `exclusions` entry measured 5763 characters on one line. This
+    collapses collections instead of dumping them: booleans read `sí`/`no`, `None` reads
+    `-`, and lists/tuples/dicts render as a short comma-joined summary, truncated at
+    `limit` items with a `(+N más)` tail rather than printed in full. Recursive so a list
+    of dicts (like `exclusions`) renders each dict the same way, not as Python's repr."""
+    if isinstance(value, bool):
+        return "sí" if value else "no"
+    if value is None:
+        return "-"
+    if isinstance(value, dict):
+        if not value:
+            return "(vacío)"
+        return ", ".join(f"{k}={_human_render_value(v, limit=limit)}" for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return "(vacío)"
+        shown = [_human_render_value(item, limit=limit) for item in value[:limit]]
+        extra = len(value) - limit
+        return ", ".join(shown) + (f", … (+{extra} más)" if extra > 0 else "")
+    return str(value)
+
+
 def _routing_output(payload, human):
     if ROUTING_WARNINGS:
         payload = dict(payload)
@@ -502,10 +527,23 @@ def _routing_output(payload, human):
     if not human:
         print(json.dumps(payload, sort_keys=True))
         return
-    print(f"{payload['command']}: {'OK' if payload['ok'] else 'NO DISPONIBLE'}", file=sys.stderr)
+    # D1-F02: real human text, not repr() dumped through an f-string -- and reason_codes
+    # is skipped inside `data` (whenever the underlying dataclass carries its own copy,
+    # e.g. RouteDecision.reason_codes surfacing through `to_dict()`) because it is always
+    # printed once below from the envelope's own top-level `reason_codes` field, which
+    # carries the exact same value every caller passes into `data` (verified: every
+    # `cli_envelope(..., data, ..., reason_codes)` call site in this file passes the SAME
+    # tuple both places when `data` happens to carry the key). Every line is clamped to
+    # the live terminal width (`_term_width()`/`_clip()`, same discipline as the menu
+    # panels) so a long collection truncates instead of ever producing a 5763-char line.
+    width = _term_width()
+    print(_clip(f"{payload['command']}: {'OK' if payload['ok'] else 'NO DISPONIBLE'}", width), file=sys.stderr)
     for key, value in payload["data"].items() if isinstance(payload["data"], dict) else []:
-        print(f"{key}: {value}", file=sys.stderr)
-    if payload["reason_codes"]: print("reason_codes: " + ", ".join(payload["reason_codes"]), file=sys.stderr)
+        if key == "reason_codes":
+            continue
+        print(_clip(f"{key}: {_human_render_value(value)}", width), file=sys.stderr)
+    if payload["reason_codes"]:
+        print(_clip("reason_codes: " + ", ".join(payload["reason_codes"]), width), file=sys.stderr)
 
 
 def cmd_route_explain(task_class, human=False):
@@ -3461,7 +3499,7 @@ def table_lines(rows, indent="  "):
 
 
 def _estado_general_lines(data):
-    """The '🩺 Estado general' panel: everything --doctor-all knows, formatted for
+    """The 'Estado general' panel: everything --doctor-all knows, formatted for
     humans — harnesses with version+auth, install scope, catalog CLIs, live
     providers. Reuses _status_data's rows (already probed) and the shared probe
     cache; never prints credential material.
@@ -3520,17 +3558,25 @@ HARNESS_CHOICES = (
 # index 9 while Salir was 8). Arrow-key navigation makes the bracketed numbers themselves
 # cosmetic history, not a contract -- README.md/INSTALACION.md (AC-30) describe the selector,
 # not literal [N] numbers.
+#
+# AC-01 (025/D1, ADR-0050): no emoji as structural icons -- they depend on the font, break
+# alignment (proof was already IN this tuple: "🗒  Vault Obsidian"/"⏻  Salir" carried a
+# patched-in second space because those two glyphs render at a different width than every
+# other entry's emoji), and can't be themed. Hierarchy is now carried by `tui._render_items`
+# alone: the `›` marker plus `bold()` on the selected row (already existed, unrelated to this
+# change) IS the espaciado/peso the spec asks for -- consistent one-space `marker + text`,
+# nothing here needs to compensate for glyph width ever again.
 MENU_ITEMS = (
-    "🩺 Estado general",
-    "📦 Instalar / Reparar",
-    "🔄 Actualizar",
-    "🧠 Modelos",
-    "🧰 Herramientas (CLIs)",
-    "➕ Proponer herramienta nueva",
-    "🔌 MCPs",
-    "🧩 Plugins Claude Code",
-    "🗒  Vault Obsidian",
-    "⏻  Salir",
+    "Estado general",
+    "Instalar / Reparar",
+    "Actualizar",
+    "Modelos",
+    "Herramientas (CLIs)",
+    "Proponer herramienta nueva",
+    "MCPs",
+    "Plugins Claude Code",
+    "Vault Obsidian",
+    "Salir",
 )
 
 
@@ -3539,7 +3585,7 @@ def menu():
     banner()
     if first_run():
         print()
-        print(bold(f"📖 Primera vez acá → leé README.md (sección {platform_label()}) para saber qué esperar."))
+        print(bold(f"Primera vez acá → leé README.md (sección {platform_label()}) para saber qué esperar."))
         write_app_config(auto_update=True)
     print(dim("· chequeando updates…"))
     update_badge = launch_update_check()
@@ -3612,16 +3658,76 @@ def menu():
             return 0
 
 
-def main():
-    # ADR-0038: --tools-propose/--tools-approve are intercepted here, before the main
-    # argparse parser is even built, because --install-<method> is a dynamic flag NAME
-    # argparse cannot declare (metavar/choices only constrain a flag's VALUE) -- the same
-    # reasoning coord_policy's own argv-walkers use: a fixed declarative grammar can't
-    # express this shape, so it's walked by hand instead (_dispatch_tools_discovery).
-    # This keeps the rest of main()'s mode-exclusivity machinery (_mode_flags/other_mode
-    # below) completely untouched -- these two verbs never reach `parser.parse_args()`.
-    if len(sys.argv) > 1 and sys.argv[1] in ("--tools-propose", "--tools-approve"):
-        return _dispatch_tools_discovery(sys.argv[1], sys.argv[2:])
+# AC-02 (025/D1, ADR-0050) -- three groups, same criterion applied to each: what a
+# spawn/orchestrator/wizard invokes but a human never types at a terminal is hidden;
+# what a human actually reads about in README.md or a wizard panel stays visible.
+#
+# GROUP 1 -- machine-lifecycle routing primitives: mutate a run's state (decide/
+# dispatch/close) or are pure modifiers of one of those, plus the one live E2E gate.
+# Evidence for "only a spawn/CI invokes these, never a human at a terminal":
+# `coord_policy.SAFE_ARGV`'s `--rout(e|ing)-\S+` entry is the sanctioned automation
+# channel, and `grep`ing every spawn CLI (`opencode_spawn.py`, `codex_spawn.py`,
+# `claude_code_spawn.py`, `set_agents_spawn.py`) shows `--route-decide`/`--route-dispatched`/
+# `--route-terminal`/`--route-quota-exhausted` (+ their `--quota-error`/`--latency-ms`/
+# `--usage`/`--fresh-probes` modifiers) called ONLY from `_run_app_cli`, always with
+# `--json`, never suggested to a human anywhere. `--quota-failover-e2e` is a manual live
+# gate (AC-06) that only ever shows up in past packages' evidence logs -- an engineering
+# verification tool, not everyday surface.
+#
+# GROUP 2 -- harness observability surfaces (D1-F03 repair): `--context`, `--graph`,
+# `--feature-id`, `--out`, `--routing-report`, `--routing-open-runs`,
+# `--routing-recent-writers`, `--routing-decisions`, `--limit`. These are the
+# orchestrator's OWN recovery/audit channel (see Global/_canonical/agents/orchestrator.md:
+# every one of these is a literal, pasted "Run exactly:" command in that doctrine) and
+# `--context` additionally has its own `coord_policy.SAFE_ARGV` entry, like GROUP 1.
+# Corrected evidence (the ORIGINAL comment here overclaimed this): `setup_models.py`'s
+# "Modelos" wizard panel suggests exactly TWO flags to a human, `--route-doctor` (twice)
+# and `--model-preference-show` (ai/scripts/setup_models.py:228,252,254,238 measured
+# `--route-explain` too, in the same citation style as `--route-doctor` -- kept visible
+# alongside it) -- `--routing-report`/`--routing-decisions`/`--routing-open-runs`/
+# `--routing-recent-writers` do NOT appear in that file, or in README.md/INSTALACION.md/
+# COMO-CAMBIAR-MODELO.md/CONTRIBUTING.md, at all (grepped, zero hits): nothing human-
+# facing ever named them. `--route-doctor`/`--route-explain`/`--routing-migrate` stay
+# VISIBLE (ADR-0010/ADR-0035 document `--routing-migrate`/`--route-doctor` as
+# operator-driven diagnostics, and the wizard cites `--route-explain`), unlike this group.
+#
+# GROUP 3 -- the `providers.toml` registry CLI (022 PKG-4, AC-11/AC-12): `--provider-add`,
+# `--provider-remove`, `--provider-verify`, `--provider-list`, `--base-url`, `--npm`,
+# `--label`, `--model`, `--include-legacy`, `--prune-dead`. Zero mentions in any
+# human-facing doc (grepped, same four files as GROUP 2) -- the human path for editing
+# `providers.toml` is the "Modelos" wizard (`setup-models.sh`), never this raw CLI by
+# hand.
+#
+# NEVER remove a flag from this set without also removing its `add_argument` call --
+# `test_internal_flags_cannot_be_silently_deleted` (tests/test_harness.py) fails the
+# build the moment one goes missing, hidden or not.
+_INTERNAL_FLAGS = frozenset({
+    # GROUP 1 -- routing lifecycle primitives + modifiers + E2E gate.
+    "--route-decide", "--route-dispatched", "--route-terminal", "--route-quota-exhausted",
+    "--quota-error", "--latency-ms", "--usage", "--fresh-probes", "--quota-failover-e2e",
+    # GROUP 2 -- harness observability (orchestrator-only, D1-F03).
+    "--context", "--graph", "--feature-id", "--out", "--routing-report",
+    "--routing-open-runs", "--routing-recent-writers", "--routing-decisions", "--limit",
+    # GROUP 3 -- providers.toml registry CLI (wizard-only, D1-F03).
+    "--provider-add", "--provider-remove", "--provider-verify", "--provider-list",
+    "--base-url", "--npm", "--label", "--model", "--include-legacy", "--prune-dead",
+})
+
+
+def _hidden_help(advanced, text):
+    """AC-02: `argparse.SUPPRESS` for one of `_INTERNAL_FLAGS`' `help=` UNLESS `advanced`
+    -- never a second source of truth for what the flag does, just whether `--help` prints
+    it. `--help --avanzado` (main()'s own early interception) rebuilds this SAME parser
+    with `advanced=True`, so the real text always comes from here."""
+    return argparse.SUPPRESS if not advanced else text
+
+
+def _build_parser(advanced=False):
+    """The one argparse parser set-agents/main() dispatches against. `advanced=True`
+    reveals `_INTERNAL_FLAGS`' real help text (AC-02's `--help --avanzado`) -- every other
+    behavior (defaults, choices, dest, parsing) is IDENTICAL between the two calls; only
+    `help=` differs, so nothing here can silently change what a flag does depending on
+    which mode built the parser."""
     parser = argparse.ArgumentParser(
         prog="set-agents",
         description=__doc__,
@@ -3636,32 +3742,55 @@ def main():
             "--tools-propose <name> --kind cli|mcp|skill --detect <bin> --install-<method> "
             '"<cmd>" --why "<motivo>" (valida y imprime la pregunta consolidada, nunca instala) '
             "y --tools-approve <name> (la aprobación humana -- nunca la corre un agente, sea "
-            "cual sea su rol)."
+            "cual sea su rol).\n"
+            "AC-02 (ADR-0050): algunas flags de uso interno (spawns/orquestador) están "
+            "ocultas de esta lista -- siguen funcionando igual; --help --avanzado las muestra."
         ),
     )
     parser.add_argument("--status", action="store_true", help="estado en una línea (APP_STATUS ...)")
     parser.add_argument("--route-explain", metavar="TASK_CLASS")
-    parser.add_argument("--routing-report", action="store_true")
+    parser.add_argument("--routing-report", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (orquestador) -- reporte de latencia/retención "
+                                          "del store de ruteo (solo lectura)"))
     parser.add_argument("--route-doctor", action="store_true",
                         help="ADR-0035, solo lectura: por par OpenCode, auth/modelos listados/billing y diagnóstico del cache; expone credenciales sin CLI id verificado (M-1)")
-    parser.add_argument("--route-decide", metavar="FILE", help="descriptor JSON ('-' = stdin); decide y, para writers, autoriza")
-    parser.add_argument("--route-dispatched", metavar="RUN_ID")
-    parser.add_argument("--route-terminal", nargs=2, metavar=("RUN_ID", "OUTCOME"))
-    parser.add_argument("--route-quota-exhausted", metavar="RUN_ID")
+    parser.add_argument("--route-decide", metavar="FILE",
+                        help=_hidden_help(advanced, "USO INTERNO (spawns/orquestador, nunca a mano) -- descriptor JSON "
+                                          "('-' = stdin); decide y, para writers, autoriza"))
+    parser.add_argument("--route-dispatched", metavar="RUN_ID",
+                        help=_hidden_help(advanced, "USO INTERNO (spawns) -- marca run_id como dispatched"))
+    parser.add_argument("--route-terminal", nargs=2, metavar=("RUN_ID", "OUTCOME"),
+                        help=_hidden_help(advanced, "USO INTERNO (spawns) -- cierra run_id con outcome success|failure"))
+    parser.add_argument("--route-quota-exhausted", metavar="RUN_ID",
+                        help=_hidden_help(advanced, "USO INTERNO (spawns) -- cierra run_id agotado y autoriza el reemplazo"))
     parser.add_argument("--quota-failover-e2e", action="store_true",
-                        help="AC-06 live gate; bloquea hasta verificar una suscripción agotada controlada")
-    parser.add_argument("--quota-error", metavar="JSON")
-    parser.add_argument("--routing-open-runs", action="store_true")
-    parser.add_argument("--routing-recent-writers", action="store_true")
-    parser.add_argument("--routing-decisions", action="store_true", help="tail del log de decisiones por spawn (ADR-0031, solo lectura)")
-    parser.add_argument("--limit", type=int, default=None, help="con --routing-decisions: máximo de entradas (default 50)")
+                        help=_hidden_help(advanced, "USO INTERNO (gate E2E manual, AC-06) -- bloquea hasta verificar una "
+                                          "suscripción agotada controlada"))
+    parser.add_argument("--quota-error", metavar="JSON",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --route-quota-exhausted: detalle del error de cuota"))
+    parser.add_argument("--routing-open-runs", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (orquestador) -- runs de ruteo abiertos "
+                                          "ahora mismo (solo lectura)"))
+    parser.add_argument("--routing-recent-writers", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (orquestador) -- último writer verificado por "
+                                          "role_class, para review_of_run_id cuando se perdió el contexto "
+                                          "(solo lectura)"))
+    parser.add_argument("--routing-decisions", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (orquestador) -- tail del log de decisiones "
+                                          "por spawn (ADR-0031, solo lectura)"))
+    parser.add_argument("--limit", type=int, default=None,
+                        help=_hidden_help(advanced, "USO INTERNO -- con --routing-decisions: máximo de "
+                                          "entradas (default 50)"))
     parser.add_argument("--routing-migrate", action="store_true", help="migra explícitamente la DB de routing al schema actual")
     parser.add_argument("--project", metavar="DIR", help="ancla explícita del proyecto para ruteo")
     parser.add_argument("--scaffold", nargs="?", metavar="DIR", const="", help="crea el estado portable mínimo del proyecto")
-    parser.add_argument("--fresh-probes", action="store_true", help="con --route-decide: saltea el cache de probes")
-    parser.add_argument("--latency-ms", type=int, default=None, help="con --route-terminal: latencia observada")
-    parser.add_argument("--usage", metavar="JSON", help="con --route-terminal: uso/costo del spawn")
-    parser.add_argument("--json", action="store_true", help="salida JSON para comandos de observabilidad")
+    parser.add_argument("--fresh-probes", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --route-decide: saltea el cache de probes"))
+    parser.add_argument("--latency-ms", type=int, default=None,
+                        help=_hidden_help(advanced, "USO INTERNO -- con --route-terminal: latencia observada"))
+    parser.add_argument("--usage", metavar="JSON",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --route-terminal: uso/costo del spawn"))
+    parser.add_argument("--json", action="store_true", help="salida JSON para comandos de observabilidad (routing, --context)")
     parser.add_argument("--check-update", action="store_true")
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--yes", action="store_true")
@@ -3678,23 +3807,40 @@ def main():
     # 022 PKG-4 (AC-11/AC-12): the `providers.toml` registry CLI -- list/add/remove/
     # verify, never a raw JSON edit. `--provider-verify` alone (no ID) checks every
     # registered entry; `--provider-verify ID` checks just one.
-    parser.add_argument("--provider-list", action="store_true", help="lista providers.toml (solo lectura)")
-    parser.add_argument("--provider-add", metavar="ID", help="agrega/reemplaza un provider local en providers.toml (con --base-url y --model, al menos uno)")
-    parser.add_argument("--provider-remove", metavar="ID", help="saca un provider de providers.toml")
+    parser.add_argument("--provider-list", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (setup-models.sh) -- lista providers.toml "
+                                          "(solo lectura)"))
+    parser.add_argument("--provider-add", metavar="ID",
+                        help=_hidden_help(advanced, "USO INTERNO (setup-models.sh) -- agrega/reemplaza un "
+                                          "provider local en providers.toml (con --base-url y --model, al "
+                                          "menos uno)"))
+    parser.add_argument("--provider-remove", metavar="ID",
+                        help=_hidden_help(advanced, "USO INTERNO (setup-models.sh) -- saca un provider de "
+                                          "providers.toml"))
     parser.add_argument("--provider-verify", nargs="?", const="", metavar="ID",
-                        help="chequea la forma declarada de un provider (o de todos, sin ID) y, para origin=user "
-                             "(AC-18), liveness real: GET {baseURL}/models, 2s, alive|dead|unreachable")
+                        help=_hidden_help(advanced, "USO INTERNO (setup-models.sh) -- chequea la forma "
+                             "declarada de un provider (o de todos, sin ID) y, para origin=user "
+                             "(AC-18), liveness real: GET {baseURL}/models, 2s, alive|dead|unreachable"))
     parser.add_argument("--include-legacy", action="store_true",
-                        help="con --provider-verify: además de origin=user (AC-18), suma origin=harness-legacy -- "
-                             "el caso ollama post-P4 (--provider-remove es la otra salida documentada)")
+                        help=_hidden_help(advanced, "USO INTERNO -- con --provider-verify: además de "
+                             "origin=user (AC-18), suma origin=harness-legacy -- "
+                             "el caso ollama post-P4 (--provider-remove es la otra salida documentada)"))
     parser.add_argument("--prune-dead", action="store_true",
-                        help="con --provider-verify: saca de providers.toml los providers que ESTA corrida midió "
-                             "dead (nunca unreachable) -- requiere ./build.sh --install para reflejarse")
-    parser.add_argument("--base-url", metavar="URL", help="con --provider-add: baseURL del endpoint OpenAI-compatible")
-    parser.add_argument("--npm", metavar="PACKAGE", help="con --provider-add: paquete npm del adaptador (default @ai-sdk/openai-compatible)")
-    parser.add_argument("--label", metavar="NAME", help="con --provider-add: nombre visible del provider (default: el ID)")
+                        help=_hidden_help(advanced, "USO INTERNO -- con --provider-verify: saca de "
+                             "providers.toml los providers que ESTA corrida midió "
+                             "dead (nunca unreachable) -- requiere ./build.sh --install para reflejarse"))
+    parser.add_argument("--base-url", metavar="URL",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --provider-add: baseURL del endpoint "
+                                          "OpenAI-compatible"))
+    parser.add_argument("--npm", metavar="PACKAGE",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --provider-add: paquete npm del "
+                                          "adaptador (default @ai-sdk/openai-compatible)"))
+    parser.add_argument("--label", metavar="NAME",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --provider-add: nombre visible del "
+                                          "provider (default: el ID)"))
     parser.add_argument("--model", action="append", metavar="ID[:NOMBRE]",
-                        help="con --provider-add: modelo declarado, repetible, al menos uno")
+                        help=_hidden_help(advanced, "USO INTERNO -- con --provider-add: modelo declarado, "
+                                          "repetible, al menos uno"))
     parser.add_argument("--harness", choices=("opencode", "claude", "codex", "cursor", "gemini", "pi"))
     parser.add_argument("--doctor", action="store_true", help="chequeo redactado del harness (usar con --harness pi)")
     parser.add_argument("--doctor-all", action="store_true", help="qué detecta esta máquina: harnesses, CLIs y proveedores autenticados")
@@ -3704,10 +3850,18 @@ def main():
     parser.add_argument("--vault-init", metavar="DIR", help="crea el vault Obsidian de la empresa en DIR/obsidian")
     parser.add_argument("--vault-link", metavar="PROYECTO", help="linkea docs/notas del proyecto al vault")
     parser.add_argument("--vault", metavar="DIR", help="vault explícito para --vault-link")
-    parser.add_argument("--context", action="store_true", help="hub + contexto de empresa + nota del proyecto + qué falta (solo lectura)")
-    parser.add_argument("--graph", action="store_true", help="grafo de ejecución (mermaid): findings, reviews, verificaciones, repairs, blockers (solo lectura)")
-    parser.add_argument("--feature-id", action="append", metavar="ID", help="con --graph: limita a esta feature (repetible; sin ninguna, todas)")
-    parser.add_argument("--out", metavar="FILE", help="con --graph: escribe el mermaid en FILE en vez de stdout")
+    parser.add_argument("--context", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (orquestador/agentes) -- hub + contexto de "
+                             "empresa + nota del proyecto + qué falta (solo lectura)"))
+    parser.add_argument("--graph", action="store_true",
+                        help=_hidden_help(advanced, "USO INTERNO (orquestador) -- grafo de ejecución (mermaid): "
+                             "findings, reviews, verificaciones, repairs, blockers (solo lectura)"))
+    parser.add_argument("--feature-id", action="append", metavar="ID",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --graph: limita a esta feature "
+                             "(repetible; sin ninguna, todas)"))
+    parser.add_argument("--out", metavar="FILE",
+                        help=_hidden_help(advanced, "USO INTERNO -- con --graph: escribe el mermaid en FILE "
+                             "en vez de stdout"))
     parser.add_argument("--vault-doctor", action="store_true", help="estado del vault: symlinks sanos, drift, no-registrados (report-only)")
     parser.add_argument("--repair", action="store_true", help="con --vault-doctor --project: aplica lo que el --dry-run inmediatamente anterior confirmó")
     # SEC-005: DEC-5/AC-16 say notes exclusion is "written/kept" as part of migration, full
@@ -3733,6 +3887,32 @@ def main():
                         help="escribe [model_pin].ROLE en model-preference.toml (ROLE puede ser '*')")
     parser.add_argument("--model-pin-clear", metavar="ROLE",
                         help="borra [model_pin].ROLE de model-preference.toml")
+    return parser
+
+
+def main():
+    # ADR-0038: --tools-propose/--tools-approve are intercepted here, before the main
+    # argparse parser is even built, because --install-<method> is a dynamic flag NAME
+    # argparse cannot declare (metavar/choices only constrain a flag's VALUE) -- the same
+    # reasoning coord_policy's own argv-walkers use: a fixed declarative grammar can't
+    # express this shape, so it's walked by hand instead (_dispatch_tools_discovery).
+    # This keeps the rest of main()'s mode-exclusivity machinery (_mode_flags/other_mode
+    # below) completely untouched -- these two verbs never reach `parser.parse_args()`.
+    if len(sys.argv) > 1 and sys.argv[1] in ("--tools-propose", "--tools-approve"):
+        return _dispatch_tools_discovery(sys.argv[1], sys.argv[2:])
+    # AC-02: `--help --avanzado` (either order) rebuilds the SAME parser with
+    # `_INTERNAL_FLAGS`' real help text restored, prints it, and returns -- checked
+    # against raw `sys.argv` (like the interception above), NEVER via the normal parser's
+    # own `-h/--help` action, because `--avanzado` is not itself a registered argument
+    # (declaring it as one would make it a real, discoverable, un-hidden flag -- the
+    # opposite of the point) and argparse's own unrecognized-argument error would fire
+    # before the built-in `-h` action gets a chance to short-circuit in the order that
+    # matters here.
+    rest = sys.argv[1:]
+    if "--avanzado" in rest and ("--help" in rest or "-h" in rest):
+        _build_parser(advanced=True).print_help()
+        return 0
+    parser = _build_parser(advanced=False)
     args = parser.parse_args()
 
     # This gate is intentionally outside the ordinary routing modes.  It has no
@@ -3740,7 +3920,14 @@ def main():
     if args.quota_failover_e2e:
         return cmd_quota_failover_e2e()
 
-    routing_human = sys.stdout.isatty() and not args.json
+    # AC-03 (025/D1): default is human text (to stderr, `_routing_output`'s existing
+    # split) regardless of whether stdout is a TTY -- only an explicit `--json` switches
+    # to the byte-identical machine envelope on stdout. Every real machine consumer
+    # (opencode_spawn.py/codex_spawn.py/claude_code_spawn.py/set_agents_spawn.py's
+    # `_run_app_cli` calls, `docs/adr/*`) already passes `--json` explicitly -- grepped,
+    # none rely on the old isatty-gated default -- so this only changes what a human
+    # sees when stdout happens to be piped/redirected without asking for JSON.
+    routing_human = not args.json
     # Routing modes are total: JSON is a rendering modifier, per-mode modifiers are the only
     # exemptions (--fresh-probes with decide, --latency-ms with terminal), and no other argument —
     # operational command or modifier — may be silently combined with a routing mode. Comparing every
