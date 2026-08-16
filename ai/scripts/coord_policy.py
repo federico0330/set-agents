@@ -151,11 +151,18 @@ SAFE_BINARY_COMMANDS = [
         "-v": 0,
         "-e": 1,  # allow -e for inline scripts (still subject to FORBIDDEN_SYNTAX)
     }),
-    # python: version check only.
+    # python: version check only.  SEC-030-R1: `-m` deliberately absent here.  It used to be
+    # `"-m": 1`, which routed `python -m <anything>` through the GENERIC walker -- any module,
+    # any positional -- while `python3 -m` went through the restricted `_python_m_allowed`.
+    # That asymmetry between two names for the same interpreter was a full RCE from the
+    # read-only role: `python -m timeit '__import__("os").system(...)'` was allowed and
+    # executed (PoC created a real file), as were `-m pip install`, `-m venv` and
+    # `-m http.server`.  Both spellings now converge on `_python_m_allowed`, which is the
+    # stricter of the two.  Rule for any future alias pair: converge on the strictest
+    # validator, never let the second spelling fall through to the generic one.
     ("python", {
         "--version": 0,
         "-V": 0,
-        "-m": 1,
     }),
     # pip/pip3: list packages, show metadata.
     ("pip", {
@@ -483,35 +490,41 @@ def _curl_allowed(argv: list[str]) -> bool:
     """Validate curl: no file://, no -o/-O/-d/--config, URL as last token, http/https only."""
     if len(argv) < 2 or argv[0] != "curl":
         return False
-    # Forbidden flags
+    # SEC-030-R1.  Two holes closed here, both with executed PoCs:
+    #   1. Only the FIRST non-flag token was validated ("if not url"), and curl happily
+    #      fetches EVERY url on the line.  `curl http://localhost:1/ file:///secret` read
+    #      the file to stdout -- which is exactly what the agent sees.
+    #   2. `-w/--write-out` was neither forbidden nor value-consuming, so its `@file`
+    #      argument fell through as a loose token.  `curl -w @/secret http://localhost:1/`
+    #      printed the file.
+    # The blacklist below is still a blacklist and that is a known structural weakness:
+    # any future curl flag that reads or writes and is not listed here gets through.  It
+    # is bounded by requiring EXACTLY ONE url token, which is what kills the whole
+    # multi-target family at once rather than flag by flag.
     forbidden_flags = {"-o", "--output", "-O", "--remote-name", "-T", "--upload",
                        "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode",
-                       "-K", "--config"}
-    # Find URL (should be last non-flag token)
-    url = None
+                       "-K", "--config",
+                       "-w", "--write-out",          # @file is read and printed
+                       "-D", "--dump-header",        # writes
+                       "--trace", "--trace-ascii"}   # write
+    value_flags = {"-H", "--header", "-A", "--user-agent", "-b", "--cookie", "-u", "--user"}
+    urls: list[str] = []
     i = 1
     while i < len(argv):
         token = argv[i]
         if token.startswith("-"):
-            # Check for forbidden flags
             if token.split("=")[0] in forbidden_flags:
                 return False
-            # Skip flag + its argument
-            if token in {"-H", "--header", "-A", "--user-agent", "-b", "--cookie", "-u", "--user"}:
-                i += 2
-            else:
-                i += 1
+            i += 2 if token in value_flags else 1
         else:
-            # Non-flag token: could be URL or arg to previous flag
-            if not url and (i == 1 or not argv[i-1].startswith("-")):
-                url = token
+            urls.append(token)
             i += 1
-    # Validate URL
-    if not url:
+    # Exactly one target.  More than one is never a legitimate harness call and is the
+    # shape every multi-url exfiltration took.
+    if len(urls) != 1:
         return False
     try:
-        parsed = urlparse(url)
-        # Only allow http/https, reject file://, scp://, dict://, etc.
+        parsed = urlparse(urls[0])
         if parsed.scheme not in {"http", "https"}:
             return False
     except Exception:

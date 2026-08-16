@@ -35,6 +35,7 @@
 - decisión: [[decisiones/2026-08-15 actualizar-le-repone-los-cuatro-CLIs-al-que-instalo-uno|Defecto latente: cmd_update ignora install-targets.json y reinstala los cuatro arboles]]
 - decisión: [[decisiones/2026-08-15 RDD-ya-existe-en-el-repo-con-otra-acepcion|RDD no es un termino a definir: ya esta en uso instalado, con otro significado]]
 - decisión: [[decisiones/2026-08-15 numeracion-de-ADRs-de-025-desempatada-a-favor-de-los-context-packs|Los numeros de ADR de la spec 025 estaban viejos y se corrigieron a favor de los context packs]]
+- decisión: [[decisiones/2026-08-16 RDD-es-el-modulo-de-gentle-ai-confirmado-por-federico|RDD queda definido: es el modulo strict-TDD de gentle-ai, confirmado por Federico]]
 
 ## Qué falta
 

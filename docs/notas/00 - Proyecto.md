@@ -53,14 +53,14 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-16 RDD-es-el-modulo-de-gentle-ai-confirmado-por-federico|RDD queda definido: es el modulo strict-TDD de gentle-ai, confirmado por Federico]]
+- [[decisiones/2026-08-15 no-instalo-la-politica-nueva-sin-que-federico-decida|El fix del RCE queda commiteado pero NO instalado: esa decision es de Federico]]
 - [[decisiones/2026-08-15 dos-comandos-que-el-fix-de-seguridad-dejo-afuera|El fix del RCE deja fuera 'git show HEAD:ruta' y './build.sh --output', medido]]
 - [[decisiones/2026-08-15 el-RCE-quedo-cerrado-y-el-harness-sigue-funcionando|El RCE de la allowlist quedo cerrado: 24 ataques bloqueados, 25 comandos legitimos intactos]]
 - [[decisiones/2026-08-15 cinco-agentes-muertos-a-la-vez-por-limite-de-sesion-de-anthropic|Corte de cuota: los cinco agentes concurrentes murieron simultaneamente]]
 - [[decisiones/2026-08-15 por-que-el-CI-esta-rojo-desde-agosto-tres-causas-distintas|El CI lleva doce dias en rojo por tres causas independientes, una por sistema operativo]]
 - [[decisiones/2026-08-15 el-mismo-invariante-vive-en-cuatro-copias-y-solo-una-recibio-el-parche|CRITICO: los guardas de shell son cuatro copias del mismo invariante, con agujeros distintos cada una]]
 - [[decisiones/2026-08-15 la-allowlist-de-comandos-es-un-prefix-match-y-eso-es-RCE|CRITICO: coord_policy.allowed() es un prefix match, y desde el rol read-only se ejecuta codigo arbitrario]]
-- [[decisiones/2026-08-15 numeracion-de-ADRs-de-025-desempatada-a-favor-de-los-context-packs|Los numeros de ADR de la spec 025 estaban viejos y se corrigieron a favor de los context packs]]
-- [[decisiones/2026-08-15 cuatro-huecos-de-la-guarda-de-escritura-para-una-feature-de-seguimiento|P2-F12 a P2-F15: la guarda cierra los casos nombrados, no las clases]]
 
 ## Referencias
 
