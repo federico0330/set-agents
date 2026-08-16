@@ -778,6 +778,50 @@ class RoutingTests(unittest.TestCase):
                     (identity, "terminal_success"),
                 )
 
+    def test_route_and_spawn_ignores_an_inherited_set_agents_project_when_spawn_cwd_is_explicit(self):
+        """027 isolation follow-up: an ambient SET_AGENTS_PROJECT never re-anchors the lifecycle.
+
+        The previous test's own failure mode, promoted to a first-class guarantee. The
+        lifecycle CLI runs as a subprocess that inherits this process's environment, and
+        `resolve_project_root` (project_identity.py:56) ranks `SET_AGENTS_PROJECT` ABOVE the
+        cwd walk-up -- so an inherited value silently overrode the `spawn_cwd` the caller
+        explicitly asked for, and `dispatches.project_key` recorded the WRONG project.
+        `set_agents_app.main()` exports that variable into its own process
+        (set_agents_app.py:4141), so merely having run a routing command in-process was
+        enough to poison every later spawn. The decoy here is a fully valid project (own
+        marker dirs, own project.json): a bogus path would be rejected outright by
+        ADR-0008's explicit-override-must-resolve rule, and the test would then pass for the
+        wrong reason -- an error instead of the mis-attribution it exists to catch.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            sandbox=Path(td); project=sandbox/"user-project"; nested=project/"src"/"feature"
+            (project/"ai/state/features").mkdir(parents=True); nested.mkdir(parents=True)
+            identity="proj1_" + "e" * 32
+            (project/"ai/state/project.json").write_text(json.dumps({"schema":1,"project_key":identity,"created_at":"2026-07-27T00:00:00Z"}))
+            # The decoy: a real, resolvable project that is NOT the spawn target.
+            decoy=sandbox/"decoy-project"; (decoy/"ai/state/features").mkdir(parents=True)
+            decoy_identity="proj1_" + "d" * 32
+            (decoy/"ai/state/project.json").write_text(json.dumps({"schema":1,"project_key":decoy_identity,"created_at":"2026-07-27T00:00:00Z"}))
+            home=sandbox/"home"; auth=home/".pi/agent"; auth.mkdir(parents=True)
+            (auth/"auth.json").write_text(json.dumps({"openai-codex": {}}))
+            bins=sandbox/"bin"; bins.mkdir()
+            pnpm=bins/"pnpm"
+            pnpm.write_text("#!/bin/sh\nprintf 'provider model\\nopenai-codex gpt-5.6-sol\\n'\n")
+            pnpm.chmod(0o755)
+            env={"HOME":str(home), "PATH":f"{bins}:{os.environ['PATH']}", "SET_AGENTS_PROJECT":str(decoy)}
+            with mock.patch.dict(os.environ, env, clear=False), \
+                 mock.patch.object(set_agents_spawn,"spawn",return_value=("success",{})):
+                result=set_agents_spawn.route_and_spawn(
+                    "implementer", "mechanical", "do it", routing_test_root=str(sandbox/"routing"), spawn_cwd=nested,
+                )
+                # This process's own environment is never mutated -- only the child's copy.
+                self.assertEqual(os.environ["SET_AGENTS_PROJECT"], str(decoy))
+            self.assertEqual(result["status"], "success", result)
+            with sqlite3.connect(f"file:{sandbox / 'routing/routing.db'}?mode=ro", uri=True) as connection:
+                row=connection.execute("SELECT project_key,state FROM dispatches WHERE run_id=?", (result["run_id"],)).fetchone()
+            self.assertEqual(row, (identity, "terminal_success"),
+                             msg=f"lifecycle anchored to the ambient decoy {decoy_identity} instead of spawn_cwd")
+
     def test_route_and_spawn_refuses_non_executable_decision_without_spawning(self):
         def fake_cli(args,env=None,timeout=60,cwd=None):
             self.assertEqual(args[0],"--route-decide")  # never reaches dispatch/spawn

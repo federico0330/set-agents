@@ -53,14 +53,14 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-16 tres-de-los-cuatro-carriles-siguen-atribuyendo-mal-el-proyecto|El arreglo de SET_AGENTS_PROJECT quedo solo en el carril de pi; faltan los otros tres]]
+- [[decisiones/2026-08-16 SET_AGENTS_PROJECT-heredada-le-gana-al-spawn-cwd|Defecto vivo: un spawn hijo atribuye su trabajo al proyecto del padre, no al que se le pidio]]
+- [[decisiones/2026-08-16 RDD-es-receipt-driven-development-y-ahora-tiene-fuente|RDD queda cerrado con fuente: Receipt-Driven Development, verificado contra el upstream]]
 - [[decisiones/2026-08-16 medir-en-el-worktree-no-es-medir-lo-integrado|D1 se reporto integrado sin estarlo: el exit code se leyo de head y la medicion se hizo en el lugar equivocado]]
 - [[decisiones/2026-08-16 el-reporte-de-un-implementer-no-es-evidencia-de-que-el-codigo-exista|D5 nunca produjo codigo, y el orquestador lo dio por implementado durante horas]]
 - [[decisiones/2026-08-16 RDD-es-el-modulo-de-gentle-ai-confirmado-por-federico|RDD queda definido: es el modulo strict-TDD de gentle-ai, confirmado por Federico]]
 - [[decisiones/2026-08-15 no-instalo-la-politica-nueva-sin-que-federico-decida|El fix del RCE queda commiteado pero NO instalado: esa decision es de Federico]]
 - [[decisiones/2026-08-15 dos-comandos-que-el-fix-de-seguridad-dejo-afuera|El fix del RCE deja fuera 'git show HEAD:ruta' y './build.sh --output', medido]]
-- [[decisiones/2026-08-15 el-RCE-quedo-cerrado-y-el-harness-sigue-funcionando|El RCE de la allowlist quedo cerrado: 24 ataques bloqueados, 25 comandos legitimos intactos]]
-- [[decisiones/2026-08-15 cinco-agentes-muertos-a-la-vez-por-limite-de-sesion-de-anthropic|Corte de cuota: los cinco agentes concurrentes murieron simultaneamente]]
-- [[decisiones/2026-08-15 por-que-el-CI-esta-rojo-desde-agosto-tres-causas-distintas|El CI lleva doce dias en rojo por tres causas independientes, una por sistema operativo]]
 
 ## Referencias
 

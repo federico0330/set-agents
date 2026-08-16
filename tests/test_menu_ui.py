@@ -7,7 +7,9 @@ Salir, the Esc contract, and the tools_menu row format — nothing here may
 contradict those.
 """
 
+import contextlib
 import io
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -145,3 +147,92 @@ class ToolsHeaderTests(unittest.TestCase):
             app.tools_menu()
         install.assert_called_once_with("vercel")
         self.assertEqual(picker.call_args.kwargs["header"], "x")
+
+
+class _FakeStream(io.StringIO):
+    """`StringIO` with a controllable `isatty()` -- mirrors `tests/test_harness.py`'s
+    `_FakeStdout`, kept local here (own-paths discipline: this file doesn't import that
+    one) so `--route-doctor`/`--doctor-all`'s progress indicator can be exercised as a
+    LIVE (animated) stream without a real pty."""
+
+    def __init__(self, is_tty):
+        super().__init__()
+        self._is_tty = is_tty
+
+    def isatty(self):
+        return self._is_tty
+
+
+class RouteDoctorProgressTests(unittest.TestCase):
+    """025/D2 (AC-04/AC-05): the progress indicator wrapping `--route-doctor`'s ~20s provider
+    probe (`route_doctor`, `catalog.py:1136`) never touches stdout -- the JSON envelope's
+    contract (D1, AC-03) -- and never leaves the operation silent, live or degraded."""
+
+    def _run(self, *, human, stderr_stream, env):
+        fake_report = {"cache": {"used": False, "reason": "CACHE_ROOT_ABSENT"}, "providers": []}
+        stdout_buf = io.StringIO()
+        with mock.patch("routing_core.catalog.prune_legacy_probe_cache", return_value=False), \
+             mock.patch("routing_core.catalog.route_doctor", return_value=fake_report), \
+             mock.patch.object(app, "ROUTING_WARNINGS", ()), \
+             mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch("sys.stderr", stderr_stream), \
+             contextlib.redirect_stdout(stdout_buf):
+            rc = app.cmd_route_doctor(human=human)
+        return rc, stdout_buf.getvalue(), stderr_stream.getvalue()
+
+    def test_json_stdout_is_byte_identical_whether_or_not_the_spinner_animates(self):
+        # Mordida #1 at the command level: same `--route-doctor --json` bytes on stdout
+        # whether the spinner is live (stderr is a TTY) or degraded (stderr is piped too).
+        env_live = {"NO_COLOR": "", "TERM": "xterm"}
+        env_degraded = {"NO_COLOR": "", "TERM": "xterm"}
+        rc_live, stdout_live, stderr_live = self._run(
+            human=False, stderr_stream=_FakeStream(is_tty=True), env=env_live)
+        rc_degraded, stdout_degraded, stderr_degraded = self._run(
+            human=False, stderr_stream=_FakeStream(is_tty=False), env=env_degraded)
+        fake_report = {"cache": {"used": False, "reason": "CACHE_ROOT_ABSENT"}, "providers": []}
+        expected = app.json.dumps(app.routing.cli_envelope(
+            True, "route-doctor", fake_report, (), ()), sort_keys=True) + "\n"
+        self.assertEqual(rc_live, 0)
+        self.assertEqual(rc_degraded, 0)
+        self.assertEqual(stdout_live, stdout_degraded)
+        self.assertEqual(stdout_live, expected)
+        # The DIFFERENCE lives entirely on stderr: live got a spinner, degraded got a
+        # static line -- proving the spinner ran at all in the live case, not that both
+        # cases silently skipped it.
+        self.assertIn("\r", stderr_live)
+        self.assertNotIn("\r", stderr_degraded)
+
+    def test_no_color_pipe_never_leaves_route_doctor_silent(self):
+        # Mordida #2 at the command level (AC-05): the exact env the harness's own spawns
+        # force (opencode_spawn.py:202, codex_spawn.py:222, set_agents_spawn.py:115).
+        stderr_stream = _FakeStream(is_tty=False)
+        rc, stdout, stderr = self._run(
+            human=False, stderr_stream=stderr_stream, env={"NO_COLOR": "1", "TERM": "dumb"})
+        self.assertEqual(rc, 0)
+        self.assertNotIn("\r", stderr)
+        self.assertNotIn("\x1b", stderr)
+        self.assertIn("consultando routing: listo", stderr)
+
+
+class DoctorAllProgressTests(unittest.TestCase):
+    """Same discipline as `RouteDoctorProgressTests`, for `--doctor-all`'s
+    `probe_listed_and_usable` (`catalog.py:1238`) -- it has no `--json` mode, so the
+    interesting assertion is stdout purity of the progress mechanism itself plus the
+    persistent stderr line under degradation, not byte-for-byte stdout equality."""
+
+    def _run(self, *, stderr_stream, env):
+        with mock.patch("routing_core.catalog.prune_legacy_probe_cache", return_value=False), \
+             mock.patch("routing_core.catalog.probe_listed_and_usable", return_value=({}, {})), \
+             mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch("sys.stderr", stderr_stream):
+            rc = app.cmd_doctor_all()
+        return rc
+
+    def test_no_color_pipe_never_leaves_doctor_all_silent(self):
+        stderr_stream = _FakeStream(is_tty=False)
+        rc = self._run(stderr_stream=stderr_stream, env={"NO_COLOR": "1", "TERM": "dumb"})
+        out = stderr_stream.getvalue()
+        self.assertEqual(rc, 0)
+        self.assertNotIn("\r", out)
+        self.assertNotIn("\x1b", out)
+        self.assertIn("consultando proveedores: listo", out)

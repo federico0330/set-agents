@@ -39,6 +39,7 @@
 - decisión: [[decisiones/2026-08-15 numeracion-de-ADRs-de-025-desempatada-a-favor-de-los-context-packs|Los numeros de ADR de la spec 025 estaban viejos y se corrigieron a favor de los context packs]]
 - decisión: [[decisiones/2026-08-16 RDD-es-el-modulo-de-gentle-ai-confirmado-por-federico|RDD queda definido: es el modulo strict-TDD de gentle-ai, confirmado por Federico]]
 - decisión: [[decisiones/2026-08-16 el-reporte-de-un-implementer-no-es-evidencia-de-que-el-codigo-exista|D5 nunca produjo codigo, y el orquestador lo dio por implementado durante horas]]
+- decisión: [[decisiones/2026-08-16 RDD-es-receipt-driven-development-y-ahora-tiene-fuente|RDD queda cerrado con fuente: Receipt-Driven Development, verificado contra el upstream]]
 
 ## Qué falta
 

@@ -31,6 +31,7 @@ import os
 import select
 import signal
 import sys
+import threading
 import time
 from dataclasses import dataclass, replace
 
@@ -543,6 +544,90 @@ def suspend_terminal():
     if _ACTIVE_SESSION is None:
         return contextlib.nullcontext()
     return _ACTIVE_SESSION.suspended()
+
+
+# ------------------------------------------------------------ progress / spinner (AC-04, AC-05)
+#
+# 025/D2: any operation over ~300ms says so. This NEVER writes to stdout -- stdout is the
+# machine channel (`--json` envelopes, `install.py --preview`'s MANAGED_DIFF_FILES= that
+# `check-drift.sh` parses with `sed`); every byte here targets `stream`, which callers pass
+# as `sys.stderr`. `use_color()` (set_agents_app.py) asks `sys.stdout.isatty()` -- the wrong
+# stream for something that writes to stderr -- so this module owns its own predicate instead
+# of reusing it.
+
+def supports_progress(stream) -> bool:
+    """True when `stream` can safely carry an animated, `\\r`-redrawing indicator: a real TTY
+    on THAT stream (reuses `_is_tty`, not a rewrite -- see its docstring: degrades to `False`
+    for anything that can't answer `isatty()` instead of raising), and no explicit request to
+    degrade. `NO_COLOR` and `TERM=dumb` are the same two escape hatches `use_color()` honors
+    for stdout color, checked here independently because they must gate a DIFFERENT stream."""
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    return _is_tty(stream)
+
+
+_SPINNER_FRAMES = "|/-\\"
+_SPINNER_INTERVAL_SECONDS = 0.1
+
+
+def with_progress(message, fn, *, stream=None, final=None):
+    """Run `fn()` (no arguments) while telling `stream` (default `sys.stderr` -- NEVER
+    stdout) that work is happening, for operations that can take seconds (AC-04: routing
+    probes, `--doctor-all`, `--route-doctor`, all measured over the ~300ms threshold in
+    the D2 context pack).
+
+    Live mode (`supports_progress(stream)`): a background thread redraws a `\\r`-prefixed
+    spinner frame every `_SPINNER_INTERVAL_SECONDS`. Degraded mode (no TTY, `NO_COLOR`,
+    `TERM=dumb`, or any stream that can't answer `isatty()`): one static line, no `\\r`, no
+    ANSI -- printed once, not touched again until the final line.
+
+    AC-05, "never the only indicator": when `fn()` returns, a PERSISTENT line is always
+    written to `stream` -- `final(result)` if given, else a plain "<message>: listo"
+    fallback -- in BOTH modes. If `fn()` raises, the spinner is still stopped and the
+    spinner line cleared (the `finally` below) before the exception propagates, but no
+    final line is written for a result that doesn't exist; the caller's own error path is
+    what informs the user in that case.
+
+    AC-05, "never blocks input": the spinner thread is always joined (bounded 1s timeout,
+    matching this module's other terminal-restore joins) BEFORE `with_progress` returns,
+    so nothing here can still be writing when a caller immediately follows with an
+    `input()`/`tui.suspend_terminal()` prompt."""
+    stream = stream if stream is not None else sys.stderr
+    live = supports_progress(stream)
+    stop_event = threading.Event()
+    thread = None
+
+    def _write(text):
+        try:
+            stream.write(text)
+            stream.flush()
+        except (OSError, ValueError):
+            pass
+
+    if live:
+        def _spin():
+            i = 0
+            while not stop_event.wait(_SPINNER_INTERVAL_SECONDS):
+                frame = _SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]
+                _write(f"\r{frame} {message}…")
+                i += 1
+        thread = threading.Thread(target=_spin, daemon=True)
+        thread.start()
+    else:
+        _write(f"· {message}…\n")
+
+    try:
+        result = fn()
+    finally:
+        if thread is not None:
+            stop_event.set()
+            thread.join(timeout=1.0)
+            _write("\r" + " " * (len(message) + 4) + "\r")
+
+    _write((final(result) if final is not None else f"{message}: listo") + "\n")
+    return result
 
 
 # --------------------------------------------------------------------------- render loop

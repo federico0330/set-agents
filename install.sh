@@ -12,10 +12,12 @@ DRY=0
 SKIP_AUTH=0
 SKIP_DEPS=0
 NO_INSTALL=0
+UNINSTALL=0
 HARNESS="all"
 
 usage() {
   echo "usage: ./install.sh [--yes] [--update] [--dry-run] [--skip-auth] [--skip-deps] [--no-install] [--harness claude|opencode|codex|pi|all]"
+  echo "       ./install.sh --uninstall [--harness claude|opencode|codex|pi|all] [--dry-run] [--yes]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -26,6 +28,7 @@ while [ "$#" -gt 0 ]; do
     --skip-auth) SKIP_AUTH=1 ;;
     --skip-deps) SKIP_DEPS=1 ;;
     --no-install) NO_INSTALL=1 ;;
+    --uninstall) UNINSTALL=1 ;;
     --harness)
       shift
       case "${1:-}" in
@@ -38,6 +41,41 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+# --------------------------------------------------------------- uninstall
+# D4/AC-10. Calls ai/scripts/install.py --uninstall DIRECTLY (never through
+# build.sh -- build.sh only knows --install): a --preview run always prints
+# first, then a real run only happens after an explicit y/N (or --yes),
+# exactly like build.sh's own --install confirmation dance. F16: --uninstall
+# never silently drops --yes/--harness -- both are read the same way the
+# install flow reads them; --update/--no-install don't apply to uninstalling
+# and are flagged, not swallowed.
+run_uninstall_flow() {
+  if [ "$UPDATE" -eq 1 ] || [ "$NO_INSTALL" -eq 1 ]; then
+    echo "AVISO: --update/--no-install no aplican a --uninstall; se ignoran esta corrida."
+  fi
+  local target_args=()
+  case "$HARNESS" in
+    claude) target_args=(--target claude-code --target pi) ;;
+    opencode) target_args=(--target opencode) ;;
+    codex) target_args=(--target codex) ;;
+    pi) target_args=(--target pi) ;;
+    all) target_args=(--target opencode --target claude-code --target codex --target pi) ;;
+  esac
+  echo "Vista previa de lo que --uninstall va a borrar/des-fusionar (harness=$HARNESS):"
+  python3 "$ROOT/ai/scripts/install.py" --home "$HOME" --uninstall "${target_args[@]}" --preview
+  if [ "$DRY" -eq 1 ]; then
+    # F01: --dry-run must actually stop here, in EVERY mode -- it must never
+    # reach the destructive branch below, uninstall included.
+    echo "UNINSTALL_DRY_RUN (no se tocó nada; repetí sin --dry-run para aplicar)"
+    return 0
+  fi
+  confirm "¿Confirmar la desinstalación de '$HARNESS'? Esto borra archivos gestionados y des-fusiona configuración de los archivos vivos." || {
+    echo "Desinstalación cancelada."
+    return 1
+  }
+  python3 "$ROOT/ai/scripts/install.py" --home "$HOME" --uninstall "${target_args[@]}"
+}
 
 harness_wanted() {
   # $1 cli name (opencode|claude|codex). With --harness all, everything is wanted.
@@ -419,6 +457,11 @@ verify_final() {
     printf '%-12s %s\n' "pi" "FALTA (sin pnpm)"
   fi
 }
+
+if [ "$UNINSTALL" -eq 1 ]; then
+  run_uninstall_flow
+  exit $?
+fi
 
 echo "Detalle de todo lo que vas a ver paso a paso: README.md"
 detect_os

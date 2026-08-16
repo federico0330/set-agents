@@ -107,6 +107,42 @@ class SpawnError(Exception):
     """A stable, non-secret reason string; never a bare traceback."""
 
 
+# ADR-0056 (amends ADR-0012, AC-12, 025/D5): see `claude_code_spawn._fetch_vault_block`'s
+# own docstring for the full rationale (sanctioned `--context --json` channel, why an
+# in-process re-implementation would be a circular import here in particular -- this
+# module is what `set_agents_app.py` itself imports at its own top level, `set_agents_
+# app.py:37`, so a `import set_agents_app` from THIS module would be a direct, guaranteed
+# cycle, not merely a theoretical one -- "obligatorio" != "falla cerrado", per-process
+# cache). Duplicated here, not imported: this module is, by this feature's own deliberate
+# architecture, a SEPARATE lane module from the other three spawners.
+_VAULT_FETCH_TIMEOUT_SECONDS = 10.0
+_vault_block_cache: dict[str, str | None] = {}
+
+
+def _fetch_vault_block(cwd, *, timeout: float = _VAULT_FETCH_TIMEOUT_SECONDS) -> str | None:
+    key = str(Path(cwd).resolve()) if cwd is not None else str(ROOT)
+    if key in _vault_block_cache:
+        return _vault_block_cache[key]
+    block = None
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(APP_CLI), "--context", "--json", "--project", key],
+            cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=timeout, check=False,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            doc = json.loads(proc.stdout.strip())
+            if isinstance(doc, dict):
+                sections = [doc.get(name) for name in ("hub", "company", "project", "pending")]
+                present = [section for section in sections if isinstance(section, str) and section]
+                if present:
+                    block = "\n\n".join(present)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        block = None
+    _vault_block_cache[key] = block
+    return block
+
+
 def _probe_env():
     # Same CI/NO_COLOR/TERM hygiene routing_core.catalog uses for the other probes: pi's
     # TUI must never block on a non-tty stdout, and locale/ANSI noise must never enter
@@ -210,7 +246,7 @@ _PI_THINKING_LEVELS = frozenset({"off", "minimal", "low", "medium", "high", "xhi
 
 def spawn(role: str, task: str, provider: str, model: str, prompt_path,
           guard_tools=GUARD_TOOLS_READONLY, cwd=None, timeout: float = PI_TIMEOUT_SECONDS,
-          effort=None):
+          effort=None, vault_block: str | None = None):
     """One guarded pi child (T-303/T-304). Returns `(outcome, detail)`:
 
     - `("success", {"model": ..., "usage": ...})` — agent_settled reached, exit 0, the
@@ -244,6 +280,12 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     # text (live-confirmed, see module docstring).
     if task.lstrip().startswith("-"):
         return "failure", {"reason": "TASK_LOOKS_LIKE_FLAG"}
+    # ADR-0056 (AC-12): `vault_block`, when given, is the ALREADY-fenced text
+    # `_fetch_vault_block` returns (context_pack._mark_untrusted's own per-call nonce,
+    # never a second scheme) -- composed AHEAD of the task, the pi lane's own equivalent
+    # of the other three lanes' `compose_task`. The SEC-A01 flag-lookalike check above runs
+    # on the ORIGINAL, caller-supplied `task` only -- a vault block can never suppress it.
+    composed_task = f"{vault_block}\n\n{task}" if vault_block else task
     own_scratch = cwd is None
     work_dir = Path(cwd) if cwd is not None else Path(tempfile.mkdtemp(prefix="pi-spawn-"))
     # T-304 guards: --no-session, --no-extensions, --no-context-files, --no-skills, and
@@ -259,7 +301,7 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     argv = catalog.pi_pinned_argv(
         "--model", target_id, *thinking, "--print", "--mode", "json", "--no-session", "--no-extensions",
         "--no-context-files", "--no-skills", "--no-prompt-templates", "--tools", ",".join(guard_tools),
-        "--append-system-prompt", str(prompt_path), task,
+        "--append-system-prompt", str(prompt_path), composed_task,
     )
     try:
         proc = subprocess.run(argv, cwd=work_dir, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -318,9 +360,32 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
 
 
 def _run_app_cli(args, env=None, timeout=60, cwd=ROOT):
+    """An `env` entry whose value is None UNSETS that variable in the child.
+
+    027 isolation follow-up, and the reason this convention exists at all. The lifecycle
+    contract (ADR-0008 D5, restated in `route_and_spawn`'s own opening comment) is "the
+    routing CLI discovers PROJECT_ROOT from its cwd" -- but this function hands the child a
+    copy of `os.environ`, and `resolve_project_root` (project_identity.py:56) ranks an
+    inherited `SET_AGENTS_PROJECT` ABOVE that cwd walk-up. `set_agents_app.main()` exports
+    exactly that variable into its own process (set_agents_app.py:4141), so any orchestrator
+    that ran a routing command in-process -- or any shell that merely exported the variable
+    -- silently re-anchored EVERY child of every later spawn to its own project, and the
+    persisted `dispatches.project_key` attributed the user's work to the wrong project. That
+    is precisely the corruption ADR-0008's "minimal change" was introduced to prevent.
+
+    Expressing the removal through the EXISTING `env` parameter, rather than a new keyword,
+    is deliberate: `_run_app_cli` is mocked by name across several test modules whose fakes
+    declare exactly `(args, env=None, timeout=60, cwd=None)`, so a new call-site keyword is
+    a TypeError in every one of them (measured: tests/test_pi_effort.py). `env` is a channel
+    they already accept and ignore. Only the CHILD's copy is touched; this process's own
+    `os.environ` is never mutated.
+    """
     full_env = dict(os.environ)
-    if env:
-        full_env.update(env)
+    for key, value in (env or {}).items():
+        if value is None:
+            full_env.pop(key, None)
+        else:
+            full_env[key] = value
     return subprocess.run([sys.executable, str(APP_CLI), *args], cwd=cwd, stdin=subprocess.DEVNULL,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                           timeout=timeout, check=False, env=full_env)
@@ -370,7 +435,23 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         descriptor["feature_id"] = feature_id
     if package_id:
         descriptor["package_id"] = package_id
-    env = {"SET_AGENTS_ROUTING_TEST_ROOT": routing_test_root} if routing_test_root else None
+    env = {"SET_AGENTS_ROUTING_TEST_ROOT": routing_test_root} if routing_test_root else {}
+    if spawn_cwd is not None:
+        # An explicit spawn target is this lane's analogue of `--project`: the most specific
+        # signal there is, so it must outrank an inherited `SET_AGENTS_PROJECT`, which would
+        # otherwise beat the cwd walk-up (project_identity.py:56) and re-anchor the whole
+        # lifecycle to whatever project the ORCHESTRATOR happens to sit in. None == unset in
+        # the child (see `_run_app_cli`). With no explicit spawn target the variable is left
+        # alone, so ADR-0008's documented precedence (`--project` > env > walk-up) still
+        # holds for a plain ambient run -- this narrows nothing that was ever intentional.
+        env["SET_AGENTS_PROJECT"] = None
+    # One kwargs bundle for all SIX lifecycle CLI calls (decide, dispatched, both terminal
+    # closes, the quota replacement close, and the best-effort close in the except block).
+    # Bundling is structural, not cosmetic: the child's project scoping MUST be identical
+    # across every call of one run -- a close that resolved a different PROJECT_ROOT than
+    # its own decide would write the terminal state into another project's routing store.
+    # Sharing one dict makes forgetting a call site impossible.
+    cli_kwargs = {"env": env, "cwd": routing_cwd}
     handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
     try:
         json.dump(descriptor, handle)
@@ -378,7 +459,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
     finally:
         handle.close()
     try:
-        decide = _run_app_cli(["--route-decide", descriptor_path, "--json"], env=env, cwd=routing_cwd)
+        decide = _run_app_cli(["--route-decide", descriptor_path, "--json"], **cli_kwargs)
     finally:
         try:
             os.unlink(descriptor_path)
@@ -391,10 +472,14 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         return {"status": "refused", "reason_codes": envelope.get("reason_codes", []),
                "decide_exit_code": decide.returncode}
     run_id, provider, model = data.get("run_id"), data.get("provider"), data.get("model")
+    # ADR-0056 (AC-12): fetched before the routing store's own dispatch call -- a
+    # vault-fetch timeout/crash never burns the one-use `single_writer` authorization the
+    # `--route-decide` call above already produced.
+    vault_block = _fetch_vault_block(routing_cwd)
     try:
-        dispatched = _run_app_cli(["--route-dispatched", run_id, "--json"], env=env, cwd=routing_cwd)
+        dispatched = _run_app_cli(["--route-dispatched", run_id, "--json"], **cli_kwargs)
         if dispatched.returncode != 0:
-            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env, cwd=routing_cwd)
+            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], **cli_kwargs)
             return {"status": "failure", "run_id": run_id, "reason": "DISPATCH_FAILED"}
         started = time.time()
         role_prompt = (Path(prompt_root) if prompt_root else CANON_AGENTS) / f"{role}.md"
@@ -402,7 +487,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         # ADR-0030: the decision's effort rides along as pi's --thinking level (validated
         # against the closed set inside spawn(); absent/unknown just omits the flag).
         outcome, detail = spawn(role, task, provider, model, role_prompt,
-                                guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd,
+                                guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd, vault_block=vault_block,
                                 effort=data.get("effort"))
         latency_ms = max(0, int((time.time() - started) * 1000))
         terminal_outcome = "success" if outcome == "success" else "failure"
@@ -427,19 +512,20 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
                              "--latency-ms", str(latency_ms), "--json"]
         if isinstance(usage, dict):
             terminal_args += ["--usage", json.dumps(usage)]
-        terminal = _run_app_cli(terminal_args, env=env, cwd=routing_cwd)
+        terminal = _run_app_cli(terminal_args, **cli_kwargs)
         quota_result = _last_json_line(terminal.stdout).get("data", {}) if detail.get("quota_error") else {}
         replacement_id = quota_result.get("replacement_run_id") if isinstance(quota_result, dict) else None
         replacement_provider = quota_result.get("replacement_provider") if isinstance(quota_result, dict) else None
         replacement_model = quota_result.get("replacement_model") if isinstance(quota_result, dict) else None
         if replacement_id and isinstance(replacement_provider, str) and isinstance(replacement_model, str):
             replacement_outcome, replacement_detail = spawn(role, task, replacement_provider, replacement_model, role_prompt,
-                                                             guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd)
+                                                             guard_tools=GUARD_TOOLS_READONLY, cwd=spawn_cwd,
+                                                             vault_block=vault_block)
             replacement_args = ["--route-terminal", replacement_id,
                                 "success" if replacement_outcome == "success" else "failure", "--json"]
             if isinstance(replacement_detail.get("usage"), dict):
                 replacement_args += ["--usage", json.dumps(replacement_detail["usage"])]
-            replacement_terminal = _run_app_cli(replacement_args, env=env, cwd=routing_cwd)
+            replacement_terminal = _run_app_cli(replacement_args, **cli_kwargs)
             detail = dict(detail, replacement_run_id=replacement_id, replacement_status=replacement_outcome,
                           replacement_terminal_exit_code=replacement_terminal.returncode)
     except Exception as exc:  # noqa: BLE001 - SEC-A03/PKG-N01: no orphaned authorized run
@@ -449,7 +535,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
         # as failure without a durable close; a caller that observes this reason should
         # treat `run_id` as needing a manual audit, but the process here never crashes.
         try:
-            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], env=env, cwd=routing_cwd)
+            _run_app_cli(["--route-terminal", run_id, "failure", "--json"], **cli_kwargs)
         except Exception:  # noqa: BLE001
             pass
         return {"status": "failure", "run_id": run_id, "reason": "ORCHESTRATION_EXCEPTION",

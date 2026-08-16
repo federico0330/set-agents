@@ -597,7 +597,14 @@ def cmd_route_doctor(human=False):
         from routing_core.catalog import prune_legacy_probe_cache, route_doctor
         config = models_config.load_config(ROOT / "models.toml")
         prune_legacy_probe_cache(STATE_DIR)
-        report = route_doctor(config, cache_root=_probe_cache_root())
+        # 025/D2 (AC-04/AC-05): this probes every configured provider (seconds, `catalog.py`'s
+        # own `timeout=20.0`) -- always to stderr, never stdout, so `--route-doctor --json`'s
+        # stdout stays byte-identical whether or not the spinner runs (the JSON envelope is
+        # printed by `_routing_output` below, after this call returns).
+        report = tui.with_progress(
+            "consultando routing", lambda: route_doctor(config, cache_root=_probe_cache_root()),
+            stream=sys.stderr, final=lambda _r: "consultando routing: listo",
+        )
         _routing_output(routing.cli_envelope(True, "route-doctor", report, (), ()), human)
         return 0
     except models_config.ModelsError:
@@ -966,7 +973,15 @@ def cmd_doctor_all():
         print("PROVIDERS_UNKNOWN models.toml inválido — corré ./build.sh --check")
         return 1
     prune_legacy_probe_cache(STATE_DIR)
-    listed, usable = probe_listed_and_usable(config, cache_root=_probe_cache_root())
+    # 025/D2 (AC-04/AC-05): measured ~10.5s locally (see D2-implementer.md evidence) --
+    # every provider gets probed. `--doctor-all` has no `--json` mode (its lines above and
+    # below are always plain stdout text), but the spinner itself still goes to stderr only,
+    # same discipline as `--route-doctor`, so a future `--json` variant here is never blocked
+    # by an accidental stdout dependency.
+    listed, usable = tui.with_progress(
+        "consultando proveedores", lambda: probe_listed_and_usable(config, cache_root=_probe_cache_root()),
+        stream=sys.stderr, final=lambda _r: "consultando proveedores: listo",
+    )
     all_pairs = sorted(set(listed) | set(usable))
     if not all_pairs:
         print("PROVIDERS_NONE no se detectó ninguna suscripción activa (claude/codex/opencode/pi) — "
@@ -1084,6 +1099,126 @@ def write_app_config(**updates):
 def set_auto_update(enabled):
     write_app_config(auto_update=enabled)
     print(f"AUTO_UPDATE={'on' if enabled else 'off'}")
+
+
+# ------------------------------------------------------------- posturas (025/D3, ADR-0054)
+# AC-06: how much autonomy the user gives the harness stops being a constant baked into
+# ADR-0025/ADR-0037's prose and becomes a parameter — same store as auto_update
+# (`write_app_config`, AC-15's single writer), same molde as the toggle above. The default
+# ("autonoma") has to reproduce today's conduct byte for byte: an ABSENT key is not "no
+# postura", it IS the postura the harness already has -- ADR-0025 resolve-first, ADR-0037
+# resolvé antes de preguntar, MCP enable->use->disable, all unchanged for a user who never
+# touches this. The table below is copied verbatim from spec.md AC-06 -- the doctrine text
+# in `Global/_canonical/agents/orchestrator.md`'s "Postura de autonomía" section quotes these
+# same three `explicacion` strings, and `tests/test_harness.py` asserts they never drift
+# apart (that assertion IS the "the postura reaches the agent" test the package required).
+POSTURAS = (
+    ("autonoma", "Autónoma", "Usa MCPs, CLIs y skills por su cuenta; narra por hito"),
+    ("consultiva", "Consultiva", "Propone y espera confirmación en las acciones que mutan"),
+    ("todo_consultado", "Todo consultado", "Pregunta antes de cada delegación"),
+)
+POSTURA_KEYS = tuple(key for key, _, _ in POSTURAS)
+
+
+def postura_actual():
+    value = app_config().get("postura", "autonoma")
+    return value if value in POSTURA_KEYS else "autonoma"
+
+
+def set_postura(value):
+    if value not in POSTURA_KEYS:
+        raise ValueError(f"postura desconocida: {value!r} (elegí una de {POSTURA_KEYS})")
+    write_app_config(postura=value)
+    print(f"POSTURA={value}")
+
+
+def postura_gate(postura, *, mutating=False, delegating=False):
+    """The computable form of the 'Postura de autonomía (ADR-0054)' table in
+    `Global/_canonical/agents/orchestrator.md`: what the doctrine tells an agent to do before
+    a given action, for a given `postura`. Not called by any CLI path today (the doctrine is
+    prose an LLM reads and applies itself) -- it exists so the mordida can assert an
+    observable difference across the three postures without spawning a real agent, and so a
+    human/reviewer has one place that states the rule as code, not just as markdown prose."""
+    if postura not in POSTURA_KEYS:
+        raise ValueError(f"postura desconocida: {postura!r}")
+    if postura == "todo_consultado" and delegating:
+        return "pregunta_y_espera"
+    if postura in ("consultiva", "todo_consultado") and mutating:
+        return "propone_y_espera"
+    return "actua"
+
+
+def cmd_posturas():
+    actual = postura_actual()
+    print("Postura de autonomía -- cuánta autonomía le das al harness para actuar sin vos.")
+    print(f"actual: {actual}")
+    print()
+    for key, label, explicacion in POSTURAS:
+        marker = ">" if key == actual else " "
+        print(f"{marker} POSTURA {key} {label} -- {explicacion}")
+    print()
+    print("Se apoya en doctrina ya existente (ADR-0025 resolve-first, ADR-0037 resolvé antes de "
+          "preguntar, MCP enable->use->disable) y la vuelve un parámetro en vez de una constante.")
+    print(f"Cambiá con --postura {{{','.join(POSTURA_KEYS)}}}.")
+    print("Canal: el orquestador lee esta postura en config.toml antes de actuar/proponer/preguntar -- "
+          "ver Global/_canonical/agents/orchestrator.md, sección 'Postura de autonomía (ADR-0054)'.")
+    return 0
+
+
+# --------------------------------------------------------- metodología preferida (AC-07/AC-08)
+# TDD estricto ya existe POR PAQUETE (ADR-0022, `feature-state.py create/update --strict-tdd`,
+# `Global/_canonical/skills/strict-tdd/`) -- no se duplica un store nuevo acá, sólo se expone
+# con su explicación (AC-07). RDD es el MISMO mecanismo con el vocabulario de Gentleman
+# Programming (`strict-tdd/SKILL.md:17`/`strict-tdd-verify/SKILL.md:17`: "Ported from
+# gentle-ai's ... RDD strict-TDD module") -- AC-08 lo nombra y lo reconcilia, no lo reinventa.
+# SDD ya existe como skill (`Global/_canonical/skills/sdd/`), eje del modo `feature` de
+# `request-triage`. `metodologia_preferida` es la ÚNICA pieza nueva de estado: una preferencia
+# global y opcional (default "", sin preferencia -- conducta de hoy sin cambios) que orienta
+# al orquestador cuando triagea un pedido ambiguo o propone un paquete nuevo; nunca fuerza el
+# `strict_tdd` de un paquete ya creado.
+METODOLOGIAS = (
+    ("tdd_rdd", "TDD estricto / RDD",
+     "Ciclo RED->GREEN->TRIANGULATE->REFACTOR obligatorio por paquete (ADR-0022, skill "
+     "strict-tdd). RDD (Receipt Driven Development, Gentleman Programming) es el mismo "
+     "mecanismo con su nombre: exigirle a la IA recibos verificables -- logs, resultados de "
+     "tests, ejecuciones reales -- en vez de promesas (ya lo practica ADR-0026 evidencia sobre "
+     "memoria y las mordidas de cada paquete). Se activa por paquete al crearlo "
+     "(`feature-state.py create/update --strict-tdd`), no acá."),
+    ("sdd", "SDD (Spec-Driven Development)",
+     "Escribir spec/plan/acceptance ANTES del código y cerrar REQUIREMENTS->SPEC_DRAFT->"
+     "SPEC_CHALLENGE->USER_APPROVAL antes de implementar (skill sdd). Ya es el eje del modo "
+     "'feature' de request-triage; `--metodologia sdd` es sólo una preferencia para pedidos "
+     "ambiguos, no fuerza el modo de uno ya triageado."),
+)
+METODOLOGIA_KEYS = tuple(key for key, _, _ in METODOLOGIAS)
+METODOLOGIA_PREFERENCE_VALUES = ("", "sdd", "rdd")
+
+
+def metodologia_preferida():
+    value = app_config().get("metodologia_preferida", "")
+    return value if value in METODOLOGIA_PREFERENCE_VALUES else ""
+
+
+def set_metodologia(value):
+    value = "" if value == "off" else value
+    if value not in METODOLOGIA_PREFERENCE_VALUES:
+        raise ValueError(f"metodología desconocida: {value!r} (elegí sdd, rdd u off)")
+    write_app_config(metodologia_preferida=value)
+    print(f"METODOLOGIA={value or 'off'}")
+
+
+def cmd_metodologias():
+    pref = metodologia_preferida()
+    print("Metodología -- cómo preferís que el harness triagee un pedido o proponga un paquete nuevo.")
+    print(f"preferencia actual: {pref or 'off (sin preferencia)'}")
+    print()
+    for key, label, explicacion in METODOLOGIAS:
+        print(f"METODOLOGIA {key} {label} -- {explicacion}")
+    print()
+    print("Cambiá la preferencia con --metodologia {sdd,rdd,off}. TDD estricto en sí sigue siendo, "
+          "como siempre, un flag por paquete (ADR-0022) -- esta preferencia global sólo orienta la "
+          "propuesta del orquestador, nunca fuerza un paquete ya creado.")
+    return 0
 
 
 # ----------------------------------------------------------------------- git
@@ -1287,7 +1422,24 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
     print(f"UPDATE_APPLIED {old}..{short_sha()}")
     if no_install:
         return 0
+    # D4/AC-09 repair: this used to call build.sh --install with NO --target at
+    # all, and install.py's own "no --target means all four" default (AC-09's
+    # own contract) silently re-widened a machine that installed with e.g.
+    # `install.sh --harness claude` back to all four trees on every
+    # "Actualizar". Scope it to what `_install_scope()` says this machine
+    # actually manages instead.
+    scope = _install_scope()
+    if scope == []:
+        print("UPDATE_SKIPPED_EMPTY_SCOPE: ningun harness instalado en esta maquina (install-targets.json vacio).")
+        return 0
     install = [str(ROOT / "build.sh"), "--install"]
+    if isinstance(scope, list) and scope:
+        for target in scope:
+            install += ["--target", target]
+    elif scope == "unreadable":
+        print("UPDATE_SCOPE_UNREADABLE: install-targets.json ilegible -- actualizando los cuatro arboles por seguridad.")
+    # scope is None: machine predates install-targets.json (legacy install) --
+    # keep the historical default (all four), unchanged, never narrowed on a guess.
     if yes:
         install.append("--yes")
     # No capture: build.sh shows the managed diff and asks on the caller's TTY (AC-26).
@@ -3796,6 +3948,14 @@ def _build_parser(advanced=False):
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--no-install", action="store_true")
     parser.add_argument("--auto-update", choices=("on", "off"))
+    parser.add_argument("--posturas", action="store_true",
+                        help="explica las posturas de autonomía elegibles (AC-06)")
+    parser.add_argument("--postura", choices=POSTURA_KEYS,
+                        help="fija la postura de autonomía del harness")
+    parser.add_argument("--metodologias", action="store_true",
+                        help="explica TDD estricto/RDD y SDD (AC-07/AC-08)")
+    parser.add_argument("--metodologia", choices=("sdd", "rdd", "off"),
+                        help="fija la preferencia de metodología para pedidos/paquetes nuevos")
     parser.add_argument("--tools", action="store_true", help="TOOL <name> installed=yes/no")
     parser.add_argument("--tools-install", metavar="NAME")
     parser.add_argument("--dry-run", action="store_true")
@@ -4027,6 +4187,16 @@ def main():
         return cmd_update(yes=args.yes, no_install=args.no_install)
     if args.auto_update:
         set_auto_update(args.auto_update == "on")
+        return 0
+    if args.posturas:
+        return cmd_posturas()
+    if args.postura:
+        set_postura(args.postura)
+        return 0
+    if args.metodologias:
+        return cmd_metodologias()
+    if args.metodologia:
+        set_metodologia(args.metodologia)
         return 0
     if args.model_preference_show:
         try:

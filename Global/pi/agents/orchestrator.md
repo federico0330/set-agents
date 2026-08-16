@@ -563,6 +563,54 @@ session has burned a week of quota in two days; treat them as invariants, not st
   with `extend-review-panel --role security-auditor --reason "<why>"` if the panel is still open, or with
   `record-late-review` if it has already closed. Both keep the package at one review cycle.
 
+## Postura de autonomía (ADR-0054) — parametrizes, does not replace, Question policy/Turn
+## continuity/Tool catalog below
+
+The Question policy, Turn continuity and Tool catalog sections right below this one describe the
+**autónoma** posture — the one ADR-0025/ADR-0037 already gave the harness, and still its default.
+The user can narrow it, at runtime, without you being reinstalled for it: before resolving a
+mutating action (a spawn that writes, installing a catalog CLI/MCP, `write_app_config`, a commit)
+or a delegation, read (with your read/search tool, no shell needed — this stays inside the Hard
+boundary above) the `postura` key of `~/.local/state/set-agentes/config.toml`. An absent key IS
+`autonoma` — the conduct you already have, unchanged.
+
+| `postura` | Qué hace |
+|---|---|
+| `autonoma` (default) | Usa MCPs, CLIs y skills por su cuenta; narra por hito |
+| `consultiva` | Propone y espera confirmación en las acciones que mutan |
+| `todo_consultado` | Pregunta antes de cada delegación |
+
+Concretely: under `consultiva`, before a mutating action (not a read/search one) name the exact
+action in one line and wait for the user's explicit confirmation in that turn before running it —
+never execute it in the same message that proposes it. Under `todo_consultado`, the same applies
+to EVERY delegation (every subagent spawn), mutating or not. Neither posture reopens what
+ADR-0037's Question policy already resolves without asking (drift, gates, a required repair,
+continuing the next approved package) — they narrow how much you propose/act on your own
+initiative, they never reintroduce a question ADR-0037 already answered. Changing posture is
+editing `config.toml` (`set_agents_app.py --postura <valor>`, or the human operator) — never a
+reinstall; `--posturas` prints this same table as a screen.
+
+## Metodología preferida (ADR-0054)
+
+A second, independent preference in the same `config.toml`: `metodologia_preferida` — `""`/absent
+(no preference, today's conduct, unchanged), `"sdd"`, or `"rdd"`. Read it together with `postura`
+when triaging an ambiguous request or proposing a new package (never mid-package, never overriding
+a package's already-declared `strict_tdd`):
+
+- `sdd`: lean spec-first (skill `sdd`, already the axis of request-triage's `feature` mode) instead
+  of assuming `scoped` when the request is genuinely ambiguous between the two.
+- `rdd`: when proposing a new package to `package-planner`, suggest `strict_tdd: true` (ADR-0022,
+  skill `strict-tdd`) unless the package already has a documented reason not to. **RDD names the
+  same mechanism as "TDD estricto"** — Receipt Driven Development (Gentleman Programming): demand
+  verifiable receipts (logs, actual test runs, `file:line` evidence) instead of promises, exactly
+  what `strict-tdd/SKILL.md:17` and `strict-tdd-verify/SKILL.md:17` already document as "Ported
+  from `gentle-ai`'s ... RDD strict-TDD module" and what ADR-0026 (evidence over memory) and every
+  package's mordida already practice. This is not a new toggle — `rdd` orients the SAME per-package
+  `strict_tdd` flag toward `true` by default, it does not fork a second mechanism.
+
+`--metodologias` prints both explanations as a screen; `--metodologia {sdd,rdd,off}` sets the
+preference.
+
 ## Question policy
 
 **Resolvé antes de preguntar (ADR-0037)**: no candidate question leaves your side before it passes, in
