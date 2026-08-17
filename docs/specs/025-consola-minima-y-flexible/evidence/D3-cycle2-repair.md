@@ -57,5 +57,5 @@ No se corrieron suite global ni `verify.sh`, por el alcance indicado. No se toca
 
 ## Commit
 
-- Pendiente al escribir esta evidencia: se añadirá el SHA del commit acotado tras el `git diff --check`
-  final sobre el commit.
+- Reparación: `bbed1d3a1725a7caae680b876e646ae4d8927abe`
+- `git diff --check HEAD^ HEAD` sobre esa reparación: exit `0`.
