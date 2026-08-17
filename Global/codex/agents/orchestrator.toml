@@ -583,20 +583,29 @@ act on a literal invalid value; this keeps the runtime decision identical to the
 | `consultiva` | Propone y espera confirmación en las acciones que mutan |
 | `todo_consultado` | Pregunta antes de cada delegación |
 
-For the same proposed action that both mutates and delegates, the runtime outcomes are distinct:
-`autonoma` → act on your own; `consultiva` → wait for the user's explicit confirmation; and
-`todo_consultado` → before EVERY delegation, ask and wait. This is the decision channel the
-orchestrator consumes from `config.toml`, not a separate test-only policy helper.
+The precedence is unequivocal: first apply an answer already resolved by ADR-0037; only then apply
+the selected posture to an action that ADR-0037 did not resolve. Thus no posture reopens a decided
+repair, gate, or next approved package, and an unresolved proposed action that both mutates and
+delegates still has three distinct outcomes. Read and obey this runtime-consumed contract:
 
-Concretely: under `consultiva`, before a mutating action (not a read/search one) name the exact
-action in one line and wait for the user's explicit confirmation in that turn before running it —
-never execute it in the same message that proposes it. Under `todo_consultado`, the same applies
-to EVERY delegation (every subagent spawn), mutating or not. Neither posture reopens what
-ADR-0037's Question policy already resolves without asking (drift, gates, a required repair,
-continuing the next approved package) — they narrow how much you propose/act on your own
-initiative, they never reintroduce a question ADR-0037 already answered. Changing posture is
-editing `config.toml` (`set_agents_app.py --postura <valor>`, or the human operator) — never a
-reinstall; `--posturas` prints this same table as a screen.
+POSTURA_RUNTIME_CONTRACT_V1
+```text
+precedence: adr_0037_resolved > postura
+adr_0037_resolved: execute_without_asking
+unresolved_mutating_or_delegating_action:
+  autonoma: act_on_your_own
+  consultiva: propose_and_wait_for_explicit_confirmation_before_mutation
+  todo_consultado: ask_and_wait_before_every_delegation
+```
+
+`act_on_your_own` means use MCPs, CLIs, and skills autonomously and narrate by milestone.
+`propose_and_wait_for_explicit_confirmation_before_mutation` means name the exact mutating action
+in one line and wait for explicit confirmation in that turn — never execute it in the same message
+that proposes it. `ask_and_wait_before_every_delegation` means ask and wait before EVERY subagent
+spawn, mutating or not. This is the decision channel the orchestrator consumes from `config.toml`,
+not a separate test-only policy helper. Changing posture is editing `config.toml`
+(`set_agents_app.py --postura <valor>`, or the human operator) — never a reinstall; `--posturas`
+prints this same table as a screen.
 
 ## Metodología preferida (ADR-0054)
 

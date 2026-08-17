@@ -1056,15 +1056,15 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(config["postura"], "consultiva")
 
     def test_las_tres_posturas_dan_tres_resultados_distintos_para_el_mismo_escenario(self):
-        """Mordida 2 -- el escenario escribe el canal runtime que consume el orquestador,
-        no un helper espejo. Para una misma acción mutante+delegante, cada valor persistido
-        debe llegar a la doctrina instalada con una instrucción observable distinta."""
+        """Mordida 2 -- el contrato que consume el orquestador asocia una postura
+        persistida con SU acción para una propuesta todavía no resuelta por ADR-0037.
+        No alcanza encontrar ambos textos por separado: permutar dos filas debe romperla."""
         app = self._import("set_agents_app")
         self.assertFalse(hasattr(app, "postura_gate"), "la mordida no puede depender de un helper espejo")
         expected_actions = {
-            "autonoma": "act on your own",
-            "consultiva": "wait for the user's explicit confirmation",
-            "todo_consultado": "before EVERY delegation",
+            "autonoma": "act_on_your_own",
+            "consultiva": "propose_and_wait_for_explicit_confirmation_before_mutation",
+            "todo_consultado": "ask_and_wait_before_every_delegation",
         }
         doctrines = [(ROOT / path).read_text() for path in (
             "Global/_canonical/agents/orchestrator.md",
@@ -1073,15 +1073,34 @@ class HarnessTests(unittest.TestCase):
             "Global/codex/agents/orchestrator.toml",
             "Global/pi/agents/orchestrator.md",
         )]
+        for doctrine in doctrines:
+            contract = re.search(
+                r"POSTURA_RUNTIME_CONTRACT_V1\n```text\n(?P<body>.*?)\n```",
+                doctrine,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(contract, "falta el contrato runtime que lee el orquestador")
+            body = contract.group("body")
+            self.assertIn("precedence: adr_0037_resolved > postura", body)
+            self.assertIn("adr_0037_resolved: execute_without_asking", body)
+            runtime_actions = dict(re.findall(r"^  (autonoma|consultiva|todo_consultado): (\S+)$", body, re.MULTILINE))
+            self.assertEqual(runtime_actions, expected_actions)
         with tempfile.TemporaryDirectory() as td:
             with mock.patch.object(app, "APP_CONFIG", Path(td) / "config.toml"), \
                  mock.patch.object(app, "STATE_DIR", Path(td)):
-                for postura, action in expected_actions.items():
+                for postura, expected_action in expected_actions.items():
                     app.set_postura(postura)
                     self.assertEqual(app.postura_actual(), postura)
                     for doctrine in doctrines:
-                        self.assertIn(f"`{postura}`", doctrine)
-                        self.assertIn(action, doctrine)
+                        body = re.search(
+                            r"POSTURA_RUNTIME_CONTRACT_V1\n```text\n(?P<body>.*?)\n```",
+                            doctrine,
+                            re.DOTALL,
+                        ).group("body")
+                        runtime_actions = dict(re.findall(
+                            r"^  (autonoma|consultiva|todo_consultado): (\S+)$", body, re.MULTILINE,
+                        ))
+                        self.assertEqual(runtime_actions[app.postura_actual()], expected_action)
 
     def test_el_canal_de_postura_llega_a_donde_el_agente_lo_lee(self):
         """Mordida 3 -- la que distingue "guardé un booleano" de "cambié la conducta": el
