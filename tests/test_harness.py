@@ -7376,6 +7376,43 @@ class HarnessTests(unittest.TestCase):
             targets = [install_cmd[i + 1] for i, arg in enumerate(install_cmd) if arg == "--target"]
             self.assertEqual(sorted(targets), ["claude-code", "pi"], "must reinstall ONLY the scoped targets, never all four")
 
+    def test_virgin_session_uses_an_isolated_home_without_reading_or_mutating_installed_lane(self):
+        # D4-F01 / AC-11: start with a genuinely installed lane, then launch its
+        # real command name through a PATH shim.  The shim observes the environment
+        # the one-shot session actually receives: it must resolve every home/XDG
+        # lookup inside the disposable root, never in the installed lane.
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as staging_dir, tempfile.TemporaryDirectory() as bin_dir:
+            home = Path(td)
+            self._install_all_four(home, staging_dir)
+            before = self._tree_hashes(home, (".claude", ".config/opencode", ".codex", ".pi"))
+            marker = home / ".claude/CLAUDE.md"
+            self.assertTrue(marker.exists())
+            shim = Path(bin_dir) / "claude"
+            shim.write_text(
+                f"#!{sys.executable}\n"
+                "import os\n"
+                "from pathlib import Path\n"
+                f"installed = Path({str(home)!r})\n"
+                "scratch = Path(os.environ['HOME'])\n"
+                "assert scratch != installed\n"
+                "assert not (scratch / '.claude' / 'CLAUDE.md').exists()\n"
+                "for key in ('XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR'):\n"
+                "    value = Path(os.environ[key])\n"
+                "    assert value.is_dir() and value.is_relative_to(scratch)\n"
+                "print('SHIM_VIRGIN_OK')\n",
+                encoding="utf-8",
+            )
+            shim.chmod(0o755)
+            result = run(
+                "python3", "ai/scripts/set_agents_app.py", "--virgin", "claude", "--", "--version",
+                env={"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"}, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("SHIM_VIRGIN_OK", result.stdout)
+            self.assertIn("VIRGIN_SESSION_DONE cli=claude exit=0", result.stdout)
+            self.assertEqual(before, self._tree_hashes(home, (".claude", ".config/opencode", ".codex", ".pi")))
+            self.assertTrue(marker.exists(), "AC-11 must not mutate the installed lane")
+
     def test_generation_is_reproducible(self):
         with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
             run("./build.sh", "--output", one)

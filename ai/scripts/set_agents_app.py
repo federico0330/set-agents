@@ -3626,6 +3626,68 @@ def run_tty(command):
     return result
 
 
+# D4/AC-11: a one-shot launch is deliberately an execution boundary, not an
+# install/uninstall operation.  The child gets a new home and every XDG root;
+# its configuration cannot resolve through the installed harness tree of the
+# parent process.  Keep the child's environment deliberately narrow so an
+# inherited per-CLI override cannot quietly point it back at the real home.
+_VIRGIN_CLI_BINARIES = {
+    "opencode": ("opencode",),
+    "claude": ("claude",),
+    "codex": ("codex",),
+}
+_VIRGIN_ENV_PASSTHROUGH = ("PATH", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "COLORTERM", "NO_COLOR")
+
+
+def cmd_virgin_session(cli, child_args):
+    """Run one CLI once with no access to this harness's home/XDG config.
+
+    `child_args` is already separated by the public `--` delimiter.  No shell
+    is involved, and the temporary root is removed after the child exits.
+    """
+    if cli == "pi":
+        from routing_core.catalog import pi_pinned_argv
+        command = list(pi_pinned_argv(*child_args))
+    else:
+        binary = _VIRGIN_CLI_BINARIES.get(cli)
+        if binary is None:
+            print("VIRGIN_SESSION_INPUT_INVALID", file=sys.stderr)
+            return 2
+        command = [*binary, *child_args]
+
+    with tempfile.TemporaryDirectory(prefix="set-agentes-virgin-") as temporary_home:
+        scratch = Path(temporary_home)
+        xdg_roots = {
+            "XDG_CONFIG_HOME": scratch / "config",
+            "XDG_DATA_HOME": scratch / "data",
+            "XDG_STATE_HOME": scratch / "state",
+            "XDG_CACHE_HOME": scratch / "cache",
+            "XDG_RUNTIME_DIR": scratch / "runtime",
+        }
+        for directory in xdg_roots.values():
+            directory.mkdir(mode=0o700)
+        env = {key: os.environ[key] for key in _VIRGIN_ENV_PASSTHROUGH if os.environ.get(key)}
+        env.update({"HOME": str(scratch), "TMPDIR": str(scratch / "tmp"), "CODEX_HOME": str(scratch / "codex")})
+        (scratch / "tmp").mkdir(mode=0o700)
+        env.update({key: str(value) for key, value in xdg_roots.items()})
+        print(f"VIRGIN_SESSION cli={cli} home=temporary xdg=isolated")
+        try:
+            result = subprocess.run(command, env=env, check=False)
+        except FileNotFoundError:
+            print(f"VIRGIN_SESSION_CLI_MISSING cli={cli}", file=sys.stderr)
+            return 127
+        print(f"VIRGIN_SESSION_DONE cli={cli} exit={result.returncode}")
+        return result.returncode
+
+
+def _dispatch_virgin_session(argv):
+    """Strict argv grammar for `set-agents --virgin CLI -- [CLI args...]`."""
+    if len(argv) < 3 or argv[1] != "--" or argv[0] not in (*_VIRGIN_CLI_BINARIES, "pi"):
+        print("usage: set-agents --virgin {opencode,claude,codex,pi} -- [CLI args...]", file=sys.stderr)
+        return 2
+    return cmd_virgin_session(argv[0], argv[2:])
+
+
 DRIFT_BADGE = {
     "ok": lambda: color("OK", "32"),
     "stale": lambda: color("DESACTUALIZADO", "33"),
@@ -3910,6 +3972,8 @@ def _build_parser(advanced=False):
             '"<cmd>" --why "<motivo>" (valida y imprime la pregunta consolidada, nunca instala) '
             "y --tools-approve <name> (la aprobación humana -- nunca la corre un agente, sea "
             "cual sea su rol).\n"
+            "Sesión virgen de una vez: set-agents --virgin {opencode,claude,codex,pi} -- [args]; "
+            "la CLI corre con HOME/XDG temporales y no modifica tu instalación.\n"
             "AC-02 (ADR-0050): algunas flags de uso interno (spawns/orquestador) están "
             "ocultas de esta lista -- siguen funcionando igual; --help --avanzado las muestra."
         ),
@@ -4075,6 +4139,11 @@ def main():
     # below) completely untouched -- these two verbs never reach `parser.parse_args()`.
     if len(sys.argv) > 1 and sys.argv[1] in ("--tools-propose", "--tools-approve"):
         return _dispatch_tools_discovery(sys.argv[1], sys.argv[2:])
+    # D4/AC-11: only this exact, standalone grammar reaches the child process.
+    # Keeping it before argparse means child flags cannot be mistaken for
+    # set-agents flags, and --virgin cannot be silently combined with --update.
+    if sys.argv[1:2] == ["--virgin"]:
+        return _dispatch_virgin_session(sys.argv[2:])
     # AC-02: `--help --avanzado` (either order) rebuilds the SAME parser with
     # `_INTERNAL_FLAGS`' real help text restored, prints it, and returns -- checked
     # against raw `sys.argv` (like the interception above), NEVER via the normal parser's

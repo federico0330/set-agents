@@ -90,8 +90,14 @@ assumed, at uninstall time.
    defaulted to all four and re-widened a deliberately narrow install on every update). A machine that
    predates the scope record (`_install_scope()` returns `None`) keeps the historical default (all
    four) unchanged — never narrowed on a guess, only ever narrowed on positive evidence.
+8. AC-11 is a standalone, explicit command: `set-agents --virgin {opencode,claude,codex,pi} -- [args]`.
+   It launches only that child with a fresh 0700 temporary `HOME`, `TMPDIR`, `CODEX_HOME`, and all five
+   XDG roots (`CONFIG`, `DATA`, `STATE`, `CACHE`, `RUNTIME`), through an allowlisted argv and never a
+   shell. The temporary tree is removed after the child exits. The command cannot be combined with any
+   other `set-agents` mode because it is parsed before argparse; its mandatory `--` separates the child
+   argv unambiguously.
 
-## AC-11 — "use a CLI virgin, just this once" (deferred by the orchestrator)
+## AC-11 — "use a CLI virgin, just this once"
 
 The D4 context pack asked for this decision to be made and recorded even though its implementation
 is deferred to a later package. The two axes that exist and must not be conflated:
@@ -113,11 +119,11 @@ Every one of the four CLIs resolves its config through more than `HOME` alone:
 | pi | `home / ".pi/agent"` | `HOME` (no documented override found in this repo's own sources) |
 | opencode | `home / ".config/opencode"` | `HOME`, **and/or `XDG_CONFIG_HOME`** — `install.py:38-42` hardcodes `home / ".config/opencode"`, unconditionally ignoring `XDG_CONFIG_HOME` even when the user has exported it |
 
-A future AC-11 implementation naming only `HOME` as the axis to override would be incomplete for
+A command naming only `HOME` as the axis to override would be incomplete for
 opencode on any machine that exports `XDG_CONFIG_HOME` (a common Linux/XDG-base-dir convention): a
 spawn given a scratch `HOME` but no matching `XDG_CONFIG_HOME` override would still read the real,
 installed `opencode.json` through the exported variable, defeating the "virgin" guarantee silently.
-The correct axis set for a future AC-11 is **`HOME` plus, per CLI, whichever of
+The correct axis set for AC-11 is **`HOME` plus, per CLI, whichever of
 `XDG_CONFIG_HOME`/`XDG_DATA_HOME`/`XDG_STATE_HOME` that CLI actually consults** — not `HOME` alone.
 
 **Sin verificar**: whether opencode's own runtime actually honors `XDG_CONFIG_HOME` (this repo's
@@ -135,4 +141,6 @@ must confirm this with a source (opencode's own docs/`--help`) before relying on
   `~/.codex/config.toml` by hand) keeps that value forever after — uninstall, and any FUTURE install,
   never claims it back once the live value has diverged from what this installer last wrote. This is
   intentional (F04's fix) and matches ADR-0008 D2's standing doctrine, not a new relaxation.
-- AC-11 remains unimplemented; this ADR only fixes the axis it must eventually use.
+- A virgin one-shot intentionally starts without the installed harness configuration or its local
+  authentication state. It is a clean runtime session, not a temporary uninstall and not a way to
+  preserve that configuration for one process.
