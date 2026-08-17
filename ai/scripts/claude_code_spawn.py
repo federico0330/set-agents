@@ -296,29 +296,47 @@ class SpawnError(Exception):
 # the subprocess+import this reuses is ~150-225ms per cache miss (docs/specs/
 # 025-consola-minima-y-flexible/evidence/D5-implementer.md); a cache hit is a dict lookup.
 _VAULT_FETCH_TIMEOUT_SECONDS = 10.0
-_vault_block_cache: dict[str, str | None] = {}
+_VAULT_NONE_LINKED_NOTE = "[vault: none linked for this project; spawn proceeds without it]"
+_VAULT_DEGRADED_NOTE = "[vault: lookup failed; spawn proceeds without it]"
+VAULT_DEGRADATION_LOG_FILENAME = "vault_degradation.jsonl"
+_vault_block_cache: dict[str, str] = {}
 
 
-def _fetch_vault_block(cwd, *, timeout: float = _VAULT_FETCH_TIMEOUT_SECONDS) -> str | None:
+def _persist_vault_degradation(reason: str, *, routing_test_root=None) -> None:
+    try:
+        root = RoutingStore(root=Path(routing_test_root) if routing_test_root else None).ensure_cache_root()
+        path = root / VAULT_DEGRADATION_LOG_FILENAME
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"ts": time.time(), "reason": reason}, sort_keys=True) + "\n")
+        os.chmod(path, 0o600)
+    except Exception:  # noqa: BLE001 - observational only
+        pass
+
+
+def _fetch_vault_block(cwd, *, timeout: float = _VAULT_FETCH_TIMEOUT_SECONDS, routing_test_root=None) -> str:
     key = str(Path(cwd).resolve()) if cwd is not None else str(ROOT)
     if key in _vault_block_cache:
         return _vault_block_cache[key]
-    block = None
     try:
         proc = subprocess.run(
             [sys.executable, str(APP_CLI), "--context", "--json", "--project", key],
             cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             timeout=timeout, check=False, **_CHILD_TEXT_KWARGS,
         )
-        if proc.returncode == 0 and proc.stdout.strip():
-            doc = json.loads(proc.stdout.strip())
-            if isinstance(doc, dict):
-                sections = [doc.get(name) for name in ("hub", "company", "project", "pending")]
-                present = [section for section in sections if isinstance(section, str) and section]
-                if present:
-                    block = "\n\n".join(present)
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        block = None
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _persist_vault_degradation(f"VAULT_FETCH_EXCEPTION:{type(exc).__name__}", routing_test_root=routing_test_root)
+        return _VAULT_DEGRADED_NOTE
+    if proc.returncode != 0:
+        _persist_vault_degradation(f"VAULT_FETCH_NONZERO_EXIT:{proc.returncode}", routing_test_root=routing_test_root)
+        return _VAULT_DEGRADED_NOTE
+    try:
+        doc = json.loads(proc.stdout.strip()) if proc.stdout.strip() else {}
+    except ValueError:
+        _persist_vault_degradation("VAULT_FETCH_UNPARSEABLE_OUTPUT", routing_test_root=routing_test_root)
+        return _VAULT_DEGRADED_NOTE
+    sections = [doc.get(name) for name in ("hub", "company", "project", "pending")] if isinstance(doc, dict) else []
+    present = [section for section in sections if isinstance(section, str) and section]
+    block = "\n\n".join(present) if present else _VAULT_NONE_LINKED_NOTE
     _vault_block_cache[key] = block
     return block
 
@@ -573,8 +591,11 @@ def spawn(role: str, task: str, provider: str, model: str, roster, *,
 
 def _run_app_cli(args, env=None, timeout=60, cwd=ROOT):
     full_env = dict(os.environ)
-    if env:
-        full_env.update(env)
+    for key, value in (env or {}).items():
+        if value is None:
+            full_env.pop(key, None)
+        else:
+            full_env[key] = value
     return subprocess.run([sys.executable, str(APP_CLI), *args], cwd=cwd, stdin=subprocess.DEVNULL,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                           timeout=timeout, check=False, env=full_env, **_CHILD_TEXT_KWARGS)
@@ -634,11 +655,14 @@ def dispatch_writer(role: str, task: str, run_id: str, provider: str, model: str
         routing_cwd.relative_to(ROOT)
     except ValueError:
         return {"status": "failure", "run_id": run_id, "reason": "CWD_OUTSIDE_ROOT"}
-    env = {"SET_AGENTS_ROUTING_TEST_ROOT": routing_test_root} if routing_test_root else None
+    env = {"SET_AGENTS_ROUTING_TEST_ROOT": routing_test_root} if routing_test_root else {}
+    if spawn_cwd is not None:
+        env["SET_AGENTS_PROJECT"] = None
+    env = env or None
     # ADR-0056 (AC-12): fetched BEFORE the routing store is ever touched -- a vault-fetch
     # timeout/crash never burns the one-use `single_writer` authorization; the spawn simply
     # proceeds without a vault block (module-level doctrine: "obligatorio" != "falla cerrado").
-    vault_block = _fetch_vault_block(routing_cwd)
+    vault_block = _fetch_vault_block(routing_cwd, routing_test_root=routing_test_root)
     # SEC-002/SEC-P1-003: persist the decision-to-spawn binding actually used, so a
     # future divergence from the authorizing `--route-decide` envelope is detectable
     # after the fact -- durably, not merely via an unconfigured `logging` call. Purely

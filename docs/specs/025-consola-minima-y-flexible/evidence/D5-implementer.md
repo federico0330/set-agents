@@ -309,6 +309,19 @@ margen que las otras tres lanes. Documentado en ADR-0056, sección "Límite cono
 
 ## Qué quedó sin verificar
 
+## Continuation checkpoint — 2026-08-17
+
+Base verified: `8a9f62bb5fa7dc1ed3f4275a1261de7c88ea9208`.
+
+This continuation was cut before completion. Applied only to `set_agents_spawn.py` and
+`claude_code_spawn.py`: Pi vault text now travels via stdin; those lanes distinguish a
+settled no-vault result from a recorded, retryable lookup failure; and Claude scrubs an
+inherited `SET_AGENTS_PROJECT` when `spawn_cwd` is explicit. Codex/OpenCode and the four
+shared prompt fences remain unmodified. No validation ran after this partial port.
+
+Next: complete Codex/OpenCode symmetrically, add focal RED→GREEN tests for all four
+lanes and shared prompts, then run the requested local validations with heartbeat.
+
 - El invocador real de producción de `set_agents_spawn.py`'s `route_and_spawn` cuando el orquestador corre
   en Pi (ver sección "main() cubre los caminos reales" arriba) — no encontré el snippet CLI documentado,
   lo marco explícitamente en vez de asumir que `main()` es el único camino.

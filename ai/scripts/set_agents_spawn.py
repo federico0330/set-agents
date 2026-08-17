@@ -58,6 +58,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from routing_core import catalog
 from routing_core.domain import classify_pi_terminal_error
+from routing_core.store import RoutingStore
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_CLI = ROOT / "ai/scripts/set_agents_app.py"
@@ -116,29 +117,50 @@ class SpawnError(Exception):
 # cache). Duplicated here, not imported: this module is, by this feature's own deliberate
 # architecture, a SEPARATE lane module from the other three spawners.
 _VAULT_FETCH_TIMEOUT_SECONDS = 10.0
-_vault_block_cache: dict[str, str | None] = {}
+_VAULT_NONE_LINKED_NOTE = "[vault: none linked for this project; spawn proceeds without it]"
+_VAULT_DEGRADED_NOTE = "[vault: lookup failed; spawn proceeds without it]"
+VAULT_DEGRADATION_LOG_FILENAME = "vault_degradation.jsonl"
+# Cache only settled outcomes. Transient failures must be retried by the next spawn.
+_vault_block_cache: dict[str, str] = {}
 
 
-def _fetch_vault_block(cwd, *, timeout: float = _VAULT_FETCH_TIMEOUT_SECONDS) -> str | None:
+def _persist_vault_degradation(reason: str, *, routing_test_root=None) -> None:
+    """Record a failed vault lookup without making the spawn fail."""
+    try:
+        root = RoutingStore(root=Path(routing_test_root) if routing_test_root else None).ensure_cache_root()
+        path = root / VAULT_DEGRADATION_LOG_FILENAME
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"ts": time.time(), "reason": reason}, sort_keys=True) + "\n")
+        os.chmod(path, 0o600)
+    except Exception:  # noqa: BLE001 - observational only
+        pass
+
+
+def _fetch_vault_block(cwd, *, timeout: float = _VAULT_FETCH_TIMEOUT_SECONDS,
+                       routing_test_root=None) -> str:
     key = str(Path(cwd).resolve()) if cwd is not None else str(ROOT)
     if key in _vault_block_cache:
         return _vault_block_cache[key]
-    block = None
     try:
         proc = subprocess.run(
             [sys.executable, str(APP_CLI), "--context", "--json", "--project", key],
             cwd=ROOT, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, timeout=timeout, check=False,
         )
-        if proc.returncode == 0 and proc.stdout.strip():
-            doc = json.loads(proc.stdout.strip())
-            if isinstance(doc, dict):
-                sections = [doc.get(name) for name in ("hub", "company", "project", "pending")]
-                present = [section for section in sections if isinstance(section, str) and section]
-                if present:
-                    block = "\n\n".join(present)
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        block = None
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _persist_vault_degradation(f"VAULT_FETCH_EXCEPTION:{type(exc).__name__}", routing_test_root=routing_test_root)
+        return _VAULT_DEGRADED_NOTE
+    if proc.returncode != 0:
+        _persist_vault_degradation(f"VAULT_FETCH_NONZERO_EXIT:{proc.returncode}", routing_test_root=routing_test_root)
+        return _VAULT_DEGRADED_NOTE
+    try:
+        doc = json.loads(proc.stdout.strip()) if proc.stdout.strip() else {}
+    except ValueError:
+        _persist_vault_degradation("VAULT_FETCH_UNPARSEABLE_OUTPUT", routing_test_root=routing_test_root)
+        return _VAULT_DEGRADED_NOTE
+    sections = [doc.get(name) for name in ("hub", "company", "project", "pending")] if isinstance(doc, dict) else []
+    present = [section for section in sections if isinstance(section, str) and section]
+    block = "\n\n".join(present) if present else _VAULT_NONE_LINKED_NOTE
     _vault_block_cache[key] = block
     return block
 
@@ -280,12 +302,11 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     # text (live-confirmed, see module docstring).
     if task.lstrip().startswith("-"):
         return "failure", {"reason": "TASK_LOOKS_LIKE_FLAG"}
-    # ADR-0056 (AC-12): `vault_block`, when given, is the ALREADY-fenced text
+    # ADR-0056 (AC-12, D5-F05): the fenced vault reaches pi through stdin, never argv.
     # `_fetch_vault_block` returns (context_pack._mark_untrusted's own per-call nonce,
     # never a second scheme) -- composed AHEAD of the task, the pi lane's own equivalent
     # of the other three lanes' `compose_task`. The SEC-A01 flag-lookalike check above runs
     # on the ORIGINAL, caller-supplied `task` only -- a vault block can never suppress it.
-    composed_task = f"{vault_block}\n\n{task}" if vault_block else task
     own_scratch = cwd is None
     work_dir = Path(cwd) if cwd is not None else Path(tempfile.mkdtemp(prefix="pi-spawn-"))
     # T-304 guards: --no-session, --no-extensions, --no-context-files, --no-skills, and
@@ -301,10 +322,10 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     argv = catalog.pi_pinned_argv(
         "--model", target_id, *thinking, "--print", "--mode", "json", "--no-session", "--no-extensions",
         "--no-context-files", "--no-skills", "--no-prompt-templates", "--tools", ",".join(guard_tools),
-        "--append-system-prompt", str(prompt_path), composed_task,
+        "--append-system-prompt", str(prompt_path), task,
     )
     try:
-        proc = subprocess.run(argv, cwd=work_dir, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        proc = subprocess.run(argv, cwd=work_dir, input=(vault_block or ""), stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, text=True, timeout=timeout, check=False, env=_probe_env())
     except (OSError, subprocess.TimeoutExpired) as exc:
         # SEC-A05: never persist a raw exception string verbatim (it can embed the fixed
@@ -475,7 +496,7 @@ def route_and_spawn(role, task_class, task, *, risk=None, review_of_run_id=None,
     # ADR-0056 (AC-12): fetched before the routing store's own dispatch call -- a
     # vault-fetch timeout/crash never burns the one-use `single_writer` authorization the
     # `--route-decide` call above already produced.
-    vault_block = _fetch_vault_block(routing_cwd)
+    vault_block = _fetch_vault_block(routing_cwd, routing_test_root=routing_test_root)
     try:
         dispatched = _run_app_cli(["--route-dispatched", run_id, "--json"], **cli_kwargs)
         if dispatched.returncode != 0:
