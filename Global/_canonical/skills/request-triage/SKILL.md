@@ -19,10 +19,20 @@ failure this skill exists to prevent (applying the heavy flow to a problem that 
 2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
    original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
    scoping doubt one of those already answers is resolved with `log-decision`, not asked.
-3. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
+3. **Close architecture conventions before code** when the request opens them: audience, data shape
+   (including vector vs relational), hosting now vs at scale, API boundary, auth, real-time behavior,
+   mobile surface, cost posture, and legal/ToS constraints. This is not a questionnaire ritual: each
+   open axis must land as either (a) a resolved convention with source, or (b) an explicit unknown that
+   blocks implementation.
+4. For category-matching requests, load `solution-baselines` in intake and bring a default + threshold
+   before asking. Ask for the user's **bit** (which side of the threshold they are on), not for a raw
+   tool choice. Example: "default Postgres, vector only if semantic-search trigger appears."
+5. Never invent thresholds or defaults: if no source-backed baseline exists, say "sin default verificado",
+   ask the minimum needed question, and record the resolution.
+6. If the request is still ambiguous on scope, risk, or intent after that check, ask **1–2 scoping
    questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
    cart".
-4. Only then delegate the first action of the chosen mode.
+7. Only then delegate the first action of the chosen mode.
 
 ## The five modes
 

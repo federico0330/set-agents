@@ -111,6 +111,40 @@ class CodexArgvTests(unittest.TestCase):
         self.assertEqual(cx._sandbox_mode("gate-runner", _ROSTER), "read-only")
 
 
+class VaultDegradationParityTests(unittest.TestCase):
+    def setUp(self):
+        cx._vault_block_cache.clear()
+        oc._vault_block_cache.clear()
+
+    def test_codex_transient_vault_lookup_degrades_logs_and_never_caches_the_failure(self):
+        with tempfile.TemporaryDirectory() as td:
+            ok = _Proc(stdout=json.dumps({"hub": "<<<VAULT-CODEX>>>"}) + "\n", returncode=0)
+            with mock.patch.object(cx.subprocess, "run",
+                                   side_effect=[subprocess.TimeoutExpired(cmd="ctx", timeout=1), ok]) as run:
+                first = cx._fetch_vault_block(td, routing_test_root=td)
+                second = cx._fetch_vault_block(td, routing_test_root=td)
+            self.assertEqual(first, cx._VAULT_DEGRADED_NOTE)
+            self.assertEqual(second, "<<<VAULT-CODEX>>>")
+            self.assertEqual(run.call_count, 2)  # bite: caching a transient failure would hide call #2
+            log = Path(td) / cx.VAULT_DEGRADATION_LOG_FILENAME
+            self.assertTrue(log.exists())
+            self.assertIn("VAULT_FETCH_EXCEPTION:TimeoutExpired", log.read_text(encoding="utf-8"))
+
+    def test_opencode_transient_vault_lookup_degrades_logs_and_never_caches_the_failure(self):
+        with tempfile.TemporaryDirectory() as td:
+            ok = _Proc(stdout=json.dumps({"project": "<<<VAULT-OPENCODE>>>"}) + "\n", returncode=0)
+            with mock.patch.object(oc.subprocess, "run",
+                                   side_effect=[subprocess.TimeoutExpired(cmd="ctx", timeout=1), ok]) as run:
+                first = oc._fetch_vault_block(td, routing_test_root=td)
+                second = oc._fetch_vault_block(td, routing_test_root=td)
+            self.assertEqual(first, oc._VAULT_DEGRADED_NOTE)
+            self.assertEqual(second, "<<<VAULT-OPENCODE>>>")
+            self.assertEqual(run.call_count, 2)  # bite: caching a transient failure would hide call #2
+            log = Path(td) / oc.VAULT_DEGRADATION_LOG_FILENAME
+            self.assertTrue(log.exists())
+            self.assertIn("VAULT_FETCH_EXCEPTION:TimeoutExpired", log.read_text(encoding="utf-8"))
+
+
 class DispatchLifecycleTests(unittest.TestCase):
     def test_opencode_writer_threads_effort_and_closes_the_run(self):
         calls = []

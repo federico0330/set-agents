@@ -1115,13 +1115,38 @@ def build_parser() -> argparse.ArgumentParser:
     quickfix.set_defaults(func=cmd_log_quickfix)
 
     narrative = sub.add_parser("log-narrative")
+    add_common_state_args(narrative)  # AC-07 (028/N1, E-4): --state-file/--expect-revision/
+    # --actor/--event-id, same seam every other write verb uses. This does NOT make
+    # log-narrative read state (that would reintroduce the ADR-0051 family AC-07's own
+    # rationale warns about) -- the fields the guard needs (--phase, --human-decision
+    # below) travel as their own explicit flags instead, so the guard stays a pure
+    # function of its arguments even under `cwd=ROOT` test runs.
     narrative.add_argument("--client", required=True)
     narrative.add_argument("--tech", required=True)
     narrative.add_argument("--result", default="done", choices=["started", "done", "blocked"])
     narrative.add_argument("--role")
     narrative.add_argument("--package-id")
     narrative.add_argument("--feature-id")
-    narrative.add_argument("--actor", default="orchestrator")
+    # AC-01 (028/N1, E-15): four new content fields. Absent unless passed -- the
+    # written entry omits the key entirely rather than writing None/"-", so the 178
+    # pre-existing entries and every render stay compatible by ABSENCE OF KEY, no
+    # schema version bump (spec AC-01).
+    narrative.add_argument("--learned")
+    narrative.add_argument("--next", dest="next_step")
+    narrative.add_argument("--why")
+    narrative.add_argument("--alternative")
+    # AC-02 (E-6): explicit, no default -- inferring it from state reintroduces the
+    # non-determinism E-3 eliminated (transitions.py:129: order of narrate-vs-record
+    # is not fixed). Required only when --result is done|blocked; enforced by the
+    # guard, not by argparse `required=`, because that requirement is conditional.
+    narrative.add_argument("--milestone", choices=["yes", "no"])
+    # AC-03 (E-3): the only two inputs the guard needs to resolve whether
+    # --alternative is required, and neither comes from reading state (see comment
+    # above `add_common_state_args`). --phase is the caller's own declaration of
+    # which phase this narration closes, not a state read.
+    narrative.add_argument("--phase", choices=sorted(model.PHASES))
+    narrative.add_argument("--human-decision", action="store_true",
+        help="AC-03: bloqueo es HUMAN_DECISION_REQUIRED -- la alternativa es del humano, no del agente")
     narrative.add_argument("--log-file")
     narrative.set_defaults(func=cmd_log_narrative)
 

@@ -3142,7 +3142,7 @@ class HarnessTests(unittest.TestCase):
             note_before = feature_note.read_bytes()
             run("python3", str(FEATURE_STATE), "log-narrative", "--no-render",
                 "--client", "avanzamos con el paquete", "--tech", "spawn intra-fase, render diferido",
-                "--feature-id", "feat-x", "--result", "done",
+                "--feature-id", "feat-x", "--result", "done", "--milestone", "no",
                 "--log-file", str(root / "ai/state/narrative-log.jsonl"))
             self.assertEqual(status_before, status.read_bytes(), "--no-render must not touch STATUS.md")
             self.assertEqual(note_before, feature_note.read_bytes(), "--no-render must not touch notes")
@@ -4236,17 +4236,18 @@ class HarnessTests(unittest.TestCase):
                     self.assertNotIn("<<<", remainder, f"{label}: a stray, unfenced '<<<' escaped the defanging")
                     self.assertNotIn(">>>", remainder, f"{label}: a stray, unfenced '>>>' escaped the defanging")
 
-    def test_fetch_vault_block_degrades_to_none_on_subprocess_timeout_or_crash_never_raises(self):
+    def test_fetch_vault_block_degrades_to_explicit_note_on_subprocess_timeout_or_crash_never_raises(self):
         # "Obligatorio" != "falla cerrado": a Syncthing-slow vault or a crashed subprocess
-        # must never abort the spawn -- `_fetch_vault_block` degrades to None, silently.
+        # must never abort the spawn -- `_fetch_vault_block` degrades to an explicit
+        # marker note, never raises.
         ccs = self._import("claude_code_spawn")
         with tempfile.TemporaryDirectory() as td:
             with mock.patch.object(ccs.subprocess, "run",
                                    side_effect=subprocess.TimeoutExpired(cmd="ctx", timeout=1)):
-                self.assertIsNone(ccs._fetch_vault_block(td))
+                self.assertEqual(ccs._fetch_vault_block(td), ccs._VAULT_DEGRADED_NOTE)
         with tempfile.TemporaryDirectory() as td2:
             with mock.patch.object(ccs.subprocess, "run", side_effect=OSError("boom")):
-                self.assertIsNone(ccs._fetch_vault_block(td2))
+                self.assertEqual(ccs._fetch_vault_block(td2), ccs._VAULT_DEGRADED_NOTE)
 
     def test_dispatch_writer_composes_unchanged_task_when_no_vault_is_linked_and_never_aborts(self):
         # Real `_fetch_vault_block` call (not mocked), against a directory with genuinely
@@ -4261,10 +4262,10 @@ class HarnessTests(unittest.TestCase):
             doc = {"is_error": False, "modelUsage": {"x": {"canonicalModel": "claude-sonnet-5"}}}
             return types.SimpleNamespace(returncode=0, stdout=json.dumps(doc), stderr="")
 
-        # `_fetch_vault_block` returning None (the real, verified return value for a
-        # directory with no vault anywhere in its ancestor chain -- confirmed directly
-        # below, unmocked) is mocked HERE only so `spawn_cwd` can stay inside the
+        # `_fetch_vault_block` returning None (a unit seam used here so `spawn_cwd`
+        # can stay inside the repository ROOT) is mocked HERE only so `spawn_cwd` can stay inside the
         # repository ROOT (dispatch_writer's own SEC-005 guard, orthogonal to this test).
+        # The real no-vault behavior is asserted below, unmocked.
         with mock.patch.object(ccs, "_fetch_vault_block", return_value=None), \
              mock.patch.object(ccs, "_run_app_cli", side_effect=self._fake_route_cli(
                  "run1_" + "2" * 32, "anthropic", "sonnet")), \
@@ -4275,11 +4276,12 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(captured["input"], "implement without a vault")  # byte-identical, no block prepended
         # The REAL, unmocked degrade: a genuinely vault-less directory (outside ROOT is
         # fine here -- `_fetch_vault_block` itself carries no cwd-containment guard,
-        # unlike `dispatch_writer`/`spawn()`) returns None, never raises.
+        # unlike `dispatch_writer`/`spawn()`) returns an explicit "none linked" marker,
+        # never raises.
         with tempfile.TemporaryDirectory() as td:
             orphan = Path(td) / "sin-vault" / "proyecto"
             orphan.mkdir(parents=True)
-            self.assertIsNone(ccs._fetch_vault_block(orphan))
+            self.assertEqual(ccs._fetch_vault_block(orphan), ccs._VAULT_NONE_LINKED_NOTE)
 
     def test_fetch_vault_block_never_leaks_content_through_an_escaping_registry_vault_path(self):
         # SEC-002/SEC-003, applied to the NEW spawn-time consumption path (not just
@@ -4811,6 +4813,10 @@ class HarnessTests(unittest.TestCase):
             run("python3", str(FEATURE_STATE), "log-narrative",
                 "--client", "ya podés cobrar con tarjeta",
                 "--tech", "cierre del paquete de pagos, gate verde",
+                "--milestone", "yes",
+                "--learned", "Que faltaba cerrar explícitamente el gate de pagos antes del cierre.",
+                "--next", "Validar el cierre completo del flujo de cobro en staging.",
+                "--why", "Sin esa validación final podríamos cerrar el paquete con cobertura incompleta.",
                 "--role", "implementer", "--feature-id", "feat-n", "--result", "done",
                 "--log-file", str(log))
             entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
@@ -11708,6 +11714,28 @@ class HarnessTests(unittest.TestCase):
                      "opencode/AGENTS.md", "claude-code/CLAUDE.md"):
             text = (generated / path).read_text()
             self.assertIn("Resolvé antes de preguntar (ADR-0037)", text, path)
+
+    def test_ac30_intake_declares_conventions_before_code(self):
+        triage = (ROOT / "Global/_canonical/skills/request-triage/SKILL.md").read_text()
+        self.assertIn("Close architecture conventions before code", triage)
+        self.assertIn("solution-baselines", triage)
+        self.assertIn("bit", triage)
+        self.assertIn("sin default verificado", triage)
+
+        baselines = (ROOT / "Global/_canonical/skills/solution-baselines/SKILL.md").read_text()
+        self.assertIn("enabled_for: orchestrator", baselines)
+        self.assertIn("transversal defaults", baselines)
+
+        design = (ROOT / "Global/_canonical/skills/system-design-decisions/SKILL.md").read_text()
+        self.assertIn("enabled_for: orchestrator", design)
+
+    def test_ac31_closing_milestone_requires_explanatory_fields_in_doctrine(self):
+        orchestrator = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
+        self.assertIn("Aprendimos:", orchestrator)
+        self.assertIn("Conviene ahora:", orchestrator)
+        self.assertIn("Por qué ahora:", orchestrator)
+        self.assertIn("Alternativa:", orchestrator)
+        self.assertIn("--milestone yes|no", orchestrator)
 
     def test_ac28_explicar_is_read_only_no_state_and_names_the_staleness_mitigant(self):
         # AC-28: /explicar mirrors /consult's read-only, no-init, no-pipeline posture, and

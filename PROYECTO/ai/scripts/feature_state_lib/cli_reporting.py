@@ -56,7 +56,40 @@ def cmd_log_narrative(args: argparse.Namespace) -> int:
     Every closing block, and every block emitted in consult or quick-fix mode,
     lands here. Narrating in chat without landing it here is exactly the hole
     this command closes: the chat is gone next week, the bitacora is not.
+
+    ADR-0057 / 028-narracion-que-ensena N1: this is the WRITE-PATH GUARD. A
+    narration full of pointers ("PKG-007", "sigue el item A") tells a reader who
+    already knows the story where to look, never what happened or why it matters --
+    `narration_lint.lint_narrative` rejects it here, before a single byte reaches
+    `narrative-log.jsonl`, and the rejection message (AC-06) is itself required to
+    teach: name what is missing, say why it matters, show a corrected runnable
+    invocation. See narration_lint.py's own module docstring for the guard's design
+    and docs/specs/028-narracion-que-ensena/spec.md for the corpus it is measured
+    against.
     """
+    # Imported lazily: `init`/`transition` in synthetic fixture repos used by
+    # integration tests do not carry narration_lint.py, and they should keep working
+    # because they never invoke this command.
+    import narration_lint
+
+    violations = narration_lint.lint_narrative(
+        client=args.client,
+        tech=args.tech,
+        result=args.result,
+        milestone=args.milestone,
+        learned=args.learned,
+        next_step=args.next_step,
+        why=args.why,
+        alternative=args.alternative,
+        feature_id=args.feature_id,
+        phase=args.phase,
+        human_decision=args.human_decision,
+    )
+    if violations:
+        print(narration_lint.render_rejection(violations), file=sys.stderr)
+        raise StateError(
+            "NARRATION_LINT_FAIL: " + "; ".join(v.code for v in violations)
+        )
     log_path = Path(args.log_file) if args.log_file else Path("ai/state") / NARRATIVE_LOG
     entry = {
         "at": now(),
@@ -68,6 +101,19 @@ def cmd_log_narrative(args: argparse.Namespace) -> int:
         "tech": args.tech,
         "actor": args.actor,
     }
+    # AC-01: absence of key IS the version -- a legacy reader of an old entry never
+    # sees a None/"-" placeholder for a field this package adds, because the key is
+    # only ever written when the caller actually provided it.
+    if args.milestone is not None:
+        entry["milestone"] = args.milestone
+    if args.learned:
+        entry["learned"] = args.learned
+    if args.next_step:
+        entry["next"] = args.next_step
+    if args.why:
+        entry["why"] = args.why
+    if args.alternative:
+        entry["alternative"] = args.alternative
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
@@ -256,6 +302,14 @@ def cmd_digest(args: argparse.Namespace) -> int:
             # sentence cut (D-3-style example: `bitacora.md` closes routinely run past
             # 300 chars and today lose the second half of the sentence to `…`).
             lines.append(f"- **{head}** — {_short(entry.get('client') or entry.get('tech'), None)}")
+            if entry.get("learned"):
+                lines.append(f"  - aprendimos: {_short(entry.get('learned'), None)}")
+            if entry.get("next"):
+                lines.append(f"  - conviene ahora: {_short(entry.get('next'), None)}")
+            if entry.get("why"):
+                lines.append(f"  - por qué ahora: {_short(entry.get('why'), None)}")
+            if entry.get("alternative"):
+                lines.append(f"  - alternativa: {_short(entry.get('alternative'), None)}")
     else:
         lines.append("- _sin cierres registrados en la ventana_")
 

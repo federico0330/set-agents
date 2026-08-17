@@ -1,9 +1,9 @@
 ---
 name: solution-baselines
-description: Pre-decided starting points per solution category (management webapp/dashboard, scraping+data/ML, B2B API/integrations, e-commerce/landing) — golden-path stack, the three architecture axes already taken with explicit YAGNI thresholds, typical package shapes, and recurring risks. Load at the START of any architecture/design for a new system or module — design as a DEVIATION from the matching baseline, not from zero.
+description: Pre-decided starting points per solution category (management webapp/dashboard, scraping+data/ML, B2B API/integrations, e-commerce/landing) — golden-path stack, the architecture conventions already taken with explicit YAGNI thresholds (three first-class axes + transversal defaults), typical package shapes, and recurring risks. Load at the START of any architecture/design for a new system or module — design as a DEVIATION from the matching baseline, not from zero.
 license: MIT
 metadata:
-  enabled_for: architect, project-bootstrapper, package-planner
+  enabled_for: orchestrator, architect, project-bootstrapper, package-planner
 ---
 
 # Solution Baselines

@@ -15,18 +15,23 @@
 
 ## Hallazgos
 
-- D1-F01 [high] open — correctness
-- D1-F02 [high] open — correctness
-- D1-F03 [high] open — correctness
-- D1-F04 [medium] open — correctness
-- D1-F05 [medium] open — correctness
-- D1-F06 [medium] open — testing
-- D1-F07 [low] open — testing
-- D1-F09 [low] open — readability
+- D1-F01 [high] closed — correctness
+- D1-F02 [high] closed — correctness
+- D1-F03 [high] closed — correctness
+- D1-F04 [medium] refuted — correctness · refutado por finding-verifier: hierarchy already in tui render_items [ai/scripts/tui.py:720-734]
+- D1-F05 [medium] closed — correctness
+- D1-F06 [medium] closed — testing
+- D1-F07 [low] closed — testing
+- D1-F09 [low] closed — readability
 
 ## Recorrido
 
 - review: repair_required (8 hallazgos)
+- verificación: 1 refutados, 7 sostenidos
+- repair: D1-F01, D1-F02, D1-F03, D1-F05, D1-F06, D1-F07, D1-F09 → 4 archivos
+- delta review: pass
+- testing: pass
+- runtime QA: pass
 - gate `unittest-suite`: pass
 - gate `verify-sh`: pass
 - gate `build-check`: pass
@@ -37,6 +42,7 @@
 - SPAWN-001 implementer · modelo anthropic/sonnet · effort medium · route run1_9a9d617d4b6885d58de13f800a9afd95
 - SPAWN-002 package-reviewer · modelo anthropic/claude-opus-5 · effort high
 - SPAWN-003 repair-agent · modelo anthropic/claude-sonnet-5 · effort medium
+- SPAWN-006 gate-runner · modelo openai-codex/gpt-5.6-luna · effort low · route MODEL_STATIC_FALLBACK
 
 context pack: `docs/specs/025-consola-minima-y-flexible/context/D1-superficie-humana.md`
 

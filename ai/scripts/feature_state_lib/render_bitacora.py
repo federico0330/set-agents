@@ -82,6 +82,13 @@ def collect_narrative(features_dir: Path, out_dir: Path) -> list[dict[str, Any]]
 def format_narrative(entry: dict[str, Any]) -> list[str]:
     """One narration block: a header line plus the two labelled registers."""
     from feature_state_lib.render_notes import _short  # deferred: see module docstring
+    def _render_field(label: str, value: Any, limit: int = 300) -> str:
+        normalized = " ".join(str(value or "").split()).replace("<!--", "‹!--").replace("-->", "--›")
+        text = _short(value, limit) or "-"
+        if normalized and len(normalized) > limit:
+            text += " _(truncado al render)_"
+        return f"{label}: {text}"
+
     parts = [
         part for part in (entry.get("package_id"), entry.get("role"), entry.get("result"))
         if part and part != "-"
@@ -95,12 +102,21 @@ def format_narrative(entry: dict[str, Any]) -> list[str]:
     if entry.get("effort"):
         parts.append("effort " + _short(entry["effort"], 20))
     tail = " · ".join(parts)
-    return [
+    lines = [
         f"[{entry.get('at', '?')}] {tail}".rstrip(),
-        f"Cliente: {_short(entry.get('client'), 400) or '-'}",
-        f"Ingeniería: {_short(entry.get('tech'), 400) or '-'}",
-        "",
+        _render_field("Cliente", entry.get("client"), 300),
+        _render_field("Ingeniería", entry.get("tech"), 300),
     ]
+    if entry.get("learned"):
+        lines.append(_render_field("Aprendimos", entry.get("learned"), 300))
+    if entry.get("next"):
+        lines.append(_render_field("Conviene ahora", entry.get("next"), 300))
+    if entry.get("why"):
+        lines.append(_render_field("Por qué ahora", entry.get("why"), 300))
+    if entry.get("alternative"):
+        lines.append(_render_field("Alternativa", entry.get("alternative"), 300))
+    lines.append("")
+    return lines
 
 
 def bitacora_path(out_dir: Path, feature_id: str) -> Path:

@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-15T12:56:16+00:00
+Actualizado: 2026-08-17T02:15:23+00:00
 
 [2026-08-02T22:07:53+00:00] package-planner · started
 Cliente: Con tu aprobacion del contrato de deuda de auditoria, un planificador arma los dos paquetes previstos: la deuda prioritaria y la limpieza menor.

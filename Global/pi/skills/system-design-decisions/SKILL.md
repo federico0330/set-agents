@@ -4,7 +4,7 @@ description: Design-TIME architecture decision framework — when to add (or NOT
 license: MIT
 compatibility: opencode
 metadata:
-  enabled_for: architect, brainstormer, product-analyst
+  enabled_for: orchestrator, architect, brainstormer, product-analyst
 ---
 
 # System Design Decisions

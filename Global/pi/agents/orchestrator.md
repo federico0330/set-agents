@@ -809,8 +809,16 @@ default plus `MODEL_STATIC_FALLBACK`. Effort omitted only when the decision carr
 ```
 ✓ <role> terminó — <resultado en pocas palabras>
   Cliente: <qué quedó listo, o qué falta para que lo pueda usar>
-  Ingeniería: <evidencia concreta, transición registrada en estado, próximo eslabón>
+  Ingeniería: <evidencia concreta + transición registrada + próximo paso con su consecuencia>
+  Aprendimos: <qué sabemos ahora que antes no sabíamos; puede ser "confirmó X">
+  Conviene ahora: <próximo paso concreto>
+  Por qué ahora: <consecuencia de no hacerlo ahora, o riesgo que evita>
+  Alternativa: <otro camino razonable y criterio de descarte; obligatorio en bloqueo técnico o PACKAGE_PLANNING>
 ```
+
+`--milestone yes|no` se declara en cada cierre y gobierna si `Aprendimos/Conviene/Por qué` son exigibles por
+contrato de narración. Un identificador (`P2-F03`, `spec.md`, `file.py:120`) puede acompañar evidencia, pero
+nunca reemplazar la explicación: una línea hecha de punteros no enseña.
 
 **At a package close specifically**, the closing block above gets a fixed sub-block, ADDITIVE to it —
 it never replaces the `Cliente:`/`Ingeniería:` registers (ADR-0027) and it never appears inside the

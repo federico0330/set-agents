@@ -582,8 +582,10 @@ class DigestRegenerationCadenceTests(unittest.TestCase):
             digest_path = tmp / "docs/notas/BUENOS-DIAS.md"
             result = subprocess.run(
                 [sys.executable, str(FEATURE_STATE), "log-narrative",
-                 "--client", "avanzamos", "--tech", "avance tecnico",
+                 "--client", "Se avanzó en la implementación prevista.",
+                 "--tech", "Se completó la tarea técnica y quedó lista para continuar.",
                  "--feature-id", "711-any", "--result", "done",
+                 "--milestone", "no",
                  "--log-file", str(state_dir / "narrative-log.jsonl")],
                 cwd=tmp, capture_output=True, text=True,
             )
@@ -599,9 +601,10 @@ class DigestRegenerationCadenceTests(unittest.TestCase):
 class DoctrineTests(unittest.TestCase):
     def test_milestone_narration_is_doctrine_in_all_shared_files(self):
         for path in ("Global/_shared/CLAUDE.md", "Global/_shared/AGENTS.opencode.md",
-                     "Global/_shared/AGENTS.pi.md"):
+                     "Global/_shared/AGENTS.pi.md", "Global/_shared/AGENTS.codex.md"):
             text = (ROOT / path).read_text()
             self.assertIn("by MILESTONE, not by spawn (ADR-0027)", text, path)
+            self.assertIn("feature-state.py digest", text, path)
         orchestrator = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
         self.assertIn("by MILESTONE, not by spawn", orchestrator)
         self.assertIn("feature-state.py digest", orchestrator)
@@ -614,6 +617,90 @@ class DoctrineTests(unittest.TestCase):
     def test_session_open_reads_hub_without_vault(self):
         text = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
         self.assertIn("no vault required", text)
+
+
+class NarrationSurfacesTests(unittest.TestCase):
+    def test_new_narration_fields_render_in_bitacora_and_digest(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state = tmp / "ai/state"
+            at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+            (state / "features").mkdir(parents=True)
+            (state / "features/901-campos.json").write_text(json.dumps({
+                "feature_id": "901-campos",
+                "phase": "PACKAGE_IMPLEMENTATION",
+                "packages": [],
+                "history": [],
+                "blockers": [],
+                "updated_at": at,
+            }))
+            _write_jsonl(state / "narrative-log.jsonl", [
+                {
+                    "at": at,
+                    "feature_id": "901-campos",
+                    "package_id": "N3b",
+                    "role": "implementer",
+                    "result": "done",
+                    "client": "La salida de estado ahora explica por qué conviene el próximo paso.",
+                    "tech": "render_status usa la razón de transición en castellano y sin flags crudos.",
+                    "learned": "El problema no era falta de datos, era descarte en el render.",
+                    "next": "Cerrar la ronda de pruebas de regresión de narración.",
+                    "why": "Sin esa ronda no hay garantía de que no reaparezcan punteros vacíos.",
+                    "alternative": "Cerrar ya y corregir luego; se descartó porque dejaría superficies inconsistentes.",
+                    "actor": "orchestrator",
+                }
+            ])
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "sync-notes", "--state-dir", str(state)],
+                cwd=tmp, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            bitacora = (state / "bitacora/901-campos.md").read_text(encoding="utf-8")
+            digest = (tmp / "docs/notas/BUENOS-DIAS.md").read_text(encoding="utf-8")
+            self.assertIn("Aprendimos:", bitacora)
+            self.assertIn("Conviene ahora:", bitacora)
+            self.assertIn("Por qué ahora:", bitacora)
+            self.assertIn("Alternativa:", bitacora)
+            self.assertIn("aprendimos:", digest)
+            self.assertIn("conviene ahora:", digest)
+            self.assertIn("por qué ahora:", digest)
+            self.assertIn("alternativa:", digest)
+            self.assertNotIn("None", bitacora)
+            self.assertNotIn("None", digest)
+
+    def test_bitacora_marks_render_truncation_explicitly(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            state = tmp / "ai/state"
+            at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+            (state / "features").mkdir(parents=True)
+            (state / "features/902-historico.json").write_text(json.dumps({
+                "feature_id": "902-historico",
+                "phase": "PACKAGE_IMPLEMENTATION",
+                "packages": [],
+                "history": [],
+                "blockers": [],
+                "updated_at": at,
+            }))
+            _write_jsonl(state / "narrative-log.jsonl", [
+                {
+                    "at": at,
+                    "feature_id": "902-historico",
+                    "package_id": "N3b",
+                    "role": "implementer",
+                    "result": "done",
+                    "client": "x" * 340,
+                    "tech": "y" * 340,
+                    "actor": "orchestrator",
+                }
+            ])
+            result = subprocess.run(
+                [sys.executable, str(FEATURE_STATE), "sync-notes", "--state-dir", str(state)],
+                cwd=tmp, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            bitacora = (state / "bitacora/902-historico.md").read_text(encoding="utf-8")
+            self.assertIn("truncado al render", bitacora)
 
 
 if __name__ == "__main__":

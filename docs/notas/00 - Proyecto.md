@@ -24,9 +24,12 @@
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `DONE` · paquetes 4/4 · **DONE**
 - [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `BLOCKED` · paquetes 4/4 · **BLOCKED**
-- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `PACKAGE_REPAIR` · paquetes 0/5
+- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/027-controles-que-miran|027-controles-que-miran]] — fase `DONE` · paquetes 4/4 · **DONE**
+- [[features/028-narracion-que-ensena|028-narracion-que-ensena]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/3
+- [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/1
+- [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 
 ## Qué falta
 
@@ -40,8 +43,8 @@
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **024-listo-para-terceros** → corresponde tu decisión (ver Blocker)
 - **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
-- **025-consola-minima-y-flexible** → hace falta verificar los hallazgos antes de reparar
-- **025-consola-minima-y-flexible** 8 hallazgos abiertos
+- **028-narracion-que-ensena** → las tareas del paquete están completas; sigue evaluar los gates
+- **029-convenciones-antes-del-codigo** → las tareas del paquete están completas; sigue evaluar los gates
 
 ## Quick-fixes recientes
 
@@ -53,21 +56,21 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-17 despachar-contra-una-base-que-el-orquestador-va-a-mover|Error de secuencia: despache un agente contra main y commitee sobre main mientras trabajaba]]
-- [[decisiones/2026-08-16 tres-de-los-cuatro-carriles-siguen-atribuyendo-mal-el-proyecto|El arreglo de SET_AGENTS_PROJECT quedo solo en el carril de pi; faltan los otros tres]]
-- [[decisiones/2026-08-16 SET_AGENTS_PROJECT-heredada-le-gana-al-spawn-cwd|Defecto vivo: un spawn hijo atribuye su trabajo al proyecto del padre, no al que se le pidio]]
-- [[decisiones/2026-08-16 RDD-es-receipt-driven-development-y-ahora-tiene-fuente|RDD queda cerrado con fuente: Receipt-Driven Development, verificado contra el upstream]]
-- [[decisiones/2026-08-16 medir-en-el-worktree-no-es-medir-lo-integrado|D1 se reporto integrado sin estarlo: el exit code se leyo de head y la medicion se hizo en el lugar equivocado]]
-- [[decisiones/2026-08-16 el-reporte-de-un-implementer-no-es-evidencia-de-que-el-codigo-exista|D5 nunca produjo codigo, y el orquestador lo dio por implementado durante horas]]
-- [[decisiones/2026-08-16 RDD-es-el-modulo-de-gentle-ai-confirmado-por-federico|RDD queda definido: es el modulo strict-TDD de gentle-ai, confirmado por Federico]]
-- [[decisiones/2026-08-15 no-instalo-la-politica-nueva-sin-que-federico-decida|El fix del RCE queda commiteado pero NO instalado: esa decision es de Federico]]
+- [[decisiones/2026-08-17 d5-relanzamiento-único-tras-watchdog|D5 relanzamiento único tras watchdog]]
+- [[decisiones/2026-08-17 d4-presupuesto-spawn-agotado-antes-delta-final|D4 agotó su presupuesto de spawns antes del delta final]]
+- [[decisiones/2026-08-17 d4-segundo-repair-con-evidencia-delta|D4 usa el último repair batch con evidencia directa del delta]]
+- [[decisiones/2026-08-17 d4-review-reintento-sin-poc-rutas|D4 relanza revisión de producto sin PoC de rutas]]
+- [[decisiones/2026-08-17 d4-gate-reintento-focal|D4 relanza el gate focal por evidencia incompleta]]
+- [[decisiones/2026-08-17 d2-segundo-ciclo-reparacion-consolidada|D2 entra al segundo y último ciclo de reparación]]
+- [[decisiones/2026-08-17 enmienda-documental-025-antes-de-aceptar-D1|La enmienda documental de 025 se formaliza antes de aceptar D1]]
+- [[decisiones/2026-08-17 route-decide-sin-descriptor-host|route-decide sin descriptor en host OpenCode]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-16T20:18:44+00:00_
+_Actualizado: 2026-08-17T19:13:48+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

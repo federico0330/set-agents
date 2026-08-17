@@ -12,6 +12,11 @@ CLI+TUI unificado: install/repair, self-update, routing (--route-decide/--route-
 
 ## Últimos cambios estructurales
 
+- 2026-08-17 025-consola-minima-y-flexible/D5-vault-en-todo-spawn — Los spawners de codex/opencode/claude ahora materializan el bloque de vault con degradacion honesta y sink protegido para fallas transitorias.
+- 2026-08-17 025-consola-minima-y-flexible/D4-harness-por-CLI — Sesión virgen por CLI con HOME/XDG/CODEX_HOME temporales y argv hijo opcional.
+- 2026-08-17 025-consola-minima-y-flexible/D3-posturas-de-autonomia — La postura y metodología son preferencias persistidas con contrato runtime explícito, fallbacks comunes y precedencia ADR-0037.
+- 2026-08-17 025-consola-minima-y-flexible/D2-trabajo-visible — El trabajo visible se activa luego de 300 ms por stream y el handoff de hijos interactivos queda sin escritores concurrentes.
+- 2026-08-17 025-consola-minima-y-flexible/D1-superficie-humana — La CLI ahora separa la ayuda cotidiana de los controles avanzados y muestra estado humano por defecto sin alterar los formatos JSON de automatización.
 - 2026-08-12 019-harness-evolution/P5-tools-discovery — La consola dejo de tener un catalogo de herramientas cerrado. load_catalog ahora mergea tools.toml (curado, trackeado) con tools.local.toml (untracked, por clon del harness), y aparecieron --tools-pr…
 
 _Debajo de esta línea la prosa es mantenida a mano — contrastala con la fecha del último cambio estructural._
