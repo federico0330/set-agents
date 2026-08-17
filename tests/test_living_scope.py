@@ -23,14 +23,28 @@ def _run(tmp, *args, check=False):
     return result
 
 
+def _axes_log(tmp: Path, fid: str) -> Path:
+    axes_log = tmp / "ai/state/axes-log.jsonl"
+    axes_log.parent.mkdir(parents=True, exist_ok=True)
+    axes_rows = [
+        {"at": "2026-08-15T00:00:00Z", "feature_id": fid, "axis": axis,
+         "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+        for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                     "realtime", "mobile", "auth", "cost", "legal")
+    ]
+    axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+    return axes_log
+
+
 def _init_feature(tmp: Path, fid="020-scope"):
     spec = tmp / "docs/specs" / fid / "spec.md"
     spec.parent.mkdir(parents=True, exist_ok=True)
     spec.write_text("# Spec v1\n\nAlcance original.\n", encoding="utf-8")
     digest = hashlib.sha256(spec.read_bytes()).hexdigest()
     (tmp / "ai/state/features").mkdir(parents=True, exist_ok=True)
+    axes_log = _axes_log(tmp, fid)
     _run(tmp, "init", fid, str(spec.relative_to(tmp)), digest,
-         "--approved-by", "tester", "--ac", "AC-01", check=True)
+         "--approved-by", "tester", "--ac", "AC-01", "--axes-log", str(axes_log), check=True)
     return fid, spec
 
 

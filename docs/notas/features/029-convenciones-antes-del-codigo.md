@@ -3,16 +3,17 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_IMPLEMENTATION` · modo: scoped · revisión 8
+- fase: `DONE` · modo: scoped · revisión 20
+- estado final: **DONE**
 - spec: `docs/specs/029-convenciones-antes-del-codigo/spec.md` (hash `f86718d32977`)
 
 ## Paquetes
 
-- [[features/029-convenciones-antes-del-codigo/A1-ejes-al-momento-de-hablar|A1-ejes-al-momento-de-hablar]] — planned · Cerrar convenciones en intake con baseline y contrato de pregunta analítica
+- [[features/029-convenciones-antes-del-codigo/A1-ejes-al-momento-de-hablar|A1-ejes-al-momento-de-hablar]] — accepted · Cerrar convenciones en intake con baseline y contrato de pregunta analítica
 
 ## Qué falta
 
-- → las tareas del paquete están completas; sigue evaluar los gates
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -20,7 +21,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/029-convenciones-antes-del-codigo/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/029-convenciones-antes-del-codigo/bitacora.md`
 
-_Actualizado: 2026-08-17T19:13:48+00:00_
+_Actualizado: 2026-08-17T20:46:29+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

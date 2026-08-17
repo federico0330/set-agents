@@ -97,6 +97,19 @@ def _fs(*args, cwd, check=True):
     )
 
 
+def _axes_log(repo: Path, feature_id: str) -> Path:
+    axes_log = repo / "ai/state/axes-log.jsonl"
+    axes_log.parent.mkdir(parents=True, exist_ok=True)
+    axes_rows = [
+        {"at": "2026-08-15T00:00:00Z", "feature_id": feature_id, "axis": axis,
+         "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+        for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                     "realtime", "mobile", "auth", "cost", "legal")
+    ]
+    axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+    return axes_log
+
+
 def _drive_to_receipt(repo, base_sha, candidate_sha, package_id="PKG-01", feature_id="feat",
                        freeze_candidate_ref=None):
     # Defaults to the fixed candidate_sha (immune to later commits, the common/safe
@@ -107,7 +120,9 @@ def _drive_to_receipt(repo, base_sha, candidate_sha, package_id="PKG-01", featur
     spec.write_text("# contract\n")
     digest = hashlib.sha256(spec.read_bytes()).hexdigest()
     state = repo / "state.json"
-    _fs("init", feature_id, str(spec), digest, "--state-file", str(state), "--approved-by", "test", cwd=repo)
+    axes_log = _axes_log(repo, feature_id)
+    _fs("init", feature_id, str(spec), digest, "--state-file", str(state), "--approved-by", "test",
+        "--axes-log", str(axes_log), cwd=repo)
     _fs("create-package", package_id, "objective", "--state-file", str(state),
         "--complexity", "small", "--ac", "AC-01", "--task", "T1", "--actor", "test", cwd=repo)
     _fs("transition", "PACKAGE_IMPLEMENTATION", "--package-id", package_id,
@@ -168,7 +183,9 @@ class IntegrationActionEndToEndTests(unittest.TestCase):
             spec.write_text("# contract\n")
             digest = hashlib.sha256(spec.read_bytes()).hexdigest()
             state = repo / "state.json"
-            _fs("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test", cwd=repo)
+            axes_log = _axes_log(repo, "feat")
+            _fs("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test",
+                "--axes-log", str(axes_log), cwd=repo)
             _fs("create-package", "PKG-01", "objective", "--state-file", str(state),
                 "--complexity", "small", "--ac", "AC-01", "--task", "T1", "--actor", "test", cwd=repo)
             # Never driven past PACKAGE_PLANNING -- no receipt, no candidate_identity.

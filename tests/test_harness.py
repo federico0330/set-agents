@@ -285,9 +285,25 @@ def init_state(state, *extra, feature_id="feat", body="# contract\n", check=True
     spec = spec_path(state, feature_id)
     spec.parent.mkdir(parents=True, exist_ok=True)
     spec.write_text(body)
+    axes_log = Path(state).parent.parent / "axes-log.jsonl"
+    axes_log.parent.mkdir(parents=True, exist_ok=True)
+    axes_rows = [
+        {
+            "at": "2026-08-15T00:00:00Z",
+            "feature_id": feature_id,
+            "axis": axis,
+            "stance": "deferred",
+            "origin": "n/a",
+            "reason": "not decided yet",
+        }
+        for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                     "realtime", "mobile", "auth", "cost", "legal")
+    ]
+    axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
     return run("python3", str(FEATURE_STATE), "init", feature_id, str(spec),
                spec_digest(state, feature_id),
-               "--state-file", str(state), "--approved-by", "test", *extra, check=check)
+               "--state-file", str(state), "--approved-by", "test",
+               "--axes-log", str(axes_log), *extra, check=check)
 
 
 def spec_path(state, feature_id="feat"):
@@ -6531,7 +6547,15 @@ class HarnessTests(unittest.TestCase):
             spec = root / "spec.md"
             spec.write_text("# the contract as approved\n")
             digest = hashlib.sha256(spec.read_bytes()).hexdigest()
-            common = ["--state-file", str(state), "--ac", "AC-1", "--no-render"]
+            axes_log = root / "axes-log.jsonl"
+            axes_rows = [
+                {"at": "2026-08-15T00:00:00Z", "feature_id": "feat", "axis": axis,
+                 "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+                for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                             "realtime", "mobile", "auth", "cost", "legal")
+            ]
+            axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+            common = ["--state-file", str(state), "--ac", "AC-1", "--no-render", "--axes-log", str(axes_log)]
 
             wrong = run("python3", str(FEATURE_STATE), "init", "feat", str(spec), "deadbeef",
                         *common, "--approved-by", "federico", check=False)

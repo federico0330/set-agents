@@ -43,6 +43,19 @@ def _run(*args, cwd, check=True):
     )
 
 
+def _axes_log(root: Path, feature_id: str) -> Path:
+    axes_log = root / "ai/state/axes-log.jsonl"
+    axes_log.parent.mkdir(parents=True, exist_ok=True)
+    axes_rows = [
+        {"at": "2026-08-15T00:00:00Z", "feature_id": feature_id, "axis": axis,
+         "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+        for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                     "realtime", "mobile", "auth", "cost", "legal")
+    ]
+    axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+    return axes_log
+
+
 def _init_ready_package(root: Path) -> Path:
     """A package driven to PACKAGE_ACCEPTED via the real CLI, owned_paths matching
     modules.toml's demo module glob."""
@@ -50,7 +63,9 @@ def _init_ready_package(root: Path) -> Path:
     spec = root / "feat-spec.md"
     spec.write_text("# contract\n")
     digest = hashlib.sha256(spec.read_bytes()).hexdigest()
-    _run("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test", cwd=root)
+    axes_log = _axes_log(root, "feat")
+    _run("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test",
+         "--axes-log", str(axes_log), cwd=root)
     _run("create-package", "PKG-01", "objective", "--state-file", str(state),
          "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium",
          "--owned-path", "src/demo/**", "--actor", "test", cwd=root)
@@ -346,7 +361,9 @@ class ModuleImpactCliTests(unittest.TestCase):
             spec = root / "feat-spec.md"
             spec.write_text("# contract\n")
             digest = hashlib.sha256(spec.read_bytes()).hexdigest()
-            _run("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test", cwd=root)
+            axes_log = _axes_log(root, "feat")
+            _run("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test",
+                 "--axes-log", str(axes_log), cwd=root)
             _run("create-package", "PKG-01", "objective", "--state-file", str(state),
                  "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium",
                  "--owned-path", "src/demo/**", "--owned-path", "src/orphan/unmatched.py",

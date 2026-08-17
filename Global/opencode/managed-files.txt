@@ -70,6 +70,7 @@ commands/sdd-start.md
 commands/status.md
 commands/verify.md
 hooks/feature_state_lib/__init__.py
+hooks/feature_state_lib/axes.py
 hooks/feature_state_lib/candidate_identity.py
 hooks/feature_state_lib/check_anchors.py
 hooks/feature_state_lib/cli_integration.py

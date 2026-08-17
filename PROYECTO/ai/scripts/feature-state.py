@@ -28,6 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from feature_state_lib import model
+from feature_state_lib import axes
 from feature_state_lib.model import (
     StateError, now, state_path, print_json, parse_json_object, parse_bool, base_state,
     compact_package, load_state, atomic_write, validate_state, fail_if_invalid, package_by_id,
@@ -56,7 +57,7 @@ from feature_state_lib.cli_lifecycle import (
     output_state, state_file_arg, verify_spec_hash, cmd_init, cmd_validate, cmd_status, cmd_next,
     cmd_transition, cmd_create_package, cmd_update_package, cmd_start_task, cmd_complete_task,
     cmd_fail_task, cmd_resume, cmd_reopen, cmd_block, block_with_reason,
-    cmd_amend_spec, cmd_supersede_package,
+    cmd_amend_spec, cmd_supersede_package, cmd_record_axis,
 )
 from feature_state_lib.cli_review import (
     cmd_record_review, panel_roles, cmd_record_subreview, cmd_finalize_review_panel,
@@ -217,6 +218,13 @@ def _hub_body(states: list[dict[str, Any]], out_dir: Path, decisions: list[dict[
         lines += ["", "## Decisiones", ""]
         for entry in decisions[-8:][::-1]:
             lines.append(f"- [[decisiones/{_decision_name(entry)}|{entry.get('title', '')}]]")
+    axes_rows = []
+    for state in states:
+        axes_log = state.get("axes_log")
+        axes_path = Path(axes_log) if axes_log else out_dir / "axes-log.jsonl"
+        axes_rows.extend(axes.read_axes_log(axes_path))
+    if axes_rows:
+        lines += ["", axes.render_hub_table(axes_rows)]
     updated = max((data.get("updated_at", "") for data in states), default="-")
     lines += [
         "", "## Referencias", "",
@@ -258,6 +266,10 @@ def _feature_body(
             approach.append(f"- decisión: [[decisiones/{_decision_name(entry)}|{entry.get('title', '')}]]")
     if approach:
         lines += ["", "## Approach y decisiones", ""] + approach
+    axes_log = data.get("axes_log")
+    axes_rows = axes.read_axes_log(Path(axes_log)) if axes_log else read_jsonl(out_dir / "axes-log.jsonl")
+    if axes_rows:
+        lines += ["", axes.render_table(axes_rows, fid)]
     pending = _pending_bits(data)
     lines += ["", "## Qué falta", ""] + ([f"- {bit}" for bit in pending] or ["- _nada pendiente_ ✅"])
     budgets = data.get("budgets", {})
@@ -813,6 +825,7 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--max-repairs-per-finding", type=int)
     init.add_argument("--max-package-subdivisions", type=int)
     init.add_argument("--max-spawns-per-package", type=int)
+    init.add_argument("--axes-log")
     # A feature that reaches init already carries a risk signal (quick-fixes
     # close via log-quickfix, no state file), so scoped budgets are the floor;
     # full feature/SDD budgets stay opt-in via explicit --mode feature.
@@ -1104,6 +1117,20 @@ def build_parser() -> argparse.ArgumentParser:
     render = sub.add_parser("render-status")
     render.add_argument("--state-dir")
     render.set_defaults(func=cmd_render_status)
+
+    axes_cmd = sub.add_parser("record-axis")
+    axes_cmd.add_argument("axis", choices=axes.AXES)
+    axes_cmd.add_argument("stance")
+    axes_cmd.add_argument("--feature-id", required=True)
+    axes_cmd.add_argument("--origin", required=True, choices=sorted(axes.VALID_ORIGINS))
+    axes_cmd.add_argument("--source", default="")
+    axes_cmd.add_argument("--threshold", default="")
+    axes_cmd.add_argument("--next-stance", default="")
+    axes_cmd.add_argument("--revisit", default="")
+    axes_cmd.add_argument("--reason", default="")
+    axes_cmd.add_argument("--asked-at", default="")
+    axes_cmd.add_argument("--axes-log", required=True)
+    axes_cmd.set_defaults(func=cmd_record_axis)
 
     quickfix = sub.add_parser("log-quickfix")
     quickfix.add_argument("--summary", required=True)

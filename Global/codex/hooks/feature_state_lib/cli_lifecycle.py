@@ -20,6 +20,7 @@ from feature_state_lib.model import (
 from feature_state_lib.transitions import check_transition, next_transition
 from feature_state_lib.render_status import render_status
 from feature_state_lib.render_bitacora import render_bitacora
+from feature_state_lib import axes
 
 
 def output_state(data: dict[str, Any], changed: bool = False, path: Path | None = None) -> int:
@@ -155,6 +156,12 @@ def cmd_init(args: argparse.Namespace) -> int:
     data["acceptance_criteria"] = args.ac or []
     data["mode"] = args.mode
     data["budgets"].update(MODE_BUDGETS[args.mode])
+    axes_path = axes.axes_log_path(path, getattr(args, "axes_log", None))
+    axes_rows = axes.read_axes_log(axes_path)
+    axes_errors = axes.validate_rows(axes_rows, args.feature_id)
+    if axes_errors:
+        raise StateError("axes log invalid: " + "; ".join(axes_errors))
+    data["axes_log"] = str(axes_path)
     for key in ("max_deep_review_cycles", "max_repairs_per_finding", "max_package_subdivisions", "max_spawns_per_package"):
         value = getattr(args, key)
         if value is not None:
@@ -174,10 +181,38 @@ def cmd_init(args: argparse.Namespace) -> int:
     return output_state(data, True, path)
 
 
+def cmd_record_axis(args: argparse.Namespace) -> int:
+    axes_path = Path(args.axes_log)
+    row = {
+        "at": now(),
+        "feature_id": args.feature_id,
+        "axis": args.axis,
+        "stance": args.stance,
+        "origin": args.origin,
+        "source": args.source,
+        "threshold": args.threshold,
+        "next_stance": args.next_stance,
+        "revisit": args.revisit,
+        "reason": args.reason,
+        "asked_at": args.asked_at,
+    }
+    row_errors = axes.validate_row(row)
+    if row_errors:
+        raise StateError("invalid axis row: " + "; ".join(row_errors))
+    axes.append_axes_row(axes_path, row)
+    print_json({"ok": True, "changed": True, "axes_log": str(axes_path), "row": row})
+    return 0
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
     data = load_state(path)
     errors = validate_state(data)
+    axes_log = data.get("axes_log")
+    if axes_log:
+        axes_errors = axes.validate_rows(axes.read_axes_log(Path(axes_log)), data.get("feature_id", ""))
+        if axes_errors:
+            errors.append("axes_log: " + "; ".join(axes_errors))
     if errors:
         print_json({"ok": False, "errors": errors, "state_file": str(path)})
         return 2

@@ -12,6 +12,13 @@
 - [x] wire-enabled-for-orchestrator (completed) · harness focal tests green
 - [x] doctrine-close-template (completed) · harness focal tests green
 
+## Recorrido
+
+- review: pass (0 hallazgos)
+- testing: pass
+- runtime QA: pass
+- gate `verify`: pass
+
 ↩ [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]]
 <!-- /notas:auto -->
 

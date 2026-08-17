@@ -56,6 +56,7 @@ hooks/claude_local_gate_guard.py
 hooks/claude_release_guard.py
 hooks/coord_policy.py
 hooks/feature_state_lib/__init__.py
+hooks/feature_state_lib/axes.py
 hooks/feature_state_lib/candidate_identity.py
 hooks/feature_state_lib/check_anchors.py
 hooks/feature_state_lib/cli_integration.py

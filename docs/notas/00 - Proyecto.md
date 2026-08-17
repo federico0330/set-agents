@@ -28,7 +28,7 @@
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/027-controles-que-miran|027-controles-que-miran]] — fase `DONE` · paquetes 4/4 · **DONE**
 - [[features/028-narracion-que-ensena|028-narracion-que-ensena]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/3
-- [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/1
+- [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 
 ## Qué falta
@@ -44,7 +44,6 @@
 - **024-listo-para-terceros** → corresponde tu decisión (ver Blocker)
 - **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
 - **028-narracion-que-ensena** → las tareas del paquete están completas; sigue evaluar los gates
-- **029-convenciones-antes-del-codigo** → las tareas del paquete están completas; sigue evaluar los gates
 
 ## Quick-fixes recientes
 
@@ -70,7 +69,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-17T19:13:48+00:00_
+_Actualizado: 2026-08-17T20:46:29+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

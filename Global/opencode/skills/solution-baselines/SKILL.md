@@ -28,6 +28,22 @@ as an ADR. Conformance with the baseline needs no ADR — deviation does.
    baseline with explicit YAGNI thresholds ("no X until Y"). If the client's case crosses a stated
    threshold, that is a deviation → ADR + the orchestrator's Question policy still applies.
 
+## Transversal defaults (before the category baseline)
+These are the non-category conventions the intake should close before implementation starts. If a request
+already answers one, record it; if not, ask only for the missing bit.
+
+| Eje | Default verificado | Se abre cuando… |
+|---|---|---|
+| Audience | user/operator named in the request or existing spec | the caller is vague enough that UX, permissions, or tone would change |
+| Data shape | relational unless a non-relational or vector need is evidenced | the access pattern needs semantic search, graph traversal, or document-native writes |
+| Hosting now vs scale | simplest platform that fits the current runtime | long-running work, cold-start pain, or sustained cost pushes past PaaS/VPS thresholds |
+| API boundary | monolith / single client until a second consumer or service boundary exists | a new external caller, auth boundary, or rate-limit domain appears |
+| Auth | managed auth + least privilege | the request introduces identity, roles, or external accounts |
+| Realtime | no realtime by default | the user needs pushed updates, collaboration, or live state |
+| Mobile | no mobile surface by default | the request names mobile or the UX must fit a native surface |
+| Cost posture | cheapest safe path with a written threshold | the baseline cost exceeds the threshold or usage becomes sustained |
+| Legal / ToS | ask only when the request touches external data or regulated content | scraping, third-party APIs, or sensitive content are in scope |
+
 ## Hard rules
 - A baseline is a starting posture, not a straitjacket: crossing a YAGNI threshold with evidence is
   expected and healthy. Ignoring a threshold silently is not.

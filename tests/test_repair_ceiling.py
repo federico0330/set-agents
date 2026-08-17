@@ -54,7 +54,17 @@ class RepairCeilingCliTests(unittest.TestCase):
         spec.parent.mkdir(parents=True, exist_ok=True)
         spec.write_text("# contract\n")
         digest = hashlib.sha256(spec.read_bytes()).hexdigest()
-        _run("init", feature_id, str(spec), digest, "--state-file", str(state), "--approved-by", "test")
+        axes_log = Path(state).parent.parent / "axes-log.jsonl"
+        axes_log.parent.mkdir(parents=True, exist_ok=True)
+        axes_rows = [
+            {"at": "2026-08-15T00:00:00Z", "feature_id": feature_id, "axis": axis,
+             "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+            for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                         "realtime", "mobile", "auth", "cost", "legal")
+        ]
+        axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+        _run("init", feature_id, str(spec), digest, "--state-file", str(state),
+             "--approved-by", "test", "--axes-log", str(axes_log))
 
     def _drive_to_review_required(self, state, repo, base_sha, candidate_sha,
                                   complexity="small", package_id="PKG-01"):
