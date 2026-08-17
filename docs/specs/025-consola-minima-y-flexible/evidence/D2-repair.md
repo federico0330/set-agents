@@ -1,7 +1,7 @@
 # D2-trabajo-visible — reparación consolidada
 
-Package: `D2-trabajo-visible`  
-Estado: `repaired` (un único batch)  
+Package: `D2-trabajo-visible`
+Estado: `repaired` (un único batch)
 Findings: `D2-F01`, `D2-F02`
 
 ## Trazabilidad

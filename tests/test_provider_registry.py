@@ -12,10 +12,12 @@ does for the rest of the installer.
 """
 
 import json
+import io
 import os
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 import unittest
 from pathlib import Path
@@ -287,6 +289,28 @@ class ProviderVerifyLivenessScopeTests(unittest.TestCase):
                     rc = app.cmd_provider_verify(provider_id, include_legacy=include_legacy, prune_dead=prune_dead)
                 final = pr.parse_providers_toml(path)
             return rc, out, final
+
+    def test_slow_liveness_reports_stderr_progress_without_changing_provider_stdout(self):
+        # D2-F01: the two-second liveness timeout is human work. After the 300 ms delay
+        # it must report on stderr, while the machine-readable PROVIDER_* stdout line stays
+        # exactly in its historical channel and contains no indicator bytes.
+        stdout, stderr = io.StringIO(), io.StringIO()
+
+        def slow_liveness(_base_url):
+            time.sleep(0.35)
+            return "alive"
+
+        with mock.patch.object(app, "_load_providers_registry", return_value={"mine": _entry("user")}), \
+             mock.patch.object(app, "_provider_liveness", side_effect=slow_liveness), \
+             mock.patch.dict(os.environ, {"NO_COLOR": "1", "TERM": "dumb"}, clear=False), \
+             mock.patch("sys.stdout", stdout), mock.patch("sys.stderr", stderr):
+            rc = app.cmd_provider_verify()
+        self.assertEqual(rc, 0)
+        self.assertRegex(stdout.getvalue(), r"^PROVIDER_VERIFY mine origin=user shape=ok liveness=alive at=\d{4}-")
+        self.assertNotIn("verificando proveedores", stdout.getvalue())
+        self.assertNotIn("\r", stderr.getvalue())
+        self.assertIn("· verificando proveedores…\n", stderr.getvalue())
+        self.assertTrue(stderr.getvalue().endswith("verificando proveedores: listo\n"))
 
     def test_default_scope_checks_user_never_harness_or_harness_legacy_or_discovered(self):
         entries = {

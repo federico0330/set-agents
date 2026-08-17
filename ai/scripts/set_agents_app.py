@@ -1449,9 +1449,16 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
     if yes:
         install.append("--yes")
     # No capture: build.sh shows the managed diff and asks on the caller's TTY (AC-26).
+    # `--yes` makes this installer non-interactive, so it can safely share stderr with the
+    # delayed indicator. Without it build.sh may prompt; give the child exclusive terminal
+    # ownership instead of redrawing a frame over its input (025/D2-DR01, AC-05).
     with tui.suspend_terminal():
-        return tui.with_progress("instalando actualización", lambda: subprocess.run(install, check=False).returncode,
-                                 stream=sys.stderr, final=lambda _r: "instalando actualización: listo")
+        if yes:
+            return tui.with_progress("instalando actualización", lambda: subprocess.run(install, check=False).returncode,
+                                     stream=sys.stderr, final=lambda _r: "instalando actualización: listo")
+        result = subprocess.run(install, check=False).returncode
+    print("instalando actualización: listo", file=sys.stderr)
+    return result
 
 
 def launch_update_check():
@@ -2728,6 +2735,18 @@ def cmd_provider_verify(provider_id=None, include_legacy=False, prune_dead=False
     `_INSTALL_HINT`-gated, non-silent discipline as `--provider-remove`: takes effect at
     the next `./build.sh --install`, and offering it is opt-in, never automatic on a
     plain `--provider-verify`."""
+    # The live probe can take its declared two-second timeout. Its human-facing progress is
+    # stderr-only, preserving the established PROVIDER_* stdout protocol byte-for-byte.
+    return tui.with_progress(
+        "verificando proveedores",
+        lambda: _cmd_provider_verify(provider_id, include_legacy, prune_dead),
+        stream=sys.stderr,
+        final=lambda _r: "verificando proveedores: listo",
+    )
+
+
+def _cmd_provider_verify(provider_id=None, include_legacy=False, prune_dead=False):
+    """Implementation of :func:`cmd_provider_verify`, kept synchronous for its stdout protocol."""
     full_registry = _load_providers_registry()  # AC-18: --prune-dead must never drop an
     # entry this run did not even examine -- a single-`provider_id` verify narrows
     # `entries` below for REPORTING only; pruning always writes back against the FULL
@@ -3616,8 +3635,11 @@ def run_tty(command):
     the normal per-call picker sessions this module uses today, where control is already back
     in cooked mode by the time any menu branch reaches here."""
     with tui.suspend_terminal():
-        return tui.with_progress("ejecutando instalador", lambda: subprocess.run(command, check=False).returncode,
-                                 stream=sys.stderr, final=lambda _r: "ejecutando instalador: listo")
+        # Wizards and installers can print a prompt and then read stdin. They must be the
+        # exclusive writer while active; an outer spinner would redraw over that prompt.
+        result = subprocess.run(command, check=False).returncode
+    print("ejecutando instalador: listo", file=sys.stderr)
+    return result
 
 
 DRIFT_BADGE = {

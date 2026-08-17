@@ -177,6 +177,57 @@ class _FakeStream(io.StringIO):
         return self._is_tty
 
 
+class InteractiveInstallerProgressTests(unittest.TestCase):
+    """D2-DR01: a child that might prompt owns the terminal until it exits."""
+
+    def test_run_tty_never_redraws_after_an_installer_prompt(self):
+        stderr = _FakeStream(is_tty=True)
+
+        def child(*_args, **_kwargs):
+            stderr.write("CONFIRMAR? [s/N] ")
+            time.sleep(0.35)
+            stderr.write("CHILD_DONE")
+            return mock.Mock(returncode=0)
+
+        with mock.patch.object(app.subprocess, "run", side_effect=child), \
+             mock.patch("sys.stderr", stderr), \
+             mock.patch.dict(os.environ, {"NO_COLOR": "", "TERM": "xterm"}, clear=False):
+            rc = app.run_tty(["fake-installer"])
+        between = stderr.getvalue().split("CONFIRMAR? [s/N] ", 1)[1].split("CHILD_DONE", 1)[0]
+        self.assertEqual(rc, 0)
+        self.assertNotIn("\r", between)
+        self.assertTrue(stderr.getvalue().endswith("ejecutando instalador: listo\n"))
+
+    def test_post_update_without_yes_never_redraws_after_an_installer_prompt(self):
+        stdout, stderr = io.StringIO(), _FakeStream(is_tty=True)
+        commands = []
+
+        def child(command, **_kwargs):
+            commands.append(command)
+            stderr.write("ACTUALIZAR? [s/N] ")
+            time.sleep(0.35)
+            stderr.write("CHILD_DONE")
+            return mock.Mock(returncode=0)
+
+        pull = mock.Mock(returncode=0, stdout="", stderr="")
+        with mock.patch.object(app, "tree_clean", return_value=True), \
+             mock.patch.object(app, "upstream_ref", return_value="origin/main"), \
+             mock.patch.object(app, "rev_count", side_effect=[1, 0]), \
+             mock.patch.object(app, "short_sha", side_effect=["old", "new"]), \
+             mock.patch.object(app, "git", return_value=pull), \
+             mock.patch.object(app, "_upstream_remote_and_branch", return_value=("origin", "main")), \
+             mock.patch.object(app, "_install_scope", return_value=None), \
+             mock.patch.object(app.subprocess, "run", side_effect=child), \
+             mock.patch("sys.stdout", stdout), mock.patch("sys.stderr", stderr), \
+             mock.patch.dict(os.environ, {"NO_COLOR": "", "TERM": "xterm"}, clear=False):
+            rc = app.cmd_update(yes=False, assume_fetched=True)
+        between = stderr.getvalue().split("ACTUALIZAR? [s/N] ", 1)[1].split("CHILD_DONE", 1)[0]
+        self.assertEqual(rc, 0)
+        self.assertNotIn("--yes", commands[0])
+        self.assertNotIn("\r", between)
+        self.assertTrue(stderr.getvalue().endswith("instalando actualización: listo\n"))
+
+
 class RouteDoctorProgressTests(unittest.TestCase):
     """025/D2 (AC-04/AC-05): the progress indicator wrapping `--route-doctor`'s ~20s provider
     probe (`route_doctor`, `catalog.py:1136`) never touches stdout -- the JSON envelope's
