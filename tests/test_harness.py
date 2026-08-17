@@ -1056,19 +1056,32 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(config["postura"], "consultiva")
 
     def test_las_tres_posturas_dan_tres_resultados_distintos_para_el_mismo_escenario(self):
-        """Mordida 2 -- el riesgo 3 de la spec ("que las posturas queden decorativas")
-        hecho test: UN escenario (spawn mutante y delegante) corrido en las tres posturas
-        tiene que dar tres veredictos distintos y assertados. `postura_gate` es la misma
-        regla que la sección 'Postura de autonomía (ADR-0054)' de orchestrator.md describe
-        en prosa -- si algún día las tres posturas colapsan a un solo veredicto (la guarda
-        hueca que la spec advierte), este test lo detecta sin ambigüedad."""
+        """Mordida 2 -- el escenario escribe el canal runtime que consume el orquestador,
+        no un helper espejo. Para una misma acción mutante+delegante, cada valor persistido
+        debe llegar a la doctrina instalada con una instrucción observable distinta."""
         app = self._import("set_agents_app")
-        escenario = dict(mutating=True, delegating=True)  # e.g.: spawn implementer que escribe
-        veredictos = {postura: app.postura_gate(postura, **escenario) for postura in app.POSTURA_KEYS}
-        self.assertEqual(veredictos["autonoma"], "actua")
-        self.assertEqual(veredictos["consultiva"], "propone_y_espera")
-        self.assertEqual(veredictos["todo_consultado"], "pregunta_y_espera")
-        self.assertEqual(len(set(veredictos.values())), 3, veredictos)
+        self.assertFalse(hasattr(app, "postura_gate"), "la mordida no puede depender de un helper espejo")
+        expected_actions = {
+            "autonoma": "act on your own",
+            "consultiva": "wait for the user's explicit confirmation",
+            "todo_consultado": "before EVERY delegation",
+        }
+        doctrines = [(ROOT / path).read_text() for path in (
+            "Global/_canonical/agents/orchestrator.md",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/agents/orchestrator.toml",
+            "Global/pi/agents/orchestrator.md",
+        )]
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch.object(app, "APP_CONFIG", Path(td) / "config.toml"), \
+                 mock.patch.object(app, "STATE_DIR", Path(td)):
+                for postura, action in expected_actions.items():
+                    app.set_postura(postura)
+                    self.assertEqual(app.postura_actual(), postura)
+                    for doctrine in doctrines:
+                        self.assertIn(f"`{postura}`", doctrine)
+                        self.assertIn(action, doctrine)
 
     def test_el_canal_de_postura_llega_a_donde_el_agente_lo_lee(self):
         """Mordida 3 -- la que distingue "guardé un booleano" de "cambié la conducta": el
@@ -1118,6 +1131,10 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("SDD (Spec-Driven Development)", result.stdout)
             config = tomllib.loads((Path(td) / "state" / "config.toml").read_text())
             self.assertEqual(config["metodologia_preferida"], "rdd")
+            result = run("bash", "set-agents", "--metodologia", "sdd", env=env)
+            self.assertIn("METODOLOGIA=sdd", result.stdout)
+            result = run("bash", "set-agents", "--metodologias", env=env)
+            self.assertIn("preferencia actual: sdd", result.stdout)
 
     def test_rdd_se_reconcilia_con_strict_tdd_no_lo_duplica(self):
         """AC-08: RDD es el módulo strict-TDD de gentle-ai ya referenciado, no un concepto
@@ -1135,6 +1152,42 @@ class HarnessTests(unittest.TestCase):
             text = (ROOT / f"Global/_canonical/skills/{skill}/SKILL.md").read_text()
             self.assertIn("RDD", text)
             self.assertIn("gentle-ai", text)
+        for doctrine in [(ROOT / path).read_text() for path in (
+            "Global/_canonical/agents/orchestrator.md",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/agents/orchestrator.toml",
+            "Global/pi/agents/orchestrator.md",
+        )]:
+            self.assertIn("metodologia_preferida", doctrine)
+            self.assertIn("`sdd`: lean spec-first", doctrine)
+            self.assertIn("`rdd`: when proposing a new package", doctrine)
+            self.assertIn("never mid-package, never overriding", doctrine)
+            self.assertIn("already-declared `strict_tdd`", doctrine)
+
+    def test_configuracion_invalida_resuelve_igual_en_pantalla_y_doctrina(self):
+        """D3-F03: un operador puede editar config.toml; el canal runtime y la pantalla
+        deben cerrar los mismos valores inválidos en autonoma/off."""
+        app = self._import("set_agents_app")
+        with tempfile.TemporaryDirectory() as td:
+            config = Path(td) / "config.toml"
+            with mock.patch.object(app, "APP_CONFIG", config), mock.patch.object(app, "STATE_DIR", Path(td)):
+                config.write_text('postura = "omnisciente"\nmetodologia_preferida = 7\n')
+                self.assertEqual(app.postura_actual(), "autonoma")
+                self.assertEqual(app.metodologia_preferida(), "")
+                config.write_text('postura = [\n')
+                self.assertEqual(app.postura_actual(), "autonoma")
+                self.assertEqual(app.metodologia_preferida(), "")
+        for doctrine in [(ROOT / path).read_text() for path in (
+            "Global/_canonical/agents/orchestrator.md",
+            "Global/opencode/agents/orchestrator.md",
+            "Global/claude-code/agents/orchestrator.md",
+            "Global/codex/agents/orchestrator.toml",
+            "Global/pi/agents/orchestrator.md",
+        )]:
+            self.assertIn("unknown, non-string, or unreadable", doctrine)
+            self.assertIn("`postura` means `autonoma`", doctrine)
+            self.assertIn("unreadable means `off`", doctrine)
 
     def test_app_config_writers_postura_y_metodologia_no_se_pisan(self):
         """AC-15 otra vez: postura y metodologia_preferida van por el mismo

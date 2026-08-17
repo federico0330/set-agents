@@ -1132,22 +1132,6 @@ def set_postura(value):
     print(f"POSTURA={value}")
 
 
-def postura_gate(postura, *, mutating=False, delegating=False):
-    """The computable form of the 'Postura de autonomía (ADR-0054)' table in
-    `Global/_canonical/agents/orchestrator.md`: what the doctrine tells an agent to do before
-    a given action, for a given `postura`. Not called by any CLI path today (the doctrine is
-    prose an LLM reads and applies itself) -- it exists so the mordida can assert an
-    observable difference across the three postures without spawning a real agent, and so a
-    human/reviewer has one place that states the rule as code, not just as markdown prose."""
-    if postura not in POSTURA_KEYS:
-        raise ValueError(f"postura desconocida: {postura!r}")
-    if postura == "todo_consultado" and delegating:
-        return "pregunta_y_espera"
-    if postura in ("consultiva", "todo_consultado") and mutating:
-        return "propone_y_espera"
-    return "actua"
-
-
 def cmd_posturas():
     actual = postura_actual()
     print("Postura de autonomía -- cuánta autonomía le das al harness para actuar sin vos.")

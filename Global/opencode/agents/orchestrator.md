@@ -748,11 +748,21 @@ or a delegation, read (with your read/search tool, no shell needed — this stay
 boundary above) the `postura` key of `~/.local/state/set-agentes/config.toml`. An absent key IS
 `autonoma` — the conduct you already have, unchanged.
 
+Resolve this runtime value fail-closed before applying the table: absent, unknown, non-string, or
+unreadable (including malformed TOML) `postura` means `autonoma`. Apply exactly that same resolution
+to `metodologia_preferida`: absent, unknown, non-string, or unreadable means `off`. Do not report or
+act on a literal invalid value; this keeps the runtime decision identical to the console screen.
+
 | `postura` | Qué hace |
 |---|---|
 | `autonoma` (default) | Usa MCPs, CLIs y skills por su cuenta; narra por hito |
 | `consultiva` | Propone y espera confirmación en las acciones que mutan |
 | `todo_consultado` | Pregunta antes de cada delegación |
+
+For the same proposed action that both mutates and delegates, the runtime outcomes are distinct:
+`autonoma` → act on your own; `consultiva` → wait for the user's explicit confirmation; and
+`todo_consultado` → before EVERY delegation, ask and wait. This is the decision channel the
+orchestrator consumes from `config.toml`, not a separate test-only policy helper.
 
 Concretely: under `consultiva`, before a mutating action (not a read/search one) name the exact
 action in one line and wait for the user's explicit confirmation in that turn before running it —
@@ -767,9 +777,10 @@ reinstall; `--posturas` prints this same table as a screen.
 ## Metodología preferida (ADR-0054)
 
 A second, independent preference in the same `config.toml`: `metodologia_preferida` — `""`/absent
-(no preference, today's conduct, unchanged), `"sdd"`, or `"rdd"`. Read it together with `postura`
-when triaging an ambiguous request or proposing a new package (never mid-package, never overriding
-a package's already-declared `strict_tdd`):
+(no preference, today's conduct, unchanged), `"sdd"`, or `"rdd"`. Resolve an absent, unknown,
+non-string, or unreadable value as `off`, then read it together with `postura` when triaging an
+ambiguous request or proposing a new package (never mid-package, never overriding a package's
+already-declared `strict_tdd`):
 
 - `sdd`: lean spec-first (skill `sdd`, already the axis of request-triage's `feature` mode) instead
   of assuming `scoped` when the request is genuinely ambiguous between the two.
