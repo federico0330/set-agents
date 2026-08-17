@@ -11,6 +11,7 @@ import contextlib
 import io
 import os
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -105,6 +106,19 @@ class MenuDispatchTests(unittest.TestCase):
         estado_call = picker.call_args_list[1]
         self.assertIn("Harnesses", estado_call.kwargs["header"])
 
+    def test_estado_general_reports_delayed_progress_and_a_persistent_final_status(self):
+        # D2-F01: the menu's first action includes provider probing and must not fall back to
+        # the former static "relevando estado" line when a dependency crosses 300ms.
+        stderr = _FakeStream(is_tty=False)
+        data = {"rows": [], "drift": "ok", "sha": "abc", "behind": 0, "auto_update": True}
+        with mock.patch.object(app, "_status_data", side_effect=lambda **_k: (time.sleep(0.35), data)[1]), \
+             mock.patch.object(app, "_estado_general_lines", return_value=["Harnesses"]), \
+             mock.patch("sys.stderr", stderr):
+            rc, _, _ = self._menu([app.tui.Selected(0), None, None])
+        self.assertEqual(rc, 0)
+        self.assertIn("· relevando estado…\n", stderr.getvalue())
+        self.assertTrue(stderr.getvalue().endswith("relevando estado: listo\n"))
+
     def test_instalar_picks_a_harness_and_passes_it_to_install_sh(self):
         rc, _, tty = self._menu([app.tui.Selected(1), app.tui.Selected(2), None])
         self.assertEqual(rc, 0)
@@ -172,7 +186,7 @@ class RouteDoctorProgressTests(unittest.TestCase):
         fake_report = {"cache": {"used": False, "reason": "CACHE_ROOT_ABSENT"}, "providers": []}
         stdout_buf = io.StringIO()
         with mock.patch("routing_core.catalog.prune_legacy_probe_cache", return_value=False), \
-             mock.patch("routing_core.catalog.route_doctor", return_value=fake_report), \
+             mock.patch("routing_core.catalog.route_doctor", side_effect=lambda *_a, **_k: (time.sleep(0.35), fake_report)[1]), \
              mock.patch.object(app, "ROUTING_WARNINGS", ()), \
              mock.patch.dict(os.environ, env, clear=False), \
              mock.patch("sys.stderr", stderr_stream), \

@@ -2471,6 +2471,27 @@ class HarnessTests(unittest.TestCase):
         for cli in app.HARNESS_CLIS:
             self.assertIn(cli, buf.getvalue())
 
+    def test_cmd_status_human_reports_delayed_progress_and_a_persistent_final_status(self):
+        # D2-F01: a normally quick --status can spend up to 15 seconds in each CLI probe.
+        # A controlled >300ms version probe must therefore activate progress on stderr without
+        # changing the human table's stdout contract.
+        app = self._import("set_agents_app")
+        stderr = _FakeStdout(is_tty=False)
+        with mock.patch.object(app, "rev_count", return_value=0), \
+             mock.patch.object(app, "drift_state", return_value="ok"), \
+             mock.patch.object(app, "auto_update_enabled", return_value=True), \
+             mock.patch.object(app, "short_sha", return_value="abc1234"), \
+             mock.patch.object(app.shutil, "which", return_value="/usr/bin/x"), \
+             mock.patch.object(app, "version_of", side_effect=lambda _cli: (time.sleep(0.35), "1.2.3")[1]), \
+             mock.patch.object(app, "auth_state", return_value="ok"), \
+             mock.patch("sys.stderr", stderr):
+            buf = io.StringIO()
+            with mock.patch("sys.stdout", buf):
+                app.cmd_status(human=True)
+        self.assertIn("· relevando estado…\n", stderr.getvalue())
+        self.assertTrue(stderr.getvalue().endswith("relevando estado: listo\n"))
+        self.assertIn("APP_STATUS sha=abc1234", buf.getvalue())
+
     def test_auth_state_has_an_explicit_timeout_on_both_remote_probes(self):
         # F-04: `auth_state`'s two subprocess probes (`opencode auth list`, `codex login
         # status`) had no timeout at all -- a wedged one could hang a scripted `--status`
@@ -12761,7 +12782,7 @@ class TuiTests(unittest.TestCase):
         tty_stream = _FakeStdout(is_tty=True)
 
         def _slow():
-            time.sleep(0.25)  # long enough for >=1 spinner tick at the 0.1s interval
+            time.sleep(0.35)  # exceeds the 0.3s activation threshold plus one tick
             return "ok"
 
         with mock.patch.dict(os.environ, {"NO_COLOR": "", "TERM": "xterm"}, clear=False):
@@ -12779,8 +12800,41 @@ class TuiTests(unittest.TestCase):
         tty_stream = _FakeStdout(is_tty=True)
         baseline = threading.active_count()
         with mock.patch.dict(os.environ, {"NO_COLOR": "", "TERM": "xterm"}, clear=False):
-            tui.with_progress("consultando", lambda: time.sleep(0.15), stream=tty_stream)
+            tui.with_progress("consultando", lambda: time.sleep(0.35), stream=tty_stream)
         self.assertEqual(threading.active_count(), baseline)
+
+    def test_with_progress_backpressured_frame_cannot_write_after_the_final_status(self):
+        # D2-F02: the caller, not a daemon spinner, owns stream writes. Force the first live
+        # frame to block beyond the old one-second join timeout; releasing it lets the call
+        # finish, and there is still no writer left that could append a late frame afterwards.
+        tui = self._import()
+
+        class BlockingStream(_FakeStdout):
+            def __init__(self):
+                super().__init__(is_tty=True)
+                self.entered = threading.Event()
+                self.release = threading.Event()
+                self._blocked = False
+
+            def write(self, text):
+                if not self._blocked and "consultando" in text and "\r" in text:
+                    self._blocked = True
+                    self.entered.set()
+                    self.release.wait(2)
+                return super().write(text)
+
+        stream = BlockingStream()
+        releaser = threading.Thread(target=lambda: (stream.entered.wait(1), time.sleep(1.1), stream.release.set()))
+        releaser.start()
+        with mock.patch.dict(os.environ, {"NO_COLOR": "", "TERM": "xterm"}, clear=False):
+            result = tui.with_progress("consultando", lambda: time.sleep(0.35), stream=stream)
+        releaser.join()
+        final = "consultando: listo\n"
+        self.assertEqual(result, None)
+        self.assertTrue(stream.getvalue().endswith(final))
+        stable = stream.getvalue()
+        time.sleep(0.15)
+        self.assertEqual(stream.getvalue(), stable)
 
 
 if __name__ == "__main__":

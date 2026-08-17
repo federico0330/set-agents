@@ -1369,7 +1369,9 @@ def _status_table_lines(data):
 
 
 def cmd_status(human=False):
-    data = _status_data(rows=human)
+    data = (tui.with_progress("relevando estado", lambda: _status_data(rows=True), stream=sys.stderr,
+                              final=lambda _r: "relevando estado: listo")
+            if human else _status_data(rows=False))
     print(_status_machine_line(data))
     if not human:
         return 0
@@ -1382,7 +1384,8 @@ def cmd_status(human=False):
 # -------------------------------------------------------------------- update
 
 def cmd_check_update():
-    online = fetch()
+    online = tui.with_progress("consultando actualizaciones", fetch, stream=sys.stderr,
+                               final=lambda _r: "consultando actualizaciones: listo")
     behind = rev_count(f"HEAD..{upstream_ref()}")
     suffix = "" if online else " (sin red: valor cacheado)"
     print(f"UPDATE_AVAILABLE={behind if behind is not None else '?'}{suffix}")
@@ -1394,7 +1397,8 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
         print("UPDATE_BLOCKED: hay cambios locales sin commitear — resolvelos y reintentá.")
         return 1
     if not assume_fetched:
-        fetch()
+        tui.with_progress("consultando actualizaciones", fetch, stream=sys.stderr,
+                          final=lambda _r: "consultando actualizaciones: listo")
     ref = upstream_ref()
     behind = rev_count(f"HEAD..{ref}")
     ahead = rev_count(f"{ref}..HEAD")
@@ -1412,7 +1416,9 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
     print(git("log", "--oneline", f"HEAD..{ref}").stdout.rstrip())
     remote, branch = _upstream_remote_and_branch()
     try:
-        pull = git("pull", "--ff-only", remote, branch, timeout=180)
+        pull = tui.with_progress(
+            "aplicando actualización", lambda: git("pull", "--ff-only", remote, branch, timeout=180),
+            stream=sys.stderr, final=lambda _r: "aplicando actualización: listo")
     except subprocess.TimeoutExpired:
         print("UPDATE_BLOCKED: git pull colgado (¿red o credenciales? probá `gh auth status`).")
         return 1
@@ -1444,7 +1450,8 @@ def cmd_update(yes=False, no_install=False, assume_fetched=False):
         install.append("--yes")
     # No capture: build.sh shows the managed diff and asks on the caller's TTY (AC-26).
     with tui.suspend_terminal():
-        return subprocess.run(install, check=False).returncode
+        return tui.with_progress("instalando actualización", lambda: subprocess.run(install, check=False).returncode,
+                                 stream=sys.stderr, final=lambda _r: "instalando actualización: listo")
 
 
 def launch_update_check():
@@ -3609,7 +3616,8 @@ def run_tty(command):
     the normal per-call picker sessions this module uses today, where control is already back
     in cooked mode by the time any menu branch reaches here."""
     with tui.suspend_terminal():
-        return subprocess.run(command, check=False).returncode
+        return tui.with_progress("ejecutando instalador", lambda: subprocess.run(command, check=False).returncode,
+                                 stream=sys.stderr, final=lambda _r: "ejecutando instalador: listo")
 
 
 DRIFT_BADGE = {
@@ -3739,8 +3747,8 @@ def menu():
         print()
         print(bold(f"Primera vez acá → leé README.md (sección {platform_label()}) para saber qué esperar."))
         write_app_config(auto_update=True)
-    print(dim("· chequeando updates…"))
-    update_badge = launch_update_check()
+    update_badge = tui.with_progress("chequeando actualizaciones", launch_update_check, stream=sys.stderr,
+                                     final=lambda _r: "chequeando actualizaciones: listo")
     # Drift regenerates a full staging (~2 s): cache it and refresh only after
     # actions that can change it, instead of on every redraw.
     drift = drift_state()
@@ -3768,9 +3776,10 @@ def menu():
             # Estado general: the doctor-all panel, formatted, as the toggle
             # picker's header (F-03's lesson: print()s die with the alt-screen).
             drift = drift_state()
-            print(dim("· relevando estado…"))
-            status_data = _status_data(rows=True)
-            estado_lines = _estado_general_lines(status_data)
+            status_data, estado_lines = tui.with_progress(
+                "relevando estado",
+                lambda: (lambda data: (data, _estado_general_lines(data)))(_status_data(rows=True)),
+                stream=sys.stderr, final=lambda _r: "relevando estado: listo")
             estado_header = "\n".join([_status_machine_line(status_data), ""] + estado_lines)
             toggle = tui.run_picker(
                 (f"Togglear auto-update (hoy: {'on' if auto_update_enabled() else 'off'})", "Volver"),

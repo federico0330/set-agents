@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import queue
 import select
 import signal
 import sys
@@ -570,6 +571,7 @@ def supports_progress(stream) -> bool:
 
 _SPINNER_FRAMES = "|/-\\"
 _SPINNER_INTERVAL_SECONDS = 0.1
+_PROGRESS_DELAY_SECONDS = 0.3
 
 
 def with_progress(message, fn, *, stream=None, final=None):
@@ -578,26 +580,23 @@ def with_progress(message, fn, *, stream=None, final=None):
     probes, `--doctor-all`, `--route-doctor`, all measured over the ~300ms threshold in
     the D2 context pack).
 
-    Live mode (`supports_progress(stream)`): a background thread redraws a `\\r`-prefixed
-    spinner frame every `_SPINNER_INTERVAL_SECONDS`. Degraded mode (no TTY, `NO_COLOR`,
-    `TERM=dumb`, or any stream that can't answer `isatty()`): one static line, no `\\r`, no
-    ANSI -- printed once, not touched again until the final line.
+    The indicator activates after `_PROGRESS_DELAY_SECONDS`, so quick operations do not flicker
+    but every operation that becomes slow reports progress. Live mode redraws a `\\r`-prefixed
+    spinner frame every `_SPINNER_INTERVAL_SECONDS`; degraded mode writes one static line.
 
     AC-05, "never the only indicator": when `fn()` returns, a PERSISTENT line is always
     written to `stream` -- `final(result)` if given, else a plain "<message>: listo"
-    fallback -- in BOTH modes. If `fn()` raises, the spinner is still stopped and the
-    spinner line cleared (the `finally` below) before the exception propagates, but no
+    fallback -- in BOTH modes. If `fn()` raises, a visible spinner line is cleared before the
+    exception propagates, but no
     final line is written for a result that doesn't exist; the caller's own error path is
     what informs the user in that case.
 
-    AC-05, "never blocks input": the spinner thread is always joined (bounded 1s timeout,
-    matching this module's other terminal-restore joins) BEFORE `with_progress` returns,
-    so nothing here can still be writing when a caller immediately follows with an
-    `input()`/`tui.suspend_terminal()` prompt."""
+    AC-05, "never blocks input": only the caller thread writes to `stream`; the worker runs
+    `fn` but never owns terminal output. Therefore no late animation frame can race a prompt
+    after this function returns."""
     stream = stream if stream is not None else sys.stderr
     live = supports_progress(stream)
-    stop_event = threading.Event()
-    thread = None
+    result_queue = queue.Queue(maxsize=1)
 
     def _write(text):
         try:
@@ -606,25 +605,37 @@ def with_progress(message, fn, *, stream=None, final=None):
         except (OSError, ValueError):
             pass
 
-    if live:
-        def _spin():
-            i = 0
-            while not stop_event.wait(_SPINNER_INTERVAL_SECONDS):
-                frame = _SPINNER_FRAMES[i % len(_SPINNER_FRAMES)]
-                _write(f"\r{frame} {message}…")
-                i += 1
-        thread = threading.Thread(target=_spin, daemon=True)
-        thread.start()
-    else:
-        _write(f"· {message}…\n")
+    def _work():
+        try:
+            result_queue.put((True, fn()))
+        except BaseException as exc:
+            result_queue.put((False, exc))
 
-    try:
-        result = fn()
-    finally:
-        if thread is not None:
-            stop_event.set()
-            thread.join(timeout=1.0)
+    worker = threading.Thread(target=_work)
+    worker.start()
+    shown = False
+    frame_index = 0
+    started = time.monotonic()
+    while worker.is_alive():
+        elapsed = time.monotonic() - started
+        if not shown and elapsed >= _PROGRESS_DELAY_SECONDS:
+            _write(f"\r{_SPINNER_FRAMES[frame_index]} {message}…" if live else f"· {message}…\n")
+            shown = True
+            frame_index += 1
+        wait = _SPINNER_INTERVAL_SECONDS if shown else max(0.0, _PROGRESS_DELAY_SECONDS - elapsed)
+        worker.join(wait)
+        if shown and worker.is_alive() and live:
+            _write(f"\r{_SPINNER_FRAMES[frame_index % len(_SPINNER_FRAMES)]} {message}…")
+            frame_index += 1
+    worker.join()
+    ok, value = result_queue.get()
+    if not ok:
+        if shown and live:
             _write("\r" + " " * (len(message) + 4) + "\r")
+        raise value
+    result = value
+    if shown and live:
+        _write("\r" + " " * (len(message) + 4) + "\r")
 
     _write((final(result) if final is not None else f"{message}: listo") + "\n")
     return result
