@@ -7390,12 +7390,13 @@ class HarnessTests(unittest.TestCase):
             shim = Path(bin_dir) / "claude"
             shim.write_text(
                 f"#!{sys.executable}\n"
-                "import os\n"
+                "import os\nimport sys\n"
                 "from pathlib import Path\n"
                 f"installed = Path({str(home)!r})\n"
                 "scratch = Path(os.environ['HOME'])\n"
                 "assert scratch != installed\n"
                 "assert not (scratch / '.claude' / 'CLAUDE.md').exists()\n"
+                "assert sys.argv[1:] in ([], ['--version'])\n"
                 "for key in ('XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR'):\n"
                 "    value = Path(os.environ[key])\n"
                 "    assert value.is_dir() and value.is_relative_to(scratch)\n"
@@ -7412,6 +7413,16 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("VIRGIN_SESSION_DONE cli=claude exit=0", result.stdout)
             self.assertEqual(before, self._tree_hashes(home, (".claude", ".config/opencode", ".codex", ".pi")))
             self.assertTrue(marker.exists(), "AC-11 must not mutate the installed lane")
+
+            # D4-F01: the separator is mandatory but the child argv is optional.
+            empty_argv = run(
+                "python3", "ai/scripts/set_agents_app.py", "--virgin", "claude", "--",
+                env={"HOME": str(home), "PATH": f"{bin_dir}:{os.environ['PATH']}"}, check=False,
+            )
+            self.assertEqual(empty_argv.returncode, 0, empty_argv.stderr)
+            self.assertIn("SHIM_VIRGIN_OK", empty_argv.stdout)
+            self.assertIn("VIRGIN_SESSION_DONE cli=claude exit=0", empty_argv.stdout)
+            self.assertEqual(before, self._tree_hashes(home, (".claude", ".config/opencode", ".codex", ".pi")))
 
     def test_generation_is_reproducible(self):
         with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:

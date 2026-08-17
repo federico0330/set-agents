@@ -3682,7 +3682,7 @@ def cmd_virgin_session(cli, child_args):
 
 def _dispatch_virgin_session(argv):
     """Strict argv grammar for `set-agents --virgin CLI -- [CLI args...]`."""
-    if len(argv) < 3 or argv[1] != "--" or argv[0] not in (*_VIRGIN_CLI_BINARIES, "pi"):
+    if len(argv) < 2 or argv[1] != "--" or argv[0] not in (*_VIRGIN_CLI_BINARIES, "pi"):
         print("usage: set-agents --virgin {opencode,claude,codex,pi} -- [CLI args...]", file=sys.stderr)
         return 2
     return cmd_virgin_session(argv[0], argv[2:])

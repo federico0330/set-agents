@@ -99,8 +99,8 @@ assumed, at uninstall time.
 
 ## AC-11 — "use a CLI virgin, just this once"
 
-The D4 context pack asked for this decision to be made and recorded even though its implementation
-is deferred to a later package. The two axes that exist and must not be conflated:
+The D4 context pack asked for this decision to be made and recorded; its implementation is now part
+of D4. The two axes that exist and must not be conflated:
 
 - the **installed tree** in `--home` (static, baked at install time — what AC-09/AC-10 manage), versus
 - what a **spawned session actually reads at runtime** — the axis AC-11 needs.
@@ -126,11 +126,12 @@ installed `opencode.json` through the exported variable, defeating the "virgin" 
 The correct axis set for AC-11 is **`HOME` plus, per CLI, whichever of
 `XDG_CONFIG_HOME`/`XDG_DATA_HOME`/`XDG_STATE_HOME` that CLI actually consults** — not `HOME` alone.
 
-**Sin verificar**: whether opencode's own runtime actually honors `XDG_CONFIG_HOME` (this repo's
-`install.py` never reads it — that half is verified, `install.py:38-42` — but whether the `opencode`
-binary itself would resolve its config through it if exported is outside this repository's sources
-and was not checked against opencode's own documentation this pass). AC-11's eventual implementer
-must confirm this with a source (opencode's own docs/`--help`) before relying on it, per ADR-0026.
+AC-11 does not rely on proving one particular OpenCode lookup rule: the child receives fresh values
+for every XDG root and no inherited per-CLI configuration overrides. Together with the fresh `HOME`,
+that blocks both the documented home-based paths and any XDG-root lookup from reaching the installed
+lane. The runtime regression poisons inherited `CODEX_HOME`, all XDG roots, `OPENCODE_CONFIG`, and
+`CLAUDE_CONFIG_DIR`, then proves the child receives only its disposable roots while the installed
+lanes remain byte-identical.
 
 ## Consequences
 
