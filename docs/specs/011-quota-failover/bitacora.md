@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-07-30T16:42:25+00:00] package-planner · started
 Cliente: El contrato de cuotas quedó aceptado y se inició como trabajo nuevo, separado del historial de selección previa.
@@ -30,4 +30,4 @@ Ingeniería: AC-06 requiere precondición externa verificable. Runner validado d
 
 [2026-07-30T17:57:23+00:00] P1-quota-failover · started
 Cliente: Antes de seguir, encontré que la suite completa tiene 2 pruebas rojas que la verificación acotada de la sesión anterior no corrió.
-Ingeniería: verify.sh (suite completa, 473 tests) -> FAILED (failures=2): test_routing_migrate_uses_harness_identity_and_test_store espera 'to=6' y el schema real ya es 7; test_the_usage_columns_sit_exactly_where_alter_table_puts_them compara contra un DDL canónico que no incluye replacement_of_run_id. Ambos son literales desactualizados por el propio paquete P1-quota-failover (SCHEMA=7, columna agregada cor…
+Ingeniería: verify.sh (suite completa, 473 tests) -> FAILED (failures=2): test_routing_migrate_uses_harness_identity_and_test_store espera 'to=6' y el schema real ya es 7; test_the_usage_columns_sit_exactly_where_alter_table_puts_them compara contra un DDL canónico que no incluye replacement_of_run_id. Ambos son literales desactualizados por el propio paquete P1-quota-failover (SCHEMA=7, columna agregada cor… _(truncado al render)_

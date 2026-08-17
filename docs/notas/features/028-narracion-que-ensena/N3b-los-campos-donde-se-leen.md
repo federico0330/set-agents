@@ -11,6 +11,10 @@
 - [x] render-new-fields (completed) · focal tests green
 - [x] mark-render-truncation (completed) · focal tests green
 
+## Recorrido
+
+- gate `verify`: pass
+
 ↩ [[features/028-narracion-que-ensena|028-narracion-que-ensena]]
 <!-- /notas:auto -->
 

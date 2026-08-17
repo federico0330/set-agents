@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-07-30T13:46:49+00:00] P1-spawn-provenance · implementer · started
 Cliente: Instanciamos al implementador que conecta los spawns al grafo de ejecución (010-spawn-provenance).
@@ -90,4 +90,4 @@ Ingeniería: INTEGRATION entry: read-only validation of P1-spawn-provenance agai
 
 [2026-08-02T14:54:59+00:00] P1-spawn-provenance · integrator · done
 Cliente: El integrador confirmo que el registro de procedencia de cada delegacion funciona y quedo bien conectado: las cinco condiciones acordadas se cumplen y los pendientes del traspaso anterior ya estaban ejecutados. Igual que con la vista de grafo, esta ficha queda cerrada sin sello final, tal como se decidio en su momento.
-Ingeniería: Integration validation PASS: AC-01..AC-05 verified in tree (replay guard first, spawn nodes edge-free, ownership clean, done_ready resolved_at filter, 5/5 regression tests green). HANDOFF-PASO9 5.2/5.3 executed (ADR-0013 superseded note + log-decision ac-04). Per HANDOFF 5.5 + spec Origen, 010 stays PACKAGE_ACCEPTED; INTEGRATION/DONE never invoked. Non-blocking observation: exceptions field absen…
+Ingeniería: Integration validation PASS: AC-01..AC-05 verified in tree (replay guard first, spawn nodes edge-free, ownership clean, done_ready resolved_at filter, 5/5 regression tests green). HANDOFF-PASO9 5.2/5.3 executed (ADR-0013 superseded note + log-decision ac-04). Per HANDOFF 5.5 + spec Origen, 010 stays PACKAGE_ACCEPTED; INTEGRATION/DONE never invoked. Non-blocking observation: exceptions field absen… _(truncado al render)_

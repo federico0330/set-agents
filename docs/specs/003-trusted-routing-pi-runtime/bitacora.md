@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-07-24T16:27:29+00:00] product-analyst · started
 Cliente: Voy a transformar el plan aprobado en un contrato 2.0 y escenarios verificables, manteniendo 002 intacta y visible como antecedente reemplazado.
@@ -238,7 +238,7 @@ Ingeniería: User-authorized fresh budget for R3: max_spawns_per_package 13->16 
 
 [2026-07-25T02:08:42+00:00] P1R-trusted-routing · repair-agent · started
 Cliente: Un unico reparador va a cerrar los diez pendientes: primero hara que la deteccion de herramientas autenticadas funcione de verdad, despues endurecera la base de datos y la auditoria, y dejara pruebas de choque, concurrencia y privacidad.
-Ingeniería: PACKAGE_REPAIR R3, spawn 14/16 (Claude Fable in-session): FD-003 per-pair probe parsers with graceful degradation; FD-005 canonical DDL equality; FD-002 conservative risk max; FD-007 rejection audit + lifecycle CHECKs (SCHEMA bump); FD-008 counters + transactional compaction; FD-010 generic non-default-arg exclusion; feasible halves of FD-001/004/006 (sealed composition, recomputed binding, pwd r…
+Ingeniería: PACKAGE_REPAIR R3, spawn 14/16 (Claude Fable in-session): FD-003 per-pair probe parsers with graceful degradation; FD-005 canonical DDL equality; FD-002 conservative risk max; FD-007 rejection audit + lifecycle CHECKs (SCHEMA bump); FD-008 counters + transactional compaction; FD-010 generic non-default-arg exclusion; feasible halves of FD-001/004/006 (sealed composition, recomputed binding, pwd r… _(truncado al render)_
 
 [2026-07-25T02:21:58+00:00] P1R-trusted-routing · gate-runner · started
 Cliente: Una instancia independiente va a repetir todas las validaciones con tiempo suficiente y comprobar que la reparacion no toco nada fuera del paquete.
@@ -250,4 +250,4 @@ Ingeniería: DELTA_REVIEW R3 delta-reviewer read-only, spawn 16/16 (last of auth
 
 [2026-07-25T03:02:30+00:00] P1R-trusted-routing · orchestrator · done
 Cliente: El paquete de ruteo confiable quedo aceptado: la deteccion de herramientas autenticadas ahora funciona de verdad, la base de datos se valida completa antes de tocarla, cada rechazo queda auditado, y hay pruebas de choque, concurrencia y privacidad. Dos revisores independientes lo verificaron. Queda un paso manual: borrar la base vieja para reactivar el ruteo persistente.
-Ingeniería: R3 complete within authorized budget (spawns 14-16, cycle 3/3): FD-001..FD-010 closed (6 resolved, 4 resolved-by-approved-exception per r3-threat-model-amendment); r3-final-verification gate pass (19 focused, verify.sh 117, CLI, ownership no new paths); independent delta review verdict pass; testing + runtime QA recorded; P1R PACKAGE_ACCEPTED. Backlog notes N-1..N-5 in delta review reason. P2/P3 …
+Ingeniería: R3 complete within authorized budget (spawns 14-16, cycle 3/3): FD-001..FD-010 closed (6 resolved, 4 resolved-by-approved-exception per r3-threat-model-amendment); r3-final-verification gate pass (19 focused, verify.sh 117, CLI, ownership no new paths); independent delta review verdict pass; testing + runtime QA recorded; P1R PACKAGE_ACCEPTED. Backlog notes N-1..N-5 in delta review reason. P2/P3 … _(truncado al render)_

@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-07-27T14:51:01+00:00] spec-challenger · started
 Cliente: Antes de pedirte que lo apruebes, una instancia independiente busca agujeros en el contrato: cosas que suenan bien pero no se pueden comprobar, riesgos con tus datos reales, y contradicciones internas.
@@ -14,19 +14,19 @@ Ingeniería: SPEC_DRAFT closed. product-analyst wrote docs/specs/005-portable-ha
 
 [2026-07-27T14:52:35+00:00] orchestrator · done
 Cliente: Medí el riesgo más alto del plan antes de tocar nada: tus notas de los 4 proyectos. Son 29 archivos y NO hay ningún choque de nombres, así que se pueden recuperar sin perder nada. El único caso delicado es iey-ai, que ya tiene 2 archivos tuyos en el repo: esos quedan intactos y las 13 notas se suman al lado.
-Ingeniería: Pre-planning evidence gathered read-only: docs/specs/005-portable-harness/evidence/vault-migration-inventory.md. All four <vault>/Proyectos/<name> entries are real dirs (legacy --private topology); all four target repos exist. 29 files total. iey-ai is the only merge case (repo docs/notas holds 2 non-harness files); comm -12 on the two file lists is empty => zero name collisions. Closes the spec …
+Ingeniería: Pre-planning evidence gathered read-only: docs/specs/005-portable-harness/evidence/vault-migration-inventory.md. All four <vault>/Proyectos/<name> entries are real dirs (legacy --private topology); all four target repos exist. 29 files total. iey-ai is the only merge case (repo docs/notas holds 2 non-harness files); comm -12 on the two file lists is empty => zero name collisions. Closes the spec … _(truncado al render)_
 
 [2026-07-27T15:00:45+00:00] spec-challenger · done
 Cliente: El contrato no pasó limpio: la revisión independiente encontró 29 problemas, 15 de ellos serios. Entre otros: la migración de tus notas las habría dejado invisibles para el control de versiones, y un comando obligatorio del plan estaba prohibido por las propias reglas de permisos. Todos se arreglan en el contrato, antes de escribir una línea de código. Quedan 6 decisiones que son tuyas.
-Ingeniería: SPEC_CHALLENGE closed: verdict revision_required. 15 HIGH blockers, 14 MEDIUM. Sharpest: SC-01 build-time path baking would break verify.sh:14-16 byte-identity gate on every other machine (substitution must live in install.py write path only; tracked Global/** keeps the placeholder). SC-03 find_vault's .parents excludes the start dir, so the headline AC fails standing at the project root. SC-06 A…
+Ingeniería: SPEC_CHALLENGE closed: verdict revision_required. 15 HIGH blockers, 14 MEDIUM. Sharpest: SC-01 build-time path baking would break verify.sh:14-16 byte-identity gate on every other machine (substitution must live in install.py write path only; tracked Global/** keeps the placeholder). SC-03 find_vault's .parents excludes the start dir, so the headline AC fails standing at the project root. SC-06 A… _(truncado al render)_
 
 [2026-07-27T15:19:51+00:00] product-analyst · done
 Cliente: Contrato corregido: se cerraron los 29 problemas y entraron tus 3 decisiones. Ahora hay una propuesta en lenguaje de negocio para que puedas aprobar sin leer lo tecnico. Falta solo tu aprobacion para empezar a construir.
-Ingeniería: Contract amended to 1.1.0: 32 ACs (was 27). Splits: AC-01 -> AC-01+AC-02 (install-time baking vs allowlist matcher fix); AC-02 -> AC-03+AC-04 (walk-up vs SEC-A02 trust level); AC-04 scope cut to P1 (vault link moved to P2). AC-07 -> AC-09 rewritten as a hermetic scripted test with named observables. New: AC-12 (vault intent marker), AC-23 (key decoder), AC-27 (terminal restore on abnormal exit). …
+Ingeniería: Contract amended to 1.1.0: 32 ACs (was 27). Splits: AC-01 -> AC-01+AC-02 (install-time baking vs allowlist matcher fix); AC-02 -> AC-03+AC-04 (walk-up vs SEC-A02 trust level); AC-04 scope cut to P1 (vault link moved to P2). AC-07 -> AC-09 rewritten as a hermetic scripted test with named observables. New: AC-12 (vault intent marker), AC-23 (key decoder), AC-27 (terminal restore on abnormal exit). … _(truncado al render)_
 
 [2026-07-27T15:25:51+00:00] P1-portable-core · architect · started
 Cliente: Antes de escribir codigo, un arquitecto deja por escrito COMO se resuelve cada pieza: donde vive cada ruta, como se identifica cada proyecto sin confundirlo con otro, y como se migra la base de datos sin perder nada. Eso queda documentado para que dentro de un ano se entienda por que se hizo asi.
-Ingeniería: AC-00 is a blocking predecessor of all P1 code. architect writes docs/adr/0008-two-roots-portability.md: HARNESS_HOME/PROJECT_ROOT doctrine, install-time-only baking (SC-01), allowlist dual fix incl. post-shlex.split matching (SC-02), self-inclusive nearest-ancestor-wins walk-up (SC-03/SC-04), SEC-A02 trust-level reframing (SC-05), persisted project-id primary with path-hash fallback and fail-clo…
+Ingeniería: AC-00 is a blocking predecessor of all P1 code. architect writes docs/adr/0008-two-roots-portability.md: HARNESS_HOME/PROJECT_ROOT doctrine, install-time-only baking (SC-01), allowlist dual fix incl. post-shlex.split matching (SC-02), self-inclusive nearest-ancestor-wins walk-up (SC-03/SC-04), SEC-A02 trust-level reframing (SC-05), persisted project-id primary with path-hash fallback and fail-clo… _(truncado al render)_
 
 [2026-07-27T15:54:01+00:00] P1-portable-core · implementer · started
 Cliente: Construimos el núcleo portátil: instalación sin rutas pegadas, detección del proyecto real, identidad persistente y migración segura del ruteo. La prueba de invitado queda para una validación independiente.
@@ -42,7 +42,7 @@ Ingeniería: PACKAGE_GATES after implementer checkpoint. Gate-runner is independ
 
 [2026-07-27T16:19:46+00:00] P1-portable-core · gate-runner · done
 Cliente: La prueba independiente encontró fallas reales, no cosméticas: la copia invitada todavía no pasa su verificación final y el harness actual no puede iniciar la migración porque no tiene identidad propia. Se encontraron antes de aceptar el paquete y se van a corregir de forma acotada.
-Ingeniería: Independent gates: unittest discover 172 OK, test_routing 67 OK, py_compile/build/diff OK; migration rollback/DDL/cross-project denial proved. Failures: AC-01/09 placeholder verifier expects literal __SET_AGENTS_ROOT__ in coord_policy; routing-migrate requires absent harness project.json; ownership declaration omits generated state/notas and compiled Global artifacts. One consolidated repair batc…
+Ingeniería: Independent gates: unittest discover 172 OK, test_routing 67 OK, py_compile/build/diff OK; migration rollback/DDL/cross-project denial proved. Failures: AC-01/09 placeholder verifier expects literal __SET_AGENTS_ROOT__ in coord_policy; routing-migrate requires absent harness project.json; ownership declaration omits generated state/notas and compiled Global artifacts. One consolidated repair batc… _(truncado al render)_
 
 [2026-07-27T16:19:57+00:00] P1-portable-core · repair-agent · started
 Cliente: Un agente va a corregir los tres desajustes encontrados: la verificación del clon, la identidad del harness y la declaración de archivos generados. Después se repite la prueba independiente.
@@ -86,7 +86,7 @@ Ingeniería: Delta review repair_required: P1-DLT-001 proves a subprocess enviro
 
 [2026-07-27T17:18:39+00:00] P1-portable-core · implementer · started
 Cliente: Vamos a cerrar el último desvío del ruteo Pi: al trabajar dentro de tu proyecto, sus tres pasos usarán siempre ese proyecto y la prueba invitada comprobará la identidad guardada realmente en la base.
-Ingeniería: P1 was reopened from HUMAN_DECISION_REQUIRED under explicit user authorization. The approved exception is exactly ai/scripts/set_agents_spawn.py: add optional cwd to the lifecycle CLI helper and thread one routing_cwd through decide/dispatched/terminal including exception close. Update D5/spec/plan and test the persisted dispatches.project_key without altering store, allowlist, metric_rollups, or…
+Ingeniería: P1 was reopened from HUMAN_DECISION_REQUIRED under explicit user authorization. The approved exception is exactly ai/scripts/set_agents_spawn.py: add optional cwd to the lifecycle CLI helper and thread one routing_cwd through decide/dispatched/terminal including exception close. Update D5/spec/plan and test the persisted dispatches.project_key without altering store, allowlist, metric_rollups, or… _(truncado al render)_
 
 [2026-07-27T17:26:15+00:00] P1-portable-core · gate-runner · started
 Cliente: Una validación independiente repetirá el recorrido completo como proyecto invitado y verificará que no se mezclen identidades entre proyectos.
@@ -94,7 +94,7 @@ Ingeniería: PACKAGE_GATES: gate-runner is read-only and independent of the impl
 
 [2026-07-27T17:26:15+00:00] P1-portable-core · implementer · done
 Cliente: El ruteo Pi ya usa el proyecto correcto en sus tres pasos y la prueba ahora revisa la identidad que quedó guardada. Se confirmó el ciclo de ruteo; falta repetir en forma independiente la prueba invitada completa.
-Ingeniería: Implementer completed the approved DLT-001/002 delta: optional app-CLI cwd defaults to ROOT, a single routing_cwd is threaded through all lifecycle calls (including failure close), APP_CLI remains absolute and Pi keeps spawn_cwd. Added real hermetic SQLite lifecycle evidence plus guest dispatches.project_key assertion; py_compile, five focused lifecycle tests, and diff check passed. Guest focal w…
+Ingeniería: Implementer completed the approved DLT-001/002 delta: optional app-CLI cwd defaults to ROOT, a single routing_cwd is threaded through all lifecycle calls (including failure close), APP_CLI remains absolute and Pi keeps spawn_cwd. Added real hermetic SQLite lifecycle evidence plus guest dispatches.project_key assertion; py_compile, five focused lifecycle tests, and diff check passed. Guest focal w… _(truncado al render)_
 
 [2026-07-27T17:33:32+00:00] P1-portable-core · gate-runner · blocked
 Cliente: La validación independiente confirmó las pruebas principales, pero la verificación completa quedó cortada mientras repetía la prueba invitada. Se repetirá hasta tener un resultado definitivo.

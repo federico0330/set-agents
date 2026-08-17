@@ -27,7 +27,7 @@
 - [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/027-controles-que-miran|027-controles-que-miran]] — fase `DONE` · paquetes 4/4 · **DONE**
-- [[features/028-narracion-que-ensena|028-narracion-que-ensena]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/3
+- [[features/028-narracion-que-ensena|028-narracion-que-ensena]] — fase `BLOCKED` · paquetes 0/3 · **BLOCKED**
 - [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 
@@ -43,7 +43,8 @@
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **024-listo-para-terceros** → corresponde tu decisión (ver Blocker)
 - **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
-- **028-narracion-que-ensena** → las tareas del paquete están completas; sigue evaluar los gates
+- **028-narracion-que-ensena** → corresponde tu decisión (ver Blocker)
+- **028-narracion-que-ensena** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los tres paquetes se crearon sin work items, asi que package_review_ready los niega (model.py:…
 
 ## Quick-fixes recientes
 
@@ -55,21 +56,21 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-17 replanteo-028-imposible-el-motor-no-tiene-salida|Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida]]
+- [[decisiones/2026-08-17 replanteo-028-paquetes-sin-work-items|Los tres paquetes de 028 se replantean porque fueron creados sin work items]]
 - [[decisiones/2026-08-17 d5-revision-correctiva-sin-camino-de-estado|La revision correctiva de D5 no puede aterrizar en el registro del paquete]]
 - [[decisiones/2026-08-17 d5-relanzamiento-único-tras-watchdog|D5 relanzamiento único tras watchdog]]
 - [[decisiones/2026-08-17 d4-presupuesto-spawn-agotado-antes-delta-final|D4 agotó su presupuesto de spawns antes del delta final]]
 - [[decisiones/2026-08-17 d4-segundo-repair-con-evidencia-delta|D4 usa el último repair batch con evidencia directa del delta]]
 - [[decisiones/2026-08-17 d4-review-reintento-sin-poc-rutas|D4 relanza revisión de producto sin PoC de rutas]]
 - [[decisiones/2026-08-17 d4-gate-reintento-focal|D4 relanza el gate focal por evidencia incompleta]]
-- [[decisiones/2026-08-17 d2-segundo-ciclo-reparacion-consolidada|D2 entra al segundo y último ciclo de reparación]]
-- [[decisiones/2026-08-17 enmienda-documental-025-antes-de-aceptar-D1|La enmienda documental de 025 se formaliza antes de aceptar D1]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-17T22:28:08+00:00_
+_Actualizado: 2026-08-17T23:09:04+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

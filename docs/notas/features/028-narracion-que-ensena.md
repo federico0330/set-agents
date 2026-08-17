@@ -3,7 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_IMPLEMENTATION` · modo: scoped · revisión 17
+- fase: `BLOCKED` · modo: scoped · revisión 23
+- estado final: **BLOCKED**
 - spec: `docs/specs/028-narracion-que-ensena/spec.md` (hash `d2826ba869ec`)
 
 ## Paquetes
@@ -15,10 +16,13 @@
 ## Approach y decisiones
 
 - [2026-08-17] package-reviewer: package-reviewer read-only sobre f688531, contexto limpio, modelo distinto al escritor (Cursor/Copilot). Cubre N1/N2/N3b contra AC-01..AC-20. Independencia por ADR-0011: proveedor…
+- decisión: [[decisiones/2026-08-17 replanteo-028-paquetes-sin-work-items|Los tres paquetes de 028 se replantean porque fueron creados sin work items]]
+- decisión: [[decisiones/2026-08-17 replanteo-028-imposible-el-motor-no-tiene-salida|Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida]]
 
 ## Qué falta
 
-- → las tareas del paquete están completas; sigue evaluar los gates
+- → corresponde tu decisión (ver Blocker)
+- ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los tres paquetes se crearon sin work items, asi que package_review_ready los niega (model.py:…
 
 ## Presupuestos
 
@@ -26,7 +30,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/028-narracion-que-ensena/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/028-narracion-que-ensena/bitacora.md`
 
-_Actualizado: 2026-08-17T22:28:08+00:00_
+_Actualizado: 2026-08-17T23:09:04+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

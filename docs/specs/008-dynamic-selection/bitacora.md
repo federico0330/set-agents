@@ -2,11 +2,11 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-07-28T13:04:40+00:00] P1-quota-failover · spec-challenger · done
-Cliente: El desafio encontro que el failover automatico que planee no puede alcanzar tu caso. El arnes solo controla como subproceso el carril Pi; cuando se queda sin tokens un subagente de Claude Code -- que es exactamente lo que te pasa -- no hay ningun proceso que el arnes pueda clasificar ni volver a lanzar. Ademas encontro que uno de mis argumentos era falso: cite una restriccion de la base de datos …
-Ingeniería: SPEC_CHALLENGE returned revision_required, 15 findings, 7 blocking. F-01 (scope): set_agents_spawn.py is the harness's ONLY spawner and it is pi-only (route_and_spawn pins selected_runtime=pi); there is no harness-controlled subprocess for opencode/claude-code/codex, so AC-01..AC-06 can all pass their tests while the reported symptom persists. F-02: my rejection of window-reopening cited store.py…
+Cliente: El desafio encontro que el failover automatico que planee no puede alcanzar tu caso. El arnes solo controla como subproceso el carril Pi; cuando se queda sin tokens un subagente de Claude Code -- que es exactamente lo que te pasa -- no hay ningun proceso que el arnes pueda clasificar ni volver a lanzar. Ademas encontro que uno de mis argumentos era falso: cite una restriccion de la base de datos … _(truncado al render)_
+Ingeniería: SPEC_CHALLENGE returned revision_required, 15 findings, 7 blocking. F-01 (scope): set_agents_spawn.py is the harness's ONLY spawner and it is pi-only (route_and_spawn pins selected_runtime=pi); there is no harness-controlled subprocess for opencode/claude-code/codex, so AC-01..AC-06 can all pass their tests while the reported symptom persists. F-02: my rejection of window-reopening cited store.py… _(truncado al render)_
 
 [2026-07-28T13:50:57+00:00] P1-uninterrupted-delegation · implementer · started
 Cliente: Arranco el arreglo de los parones: el asistente va a dejar de cortar la conversacion para contarte que termino un paso cuando no necesita nada de vos.
@@ -34,7 +34,7 @@ Ingeniería: El estado rechazo record-repair con 'finding was never verified: D-
 
 [2026-07-28T14:49:25+00:00] P1-uninterrupted-delegation · implementer · done
 Cliente: Listo: el asistente ya no corta la conversacion para contarte que termino un paso cuando no necesita nada tuyo, y si un modelo se queda sin cupo lo reemplaza solo en vez de frenar. Quedo escrito en las instrucciones que se cargan en las tres herramientas que usas.
-Ingeniería: Paquete P1-uninterrupted-delegation aceptado. Doctrina Turn continuity en orchestrator.md y en los tres archivos de Global/_shared, ADR-0011, dos tests de tres runtimes (209 -> 211). Panel RP-01 concurrente devolvio 11 hallazgos, uno critico: la frontera de alcance estaba trazada por carril cuando --route-decide es agnostico al carril. Refutacion adversarial sostuvo los seis por encima de low. Re…
+Ingeniería: Paquete P1-uninterrupted-delegation aceptado. Doctrina Turn continuity en orchestrator.md y en los tres archivos de Global/_shared, ADR-0011, dos tests de tres runtimes (209 -> 211). Panel RP-01 concurrente devolvio 11 hallazgos, uno critico: la frontera de alcance estaba trazada por carril cuando --route-decide es agnostico al carril. Refutacion adversarial sostuvo los seis por encima de low. Re… _(truncado al render)_
 
 [2026-07-30T17:44:00+00:00] started
 Cliente: Arrancamos el catálogo dinámico de modelos: hoy el orquestador solo conoce dos proveedores escritos a mano, y no ve los modelos propios de OpenCode ni los que agregues en el futuro.

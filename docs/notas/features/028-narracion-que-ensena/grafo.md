@@ -8,6 +8,7 @@ subgraph sg_028_narracion_que_ensena["028-narracion-que-ensena"]
   subgraph sg_028_narracion_que_ensena_n1_campos_que_obligan["N1-campos-que-obligan"]
     package_028_narracion_que_ensena_n1_campos_que_obligan_1["package: N1-campos-que-obligan"]
     spawn_028_narracion_que_ensena_n1_campos_que_obligan_1["SPAWN-001 package-reviewer package-review #91;sonnet#93;"]
+    blocker_028_narracion_que_ensena_n1_campos_que_obligan_1["blocker: open"]
   end
   subgraph sg_028_narracion_que_ensena_n2_doctrina_que_explica["N2-doctrina-que-explica"]
     package_028_narracion_que_ensena_n2_doctrina_que_explica_1["package: N2-doctrina-que-explica"]
@@ -16,6 +17,7 @@ subgraph sg_028_narracion_que_ensena["028-narracion-que-ensena"]
     package_028_narracion_que_ensena_n3b_los_campos_donde_se_leen_1["package: N3b-los-campos-donde-se-leen"]
   end
 end
+package_028_narracion_que_ensena_n1_campos_que_obligan_1 -->|bloqueó| blocker_028_narracion_que_ensena_n1_campos_que_obligan_1
 ```
 <!-- /notas:auto -->
 

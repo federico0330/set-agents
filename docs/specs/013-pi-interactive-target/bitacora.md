@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-08-02T15:04:27+00:00] package-planner · started
 Cliente: Un planificador esta partiendo el contrato aprobado del objetivo interactivo de Pi en paquetes de trabajo manejables, cada uno con sus criterios y riesgos.
@@ -18,7 +18,7 @@ Ingeniería: PACKAGE_IMPLEMENTATION spawn: implementer on P1 (complexity high, r
 
 [2026-08-02T15:51:42+00:00] P1-pi-interactive-target · implementer · done
 Cliente: El implementador termino las siete tareas: el agente Pi ya tiene su propio juego de agentes, habilidades e instrucciones instalable, con guardia contra pisar archivos ajenos, prueba real de arranque (verificada en vivo contra pi 0.83.0) y la documentacion de arquitectura al dia. Solo una mitad de la prueba de extremo a extremo quedo marcada como bloqueada por entorno, sin fingirla.
-Ingeniería: PACKAGE_IMPLEMENTATION done: 7/7 tasks, gates 568 unittest OK (skipped=2), verify.sh VERIFY_PASS, build.sh --check CHECK_PASS SYNC_OK, --diff clean, collision guard live-verified exit 2 preview+write. AC-13 pi-subagents half BLOCKED-by-environment (extension absent), opt-in test SET_AGENTS_PI_E2E=1 with named skip. Upstream note: pi YAML parser flags 2 canonical skills (read-only here). Next: ind…
+Ingeniería: PACKAGE_IMPLEMENTATION done: 7/7 tasks, gates 568 unittest OK (skipped=2), verify.sh VERIFY_PASS, build.sh --check CHECK_PASS SYNC_OK, --diff clean, collision guard live-verified exit 2 preview+write. AC-13 pi-subagents half BLOCKED-by-environment (extension absent), opt-in test SET_AGENTS_PI_E2E=1 with named skip. Upstream note: pi YAML parser flags 2 canonical skills (read-only here). Next: ind… _(truncado al render)_
 
 [2026-08-02T15:51:55+00:00] P1-pi-interactive-target · gate-runner · started
 Cliente: Un verificador independiente repite todas las pruebas automaticas del paquete de Pi, sin confiar en las corridas del implementador.

@@ -2,11 +2,11 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-08-13T13:42:44+00:00] P1-latencia-por-modelo-no-por-sufijo · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el modelo que coordina no sea forzosamente de OpenAI, como pediste.
-Ingeniería: AC-01..03. El test test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart (test_harness.py:266) exige sufijo -fast para orchestrator/implementer/product-analyst, y -fast solo existe en el proveedor openai de opencode: la asercion dice latencia y significa OpenAI. Se conserva para los dos roles de volumen y se libera el coordinador. models.toml [areas.coord] a opencode-go/grok…
+Ingeniería: AC-01..03. El test test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart (test_harness.py:266) exige sufijo -fast para orchestrator/implementer/product-analyst, y -fast solo existe en el proveedor openai de opencode: la asercion dice latencia y significa OpenAI. Se conserva para los dos roles de volumen y se libera el coordinador. models.toml [areas.coord] a opencode-go/grok… _(truncado al render)_
 
 [2026-08-13T14:27:39+00:00] P2-modelo-por-instancia · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el orquestador pueda pedir que modelo usar para cada agente que lanza, sin quedar atado a uno solo.

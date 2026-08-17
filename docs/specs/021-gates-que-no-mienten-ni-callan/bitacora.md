@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-08-12T13:35:29+00:00] P1-check-que-verifica · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
 Cliente: Arreglar el control que decia verificar que los archivos generados estaban al dia y en realidad no verificaba nada.
@@ -14,11 +14,11 @@ Ingeniería: package-reviewer sobre 021/P1: anthropic/sonnet, independence_verif
 
 [2026-08-12T15:59:43+00:00] P2-gates-que-no-callan · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
 Cliente: Ultimo tramo de esta feature: que cuando el harness este trabajando varios minutos, se note, en vez de parecer colgado.
-Ingeniería: P2 de 021 (AC-06..09). Causa raiz CORREGIDA: no es buffering del escritor sino que tail -N sin -f no puede emitir hasta EOF; stdbuf NO lo arregla, verificado. AC-09 es prevencion hacia adelante, no correccion: el patron no esta en ningun archivo versionado (grep da cero en Global/_canonical y en los context packs), vivia en texto efimero de spawn. Patron de grep ya fijado en la spec: barra-vertic…
+Ingeniería: P2 de 021 (AC-06..09). Causa raiz CORREGIDA: no es buffering del escritor sino que tail -N sin -f no puede emitir hasta EOF; stdbuf NO lo arregla, verificado. AC-09 es prevencion hacia adelante, no correccion: el patron no esta en ningun archivo versionado (grep da cero en Global/_canonical y en los context packs), vivia en texto efimero de spawn. Patron de grep ya fijado en la spec: barra-vertic… _(truncado al render)_
 
 [2026-08-12T18:07:34+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
 Cliente: Ultima verificacion independiente antes de cerrar esta feature.
-Ingeniería: package-reviewer sobre 021/P2: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-luna. Re-decidido con risk=medium tras un primer decide con risk=low que devolvia haiku: el paquete agrega un script ejecutable que corren los agentes y doctrina que propaga a los 4 arboles, no es low. El paquete se completo en DOS instancias: la primera murio por limite de sesion dej…
+Ingeniería: package-reviewer sobre 021/P2: anthropic/sonnet, independence_verified=true frente al writer openai-codex/gpt-5.6-luna. Re-decidido con risk=medium tras un primer decide con risk=low que devolvia haiku: el paquete agrega un script ejecutable que corren los agentes y doctrina que propaga a los 4 arboles, no es low. El paquete se completo en DOS instancias: la primera murio por limite de sesion dej… _(truncado al render)_
 
 [2026-08-12T20:21:56+00:00] P2-gates-que-no-callan · package-reviewer · started · modelo anthropic/sonnet · effort medium
 Cliente: Primera mitad de la verificacion independiente, en dos partes chicas porque la version completa murio dos veces.

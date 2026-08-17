@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T02:15:23+00:00
+Actualizado: 2026-08-17T23:09:09+00:00
 
 [2026-07-26T14:58:25+00:00] orchestrator · done
 Cliente: El cliente aprobo el contrato del despacho adaptativo tras dos rondas de challenge independiente: el arnes va a elegir modelo por tarea (nivel rapido/balanceado/frontera) en OpenCode ya, y con eleccion dinamica real en Pi si el estudio de viabilidad da bien.
@@ -26,7 +26,7 @@ Ingeniería: Panel P1-R1, security-auditor read-only, spawn 4/12: descriptor abu
 
 [2026-07-27T01:48:42+00:00] P1-dispatch-core · repair-agent · started
 Cliente: Un reparador va a cerrar los 14 hallazgos en una sola tanda: arreglar los codigos de salida de la CLI, la auditoria del estado abandonado, la resolucion de contexto, la independencia del reviewer y la cobertura de pruebas.
-Ingeniería: PACKAGE_REPAIR R1, repair-agent (Claude in-session) spawn 5/12: reason->exit table (PKG-N01/SEC-002), single-UPDATE abandon+audit (PKG-N02/SEC-A/B), abandoned DDL CHECK+timestamp (PKG-N03), context resolution active-package+freshness+CONTEXT_UNRESOLVED (PKG-N05/N06/SEC-001), independence_verified flag (SEC-A01), uncaught exceptions+latency bounds (SEC-A02), cache dir validation + explain read-onl…
+Ingeniería: PACKAGE_REPAIR R1, repair-agent (Claude in-session) spawn 5/12: reason->exit table (PKG-N01/SEC-002), single-UPDATE abandon+audit (PKG-N02/SEC-A/B), abandoned DDL CHECK+timestamp (PKG-N03), context resolution active-package+freshness+CONTEXT_UNRESOLVED (PKG-N05/N06/SEC-001), independence_verified flag (SEC-A01), uncaught exceptions+latency bounds (SEC-A02), cache dir validation + explain read-onl… _(truncado al render)_
 
 [2026-07-27T09:49:43+00:00] P1-dispatch-core · gate-runner · started
 Cliente: Una validacion independiente va a repetir todas las pruebas del paquete reparado antes de entregarlo al revisor delta.
@@ -42,7 +42,7 @@ Ingeniería: P1-dispatch-core PACKAGE_ACCEPTED: impl (T-100..T-105) + P1-R1 cons
 
 [2026-07-27T10:15:12+00:00] P2-opencode-lane · implementer · started
 Cliente: Un implementador va a construir el carril que te deja elegir modelo por tarea al delegar en OpenCode: crea las variantes por nivel (rapido/balanceado/frontera) de los cinco roles caros, un chequeo que garantiza que cada variante coincide con el catalogo, y la doctrina para que el orquestador elija la variante segun la decision del ruteo (y degrade con seguridad si no puede).
-Ingeniería: PACKAGE_IMPLEMENTATION P2-opencode-lane spawn 1/12 (Claude in-session implementer): T-201 per-role tier tables (models.toml/models_config, activate MODEL_TIERS, lane+subscription validated), T-202 generate.py <role>@<tier> emission + task allowlist + validate() set + build-time variant<->catalog coherence gate + prune verification, T-203 orchestrator decide->variant doctrine + degraded mode + rev…
+Ingeniería: PACKAGE_IMPLEMENTATION P2-opencode-lane spawn 1/12 (Claude in-session implementer): T-201 per-role tier tables (models.toml/models_config, activate MODEL_TIERS, lane+subscription validated), T-202 generate.py <role>@<tier> emission + task allowlist + validate() set + build-time variant<->catalog coherence gate + prune verification, T-203 orchestrator decide->variant doctrine + degraded mode + rev… _(truncado al render)_
 
 [2026-07-27T10:35:21+00:00] P2-opencode-lane · gate-runner · started
 Cliente: Una instancia independiente va a repetir todas las validaciones del paquete y comprobar que no se salio de su alcance ni rompio nada existente.
@@ -58,7 +58,7 @@ Ingeniería: Panel P2-R1 security-auditor read-only spawn 4/12: variant-name spo
 
 [2026-07-27T10:54:48+00:00] P2-opencode-lane · repair-agent · started
 Cliente: Un reparador va a cerrar tres detalles antes de aceptar: que el orquestador nunca trate un rechazo de seguridad del ruteo como si fuera un simple 'este carril no puede', que la eleccion de variante tenga una unica fuente de verdad, y que un error de configuracion de un rol de al mensaje claro.
-Ingeniería: PACKAGE_REPAIR R1 repair-agent (Claude in-session) spawn 5/12: SEC-A01 orchestrator.md degraded-mode must branch on route-decide reason taxonomy (only ok=true off-lane + ROUTING_UNAVAILABLE degrade to base; hard denials AUTHORIZATION_REPLAY/REVIEWER_INDEPENDENCE_UNAVAILABLE/REVIEW_IDENTITY_INVALID/AUTHORIZATION_INVALID/NO_ELIGIBLE_ROUTE/PROVIDER_UNAUTHENTICATED halt/HUMAN_DECISION_REQUIRED); PKG-…
+Ingeniería: PACKAGE_REPAIR R1 repair-agent (Claude in-session) spawn 5/12: SEC-A01 orchestrator.md degraded-mode must branch on route-decide reason taxonomy (only ok=true off-lane + ROUTING_UNAVAILABLE degrade to base; hard denials AUTHORIZATION_REPLAY/REVIEWER_INDEPENDENCE_UNAVAILABLE/REVIEW_IDENTITY_INVALID/AUTHORIZATION_INVALID/NO_ELIGIBLE_ROUTE/PROVIDER_UNAUTHENTICATED halt/HUMAN_DECISION_REQUIRED); PKG-… _(truncado al render)_
 
 [2026-07-27T11:53:02+00:00] P2-opencode-lane · gate-runner · started
 Cliente: Una validacion independiente repite todas las pruebas del paquete reparado antes de entregarlo al revisor final.
@@ -66,7 +66,7 @@ Ingeniería: DELTA_REVIEW R1 gate-runner read-only spawn 6/12: unittest 152, bui
 
 [2026-07-27T12:32:14+00:00] P3-pi-lane · implementer · started
 Cliente: Un implementador va a construir el ultimo tramo: que el arnes pueda delegar tareas al motor Pi eligiendo el modelo exacto de CUALQUIER proveedor por tarea (no solo dentro de una familia), con una instalacion controlada de Pi, un chequeo de salud, y candados para que esos agentes no se desmadren. Es lo que ningun otro runtime permite y ya lo probamos funcionando en vivo.
-Ingeniería: PACKAGE_IMPLEMENTATION P3-pi-lane spawn 1/12 (Claude in-session): T-301 ADR-0007 + managed pinned pi install + doctor --harness pi; T-302 minimal pi target generate/install; T-303 set_agents_spawn.py CLI-subprocess spawner (pi --model provider/model --print --mode json --no-session, lifecycle incl crash=>failure, decided-model verification); T-304 spawn guards as flags (fresh ctx, --no-extensions…
+Ingeniería: PACKAGE_IMPLEMENTATION P3-pi-lane spawn 1/12 (Claude in-session): T-301 ADR-0007 + managed pinned pi install + doctor --harness pi; T-302 minimal pi target generate/install; T-303 set_agents_spawn.py CLI-subprocess spawner (pi --model provider/model --print --mode json --no-session, lifecycle incl crash=>failure, decided-model verification); T-304 spawn guards as flags (fresh ctx, --no-extensions… _(truncado al render)_
 
 [2026-07-27T13:14:18+00:00] P3-pi-lane · gate-runner · started
 Cliente: Una instancia independiente repite todas las validaciones del ultimo tramo y comprueba que no rompio nada ni se salio de su alcance.
@@ -82,7 +82,7 @@ Ingeniería: Panel P3-R1 security-auditor read-only spawn 4/12: guard bypass (--
 
 [2026-07-27T13:30:55+00:00] P3-pi-lane · repair-agent · started
 Cliente: Un reparador cierra los detalles de seguridad antes de aceptar: el mas importante evita que una tarea maliciosa disfrazada de opcion le saque los candados al agente Pi; los demas endurecen el aislamiento y el cierre limpio de cada tarea.
-Ingeniería: PACKAGE_REPAIR R1 repair-agent (Claude in-session) spawn 5/12: SEC-A01 HIGH neutralize untrusted task-as-flag (fail closed TASK_LOOKS_LIKE_FLAG or stdin) + hostile-task test; SEC-A02 gate GUARD_TOOLS_CODE_RW behind bash-sandbox story (read-only until green) + --no-context-files unconditional; PKG-N01/SEC-A03 wrap dispatch->spawn->terminal try/finally (no orphan run); SEC-A04 detect modelFallbackM…
+Ingeniería: PACKAGE_REPAIR R1 repair-agent (Claude in-session) spawn 5/12: SEC-A01 HIGH neutralize untrusted task-as-flag (fail closed TASK_LOOKS_LIKE_FLAG or stdin) + hostile-task test; SEC-A02 gate GUARD_TOOLS_CODE_RW behind bash-sandbox story (read-only until green) + --no-context-files unconditional; PKG-N01/SEC-A03 wrap dispatch->spawn->terminal try/finally (no orphan run); SEC-A04 detect modelFallbackM… _(truncado al render)_
 
 [2026-07-27T13:54:31+00:00] P3-pi-lane · gate-runner · started
 Cliente: Una validacion independiente repite todas las pruebas del tramo reparado antes del revisor final.
