@@ -55,6 +55,7 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-17 d5-revision-correctiva-sin-camino-de-estado|La revision correctiva de D5 no puede aterrizar en el registro del paquete]]
 - [[decisiones/2026-08-17 d5-relanzamiento-único-tras-watchdog|D5 relanzamiento único tras watchdog]]
 - [[decisiones/2026-08-17 d4-presupuesto-spawn-agotado-antes-delta-final|D4 agotó su presupuesto de spawns antes del delta final]]
 - [[decisiones/2026-08-17 d4-segundo-repair-con-evidencia-delta|D4 usa el último repair batch con evidencia directa del delta]]
@@ -62,14 +63,13 @@
 - [[decisiones/2026-08-17 d4-gate-reintento-focal|D4 relanza el gate focal por evidencia incompleta]]
 - [[decisiones/2026-08-17 d2-segundo-ciclo-reparacion-consolidada|D2 entra al segundo y último ciclo de reparación]]
 - [[decisiones/2026-08-17 enmienda-documental-025-antes-de-aceptar-D1|La enmienda documental de 025 se formaliza antes de aceptar D1]]
-- [[decisiones/2026-08-17 route-decide-sin-descriptor-host|route-decide sin descriptor en host OpenCode]]
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-17T20:46:29+00:00_
+_Actualizado: 2026-08-17T22:28:08+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

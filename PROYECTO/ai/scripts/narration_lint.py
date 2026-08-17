@@ -63,24 +63,53 @@ CLOSE_ONLY_FIELDS = ("milestone", "learned", "next_step", "why", "alternative")
 
 _EVIDENCE_FILE_LINE = re.compile(
     r"\b[\w][\w./-]*\.(?:py|sh|md|json|jsonl|toml|ya?ml|ts|tsx|js|ini|cfg)"
-    r":\d+(?:-\d+)?\b"
+    r":\d+(?:-\d+)?\b",
+    re.IGNORECASE,
+)
+
+# N1-F01: los prefijos de identificador que este repo usa DE VERDAD, medidos sobre
+# docs/specs/, docs/adr/ y ai/state/ (`grep -rhoE "\b[A-Z]{2,6}-[0-9]{2,4}\b" | sort |
+# uniq -c`): AC 9516, ADR 3159, PKG 2047, SEC 849, SPAWN 416, PR 357, RP 346, DR 236,
+# FD 164, SC 154, RF 87, REV 61, DLT 28.
+#
+# Por qué una lista y no `re.IGNORECASE` sobre `flex_sep`: en minúscula, `[A-Z]{2,6}[ _]
+# \d{2,4}` deja de describir identificadores y pasa a describir prosa castellana con
+# números -- medido: "corrió 528", "en 300", "el 2026", "de 1256" matchean todas. Esa
+# es exactamente la evidencia numérica que ADR-0026 exige y que esta guarda debería
+# premiar, no castigar. La mayúscula era el desambiguador; al perderla hay que reponerlo
+# con vocabulario.
+_IDENT_PREFIXES = (
+    "ac", "adr", "pkg", "sec", "spawn", "pr", "rp", "dr", "fd", "sc", "rf", "rev", "dlt",
 )
 
 _FAMILY_PATTERNS = {
     # Pn/Dn/Rn pelado: "P1", "D3", "R3" (spec, familia 1, 23 invisibles antes de E-2).
-    "pn_dn_rn": re.compile(r"\b[PDR]\d{1,3}\b"),
+    # N1-F01: en minúscula también -- "d5", "p1". El riesgo de falso positivo en prosa
+    # castellana es despreciable con la forma letra+dígitos pegados.
+    "pn_dn_rn": re.compile(r"\b[PDR]\d{1,3}\b", re.IGNORECASE),
     # Compuesto letra+numero-letra+numero: "P2-F01", el ejemplo D-2 de la propia spec.
-    "compound": re.compile(r"\b[A-Z]\d{1,3}-[A-Z]\d{1,3}\b"),
+    # N1-F01: case-insensitive; la forma compuesta ya es lo bastante específica.
+    "compound": re.compile(r"\b[A-Z]\d{1,3}-[A-Z]\d{1,3}\b", re.IGNORECASE),
+    # N1-F01, familia nueva: los mismos identificadores en minúscula o mezclados
+    # ("pkg 007" -- B0 literal de Federico --, "adr-0057", "Sec_012"), acotados al
+    # vocabulario medido de `_IDENT_PREFIXES` para no tragarse prosa con números.
+    # Los spans se funden con los de xx_nnn/flex_sep, así que "PKG-007" nunca cuenta dos veces.
+    "lower_ident": re.compile(
+        r"\b(?:" + "|".join(_IDENT_PREFIXES) + r")[ _-]?\d{1,4}\b", re.IGNORECASE
+    ),
     # XX-nnn: "SC-01", "SEC-007", "FD-010", "PKG-007" (familia 2).
     "xx_nnn": re.compile(r"\b[A-Z]{2,6}-\d{2,4}\b"),
     # Separador flexible: "PKG 007", "PKG_007" -- el caso literal de Federico (B0).
     "flex_sep": re.compile(r"\b[A-Z]{2,6}[ _]\d{2,4}\b"),
     # feature-id NNN-slug: "028-narracion-que-ensena" (familia 4).
-    "feature_id": re.compile(r"\b\d{3}-[a-z][a-z0-9]*(?:-[a-z0-9]+)*\b"),
+    "feature_id": re.compile(r"\b\d{3}-[a-z][a-z0-9]*(?:-[a-z0-9]+)*\b", re.IGNORECASE),
     # Archivo suelto SIN archivo:línea (familia 3): "spec.md", "verify.sh". El
     # archivo:línea (evidencia, ADR-0026) se resta más abajo, nunca cuenta acá.
+    # N1-F01: case-insensitive junto con `_EVIDENCE_FILE_LINE` -- si sólo uno de los dos
+    # lo fuera, "Spec.MD:12" contaría como puntero en vez de restarse como evidencia.
     "bare_file": re.compile(
-        r"\b[\w][\w./-]*\.(?:py|sh|md|json|jsonl|toml|ya?ml|ts|tsx|js|ini|cfg)\b"
+        r"\b[\w][\w./-]*\.(?:py|sh|md|json|jsonl|toml|ya?ml|ts|tsx|js|ini|cfg)\b",
+        re.IGNORECASE,
     ),
 }
 
@@ -134,18 +163,28 @@ def _mask(text: str, spans: list[tuple[int, int]], replacement: str = "PTR") -> 
     return "".join(out)
 
 
+_MIN_WORDS_PER_CLAUSE = 2
+
+
 def clause_count(masked_text: str) -> int:
     """Cláusulas = segmentos entre separadores fuertes (`. ; : , ( )`) o conjunciones
     (`y`, `o`, `pero`, `sino`, `aunque`). Nunca cero -- un texto sin puntuación es UNA
-    cláusula, así que su densidad se dispara con el primer puntero (spec, "Sin
-    verificar #2": heurística declarada, no probada contra texto adversarial del
-    denominador)."""
+    cláusula, así que su densidad se dispara con el primer puntero.
+
+    N1-F02: sólo cuentan al denominador las cláusulas con al menos
+    `_MIN_WORDS_PER_CLAUSE` palabras. El docstring del módulo afirmaba que "agregar
+    cláusulas de relleno exige agregar cláusulas reales"; era falso, y se midió:
+    `"listo, bien, hecho, avanza, cerrado, PKG-007 reparado, seguimos, todo en orden,
+    ok."` daba densidad 0.111 y pasaba limpio, siendo en los hechos sólo "PKG-007
+    reparado" envuelto en muletillas. Una palabra suelta no es una cláusula; diluir el
+    denominador ahora exige escribir prosa de verdad, que es justamente lo que se pide.
+    """
     parts = _STRONG_SEP.split(masked_text)
     clauses: list[str] = []
     for part in parts:
         clauses.extend(_CONJUNCTIONS.split(part))
-    clauses = [c.strip() for c in clauses if c.strip()]
-    return max(len(clauses), 1)
+    substantive = [c for c in (c.strip() for c in clauses) if len(c.split()) >= _MIN_WORDS_PER_CLAUSE]
+    return max(len(substantive), 1)
 
 
 def pointer_density(text: str) -> float:
@@ -219,6 +258,85 @@ def _phase_name_present(text: str) -> bool:
     return any(w in PHASES for w in words)
 
 
+def _quality_violations(client, tech, learned, next_step, why, alternative) -> list["Violation"]:
+    """AC-05 (topes), AC-04a (densidad) y AC-04c (registro Cliente:) -- las reglas que
+    hablan de la CALIDAD de la narración, no de si es una apertura o un cierre.
+
+    Extraídas a su propia función por N1-F03: vivían dentro de `lint_narrative`,
+    después de la salida temprana de `--result started`, así que una apertura no las
+    veía nunca. Se aplican ahora en los dos caminos.
+    """
+    violations: list[Violation] = []
+    # --- AC-05: topes de longitud (nunca piso) ------------------------------------
+    for field_name, value, limit in (
+        ("client", client, LONG_FIELD_LIMIT),
+        ("tech", tech, LONG_FIELD_LIMIT),
+        ("learned", learned, SHORT_FIELD_LIMIT),
+        ("next", next_step, SHORT_FIELD_LIMIT),
+        ("why", why, SHORT_FIELD_LIMIT),
+        ("alternative", alternative, SHORT_FIELD_LIMIT),
+    ):
+        if value and len(value) > limit:
+            violations.append(Violation(
+                f"LENGTH_EXCEEDED_{field_name.upper()}",
+                f"--{field_name} supera los {limit} caracteres ({len(value)}): un "
+                "campo así de largo invita a rellenar en vez de resumir con "
+                "precisión, y además se trunca a mitad de oración en las "
+                "superficies que lo leen (bitácora, digest) -- exactamente el "
+                "defecto D-4(d)/D-4(e) que esta feature existe para cerrar.",
+            ))
+
+    # --- AC-04a: densidad de punteros por cláusula --------------------------------
+    if client:
+        density = pointer_density(client)
+        if density > DENSITY_THRESHOLD:
+            violations.append(Violation(
+                "CLIENT_POINTER_DENSITY",
+                f"--client tiene demasiados identificadores por cláusula "
+                f"(densidad={density:.2f} > {DENSITY_THRESHOLD}): un identificador "
+                "ayuda a UBICAR, pero una oración hecha de identificadores no dice "
+                "QUÉ pasó -- quien lo lea va a tener que abrir la spec para "
+                "traducirlo, que es el defecto exacto que el registro Cliente: "
+                "existe para evitar.",
+            ))
+    if tech:
+        density = pointer_density(tech)
+        if density > DENSITY_THRESHOLD:
+            violations.append(Violation(
+                "TECH_POINTER_DENSITY",
+                f"--tech tiene demasiados identificadores por cláusula "
+                f"(densidad={density:.2f} > {DENSITY_THRESHOLD}): la evidencia "
+                "archivo:línea no cuenta acá (ADR-0026 la exige), pero un índice de "
+                "identificadores sin prosa alrededor sigue siendo un puntero, no una "
+                "explicación -- decí qué pasaba y por qué, con el archivo:línea como "
+                "prueba, no como el contenido entero.",
+            ))
+
+    # --- AC-04c: registro Cliente:, castellano y sin identificadores --------------
+    if client:
+        client_pointers, _ = find_pointers(client)
+        if client_pointers or _phase_name_present(client):
+            violations.append(Violation(
+                "CLIENT_HAS_IDENTIFIER",
+                "--client contiene un identificador o un nombre de fase interno: el "
+                "registro Cliente: es para alguien sin contexto técnico "
+                "(orchestrator.md:786-788) -- un identificador ahí no ubica a nadie, "
+                "sólo confirma que quien lo escribió no tradujo la narración.",
+            ))
+        ratio = spanish_function_ratio(client)
+        if ratio < SPANISH_RATIO_THRESHOLD:
+            violations.append(Violation(
+                "CLIENT_NOT_SPANISH",
+                f"--client no parece estar en castellano llano (proporción de "
+                f"palabras funcionales={ratio:.2f} < {SPANISH_RATIO_THRESHOLD}): el "
+                "registro Cliente: existe para que alguien sin contexto técnico "
+                "entienda qué cambió -- jerga o inglés crudo ahí lo vacía de "
+                "sentido.",
+            ))
+
+    return violations
+
+
 def lint_narrative(
     *,
     client: str,
@@ -252,10 +370,16 @@ def lint_narrative(
                 "que el trabajo real que este cierre describe nunca le llega a nadie. "
                 "Usá --result done o --result blocked.",
             ))
-        # A genuine "started" narration carries none of the close-only fields, so
-        # none of the checks below (which are all about the CONTENT of a close)
-        # apply to it -- returning here keeps a legitimate opening narration free
-        # of milestone/length/density noise it never claimed to satisfy.
+        # N1-F03: la salida temprana devolvía CERO violaciones cuando el llamador
+        # omitía los flags delatores -- y omitirlos es justamente lo que haría quien
+        # quiere esquivar la guarda a propósito, no por descuido. Un cierre completo
+        # escrito como `--result started`, con prosa de cierre y sin ningún flag,
+        # pasaba limpio y después el digest lo filtraba, así que el trabajo que
+        # describía no le llegaba a nadie. Las obligaciones DE CIERRE (milestone,
+        # learned/next/why, feature-id) siguen sin aplicar a una apertura legítima,
+        # pero la CALIDAD de la narración se exige igual: una apertura hecha de
+        # punteros es tan ilegible como un cierre hecho de punteros.
+        violations.extend(_quality_violations(client, tech, learned, next_step, why, alternative))
         return violations
 
     is_milestone_result = result in MILESTONE_RESULTS
@@ -325,72 +449,7 @@ def lint_narrative(
             "en el digest -- queda huérfano.",
         ))
 
-    # --- AC-05: topes de longitud (nunca piso) ------------------------------------
-    for field_name, value, limit in (
-        ("client", client, LONG_FIELD_LIMIT),
-        ("tech", tech, LONG_FIELD_LIMIT),
-        ("learned", learned, SHORT_FIELD_LIMIT),
-        ("next", next_step, SHORT_FIELD_LIMIT),
-        ("why", why, SHORT_FIELD_LIMIT),
-        ("alternative", alternative, SHORT_FIELD_LIMIT),
-    ):
-        if value and len(value) > limit:
-            violations.append(Violation(
-                f"LENGTH_EXCEEDED_{field_name.upper()}",
-                f"--{field_name} supera los {limit} caracteres ({len(value)}): un "
-                "campo así de largo invita a rellenar en vez de resumir con "
-                "precisión, y además se trunca a mitad de oración en las "
-                "superficies que lo leen (bitácora, digest) -- exactamente el "
-                "defecto D-4(d)/D-4(e) que esta feature existe para cerrar.",
-            ))
-
-    # --- AC-04a: densidad de punteros por cláusula --------------------------------
-    if client:
-        density = pointer_density(client)
-        if density > DENSITY_THRESHOLD:
-            violations.append(Violation(
-                "CLIENT_POINTER_DENSITY",
-                f"--client tiene demasiados identificadores por cláusula "
-                f"(densidad={density:.2f} > {DENSITY_THRESHOLD}): un identificador "
-                "ayuda a UBICAR, pero una oración hecha de identificadores no dice "
-                "QUÉ pasó -- quien lo lea va a tener que abrir la spec para "
-                "traducirlo, que es el defecto exacto que el registro Cliente: "
-                "existe para evitar.",
-            ))
-    if tech:
-        density = pointer_density(tech)
-        if density > DENSITY_THRESHOLD:
-            violations.append(Violation(
-                "TECH_POINTER_DENSITY",
-                f"--tech tiene demasiados identificadores por cláusula "
-                f"(densidad={density:.2f} > {DENSITY_THRESHOLD}): la evidencia "
-                "archivo:línea no cuenta acá (ADR-0026 la exige), pero un índice de "
-                "identificadores sin prosa alrededor sigue siendo un puntero, no una "
-                "explicación -- decí qué pasaba y por qué, con el archivo:línea como "
-                "prueba, no como el contenido entero.",
-            ))
-
-    # --- AC-04c: registro Cliente:, castellano y sin identificadores --------------
-    if client:
-        client_pointers, _ = find_pointers(client)
-        if client_pointers or _phase_name_present(client):
-            violations.append(Violation(
-                "CLIENT_HAS_IDENTIFIER",
-                "--client contiene un identificador o un nombre de fase interno: el "
-                "registro Cliente: es para alguien sin contexto técnico "
-                "(orchestrator.md:786-788) -- un identificador ahí no ubica a nadie, "
-                "sólo confirma que quien lo escribió no tradujo la narración.",
-            ))
-        ratio = spanish_function_ratio(client)
-        if ratio < SPANISH_RATIO_THRESHOLD:
-            violations.append(Violation(
-                "CLIENT_NOT_SPANISH",
-                f"--client no parece estar en castellano llano (proporción de "
-                f"palabras funcionales={ratio:.2f} < {SPANISH_RATIO_THRESHOLD}): el "
-                "registro Cliente: existe para que alguien sin contexto técnico "
-                "entienda qué cambió -- jerga o inglés crudo ahí lo vacía de "
-                "sentido.",
-            ))
+    violations.extend(_quality_violations(client, tech, learned, next_step, why, alternative))
 
     # --- AC-04b: learned/next/why no pueden ser sólo un puntero -------------------
     for field_name, value in (("learned", learned), ("next", next_step), ("why", why)):

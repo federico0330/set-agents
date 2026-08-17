@@ -21,7 +21,9 @@ package start, review/delta results, anything unexpected (blocker, gate failure,
 close, and the end-of-turn block. EVERY spawn is still persisted with both registers
 (`feature-state.py record-spawn --client --tech` / `log-narrative`) — the complete story lives in
 `ai/state/STATUS.md`, the per-feature `bitacora.md`, and the generated digest
-(`feature-state.py digest` → `docs/notas/BUENOS-DIAS.md`).
+(`feature-state.py digest` → `docs/notas/BUENOS-DIAS.md`). Run `digest` at
+PHASE CLOSE and at TURN CLOSE — not on every mutation (it would be noise) and not only when asked
+(the reader would find it stale). AC-18.
 See `## Narración — protocolo de transparencia` below for the full protocol.
 
 ## Living documentation

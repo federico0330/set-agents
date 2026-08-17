@@ -302,9 +302,16 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     # text (live-confirmed, see module docstring).
     if task.lstrip().startswith("-"):
         return "failure", {"reason": "TASK_LOOKS_LIKE_FLAG"}
-    # ADR-0056 (AC-12, D5-F05): the fenced vault is composed AHEAD of the task in the
-    # single positional prompt payload (`composed_task`) so the child sees one linear
-    # context block exactly like the other lanes' `compose_task` output. The SEC-A01
+    # ADR-0056 (AC-12, D5-F05): the fenced vault reaches pi through STDIN, never argv.
+    # `_fetch_vault_block` returns text already fenced by context_pack._mark_untrusted
+    # (its own per-call nonce, never a second scheme). Vault content is external —
+    # Syncthing-synced, not written by this harness — and argv is world-readable via
+    # `ps aux` and /proc/<pid>/cmdline, so routing it through a positional would leak it
+    # to every local user AND push it toward MAX_ARG_STRLEN; stdin has neither problem
+    # (tests/test_spawn_materialization.py:64-67 states the same invariant for the other
+    # lanes). D5-DR01: commit 24b4d8a established this and f688531 -- labelled
+    # "Feature 028/029", touching this file outside its declared scope -- silently
+    # reverted it and rewrote this comment to justify the reverted shape. The SEC-A01
     # flag-lookalike check above runs on the ORIGINAL caller-supplied `task` only -- a
     # vault block can never suppress it.
     own_scratch = cwd is None
@@ -319,14 +326,13 @@ def spawn(role: str, task: str, provider: str, model: str, prompt_path,
     # minimal-and-auditable design never accounted for (see docs/adr/0007-pi-lane.md,
     # amended by docs/adr/0017-pi-interactive-target.md).
     thinking = ("--thinking", effort) if effort in _PI_THINKING_LEVELS else ()
-    composed_task = f"{vault_block}\n\n{task}" if vault_block else task
     argv = catalog.pi_pinned_argv(
         "--model", target_id, *thinking, "--print", "--mode", "json", "--no-session", "--no-extensions",
         "--no-context-files", "--no-skills", "--no-prompt-templates", "--tools", ",".join(guard_tools),
-        "--append-system-prompt", str(prompt_path), composed_task,
+        "--append-system-prompt", str(prompt_path), task,
     )
     try:
-        proc = subprocess.run(argv, cwd=work_dir, input="", stdout=subprocess.PIPE,
+        proc = subprocess.run(argv, cwd=work_dir, input=(vault_block or ""), stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, text=True, timeout=timeout, check=False, env=_probe_env())
     except (OSError, subprocess.TimeoutExpired) as exc:
         # SEC-A05: never persist a raw exception string verbatim (it can embed the fixed

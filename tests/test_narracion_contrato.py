@@ -223,19 +223,44 @@ class PointerDensityUnitTests(unittest.TestCase):
         self.assertGreater(nl.pointer_density(pointer_only), nl.DENSITY_THRESHOLD)
         self.assertLessEqual(nl.pointer_density(with_real_content), nl.DENSITY_THRESHOLD)
 
-    def test_known_limitation_conjunction_only_padding_still_dilutes_density(self):
-        """Declarado, no escondido (spec, 'Sin verificar #2'): la heurística de
-        cláusulas cuenta toda conjunción reconocida (y/o/pero/sino/aunque) como
-        separador, así que rellenar con conjunciones SIN contenido real -- sin pasar
-        por una coma ni un punto -- sí infla el denominador y diluye la densidad por
-        debajo del umbral. No se probó, ni se arregla acá, contra texto adversarial
-        construido específicamente para manipular el denominador; queda para
-        arquitectura/package-reviewer calibrar."""
+    def test_padding_with_contentless_clauses_no_longer_dilutes_density(self):
+        """N1-F02: era una limitación declarada -- rellenar con conjunciones o comas SIN
+        contenido real inflaba el denominador y bajaba la densidad por debajo del umbral.
+        El review independiente de 028 la reprodujo con dos ataques medidos, así que
+        `clause_count` pasó a exigir `_MIN_WORDS_PER_CLAUSE` palabras por cláusula.
+        Ninguna de las dos formas de relleno diluye ya. (Este test reemplaza a
+        `test_known_limitation_conjunction_only_padding_still_dilutes_density`, que
+        pedía por escrito ser actualizado si la heurística mejoraba.)"""
         pointer_only = "PKG-007."
         conjunction_padded = "PKG-007 y además y también y encima y more."
+        comma_padded = "listo, bien, hecho, avanza, cerrado, PKG-007 reparado, seguimos, ok."
         self.assertGreater(nl.pointer_density(pointer_only), nl.DENSITY_THRESHOLD)
-        self.assertLessEqual(nl.pointer_density(conjunction_padded), nl.DENSITY_THRESHOLD,
-                              "si esto empieza a fallar, la heurística mejoró -- actualizar el comentario")
+        self.assertGreater(nl.pointer_density(conjunction_padded), nl.DENSITY_THRESHOLD,
+                           "relleno por conjunciones no debe diluir la densidad")
+        self.assertGreater(nl.pointer_density(comma_padded), nl.DENSITY_THRESHOLD,
+                           "relleno por comas no debe diluir la densidad")
+
+    def test_lowercase_identifiers_are_pointers_too(self):
+        """N1-F01: las familias se escribieron con `[A-Z]` sin IGNORECASE, así que el
+        MISMO texto pasaba o no según la caja -- `pkg 007` (el B0 literal de Federico)
+        era invisible y `PKG 007` se detectaba. Medido por el review independiente."""
+        for text in ("pkg 007 reparado", "adr-0057 cerrado", "d5-f01 reparado", "Sec_012 abierto"):
+            with self.subTest(text=text):
+                spans, _ = nl.find_pointers(text)
+                self.assertTrue(spans, f"{text!r} debería contar como puntero")
+
+    def test_numeric_prose_is_not_mistaken_for_an_identifier(self):
+        """La contracara de N1-F01: bajar la caja a ciegas convertía la evidencia
+        numérica que ADR-0026 exige en punteros -- "corrió 528", "en 300", "el 2026" y
+        "de 1256" matcheaban todas contra `flex_sep` con IGNORECASE. Por eso la familia
+        nueva está acotada al vocabulario medido de `_IDENT_PREFIXES`."""
+        for text in ("la suite corrio 528 tests sin fallar",
+                     "el gate quedo en 300 milisegundos",
+                     "desde el 2026 que esto no se toca",
+                     "de 1256 pruebas pasaron todas"):
+            with self.subTest(text=text):
+                spans, _ = nl.find_pointers(text)
+                self.assertEqual(spans, [], f"{text!r} es prosa con números, no un puntero")
 
     def test_evidence_file_line_does_not_count_as_pointer_in_tech(self):
         text = "El fix está en model.py:199, no en el archivo suelto."
@@ -254,9 +279,29 @@ class Ac02MilestoneTests(unittest.TestCase):
     next/why obligatorios sólo cuando milestone=yes."""
 
     def test_started_never_requires_milestone(self):
-        violations = nl.lint_narrative(client="avanzamos", tech="spawn intra-fase",
-                                        result="started")
+        # N1-F03: `started` ya no sale sin pasar por nada -- las reglas de CALIDAD
+        # (densidad, registro Cliente:) se le aplican igual, sólo las obligaciones de
+        # CIERRE quedan exentas. Por eso el fixture pasó de "avanzamos" a una frase
+        # real: una apertura escrita como la escribiría un humano, que es lo que el
+        # test siempre quiso representar.
+        violations = nl.lint_narrative(
+            client="Arrancamos a mirar por qué la instalación se colgaba en el primer arranque.",
+            tech="spawn intra-fase para acotar la causa antes de tocar nada",
+            result="started")
         self.assertEqual(violations, [])
+
+    def test_started_still_faces_the_quality_bar(self):
+        """N1-F03: la salida temprana de `--result started` devolvía CERO violaciones
+        cuando el llamador omitía los flags delatores -- y omitirlos es exactamente lo
+        que haría quien esquiva la guarda a propósito. Las obligaciones de CIERRE siguen
+        exentas; la calidad de la narración, no."""
+        violations = nl.lint_narrative(
+            client="Arrancamos con PKG-007 y con SEC-012 del ciclo.",
+            tech="pkg 007, sec 012, adr-0057.",
+            result="started")
+        codes = {v.code for v in violations}
+        self.assertIn("CLIENT_HAS_IDENTIFIER", codes)
+        self.assertIn("TECH_POINTER_DENSITY", codes)
 
     def test_done_without_milestone_is_rejected(self):
         violations = nl.lint_narrative(client="listo", tech="listo", result="done",
@@ -541,7 +586,9 @@ class GuardCliTests(unittest.TestCase):
         preexistentes) nunca debe verse en el log recién escrito con esas claves en
         None/"-" -- sólo faltan del todo cuando el llamador no las pasó."""
         result, entries = log_narrative(
-            "--result", "started", "--client", "avanzamos", "--tech", "spawn intra-fase",
+            "--result", "started",
+            "--client", "Arrancamos a mirar por qué la instalación se colgaba en el primer arranque.",
+            "--tech", "spawn intra-fase para acotar la causa antes de tocar nada",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         entry = entries[0]

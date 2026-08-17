@@ -79,10 +79,21 @@ def collect_narrative(features_dir: Path, out_dir: Path) -> list[dict[str, Any]]
     return entries
 
 
+# AC-15 / hallazgo N3b-F01: UN solo tope para los campos de narración. Antes había dos
+# números en desacuerdo -- `narration_lint.LONG_FIELD_LIMIT = 400` decidía qué se puede
+# ESCRIBIR (AC-05) y este render cortaba en 300, así que un `tech` de 350 caracteres era
+# perfectamente legal al escribirlo y salía SIEMPRE mutilado al leerlo. No se alinea
+# bajando el tope de escritura: AC-05 concede 400 explícitamente. `tests/test_digest.py`
+# afirma que este número y `LONG_FIELD_LIMIT` son iguales, así que no pueden volver a
+# separarse en silencio. El marcador `_(truncado al render)_` sigue existiendo para todo
+# lo que sí exceda: el corte es ruidoso, nunca callado.
+NARRATION_FIELD_LIMIT = 400
+
+
 def format_narrative(entry: dict[str, Any]) -> list[str]:
     """One narration block: a header line plus the two labelled registers."""
     from feature_state_lib.render_notes import _short  # deferred: see module docstring
-    def _render_field(label: str, value: Any, limit: int = 300) -> str:
+    def _render_field(label: str, value: Any, limit: int = NARRATION_FIELD_LIMIT) -> str:
         normalized = " ".join(str(value or "").split()).replace("<!--", "‹!--").replace("-->", "--›")
         text = _short(value, limit) or "-"
         if normalized and len(normalized) > limit:
@@ -104,17 +115,17 @@ def format_narrative(entry: dict[str, Any]) -> list[str]:
     tail = " · ".join(parts)
     lines = [
         f"[{entry.get('at', '?')}] {tail}".rstrip(),
-        _render_field("Cliente", entry.get("client"), 300),
-        _render_field("Ingeniería", entry.get("tech"), 300),
+        _render_field("Cliente", entry.get("client")),
+        _render_field("Ingeniería", entry.get("tech")),
     ]
     if entry.get("learned"):
-        lines.append(_render_field("Aprendimos", entry.get("learned"), 300))
+        lines.append(_render_field("Aprendimos", entry.get("learned")))
     if entry.get("next"):
-        lines.append(_render_field("Conviene ahora", entry.get("next"), 300))
+        lines.append(_render_field("Conviene ahora", entry.get("next")))
     if entry.get("why"):
-        lines.append(_render_field("Por qué ahora", entry.get("why"), 300))
+        lines.append(_render_field("Por qué ahora", entry.get("why")))
     if entry.get("alternative"):
-        lines.append(_render_field("Alternativa", entry.get("alternative"), 300))
+        lines.append(_render_field("Alternativa", entry.get("alternative")))
     lines.append("")
     return lines
 

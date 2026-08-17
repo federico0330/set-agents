@@ -792,6 +792,10 @@ digest exactly as before — but emit NO chat block for it. Quick-fix mode: ONE 
 transparency did not shrink — it moved: `feature-state.py digest` regenerates `docs/notas/BUENOS-DIAS.md`
 from those logs, which is what the user reads with the morning coffee.
 
+**When to run `digest` (AC-18)**: at PHASE CLOSE and at TURN CLOSE. Not on every mutation — that is
+noise, and it is what the state renderers already do for you. Not only when the user asks — by then it
+is stale, and a stale digest is worse than none, because the reader trusts it.
+
 **a) At a narrated milestone that opens work:**
 
 ```

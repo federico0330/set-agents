@@ -4162,6 +4162,7 @@ class HarnessTests(unittest.TestCase):
             return ["true"]
 
         def fake_run(argv, **kwargs):
+            captured["input"] = kwargs.get("input")
             return types.SimpleNamespace(returncode=1, stdout="", stderr="")  # outcome irrelevant here
 
         with tempfile.TemporaryDirectory() as td:
@@ -4174,9 +4175,14 @@ class HarnessTests(unittest.TestCase):
                  mock.patch.object(sas.subprocess, "run", side_effect=fake_run):
                 sas.route_and_spawn("implementer", "documentation", "the real pi task",
                                     prompt_root=str(prompt_dir))
-        composed = captured["tail"][-1]
-        self.assertIn("<<<VAULT-MARKER-PI>>>", composed)
-        self.assertLess(composed.index("<<<VAULT-MARKER-PI>>>"), composed.index("the real pi task"))
+        # D5-DR01: this assertion used to read `captured["tail"][-1]` and require the vault
+        # marker INSIDE argv's last positional -- it encoded the defect instead of catching
+        # it, so the one lane that leaked vault text to `ps aux` was also the one lane whose
+        # test could never go red. Vault goes to stdin (like the other three lanes); the task
+        # stays the positional; and argv must NOT contain the vault at all.
+        self.assertIn("<<<VAULT-MARKER-PI>>>", captured["input"])
+        self.assertIn("the real pi task", captured["tail"])
+        self.assertNotIn("<<<VAULT-MARKER-PI>>>", "\x00".join(captured["tail"]))
 
     def test_claude_code_dispatch_writer_real_vault_reaches_the_composed_task_fenced_and_marked(self):
         # The literal end-to-end verification the AC demands: a REAL vault (no mocked

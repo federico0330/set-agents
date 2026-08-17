@@ -11,6 +11,10 @@
 - [x] wire-guard-cli (completed) · focal tests green
 - [x] cover-attack-corpus (completed) · focal tests green
 
+## Spawns
+
+- SPAWN-001 package-reviewer · modelo anthropic/sonnet
+
 ↩ [[features/028-narracion-que-ensena|028-narracion-que-ensena]]
 <!-- /notas:auto -->
 

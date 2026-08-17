@@ -5,6 +5,7 @@ established pattern: real subprocesses, never mocks).
 """
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -608,6 +609,40 @@ class DoctrineTests(unittest.TestCase):
         orchestrator = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
         self.assertIn("by MILESTONE, not by spawn", orchestrator)
         self.assertIn("feature-state.py digest", orchestrator)
+
+    def test_write_limit_and_render_limit_are_the_same_number(self):
+        """AC-15, hallazgo N3b-F01. Había dos topes en desacuerdo: escribir concedía 400
+        (`narration_lint.LONG_FIELD_LIMIT`, por AC-05) y renderizar cortaba en 300, así que
+        todo `tech` de entre 301 y 400 caracteres era legal al escribirlo y salía siempre
+        mutilado al leerlo. AC-15 pide alinearlos, no sólo hacer ruidoso el corte. Este
+        test es lo que impide que vuelvan a separarse en silencio."""
+        # Se lee el literal del fuente en vez de importar: `narration_lint` vive en
+        # ai/scripts/ (fuera del paquete) y cargarlo por spec_from_file_location rompe el
+        # descubrimiento de unittest sobre este mismo módulo. Para un test de deriva de
+        # constante, leer el literal alcanza y no tiene efectos de importación.
+        source = (ROOT / "ai/scripts/narration_lint.py").read_text()
+        match = re.search(r"^LONG_FIELD_LIMIT\s*=\s*(\d+)", source, re.MULTILINE)
+        self.assertIsNotNone(match, "no se encontro LONG_FIELD_LIMIT en narration_lint.py")
+        write_limit = int(match.group(1))
+        from feature_state_lib.render_bitacora import NARRATION_FIELD_LIMIT
+        self.assertEqual(
+            NARRATION_FIELD_LIMIT, write_limit,
+            "el tope de render y el de escritura tienen que ser el mismo numero (AC-15)")
+
+    def test_doctrine_says_WHEN_to_run_digest_not_only_that_it_exists(self):
+        """AC-18, hallazgo N2-F01 del review independiente de 028. El test anterior
+        afirmaba `assertIn("feature-state.py digest", text)` — presencia del NOMBRE del
+        comando, una cadena que ya existía antes del commit que decía implementar AC-18,
+        así que pasaba en verde con o sin trabajo real. Es el mismo falso verde (D-3) que
+        toda la feature 028 existe para erradicar, reproducido en su propio test de
+        aceptación. La cadencia es el contenido: sin ella, el lector encuentra un digest
+        viejo y le cree."""
+        for path in ("Global/_shared/CLAUDE.md", "Global/_shared/AGENTS.opencode.md",
+                     "Global/_shared/AGENTS.pi.md", "Global/_shared/AGENTS.codex.md",
+                     "Global/_canonical/agents/orchestrator.md"):
+            text = (ROOT / path).read_text()
+            self.assertIn("PHASE CLOSE", text, f"{path}: falta la cadencia de digest (AC-18)")
+            self.assertIn("TURN CLOSE", text, f"{path}: falta la cadencia de digest (AC-18)")
 
     def test_resume_feature_reads_the_living_notes(self):
         text = (ROOT / "Global/_canonical/commands/resume-feature.md").read_text()
