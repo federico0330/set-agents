@@ -86,8 +86,12 @@ hallazgos, `record-verification`, `record-repair`, `record-delta-review`,
 Los hallazgos de cada review están en los archivos de evidencia bajo
 `docs/specs/025-consola-minima-y-flexible/evidence/`.
 
-**Pendiente de código en 025**, con un agente trabajándolo al momento de escribir esto
-(rama `worktree-agent-a1e28ec280c592315`, commit `d042d1d`, **NO mergear sin leer abajo**):
+**Pendiente de código en 025.** El agente que lo trabajaba **murió por watchdog sin
+commitear**; el orquestador commiteó su árbol para que sobreviva:
+rama **`worktree-agent-a1e28ec280c592315`, commit `6102f96`**, 482 líneas sobre `bec3dcf`,
+**parcial y sin revisar**. Alcanzó a portar el vault por stdin y los tres carriles;
+quedó a mitad de los tests del scrub cuando lo mataron. Su último mensaje:
+*"Now let's add the SET_AGENTS_PROJECT scrub tests for the three other lanes"*.
 
 - **D5-F05** — el vault viaja por **argv** en el carril de pi: hasta 14.658 bytes de notas
   del cliente visibles en `/proc/<pid>/cmdline`, con `/proc` sin `hidepid`. El context pack
@@ -126,11 +130,16 @@ crearlo con `feature-state.py init`.**
   "Próximo paso" de `ai/state/STATUS.md` diga *"falta declarar el impacto de módulo — sin
   novedades hace 12 días"* en vez de `PACKAGE_ACCEPTED`. El "por qué" ya existía en
   `transitions.py` y `render_status.py:66` lo descartaba una línea antes de mostrarlo.
-- **N1** `campos-que-obligan` — en curso al escribir esto (rama
-  `worktree-agent-a47274084a7696ad1`, base `bec3dcf`). Campos `--learned/--next/--why/
-  --alternative/--milestone` con guarda de **densidad de punteros por cláusula** (un
-  cociente: rellenar no ayuda). El corpus de nueve ataques es **normativo y está en la spec**;
-  la evidencia debe mostrarlos en rojo, y **B5 debe dar verde y estar declarado**.
+- **N1** `campos-que-obligan` — **parcial**. Su agente murió por watchdog sin commitear; el
+  orquestador commiteó el árbol: rama **`worktree-agent-a47274084a7696ad1`, commit
+  `6a1949a`**, 1784 líneas sobre `bec3dcf`, **sin revisar**. Trae `ai/scripts/narration_lint.py`
+  (445 líneas), `tests/test_narracion_contrato.py` (575) y el ADR-0057 (156). Murió en plena
+  segunda mordida (*"Mordida 2 — AC-02 milestone requeridness"*), así que **las mordidas están
+  incompletas y hay que rehacerlas**.
+  Campos `--learned/--next/--why/--alternative/--milestone` con guarda de **densidad de
+  punteros por cláusula** (un cociente: rellenar no ayuda). El corpus de nueve ataques es
+  **normativo y está en la spec**; la evidencia debe mostrarlos en rojo, y **B5 debe dar
+  verde y estar declarado**.
 - **N2** `doctrina-que-explica` — pendiente. Va **después** de N1: una doctrina que mande
   pasar un flag inexistente es una doctrina falsa.
 - **N3b** — AC-15 y AC-16, pendientes, dependen de N1.
@@ -227,3 +236,37 @@ python3 ai/scripts/set_agents_app.py --help --avanzado | grep -cE '^\s+--'  # 71
 # 030: la política sigue cerrada y el harness sigue funcionando
 python3 -c "import sys;sys.path.insert(0,'ai/scripts');import coord_policy as c;print(c.allowed('fd . -X touch p'), c.allowed('git status --porcelain'))"
 ```
+
+---
+
+## Ramas de agente que valen la pena (y las que no)
+
+El repo quedó con veinte ramas `worktree-agent-*`. **Casi todas son ruido**: apuntan a un
+commit viejo porque su agente nunca commiteó y su trabajo ya está integrado en `main`. Las
+únicas cuatro con contenido propio útil:
+
+| rama | commit | qué tiene |
+|---|---|---|
+| `worktree-agent-a47274084a7696ad1` | `6a1949a` | **028/N1 parcial**: `narration_lint.py` (445), `test_narracion_contrato.py` (575), ADR-0057. Mordidas incompletas. |
+| `worktree-agent-a1e28ec280c592315` | `6102f96` | **025 spawners parcial**: vault por stdin, scrub en los 3 carriles. Tests del scrub a medias. |
+| `worktree-agent-a0475a05026769224` | `c034277` | Repair de D5 **ya integrado en `main`**. Sólo referencia. |
+| `worktree-agent-a034…`/`a062…`/etc. | varios | Ya integrados. Ignorar. |
+
+**Cómo distinguir señal de ruido**: `git diff bec3dcf <rama> --numstat`. Si el número es
+grande *y* la rama apunta a un commit anterior a `bec3dcf`, es ruido — su trabajo ya está
+en `main` y el diff sólo mide lo que `main` avanzó después. Las dos primeras filas de la
+tabla apuntan a commits **posteriores** a `bec3dcf`: ésas sí tienen contenido nuevo.
+
+Cuando termines de portar lo útil, borralas: `git branch -D $(git branch --list
+'worktree-agent-*' | tr -d ' ')`.
+
+## Por qué murieron siete agentes en esta sesión
+
+Vale saberlo para no repetirlo:
+
+- **Cinco de golpe** por límite de sesión de Anthropic. No fallaron en su tarea. La doctrina
+  manda relanzar una vez con otro modelo y persistir la causa; funcionó (haiku tenía cuota).
+- **Dos por el watchdog de 600 s sin salida**, los dos por correr algo largo sin heartbeat.
+- **Lo único que se salvó de todos ellos fue lo que ya estaba escrito en un archivo.** Por eso
+  todos los spawns de esta sesión terminaron pidiendo: escribí la evidencia mientras trabajás,
+  y commiteá antes de reportar.
