@@ -2,7 +2,8 @@
 
 Package: `D2-trabajo-visible`
 Base fija: `489ecff52a7c8aca84ce931180c6f0005cb8a63c`
-Estado: `validación focal completada; commit pendiente`
+Estado: `repaired`
+Commit de reparación: `d30f94f8276efb0b9d54f5682cbbf7ef5a36de37`
 
 ## Alcance y checkpoint
 
@@ -42,11 +43,6 @@ Estado: `validación focal completada; commit pendiente`
    terminó **exit 1** en 0.706 s. Ambas aserciones encontraron `\\r| …` entre el prompt y
    `CHILD_DONE`. Se restauró el archivo con `cp`.
 3. **GREEN.** `python3 ai/scripts/heartbeat-run.py --interval 20 -- python3 -m unittest tests.test_provider_registry.ProviderVerifyLivenessScopeTests tests.test_menu_ui.InteractiveInstallerProgressTests tests.test_menu_ui.RouteDoctorProgressTests tests.test_menu_ui.DoctorAllProgressTests -v` → **exit 0**, `Ran 13 tests in 2.143s`, `OK`.
-4. `git diff --check` → **exit 0**. El gate requerido de rango exacto se ejecuta tras el commit
-   de esta reparación; no se ejecutaron suite global, `verify.sh` ni `build.sh --check` porque son
-   gates de otro rol.
-
-## Próximo paso exacto
-
-Commitear exclusivamente los cinco archivos de este batch, ejecutar
-`git diff --check 489ecff^ HEAD`, y registrar su exit real junto con el SHA en esta evidencia.
+4. `git diff --check` → **exit 0** antes del commit. Tras commitear, el gate de rango exacto
+   `git diff --check 489ecff^ HEAD` → **exit 0** (sin salida). No se ejecutaron suite global,
+   `verify.sh` ni `build.sh --check` porque son gates de otro rol.
