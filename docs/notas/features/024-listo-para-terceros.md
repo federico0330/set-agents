@@ -3,8 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `BLOCKED` · modo: scoped · revisión 127
-- estado final: **BLOCKED**
+- fase: `DONE` · modo: scoped · revisión 137
+- estado final: **DONE**
 - spec: `docs/specs/024-listo-para-terceros/spec.md` (hash `f848f29b2069`)
 
 ## Criterios de aceptación
@@ -38,10 +38,24 @@
 - decisión: [[decisiones/2026-08-14 un-test-puede-escribir-en-el-estado-real-del-usuario|Un test sin mockear puede escribir en el estado real del usuario, y lo hizo]]
 - decisión: [[decisiones/2026-08-14 HUMAN-DECISION-codename-de-cliente-real-en-repo-publico|HUMAN_DECISION_REQUIRED: un codename de cliente real viaja al orchestrator.md de cada tercero, y el repo es PUBLICO]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
-- → corresponde tu decisión (ver Blocker)
-- ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -49,7 +63,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/024-listo-para-terceros/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/024-listo-para-terceros/bitacora.md`
 
-_Actualizado: 2026-08-14T11:09:17+00:00_
+_Actualizado: 2026-08-18T02:47:40+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

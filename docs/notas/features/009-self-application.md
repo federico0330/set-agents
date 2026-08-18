@@ -49,6 +49,21 @@
 - decisión: [[decisiones/2026-07-28 una-feature-bloqueada-y-reabierta-no-puede-llegar-nunca-a-done|done_ready mira si la lista de blockers esta vacia, no si algun blocker sigue abierto]]
 - decisión: [[decisiones/2026-07-28 las-cinco-deudas-del-ciclo-de-review-que-p3-nombro-y-no-reparo|Lo que quedo abierto en el ciclo de review despues de panel-integrity]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

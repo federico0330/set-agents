@@ -50,6 +50,21 @@
 - decisión: [[decisiones/2026-07-27 t300-pi-lane-feasibility-yes|T-300 spike: P3-pi-lane is FEASIBLE (all four YES)]]
 - decisión: [[decisiones/2026-07-27 ac09-ac10-pi-minimal-target-accepted|AC-09/AC-10 literal deviations accepted: minimal pi target + pnpm-store pin]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

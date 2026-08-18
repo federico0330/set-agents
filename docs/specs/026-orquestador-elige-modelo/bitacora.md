@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T23:09:09+00:00
+Actualizado: 2026-08-18T02:12:10+00:00
 
 [2026-08-13T13:42:44+00:00] P1-latencia-por-modelo-no-por-sufijo · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que el modelo que coordina no sea forzosamente de OpenAI, como pediste.

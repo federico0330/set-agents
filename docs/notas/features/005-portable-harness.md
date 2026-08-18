@@ -28,6 +28,21 @@
 - decisión: [[decisiones/2026-07-29 tools-toml-obsidian-apt-dnf-zypper-were-fabricated|AC-11's apt/dnf/zypper obsidian identifiers were fabricated, not source-verified]]
 - decisión: [[decisiones/2026-07-29 vault-doctor-basename-fallback-still-collides-when-both-sides-unregistered|vault-doctor's basename fallback for an unregistered project still lets two never-registered repos collide]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

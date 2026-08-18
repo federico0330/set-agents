@@ -4,6 +4,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 ./build.sh --check
+# ADR-0047: a fresh clone has no ai/state/ at all; seed it so tests that
+# assert canonical harness decisions (e.g. decisions-log.jsonl) find their
+# data.  On a machine with real history this is a no-op (seed refuses to
+# overwrite an existing ai/state/).
+python3 ai/scripts/seed-state.py "$ROOT" >/dev/null
 # The guest portability regression already exercises scaffold, install, and
 # routing before it calls this script.  Re-running the whole suite from that
 # copied checkout exceeds the bounded E2E budget without adding coverage; run
@@ -22,7 +27,7 @@ git diff --check
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
-./build.sh --output "$STAGING" >/dev/null
+./build.sh --output "$STAGING" --profile go-zen >/dev/null
 for harness in opencode claude-code codex pi; do
   diff -ruN "Global/$harness" "$STAGING/$harness"
 done

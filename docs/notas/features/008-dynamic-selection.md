@@ -37,6 +37,21 @@
 - decisión: [[decisiones/2026-07-30 family-se-normaliza-no-se-captura-del-vendor-para-ids-compartidos|Para modelos compartidos entre lanes de OpenCode, family se normaliza (colisiona), no se copia del vendor]]
 - decisión: [[decisiones/2026-07-30 p2-discovered-inventory-pasa-a-ser-su-propia-feature-012|P2-discovered-inventory se separa de 008 y pasa a ser la feature 012, mismo patrón que 010/006]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

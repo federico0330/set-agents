@@ -37,6 +37,21 @@
 - decisión: [[decisiones/2026-08-12 owned-paths-desactualizado-por-cambio-de-diseno|owned_paths escrito contra un diseno que el ADR despues cambio: error del orquestador, no del implementer]]
 - decisión: [[decisiones/2026-08-12 cuarto-stall-de-la-sesion-patron-de-infraestructura|Cuarto stall de infraestructura de la sesion: el patron es de agentes mutadores de corrida larga, no de un encargo puntual]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - 1 hallazgos abiertos

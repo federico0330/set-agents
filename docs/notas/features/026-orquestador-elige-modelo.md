@@ -27,6 +27,21 @@
 - [2026-08-13] implementer: AC-01..03. El test test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart (test_harness.py:266) exige sufijo -fast para orchestrator/implementer/product-analy…
 - [2026-08-13] implementer: AC-04..07, clase public-contract: cambia el contrato del descriptor de --route-decide (set_agents_app.py:605, conjunto cerrado). El riesgo central es que se convierta en bypass: l…
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

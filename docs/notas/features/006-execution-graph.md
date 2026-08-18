@@ -3,7 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_ACCEPTED` · modo: feature · revisión 51
+- fase: `DONE` · modo: feature · revisión 55
+- estado final: **DONE**
 - spec: `docs/specs/006-execution-graph/spec.md` (hash `8772b09bcb1b`)
 
 ## Criterios de aceptación
@@ -37,9 +38,24 @@
 - decisión: [[decisiones/2026-07-30 graph-d04-degradation-edge-cases-deferred|3 hallazgos low derivados de la ronda 4 de repair quedan como deuda, no reparados]]
 - decisión: [[decisiones/2026-07-30 006-evidencia-de-consistencia-whole-repo-registrada-fase-se-queda-en-package-accepted|006 evidencia de consistencia whole-repo registrada, fase se queda en PACKAGE_ACCEPTED]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
-- → P3-graph-view: falta declarar el impacto de módulo o marcarlo como exento
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -47,7 +63,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/006-execution-graph/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/006-execution-graph/bitacora.md`
 
-_Actualizado: 2026-08-02T14:44:35+00:00_
+_Actualizado: 2026-08-18T01:15:43+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

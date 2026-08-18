@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import decimal
 import os
-import pwd
+if os.name == "posix":
+    import pwd
 import re
 import secrets
 import sqlite3

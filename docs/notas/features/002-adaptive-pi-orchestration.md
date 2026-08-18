@@ -41,6 +41,21 @@
 - decisión: [[decisiones/2026-07-24 p1-third-repair-authorization|Excepción autorizada: tercer ciclo de reparación P1]]
 - decisión: [[decisiones/2026-07-30 002-retirado-superseded-por-003-trusted-routing-pi-runtime|002 retirado, superseded por 003-trusted-routing-pi-runtime]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - → corresponde tu decisión (ver Blocker)

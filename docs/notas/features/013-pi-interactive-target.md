@@ -40,6 +40,21 @@
 - decisión: [[decisiones/2026-08-02 ac09-ac10-pi-minimal-target-superseded-by-013|AC-08/AC-14 supersedes ac09-ac10-pi-minimal-target-accepted: pi gains a real install.py target and generated agent tree]]
 - decisión: [[decisiones/2026-08-02 ac-13-roster-half-environment-gated|AC-13: la mitad de discoverability viva del roster queda environment-gated, no BLOCKED de feature]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

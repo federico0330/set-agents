@@ -11,6 +11,21 @@
 
 - [[features/029-convenciones-antes-del-codigo/A1-ejes-al-momento-de-hablar|A1-ejes-al-momento-de-hablar]] — accepted · Cerrar convenciones en intake con baseline y contrato de pregunta analítica
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

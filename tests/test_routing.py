@@ -1755,8 +1755,9 @@ class RoutingTests(unittest.TestCase):
             store = routing.RoutingStore._for_tests(root)
             build_schema_db(store, frozen_dispatches_script(comments=False),
                             schema_version=4, rows=(FROZEN_V4_ROW,))
-            identity = json.loads((ROOT / "ai/state/project.json").read_text())["project_key"]
-            result = self._cli_run(["--routing-migrate"], self._cli_env(root))
+            identity = routing_store._TEST_PROJECT_KEY
+            harness = self._make_harness_root(Path(td))
+            result = self._cli_run(["--routing-migrate"], self._cli_env(root, harness_root=harness))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertRegex(result.stdout, rf"ROUTING_MIGRATE_OK from=4 to={routing_store.SCHEMA} rows=1 backup=.+")
             routing.RoutingStore._for_tests(root, project_key=identity)._validate_existing_readonly()
@@ -1876,7 +1877,8 @@ class RoutingTests(unittest.TestCase):
             store = routing.RoutingStore._for_tests(root)
             build_schema_db(store, frozen_dispatches_script(n03="absent"),
                             schema_version=4, rows=(FROZEN_V4_ROW,))
-            result = self._cli_run(["--routing-migrate"], self._cli_env(root))
+            harness = self._make_harness_root(Path(td))
+            result = self._cli_run(["--routing-migrate"], self._cli_env(root, harness_root=harness))
             self.assertEqual(result.returncode, 2)
             self.assertIn("ROUTING_MIGRATE_FAILED", result.stderr)
             self.assertIn("altered=dispatches", result.stderr)
@@ -2843,10 +2845,27 @@ class RoutingTests(unittest.TestCase):
 
     # ------------------------------------------------------------- F01/F02/F03/F07/N04 CLI
 
-    def _cli_env(self, routing_root, bins=None):
+    def _cli_env(self, routing_root, bins=None, harness_root=None):
         env=dict(os.environ); env["SET_AGENTS_ROUTING_TEST_ROOT"]=str(routing_root)
         if bins is not None: env["PATH"]=f"{bins}:{env['PATH']}"
+        if harness_root is not None: env["SET_AGENTS_ROOT"]=str(harness_root)
         return env
+
+    def _make_harness_root(self, parent: Path) -> Path:
+        """Create a minimal harness root with a project.json fixture.
+
+        Tests that call --routing-migrate read the harness project_key via
+        project_key_for(ROOT).  In a fresh clone ai/state/ is absent; these
+        tests must supply their own fixture rather than depending on production
+        state (ADR-0051 isolation principle, same family as 027's repair).
+        """
+        harness = parent / "harness"
+        state = harness / "ai" / "state"
+        state.mkdir(parents=True)
+        (state / "project.json").write_text(
+            json.dumps({"project_key": routing_store._TEST_PROJECT_KEY,
+                        "schema": 1, "created_at": "2026-01-01T00:00:00Z"}))
+        return harness
 
     def _cli_run(self, args, env, input_text=None):
         return subprocess.run([sys.executable,"ai/scripts/set_agents_app.py",*args],
@@ -2864,8 +2883,9 @@ class RoutingTests(unittest.TestCase):
             root = Path(td) / "routing-root"
             store = routing.RoutingStore._for_tests(root)
             build_schema_db(store, frozen_dispatches_script(), schema_version=4, rows=(FROZEN_V4_ROW,))
-            identity = json.loads((ROOT / "ai/state/project.json").read_text())["project_key"]
-            result = self._cli_run(["--routing-migrate"], self._cli_env(root))
+            identity = routing_store._TEST_PROJECT_KEY
+            harness = self._make_harness_root(Path(td))
+            result = self._cli_run(["--routing-migrate"], self._cli_env(root, harness_root=harness))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertRegex(result.stdout, rf"ROUTING_MIGRATE_OK from=4 to={routing_store.SCHEMA} rows=1 backup=.+")
             migrated = sqlite3.connect(f"file:{store.db_path}?mode=ro", uri=True)
@@ -2896,7 +2916,8 @@ class RoutingTests(unittest.TestCase):
                 rows = (FROZEN_V4_ROW,) if version == 4 else ()
                 build_schema_db(store, frozen_dispatches_script(version=version),
                                 schema_version=version, rows=rows)
-                result = self._cli_run(["--routing-migrate"], self._cli_env(root))
+                harness = self._make_harness_root(Path(td))
+                result = self._cli_run(["--routing-migrate"], self._cli_env(root, harness_root=harness))
                 self.assertEqual(result.returncode, 0, result.stderr)
                 banner = re.search(r"ROUTING_MIGRATE_OK from=(\d+) to=(\d+) rows=(\d+) backup=(\S+)",
                                    result.stdout)
@@ -2905,7 +2926,7 @@ class RoutingTests(unittest.TestCase):
                 self.assertEqual(banner.group(2), str(routing_store.SCHEMA))
                 # The backup is named for what is IN it, not for where the chain was going.
                 self.assertEqual(len(list((root / "backups").glob(f"routing-v{version}-*.db"))), 1)
-                identity = json.loads((ROOT / "ai/state/project.json").read_text())["project_key"]
+                identity = routing_store._TEST_PROJECT_KEY
                 routing.RoutingStore._for_tests(root, project_key=identity)._validate_existing_readonly()
         self.assertEqual(observed, {4: "4", 5: "5"})
         self.assertNotEqual(observed[4], observed[5], "the banner is reporting a constant")

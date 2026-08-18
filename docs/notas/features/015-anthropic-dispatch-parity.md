@@ -32,6 +32,21 @@
 - decisión: [[decisiones/2026-08-01 areas-judge-opencode-go-zen-colisión-cerrada-f-02-amplía-ac-06a-nuevo-residuo-areas-ops|areas.judge.opencode.go-zen colisión CERRADA (F-02, amplía AC-06a); nuevo residuo areas.ops]]
 - decisión: [[decisiones/2026-08-01 areas-ops-opencode-go-zen-colision-cerrada-f-03-ac-06a-queda-genericamente-cerrado|areas.ops.opencode.go-zen colision CERRADA (F-03); AC-06(a) queda genericamente cerrado, sin residuo]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

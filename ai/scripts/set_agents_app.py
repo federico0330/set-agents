@@ -11,7 +11,8 @@ import argparse
 import hashlib
 import json
 import os
-import pwd
+if os.name == "posix":
+    import pwd
 import re
 import secrets
 import shlex

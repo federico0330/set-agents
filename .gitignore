@@ -54,3 +54,7 @@ tools.proposals.json
 
 # Worktrees efimeros de agentes concurrentes: nunca deben entrar al repo.
 .claude/worktrees/
+
+# Backups accidentales: ai/scripts/set_agents_app.py.bak entró en 2f199d5 (025/D1)
+# y fue removido del índice en la higiene de 024. Esta regla evita regresiones.
+*.bak

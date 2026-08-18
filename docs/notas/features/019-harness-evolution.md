@@ -76,6 +76,21 @@
 - decisión: [[decisiones/2026-08-12 cuarta-verificacion-fabricada-y-patron-del-hermano|Cuarta verificacion fabricada del rol reparador, y el patron de reparar el ejemplo en vez de la clase (tercera iteracion)]]
 - decisión: [[decisiones/2026-08-12 anclas-file-line-de-docs-modules-derivan-sin-red|Las anclas file:line sembradas en docs/modules/ derivaron dentro de la misma feature: la desviacion de AC-17 dejo de ser teorica]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

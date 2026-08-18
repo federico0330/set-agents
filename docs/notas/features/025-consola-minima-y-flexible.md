@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `DONE` · modo: scoped · revisión 159
+- fase: `DONE` · modo: scoped · revisión 180
 - estado final: **DONE**
 - spec: `docs/specs/025-consola-minima-y-flexible/spec.md` (hash `f113d8233aa7`)
 
@@ -29,15 +29,17 @@
 - [[features/025-consola-minima-y-flexible/D3-posturas-de-autonomia|D3-posturas-de-autonomia]] — accepted · Que el usuario elija cuanta autonomia le da al harness, y que cada postura cambie algo ob…
 - [[features/025-consola-minima-y-flexible/D4-harness-por-CLI|D4-harness-por-CLI]] — accepted · Instalar y desinstalar el harness por CLI, sin tocar los otros
 - [[features/025-consola-minima-y-flexible/D5-vault-en-todo-spawn|D5-vault-en-todo-spawn]] — accepted · Que cada spawn de proyecto use Obsidian, verificando primero que se cumple hoy en un spaw…
+- [[features/025-consola-minima-y-flexible/D5-correctiva|D5-correctiva]] — accepted · Registrar la delta review correctiva de D5-vault-en-todo-spawn que no pudo aterrizar cuan…
 
 ## Approach y decisiones
 
-- [2026-08-17] package-reviewer: Relanzamiento único tras policy interruption; read-only y excluye security PoCs. Solo AC-11 y coherencia docs/runtime.
+- ruteo D5-correctiva: registro documental — los dos hallazgos de D5-DR01 y D5-DR02 están reparados en d1da7a0, sólo falta registrarlos
 - [2026-08-17] finding-verifier: F01 high AC11: verificación focal read-only de CLI/docs sin análisis de rutas ni cambios.
 - [2026-08-17] repair-agent: D4-F01 upheld; repair limitado a CLI one-shot, aislamiento HOME/XDG, tests y evidencia; no tocar otros carriles.
 - [2026-08-17] delta-reviewer: DELTA_REVIEW del repair bfe7b2d; revisión read-only focal de aislamiento runtime y evidencia.
 - [2026-08-17] repair-agent: Spawn 8/8; F01/DR02 probados por delta, repair mínimo sin cambios de aislamiento.
 - [2026-08-17] implementer: Base fija 8a9f62bb5fa7dc1ed3f4275a1261de7c88ea9208; usar la rama rescatada sólo como referencia selectiva, nunca mergear su D5 divergente.
+- [2026-08-18] package-reviewer: revisión correctiva del paquete D5-vault-en-todo-spawn: D5 fue aceptado con diff_ref=WORKTREE (no SHA), evidencia del implementer mismo, y cero delta reviews. La revisión correcti…
 - decisión: [[decisiones/2026-08-15 actualizar-le-repone-los-cuatro-CLIs-al-que-instalo-uno|Defecto latente: cmd_update ignora install-targets.json y reinstala los cuatro arboles]]
 - decisión: [[decisiones/2026-08-15 RDD-ya-existe-en-el-repo-con-otra-acepcion|RDD no es un termino a definir: ya esta en uso instalado, con otro significado]]
 - decisión: [[decisiones/2026-08-15 numeracion-de-ADRs-de-025-desempatada-a-favor-de-los-context-packs|Los numeros de ADR de la spec 025 estaban viejos y se corrigieron a favor de los context packs]]
@@ -54,6 +56,22 @@
 - decisión: [[decisiones/2026-08-17 d4-presupuesto-spawn-agotado-antes-delta-final|D4 agotó su presupuesto de spawns antes del delta final]]
 - decisión: [[decisiones/2026-08-17 d5-relanzamiento-único-tras-watchdog|D5 relanzamiento único tras watchdog]]
 - decisión: [[decisiones/2026-08-17 d5-revision-correctiva-sin-camino-de-estado|La revision correctiva de D5 no puede aterrizar en el registro del paquete]]
+- decisión: [[decisiones/2026-08-18 d5-dr03-asimetria-cobertura-anticacheo|D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios]]
+
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
 
 ## Qué falta
 
@@ -61,11 +79,11 @@
 
 ## Presupuestos
 
-- spawns: 23 (máx 8/paquete) · deep review máx 2 ciclos
+- spawns: 24 (máx 8/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/025-consola-minima-y-flexible/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/025-consola-minima-y-flexible/bitacora.md`
 
-_Actualizado: 2026-08-17T19:05:19+00:00_
+_Actualizado: 2026-08-18T01:15:24+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

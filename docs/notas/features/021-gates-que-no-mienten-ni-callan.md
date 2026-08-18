@@ -42,6 +42,21 @@
 - decisión: [[decisiones/2026-08-12 quinto-stall-corrige-el-patron-y-la-mitigacion|Quinto stall: el patron no era 'agentes mutadores' y nombrar la herramienta no alcanza]]
 - decisión: [[decisiones/2026-08-12 sexto-stall-segunda-muerte-del-mismo-encargo|HUMAN_DECISION_REQUIRED: sexto stall de la sesion y segunda muerte del review de P2]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

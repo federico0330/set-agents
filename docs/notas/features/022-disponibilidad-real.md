@@ -56,6 +56,21 @@
 - decisión: [[decisiones/2026-08-13 el-coordinador-deja-de-ser-gpt-en-la-lane-opencode|El coordinador deja de ser GPT en la lane de opencode]]
 - decisión: [[decisiones/2026-08-13 los-modulos-de-test-no-pasan-aislados-preexistente|Los modulos de test no pasan aislados, y es preexistente]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

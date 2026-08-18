@@ -46,6 +46,21 @@
 - decisión: [[decisiones/2026-07-29 record-spawn-budget-does-not-exempt-integration-bookkeeping|record-spawn cuenta la narracion de INTEGRATION contra el presupuesto de implementacion de un paquete ya aceptado]]
 - decisión: [[decisiones/2026-07-29 done-ready-does-not-filter-resolved-blockers|done_ready trata cualquier blocker historico como abierto para siempre, incluso ya resuelto]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

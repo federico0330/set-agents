@@ -7,11 +7,11 @@
 - [[features/003-trusted-routing-pi-runtime|003-trusted-routing-pi-runtime]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/004-adaptive-dispatch|004-adaptive-dispatch]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/005-portable-harness|005-portable-harness]] — fase `DONE` · paquetes 3/3 · **DONE**
-- [[features/006-execution-graph|006-execution-graph]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
+- [[features/006-execution-graph|006-execution-graph]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/007-quota-visibility|007-quota-visibility]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/008-dynamic-selection|008-dynamic-selection]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/009-self-application|009-self-application]] — fase `DONE` · paquetes 3/3 · **DONE**
-- [[features/010-spawn-provenance|010-spawn-provenance]] — fase `PACKAGE_ACCEPTED` · paquetes 1/1
+- [[features/010-spawn-provenance|010-spawn-provenance]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/011-quota-failover|011-quota-failover]] — fase `BLOCKED` · paquetes 0/1 · **BLOCKED**
 - [[features/012-discovered-inventory|012-discovered-inventory]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/013-pi-interactive-target|013-pi-interactive-target]] — fase `DONE` · paquetes 1/1 · **DONE**
@@ -23,54 +23,55 @@
 - [[features/021-gates-que-no-mienten-ni-callan|021-gates-que-no-mienten-ni-callan]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/022-disponibilidad-real|022-disponibilidad-real]] — fase `DONE` · paquetes 5/5 · **DONE**
 - [[features/023-senales-de-consumo|023-senales-de-consumo]] — fase `DONE` · paquetes 4/4 · **DONE**
-- [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `BLOCKED` · paquetes 4/4 · **BLOCKED**
-- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `DONE` · paquetes 5/5 · **DONE**
+- [[features/024-listo-para-terceros|024-listo-para-terceros]] — fase `DONE` · paquetes 4/4 · **DONE**
+- [[features/025-consola-minima-y-flexible|025-consola-minima-y-flexible]] — fase `DONE` · paquetes 6/6 · **DONE**
 - [[features/026-orquestador-elige-modelo|026-orquestador-elige-modelo]] — fase `DONE` · paquetes 2/2 · **DONE**
 - [[features/027-controles-que-miran|027-controles-que-miran]] — fase `DONE` · paquetes 4/4 · **DONE**
-- [[features/028-narracion-que-ensena|028-narracion-que-ensena]] — fase `BLOCKED` · paquetes 0/3 · **BLOCKED**
+- [[features/028-narracion-que-ensena|028-narracion-que-ensena]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
+- [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** → corresponde tu decisión (ver Blocker)
 - **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
-- **006-execution-graph** → P3-graph-view: falta declarar el impacto de módulo o marcarlo como exento
-- **010-spawn-provenance** → P1-spawn-provenance: falta declarar el impacto de módulo o marcarlo como exento
 - **011-quota-failover** → corresponde tu decisión (ver Blocker)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
-- **024-listo-para-terceros** → corresponde tu decisión (ver Blocker)
-- **024-listo-para-terceros** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. ge…
-- **028-narracion-que-ensena** → corresponde tu decisión (ver Blocker)
-- **028-narracion-que-ensena** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: los tres paquetes se crearon sin work items, asi que package_review_ready los niega (model.py:…
 
 ## Quick-fixes recientes
 
+- 2026-08-18T02:48 — F-04 (020-honest-dashboard/P2-anclas-verificables) cerrado: verify.sh ahora pasa --profile go-zen a ./build.sh --output… (done)
+- 2026-08-18T02:48 — P1F-01 cerrado: fix validado — cmd_transition ya tiene try/except alrededor del pop de repair_entry, cubriendo el caso … (done)
 - 2026-08-12T15:24 — render_notes emitia trailing whitespace en la linea de un finding sin category ni summary, rompiendo git diff --check y… (done)
 - 2026-08-06T13:33 — Preserve explicit --project context in set_agents_app.py script mode by aliasing __main__ for lazy routing_cli imports (done)
 - 2026-08-03T02:36 — P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id… (done)
-- 2026-07-30T01:22 — P2-vault-mandatory (accepted): exclude_notes_from_git/_notes_currently_excluded chequeaban (project/'.git').is_dir(), f… (done)
-- 2026-07-30T01:22 — P2-vault-mandatory (accepted): write_vault_registry_entry resolvía el vault_path a través del symlink recién creado, gu… (done)
 
 ## Decisiones
 
+- [[decisiones/2026-08-18 d5-dr03-asimetria-cobertura-anticacheo|D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios]]
+- [[decisiones/2026-08-18 028-deuda-ac16-codex-drift|AC-16 AGENTS.codex.md: confirmación de deriva no registrada]]
+- [[decisiones/2026-08-18 028-deuda-test-narracion-digest|tests/test_narracion_digest.py nunca se creó]]
 - [[decisiones/2026-08-17 replanteo-028-imposible-el-motor-no-tiene-salida|Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida]]
 - [[decisiones/2026-08-17 replanteo-028-paquetes-sin-work-items|Los tres paquetes de 028 se replantean porque fueron creados sin work items]]
 - [[decisiones/2026-08-17 d5-revision-correctiva-sin-camino-de-estado|La revision correctiva de D5 no puede aterrizar en el registro del paquete]]
 - [[decisiones/2026-08-17 d5-relanzamiento-único-tras-watchdog|D5 relanzamiento único tras watchdog]]
 - [[decisiones/2026-08-17 d4-presupuesto-spawn-agotado-antes-delta-final|D4 agotó su presupuesto de spawns antes del delta final]]
-- [[decisiones/2026-08-17 d4-segundo-repair-con-evidencia-delta|D4 usa el último repair batch con evidencia directa del delta]]
-- [[decisiones/2026-08-17 d4-review-reintento-sin-poc-rutas|D4 relanza revisión de producto sin PoC de rutas]]
-- [[decisiones/2026-08-17 d4-gate-reintento-focal|D4 relanza el gate focal por evidencia incompleta]]
+
+## Convenciones
+
+| Feature | Cobertura | Orígenes |
+|---|---|---|
+| 031-registro-correctivo | 10/10 | n/a, notas |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-17T23:09:04+00:00_
+_Actualizado: 2026-08-18T02:47:40+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

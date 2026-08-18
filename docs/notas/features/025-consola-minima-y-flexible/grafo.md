@@ -98,6 +98,15 @@ subgraph sg_025_consola_minima_y_flexible["025-consola-minima-y-flexible"]
     package_025_consola_minima_y_flexible_d5_vault_en_todo_spawn_1["package: D5-vault-en-todo-spawn"]
     spawn_025_consola_minima_y_flexible_d5_vault_en_todo_spawn_1["SPAWN-001 implementer Implementar AC-12 y los cuatro arreglos de spawners sobre el SHA integrado. #91;gpt-5.6-terra#93;"]
   end
+  subgraph sg_025_consola_minima_y_flexible_d5_correctiva["D5-correctiva"]
+    package_025_consola_minima_y_flexible_d5_correctiva_1["package: D5-correctiva"]
+    finding_025_consola_minima_y_flexible_d5_correctiva_1["D5-DR01 #40;high#41; verified_by=finding-verifier"]
+    finding_025_consola_minima_y_flexible_d5_correctiva_2["D5-DR02 #40;medium#41; verified_by=finding-verifier"]
+    review_025_consola_minima_y_flexible_d5_correctiva_1["repair_required #40;package-reviewer#41;"]
+    verification_025_consola_minima_y_flexible_d5_correctiva_1["verified_by=finding-verifier"]
+    repair_025_consola_minima_y_flexible_d5_correctiva_1["2 changed files"]
+    spawn_025_consola_minima_y_flexible_d5_correctiva_1["SPAWN-001 package-reviewer package-review #91;claude-sonnet-4.6#93;"]
+  end
 end
 review_025_consola_minima_y_flexible_d1_superficie_humana_1 -->|produjo| finding_025_consola_minima_y_flexible_d1_superficie_humana_1
 review_025_consola_minima_y_flexible_d1_superficie_humana_1 -->|produjo| finding_025_consola_minima_y_flexible_d1_superficie_humana_2
@@ -163,6 +172,12 @@ repair_025_consola_minima_y_flexible_d4_harness_por_cli_1 -->|reparó| commit_02
 repair_025_consola_minima_y_flexible_d4_harness_por_cli_2 -->|reparó| finding_025_consola_minima_y_flexible_d4_harness_por_cli_1
 repair_025_consola_minima_y_flexible_d4_harness_por_cli_2 -->|reparó| finding_025_consola_minima_y_flexible_d4_harness_por_cli_2
 repair_025_consola_minima_y_flexible_d4_harness_por_cli_2 -->|reparó| commit_025_consola_minima_y_flexible_d4_harness_por_cli_2
+review_025_consola_minima_y_flexible_d5_correctiva_1 -->|produjo| finding_025_consola_minima_y_flexible_d5_correctiva_1
+review_025_consola_minima_y_flexible_d5_correctiva_1 -->|produjo| finding_025_consola_minima_y_flexible_d5_correctiva_2
+verification_025_consola_minima_y_flexible_d5_correctiva_1 -->|verificó| finding_025_consola_minima_y_flexible_d5_correctiva_1
+verification_025_consola_minima_y_flexible_d5_correctiva_1 -->|verificó| finding_025_consola_minima_y_flexible_d5_correctiva_2
+repair_025_consola_minima_y_flexible_d5_correctiva_1 -->|reparó| finding_025_consola_minima_y_flexible_d5_correctiva_1
+repair_025_consola_minima_y_flexible_d5_correctiva_1 -->|reparó| finding_025_consola_minima_y_flexible_d5_correctiva_2
 package_025_consola_minima_y_flexible_d4_harness_por_cli_1 -->|bloqueó| blocker_025_consola_minima_y_flexible_d4_harness_por_cli_1
 package_025_consola_minima_y_flexible_d4_harness_por_cli_1 -->|bloqueó| blocker_025_consola_minima_y_flexible_d4_harness_por_cli_2
 ```

@@ -60,6 +60,21 @@
 - decisión: [[decisiones/2026-07-29 record-delta-review-new-finding-missing-source-role|record-delta-review no estampa source_role en --new-finding, a diferencia de record-subreview y record-late-review]]
 - decisión: [[decisiones/2026-07-29 ac-19-spec-prose-amendment-deferred-past-integration|AC-19's stale spec.md rationale clause stays unedited past integration too]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

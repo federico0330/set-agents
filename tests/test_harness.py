@@ -556,6 +556,17 @@ class HarnessTests(unittest.TestCase):
             with self.subTest(script=str(script.relative_to(ROOT))):
                 run("bash", "-n", str(script))
 
+    def test_no_bak_files_tracked_in_git(self):
+        # 024-listo-para-terceros/C4 hygiene: set_agents_app.py.bak entered the index
+        # in 2f199d5 (025/D1) and was removed in the follow-up cleanup.  This test
+        # prevents regression: a .bak file must never re-enter the tracked tree.
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        )
+        bak_files = [line for line in result.stdout.splitlines() if line.endswith(".bak")]
+        self.assertEqual(bak_files, [], f".bak files found in git index: {bak_files}")
+
     def _bootstrap_env(self, td, tools, *, isolated=False):
         """Fake HOME; the named hermetic probe can additionally close PATH."""
         stubs = Path(td) / "stubs"
@@ -7563,6 +7574,12 @@ class HarnessTests(unittest.TestCase):
             "contabilium-ingestion", "iey-ai",
         ):
             self.assertNotIn(literal, lowered)
+
+        # Obj-3 (024-listo-para-terceros follow-up): the generated file must carry the
+        # PLANTILLA disclaimer so any opencode orchestrator that routes to this agent
+        # encounters a clear note that it is a template and cannot actually run.
+        self.assertIn("NOTA DE PLANTILLA", text)
+        self.assertIn("PLANTILLA", text)
 
         orchestrator = (generated / "opencode/agents/orchestrator.md").read_text()
         self.assertIn('    "package-gate-runner": allow', orchestrator)

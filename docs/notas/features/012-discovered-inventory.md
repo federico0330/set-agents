@@ -35,6 +35,21 @@
 - [2026-08-02] integrator: INTEGRATION entry: read-only validation of P1-discovered-inventory against approved spec 012.
 - [2026-08-02] integrator: Integration validation PASS: AC-01..AC-12 verified in tree (pair commands, dual maps, lockstep allowlists, CANONICAL_MODEL aliasing closing SEC-001/002, billing kinds, ADR-0016 Ac…
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

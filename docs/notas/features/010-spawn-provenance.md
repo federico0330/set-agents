@@ -3,7 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_ACCEPTED` · modo: feature · revisión 43
+- fase: `DONE` · modo: feature · revisión 48
+- estado final: **DONE**
 - spec: `docs/specs/010-spawn-provenance/spec.md` (hash `e1e9da058144`)
 
 ## Criterios de aceptación
@@ -28,9 +29,24 @@
 - [2026-08-02] integrator: Integration validation PASS: AC-01..AC-05 verified in tree (replay guard first, spawn nodes edge-free, ownership clean, done_ready resolved_at filter, 5/5 regression tests green).…
 - decisión: [[decisiones/2026-07-30 ac-04-supersede-dos-decisiones-previas-sobre-done-ready-y-blockers|AC-04 supersede dos decisiones previas sobre done_ready() y blockers]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
-- → P1-spawn-provenance: falta declarar el impacto de módulo o marcarlo como exento
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -38,7 +54,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/010-spawn-provenance/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/010-spawn-provenance/bitacora.md`
 
-_Actualizado: 2026-08-02T14:44:35+00:00_
+_Actualizado: 2026-08-18T01:16:24+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

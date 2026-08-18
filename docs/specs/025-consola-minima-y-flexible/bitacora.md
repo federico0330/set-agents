@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-17T23:09:09+00:00
+Actualizado: 2026-08-18T02:12:10+00:00
 
 [2026-08-14T11:11:13+00:00] D1-superficie-humana · implementer · started · modelo anthropic/sonnet · effort medium
 Cliente: Que la aplicacion de terminal muestre solo lo que te sirve, sin caracteres raros ni comandos que no vas a usar.
@@ -171,3 +171,7 @@ Ingeniería: Spawn 8/8; F01/DR02 probados por delta, repair mínimo sin cambios 
 [2026-08-17T04:54:11+00:00] D5-vault-en-todo-spawn · implementer · started · modelo openai/gpt-5.6-terra · effort medium
 Cliente: Cada spawn debe recibir la bóveda por stdin cuando corresponde, limpiar SET_AGENTS_PROJECT en los cuatro carriles, degradar honestamente y respetar el fence de prompts.
 Ingeniería: Base fija 8a9f62bb5fa7dc1ed3f4275a1261de7c88ea9208; usar la rama rescatada sólo como referencia selectiva, nunca mergear su D5 divergente.
+
+[2026-08-18T01:13:45+00:00] D5-correctiva · package-reviewer · started · modelo anthropic/claude-sonnet-4.6
+Cliente: Federico pidió la revisión que nunca ocurrió en D5. El revisor la hizo con contexto limpio, proveedor distinto.
+Ingeniería: revisión correctiva del paquete D5-vault-en-todo-spawn: D5 fue aceptado con diff_ref=WORKTREE (no SHA), evidencia del implementer mismo, y cero delta reviews. La revisión correctiva (docs/specs/025-consola-minima-y-flexible/evidence/D5-delta-review-correctiva.md) encontró D5-DR01 (alta) y D5-DR02 (media).

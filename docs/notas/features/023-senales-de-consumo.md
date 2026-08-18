@@ -38,6 +38,21 @@
 - decisión: [[decisiones/2026-08-13 correccion-el-plan-tenia-razon-a-medias-y-el-orquestador-tambien|Correccion: el plan tenia razon sobre un camino que la base no exhibia]]
 - decisión: [[decisiones/2026-08-13 relanzo-b3-en-otro-proveedor-por-limite-de-sesion|B3 se relanza en otro proveedor por limite de sesion, no por fallar la tarea]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅

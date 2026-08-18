@@ -1,5 +1,5 @@
 ---
-description: "package gate runner — exact local gates and state evidence only"
+description: "PLANTILLA — ver nota abajo. package gate runner — exact local gates and state evidence only"
 mode: subagent
 model: opencode/deepseek-v4-flash-free
 temperature: 0.0
@@ -94,6 +94,15 @@ permission:
 ---
 
 # package gate runner — exact local gates and state evidence only
+
+> **NOTA DE PLANTILLA**: Este agente es una PLANTILLA, no un agente activo. Los marcadores
+> `<ABS_REPO_ROOT>`, `<FEATURE_ID>`, `<PACKAGE_ID>`, `<BASELINE_HASH>`, `<ABS_WORKTREE>` y
+> `<ADR_FILE>` en el bloque `permission` nunca son sustituidos por ningún mecanismo de
+> `generate.py`, `install.py` ni `set_agents_app.py` (verificado). Mientras esos marcadores
+> permanezcan literales, el agente no puede leer ni ejecutar nada, ya que `read: "*": deny`
+> deniega todo excepto las rutas con marcadores que ningún proceso resuelve.
+> Si en el futuro se necesita un gate-runner funcional, debe diseñarse un mecanismo de
+> sustitución explícito y documentarse en un ADR antes de activarlo.
 
 Operate only for the feature, package, baseline, and worktree named in the orchestrator's instantiation
 (placeholders `<FEATURE_ID>`, `<PACKAGE_ID>`, `<BASELINE_HASH>`, `<ABS_WORKTREE>` above). Refuse every other

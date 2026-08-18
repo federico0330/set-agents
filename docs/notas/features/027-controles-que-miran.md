@@ -42,6 +42,21 @@
 - decisión: [[decisiones/2026-08-15 la-guarda-de-escritura-es-ciega-al-bytecode-de-los-hijos|P2-F11: run_gate filtra el entorno y el hijo escribe bytecode en el repo real, sin bwrap]]
 - decisión: [[decisiones/2026-08-15 cuatro-huecos-de-la-guarda-de-escritura-para-una-feature-de-seguimiento|P2-F12 a P2-F15: la guarda cierra los casos nombrados, no las clases]]
 
+## Convenciones
+
+| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
+|---|---|---|---|---|---|
+| data-store | - | - | - | - | - |
+| api-gateway | - | - | - | - | - |
+| deploy-platform | - | - | - | - | - |
+| audience | - | - | - | - | - |
+| embeddings | - | - | - | - | - |
+| realtime | - | - | - | - | - |
+| mobile | - | - | - | - | - |
+| auth | - | - | - | - | - |
+| cost | - | - | - | - | - |
+| legal | - | - | - | - | - |
+
 ## Qué falta
 
 - _nada pendiente_ ✅
