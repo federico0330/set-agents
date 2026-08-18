@@ -199,6 +199,7 @@ def status(config, roster, profile):
 
 
 _LIVE_UNSET = object()
+_LIVE_PENDING = object()
 SUBSCRIPTION_PROBE_FAILED = "suscripciones: no se pudo medir — mostrando pins"
 REFRESH_ITEM = "Refrescar suscripciones y catálogo"
 
@@ -226,8 +227,7 @@ def _panel_lines(config, roster, profile, detected=None, *,
     from a successful probe). `--status` keeps the full machine dump.
 
     `live_discovered=_LIVE_UNSET` keeps the historical "probe now" path for
-    direct unit tests. The wizard always passes an explicit value (cached or
-    None) so the first paint never calls probe_inventory (AC-2.1)."""
+    direct unit tests. Wizard first paint passes `_LIVE_PENDING`, not `None`."""
     subs = []
     # ADR-0048 (024 C2): the EFFECTIVE view (tracked [subscriptions] merged with this
     # machine's overlay) -- a neutral tracked file (AC-03) alone would show every
@@ -275,7 +275,9 @@ def _panel_lines(config, roster, profile, detected=None, *,
     if discovered == "auto":
         live = (_resolve_live_discovered(config)
                 if live_discovered is _LIVE_UNSET else live_discovered)
-        if live is None:
+        if live is _LIVE_PENDING:
+            lines.append("proveedores descubiertos rutables: auto")
+        elif live is None:
             lines.append("proveedores descubiertos rutables: auto → no verificable ahora (probe falló; ver --route-doctor)")
         elif not live:
             lines.append("proveedores descubiertos rutables: auto → ninguno vivo ahora (ver --route-doctor)")
@@ -384,8 +386,9 @@ def _load_subscription_panel_state(now=None):
     """Disk only — never probes. First paint (AC-2.1) reads this."""
     now = time.time() if now is None else now
     entry = models_config.load_wizard_live_cache().get("subscriptions")
+    pending = {"live_discovered": _LIVE_PENDING}
     if not isinstance(entry, dict):
-        return {"detected": None, "sub_at": None, "sub_error": False, "stale": True}
+        return {"detected": None, "sub_at": None, "sub_error": False, "stale": True, **pending}
     fresh = models_config.wizard_cache_entry_fresh(
         entry, models_config.WIZARD_SUBSCRIPTIONS_TTL_SECONDS, now=now)
     error = bool(entry.get("error"))
@@ -396,6 +399,7 @@ def _load_subscription_panel_state(now=None):
         "sub_at": entry.get("at"),
         "sub_error": error,
         "stale": not fresh,
+        **pending,
     }
 
 
@@ -403,8 +407,9 @@ def _measure_subscriptions(config, now=None):
     """AC-2.4: named degradation, never a mute except, never an unusable wizard."""
     now = time.time() if now is None else now
     error = False
+    holder = []
     try:
-        detected = models_config.detect_subscriptions(config)
+        detected = models_config.detect_subscriptions(config, inventory_holder=holder)
         if detected is None:
             error = True
             detected = None
@@ -413,6 +418,16 @@ def _measure_subscriptions(config, now=None):
     except Exception:
         detected = None
         error = True
+    if error:
+        live = None
+    elif holder:
+        try:
+            from routing_core.catalog import resolve_discovered_providers
+            live = resolve_discovered_providers(config, holder[0])
+        except Exception:
+            live = None
+    else:
+        live = ()
     payload = {
         "at": now,
         "names": None if error else sorted(detected),
@@ -424,7 +439,7 @@ def _measure_subscriptions(config, now=None):
         "sub_at": now,
         "sub_error": error,
         "stale": False,
-        "live_discovered": None,
+        "live_discovered": live,
     }
 
 
@@ -447,16 +462,20 @@ def wizard(config, roster, profile, roles_path, models_out):
     # AC-2.1: first paint is disk only. detect_subscriptions is NOT called
     # here — the historical try/except Exception mute at this site is gone.
     panel_state = _load_subscription_panel_state()
-    panel_state.setdefault("live_discovered", None)
     force_refresh = False
+    painted_once = False
+    auto_probed = False
     while True:
-        # Live probe only on the refresh action (AC-2.3) — never before the
-        # first run_picker (AC-2.1/AC-2.5) and never as a hidden second-loop
-        # tax on every other wizard action.
+        # First run_picker is disk-only (AC-2.1/AC-2.5). Later loops auto-probe
+        # a stale cache once; option 9 still force-refreshes catalog too.
         if force_refresh:
             panel_state = _refresh_subscriptions_live(config)
             available_opencode_models(config, force=True)
             force_refresh = False
+            auto_probed = True
+        elif painted_once and panel_state.get("stale") and not auto_probed:
+            panel_state = _refresh_subscriptions_live(config)
+            auto_probed = True
         # AC-24/AC-29: Esc/Ctrl-C/EOF resolve to `None` inside run_picker itself -- treated
         # the same as "salir sin guardar", never a raised EOFError/KeyboardInterrupt here.
         # F-03/UI refresh: the state travels ONLY as the picker's `header=` (compact panel);
@@ -467,9 +486,10 @@ def wizard(config, roster, profile, roles_path, models_out):
             config, roster, profile, panel_state.get("detected"),
             subscription_age_s=age_s,
             subscription_error=bool(panel_state.get("sub_error")),
-            live_discovered=panel_state.get("live_discovered"),
+            live_discovered=panel_state.get("live_discovered", _LIVE_PENDING),
         )
         choice = tui.run_picker(WIZARD_ITEMS, header="\n".join(panel))
+        painted_once = True
         option = str(choice.index + 1) if isinstance(choice, tui.Selected) else "5"
         if option == "1" or option == "2":
             if option == "1":

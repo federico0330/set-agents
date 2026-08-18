@@ -375,17 +375,19 @@ def _probe_cache_root() -> Path:
     return RoutingStore().root
 
 
-def detect_subscriptions(config):
+def detect_subscriptions(config, inventory_holder=None):
     """Probe-backed subscription detection (ADR-0029): which subscriptions this
     machine can actually use, derived from authenticated pairs. Lazy import (no
     routing_core dependency at module load), shared probe cache, and `None` on
     any failure — the caller treats that as "no probe info", never as "nothing".
-    Never reads or returns credential material."""
+    Never reads or returns credential material. `inventory_holder` (list) gets the same inventory."""
     try:
         from routing_core.catalog import probe_inventory
         inventory = probe_inventory(config, cache_root=_probe_cache_root())
     except Exception:
         return None
+    if inventory_holder is not None:
+        inventory_holder.append(inventory)
     return {
         _PROVIDER_SUBSCRIPTION[provider]
         for (_, provider), models in inventory.items()

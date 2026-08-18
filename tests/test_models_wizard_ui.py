@@ -231,7 +231,7 @@ class WizardBehaviorTests(unittest.TestCase):
     def test_refresh_degrades_named_when_probe_raises_and_stays_usable(self):
         config = _config()
 
-        def boom(_config):
+        def boom(*_args, **_kwargs):
             raise RuntimeError("probe down")
 
         with tempfile.TemporaryDirectory() as td, \
@@ -270,6 +270,51 @@ class WizardBehaviorTests(unittest.TestCase):
         header = picker.call_args.kwargs["header"]
         self.assertIn("suscripciones: hace 4 min", header)
         self.assertIn("openai=auto✓", header)
+
+    def test_stale_cache_auto_probes_after_first_paint_not_before(self):
+        counts, progress = [], []
+
+        def fake_picker(*_a, **_k):
+            counts.append(probe.call_count)
+            return [setup_models.tui.Selected(0), None, setup_models.tui.Selected(4)][len(counts) - 1]
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+             mock.patch.object(setup_models.models_config, "detect_subscriptions",
+                               return_value={"openai"}) as probe, \
+             mock.patch.object(setup_models.tui, "with_progress",
+                               side_effect=lambda msg, fn, **kw: progress.append(msg) or fn()), \
+             mock.patch.object(setup_models.tui, "run_picker", side_effect=fake_picker):
+            setup_models.wizard(_config(), [{"role": "audit"}], "go-zen",
+                                Path("roles.tsv"), Path("models.toml"))
+        self.assertEqual(counts[:2], [0, 0])
+        self.assertGreaterEqual(counts[2], 1)
+        self.assertIn("midiendo suscripciones", progress)
+
+    def test_auto_live_measure_fills_live_discovered_not_probe_failed(self):
+        config = _config()
+        config["routing"]["discovered_providers"] = "auto"
+        inventory = {("opencode", "opencode-zen"): ["opencode/x"]}
+
+        def fake_detect(_config, inventory_holder=None, **_kw):
+            if inventory_holder is not None:
+                inventory_holder.append(inventory)
+            return {"openai"}
+        picks = [setup_models.tui.Selected(0), None, setup_models.tui.Selected(4)]
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+             mock.patch.object(setup_models.models_config, "detect_subscriptions",
+                               side_effect=fake_detect), \
+             mock.patch.object(setup_models.tui, "with_progress",
+                               side_effect=lambda msg, fn, **kw: fn()), \
+             mock.patch.object(setup_models.tui, "run_picker", side_effect=picks) as picker:
+            setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                                Path("roles.tsv"), Path("models.toml"))
+        first, second = picker.call_args_list[0].kwargs["header"], picker.call_args_list[2].kwargs["header"]
+        self.assertNotIn("probe falló", first)
+        self.assertNotIn("probe falló", second)
+        self.assertIn("opencode-zen", second)
 
 
 if __name__ == "__main__":

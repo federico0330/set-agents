@@ -915,7 +915,13 @@ class HarnessTests(unittest.TestCase):
             "subscriptions": {"zen": True},
         }
         roster = [{"role": "audit"}]
-        with mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+             mock.patch.object(setup_models.models_config, "detect_subscriptions",
+                               return_value=set()), \
+             mock.patch.object(setup_models.tui, "with_progress",
+                               side_effect=lambda msg, fn, **kw: fn()), \
              mock.patch.object(
                  setup_models, "dropped_cells", return_value=[("audit", "go-zen", "provider/model-a")],
              ), \
