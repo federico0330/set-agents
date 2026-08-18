@@ -73,6 +73,20 @@ def _pin_cli(*args):
                           check=False).returncode
 
 
+def _current_cell_value(config, prefix, field):
+    """Read a wizard cell with .get() only — never insert keys (AC-3.4)."""
+    if prefix.startswith("role:"):
+        target = (config.get("roles") or {}).get(prefix[len("role:"):])
+    else:
+        target = (config.get("areas") or {}).get(prefix)
+    if not isinstance(target, dict):
+        return None
+    if field.startswith("opencode."):
+        cell = target.get("opencode")
+        return cell.get(field.split(".", 1)[1]) if isinstance(cell, dict) else None
+    return target.get(field)
+
+
 def parse_address(config, roster, address):
     """<duty>.<field> | <duty>.opencode.<lane> | role:<role>... | session.opencode_small_model.<lane>"""
     tokens = address.split(".")
@@ -430,25 +444,32 @@ def _group_models_by_provider(models):
 
 
 def _models_in_use(config):
-    """Map model id -> area/role names that currently point at it (AC-3.5)."""
+    """Map model id -> unique area/role names, first-seen order (AC-3.5)."""
     used = {}
 
     def _add(name, value):
         if isinstance(value, str) and value:
-            used.setdefault(value, []).append(name)
+            names = used.setdefault(value, [])
+            if name not in names:
+                names.append(name)
         elif isinstance(value, dict):
             for inner in value.values():
-                if isinstance(inner, str) and inner:
-                    used.setdefault(inner, []).append(name)
+                _add(name, inner)
 
     for duty, area in config.get("areas", {}).items():
-        _add(duty, area.get("claude"))
-        _add(duty, area.get("codex"))
-        _add(duty, area.get("opencode"))
+        if isinstance(area, dict):
+            _add(duty, area.get("claude"))
+            _add(duty, area.get("codex"))
+            _add(duty, area.get("opencode"))
     for role, override in config.get("roles", {}).items():
+        if not isinstance(override, dict):
+            continue
         _add(role, override.get("claude"))
         _add(role, override.get("codex"))
         _add(role, override.get("opencode"))
+        for tier in (override.get("tiers") or {}).values():
+            if isinstance(tier, dict):
+                _add(role, tier.get("opencode"))
     return used
 
 
@@ -584,8 +605,7 @@ def wizard(config, roster, profile, roles_path, models_out):
             field = choose("Campo", ["claude", "codex", "codex_effort"] + [f"opencode.{lane}" for lane in LANES])
             if not field:
                 continue
-            cell, cell_key = parse_address(config, roster, f"{prefix}.{field}")
-            current_value = cell.get(cell_key) if isinstance(cell, dict) else None
+            current_value = _current_cell_value(config, prefix, field)
             if field.startswith("opencode."):
                 value = choose(
                     "Modelo", available_opencode_models(config),

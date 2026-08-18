@@ -316,6 +316,36 @@ class WizardBehaviorTests(unittest.TestCase):
         self.assertNotIn("probe falló", second)
         self.assertIn("opencode-zen", second)
 
+    def test_esc_after_campo_does_not_mutate_roles(self):
+        config = _config()
+        with mock.patch.object(setup_models, "available_opencode_models",
+                               return_value=["openai/x"]):
+            self._run([
+                setup_models.tui.Selected(1),  # Cambiar un rol
+                setup_models.tui.Selected(0),  # audit (absent from roles)
+                setup_models.tui.Selected(3),  # opencode.go-zen
+                None,                          # Esc
+                setup_models.tui.Selected(4),
+            ], config=config)
+        self.assertEqual(config["roles"], {
+            "debugger": {"claude": "opus"}, "implementer": {"codex": "gpt-5.4"},
+        })
+
+    def test_existing_current_is_passed_without_inserting_keys(self):
+        config = _config()
+        config["roles"]["audit"] = {"opencode": {"go-zen": "openai/kept"}}
+        with mock.patch.object(setup_models, "available_opencode_models",
+                               return_value=["openai/kept", "openai/other"]):
+            _, _, picker = self._run([
+                setup_models.tui.Selected(1),
+                setup_models.tui.Selected(0),
+                setup_models.tui.Selected(3),
+                None,
+                setup_models.tui.Selected(4),
+            ], config=config)
+        self.assertEqual(config["roles"]["audit"], {"opencode": {"go-zen": "openai/kept"}})
+        self.assertEqual(picker.call_args_list[3].kwargs.get("current"), "openai/kept")
+
 
 class GroupedModelPickerTests(unittest.TestCase):
     def test_choose_groups_by_provider_and_maps_selected_index_to_the_model_id(self):
@@ -353,6 +383,26 @@ class GroupedModelPickerTests(unittest.TestCase):
         self.assertEqual(result, "codex")
         self.assertEqual(list(picker.call_args.args[0]), options)
         self.assertEqual(list(picker.call_args.kwargs.get("headers") or []), [])
+
+
+class ModelsInUseTests(unittest.TestCase):
+    def test_models_in_use_unique_first_seen_and_walks_tier_pins(self):
+        used = setup_models._models_in_use({
+            "areas": {"coord": {"opencode": {
+                "go-zen": "openai/gpt-5.5", "zen": "openai/gpt-5.5",
+            }}},
+            "roles": {
+                "debugger": {"opencode": {"go-zen": "openai/gpt-5.5"}},
+                "implementer": {"tiers": {"fast": {"opencode": {
+                    "go-zen": "openai/gpt-5.6-luna", "zen": "openai/gpt-5.6-luna",
+                }}}},
+            },
+        })
+        self.assertEqual(
+            {key: used.get(key) for key in ("openai/gpt-5.5", "openai/gpt-5.6-luna")},
+            {"openai/gpt-5.5": ["coord", "debugger"],
+             "openai/gpt-5.6-luna": ["implementer"]},
+        )
 
 
 if __name__ == "__main__":
