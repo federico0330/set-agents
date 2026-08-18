@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_GATES` · modo: scoped · revisión 30
+- fase: `PACKAGE_GATES` · modo: scoped · revisión 73
 - spec: `docs/specs/033-menos-espera-menos-cuota/spec.md` (hash `18dcffafa809`)
 
 ## Criterios de aceptación
@@ -51,8 +51,8 @@
 - [[features/033-menos-espera-menos-cuota/PKG-1|PKG-1]] — planned · Una sola dimension opencode: colapsar go-zen/zen/openai-only en un solo valor por area
 - [[features/033-menos-espera-menos-cuota/PKG-2|PKG-2]] — planned · El menu Modelos no congela: probe asincronico, cache con TTL y degradacion con nombre
 - [[features/033-menos-espera-menos-cuota/PKG-3|PKG-3]] — planned · Elegir modelo sin scrollear: agrupado por proveedor, contador, valor actual marcado, sin …
-- [[features/033-menos-espera-menos-cuota/PKG-4|PKG-4]] — package_gates · Windows sin mentiras: cerrar las 8 fallas residuales y el flaky de macOS, con techo de sk…
-- [[features/033-menos-espera-menos-cuota/PKG-5|PKG-5]] — planned · El gate se ve: progreso en vivo, falla temprana, resumen final y los 10 tests mas lentos
+- [[features/033-menos-espera-menos-cuota/PKG-4|PKG-4]] — accepted · Windows sin mentiras: cerrar las 8 fallas residuales y el flaky de macOS, con techo de sk…
+- [[features/033-menos-espera-menos-cuota/PKG-5|PKG-5]] — package_gates · El gate se ve: progreso en vivo, falla temprana, resumen final y los 10 tests mas lentos
 - [[features/033-menos-espera-menos-cuota/PKG-6|PKG-6]] — planned · Cuotas que alcanzan: context pack obligatorio, gates sin modelo, panel por riesgo y presu…
 
 ## Approach y decisiones
@@ -63,14 +63,17 @@
 - ruteo PKG-4: cursor-host native subagent; no route-decide
 - ruteo PKG-5: cursor-host native subagent; no route-decide
 - ruteo PKG-6: cursor-host native subagent; no route-decide
-- [2026-08-18] package-planner: package-planner nativo Cursor, model inherit, sin route-decide. Completa PACKAGE_PLANNING: un context pack por paquete en docs/specs/033-menos-espera-menos-cuota/context/ y update…
-- [2026-08-18] implementer: implementer nativo Cursor, model inherit, sin route-decide. Context pack docs/specs/033-menos-espera-menos-cuota/context/PKG-4.md. Si hace falta set_agents_app.py o tui.py, para y…
-- [2026-08-18] package-planner: Los seis paquetes ya existian pero sin hoja de ruta, asi que cada worker iba a reexplorar el repo. Ahora cada uno tiene un archivo corto en docs/specs/033-menos-espera-menos-cuota…
-- [2026-08-18] implementer: Los cuatro tests que llamaban bash directo ahora pasan por el helper run() en tests/test_harness.py:43-71. El planificador del vault escribe rutas con barras normales (vault_ops.p…
-- [2026-08-18] gate-runner: gate-runner nativo Cursor, readonly, model inherit, sin route-decide. Comandos: check-owned-paths --baseline HEAD, heartbeat-run build.sh --check, heartbeat-run verify.sh, git dif…
+- [2026-08-18] package-reviewer: Panel RP-01 pass. package-reviewer: AC-4.1 a 4.4 cubiertos en 1f5a24f, techo 660=654+6, probe intacto. security-auditor: SECURITY_PASS, relative_to no emite puntos-puntos, run() s…
+- [2026-08-18] orchestrator: PKG-4 accepted. Candidato 1f5a24f. Gates VERIFY_PASS 1290/1393s. Panel RP-01 pass. AC-4.5 residual: SHA de verify-linux, verify-macos y windows-bootstrap en la misma corrida, pend…
+- [2026-08-18] implementer: implementer nativo Cursor, inherit, sin route-decide. Context pack PKG-5.md. Archivos: verify.sh, ai/scripts/verify_reporter.py, tests/test_verify_reporter.py. No paralelizar.
+- [2026-08-18] gate-runner: gate-runner nativo Cursor, readonly, inherit, sin route-decide. heartbeat-run verify.sh ~20 min. No repara.
+- [2026-08-18] implementer: implementer Cursor inherit. Causa: sys.path[0]=ai/scripts al invocar el archivo; chdir ROOT no alcanza. Bite: rojo contra el crash, luego verde.
+- [2026-08-18] gate-runner: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara. Gate failures 1/3 ya gastado.
 - decisión: [[decisiones/2026-08-18 orden-paquetes-033-ci-gate-consola-lane|Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final]]
 - decisión: [[decisiones/2026-08-18 033-review-mismo-modelo-contexto-limpio|Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada]]
 - decisión: [[decisiones/2026-08-18 033-pkg4-commit-antes-del-freeze|PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git]]
+- decisión: [[decisiones/2026-08-18 033-pkg5-verify-reporter-modulo-python|El presenter del gate vive en un modulo Python testeable, no en el shell]]
+- decisión: [[decisiones/2026-08-18 033-pkg5-digest-no-ensucia-owned-paths|Digest no ensucia el diff de un paquete con bitacoras ajenas]]
 
 ## Convenciones
 
@@ -93,11 +96,11 @@
 
 ## Presupuestos
 
-- spawns: 3 (máx 8/paquete) · deep review máx 2 ciclos
+- spawns: 9 (máx 8/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/033-menos-espera-menos-cuota/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/033-menos-espera-menos-cuota/bitacora.md`
 
-_Actualizado: 2026-08-18T17:37:04+00:00_
+_Actualizado: 2026-08-18T18:45:51+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

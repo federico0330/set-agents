@@ -1,12 +1,12 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-18T00:00:00` · generado 2026-08-18T16:02:10+00:00_
+_Ventana: desde `2026-08-17T14:49:01` · generado 2026-08-18T17:49:01+00:00_
 
 ## Necesita tu decisión
 
-- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 24 días)
-- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 18 días)
+- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 25 días)
+- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 19 días)
 
 ## Qué quedó listo
 
@@ -19,22 +19,43 @@ _Ventana: desde `2026-08-18T00:00:00` · generado 2026-08-18T16:02:10+00:00_
   - aprendimos: Cursor tambien lee subagentes desde los directorios de Claude Code, pero su frontmatter propio no coincide con el de ese runtime, asi que el atajo de reusar la instalacion existente habria mentido sobre lo que el agente puede hacer.
   - conviene ahora: Revision independiente de los dos paquetes, y hooks de evento de Cursor como trabajo siguiente.
   - por qué ahora: Federico agoto las cuotas de opencode, codex y claude; Cursor es el unico runtime pago disponible y era el unico que el harness no sabia configurar.
+- **033-menos-espera-menos-cuota · package-planner** — Quedaron escritas las hojas de ruta de los seis paquetes: que archivos tocar, que pruebas correr y que no hay que tocar. El primero a implementar es el de Windows y la integracion continua, para que el resto no se apoye sobre fallas ya conocidas.
+  - aprendimos: El freeze de trece segundos vive en el call site del wizard. El caso de stdin en Windows tambien llama bash directo. El flaky de macOS es la clase ProviderVerifyLivenessScopeTests.
+  - conviene ahora: Implementar el paquete de Windows y CI hasta aceptado: los cuatro tests que llaman bash directo, los otros cuatro casos, techo de skips, y el test de liveness sin reloj de pared.
+  - por qué ahora: Si el resto avanza con la CI y el gate todavia mentirosos, una regresion de Windows o un test flaky se come el presupuesto y no se puede atribuir al cambio nuevo.
+  - alternativa: Empezar por colapsar las lanes de OpenCode o por el menu que congela. Se descartan ahora: primero hay que dejar la CI y el gate en condiciones de sostener esos cambios.
+- **033-menos-espera-menos-cuota · PKG-4 · implementer** — Se corrigieron las fallas de Windows que quedaban y el test de macOS que fallaba por el reloj. Tambien hay un techo para que los tests saltados no crezcan en silencio.
+  - aprendimos: TOOL_UNKNOWN en el catalogo local era un TOML invalido por barras invertidas de Windows dentro de un string, no un bash. El ERROR del ADR era FileNotFound: el log vivo esta gitignored y el job de Windows no lo siembra.
+  - conviene ahora: Correr los gates del paquete: chequeo de build, la suite completa y el control de archivos tocados. Despues revision independiente. El SHA de los tres jobs de CI se cita al cierre.
+  - por qué ahora: Sin la suite completa y el control de alcance, un arreglo de tests puede haber roto otra cosa o escrito fuera de los paths del paquete.
+- **033-menos-espera-menos-cuota · PKG-4 · gate-runner** — La verificacion del paquete de Windows paso: el chequeo de build, la suite completa y el control de archivos tocados estan verdes. Queda la revision independiente y, para cerrar del todo, el SHA de la integracion continua cuando se publique.
+  - aprendimos: La suite local ahora corre 1290 tests en unos 1393 s: cuatro tests nuevos respecto de la linea base, un poco mas lenta. El clasificador de riesgo marca high si un archivo menciona subprocess, incluso un markdown.
+  - conviene ahora: Revision independiente del paquete, con el revisor de paquetes y el auditor de seguridad porque el clasificador salio high. El SHA de los tres jobs de CI se cita al aceptar.
+  - por qué ahora: Sin revision de un contexto limpio, el que implemento se estaria aprobando solo. El SHA de CI es el criterio que todavia no se puede mentir en verde local.
+- **033-menos-espera-menos-cuota · PKG-4 · package-reviewer** — Un revisor que no escribio el codigo y un auditor de seguridad miraron el paquete de Windows y no encontraron nada que reparar. Falta publicar el commit para tener el sello de la integracion continua.
+  - aprendimos: El clasificador marca high si un archivo menciona subprocess, incluso un markdown. El techo honesto es linea base mas addends nombrados, no un redondeo.
+  - conviene ahora: Registrar la suite ya corrida como testing del paquete, documentar que no hay app que levantar, y aceptar. El SHA de CI queda pendiente de publicar.
+  - por qué ahora: Sin cerrar testing y runtime en el estado, el paquete no se puede aceptar aunque la revision haya pasado.
+- **033-menos-espera-menos-cuota · PKG-4 · orchestrator** — El primer paquete quedo aceptado: Windows y macOS dejan de mentir en las pruebas, y hay un techo para que los tests saltados no crezcan en silencio. Falta publicar el commit para ver los tres jobs verdes juntos.
+  - aprendimos: Freeze exige commit (candidate_identity.py:7-8). runtime_surface true en un paquete de tests obliga a documentar contratos observables, no a levantar una app que no existe.
+  - conviene ahora: Implementar el paquete del gate visible: progreso en vivo, falla temprana, resumen y los diez tests mas lentos. Paralelizar solo si se prueba aislamiento.
+  - por qué ahora: Sin un gate que se pueda mirar, los cinco paquetes que siguen van a quemar veinte minutos opacos por cierre.
 
 ## Qué se está haciendo
 
 - **032-cursor-como-runtime** — fase `PACKAGE_GATES`
-- **033-menos-espera-menos-cuota** — fase `PACKAGE_PLANNING`
+- **033-menos-espera-menos-cuota** — fase `PACKAGE_ACCEPTED`
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
-- **033-menos-espera-menos-cuota** → toca planificar el próximo paquete
-- **033-menos-espera-menos-cuota** 5 tareas pendientes en PKG-6
+- **033-menos-espera-menos-cuota** → quedan paquetes del plan sin aceptar
 
 ## Qué cambió en el software
 
+- **consola** — Los spawners de codex/opencode/claude ahora materializan el bloque de vault con degradacion honesta y sink protegido para fallas transitorias. (025-consola-minima-y-flexible/D5-vault-en-todo-spawn)
 - **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done (DONE→PACKAGE_PLANNING), cmd_amend_package (agrega tasks a paquetes no-accepted); amend-package y reopen-from-done en MUTATING_COMMANDS (031-registro-correctivo/P1-verbos-correctivos)
 - **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done, cmd_amend_package nuevo; MUTATING_COMMANDS actualizado (031-registro-correctivo/P1-verbos-correctivos)
 - **narracion-notas** — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación de flags requeridos (028-narracion-que-ensena/N1-campos-que-obligan)
@@ -46,6 +67,9 @@ _Ventana: desde `2026-08-18T00:00:00` · generado 2026-08-18T16:02:10+00:00_
 
 ## Decisiones nuevas
 
+- **La revision correctiva de D5 no puede aterrizar en el registro del paquete** — La delta review se ejecuta igual con un delta-reviewer independiente sobre el diff real 8091b0b..1014b02 acotado a los cuatro spawners, y su resultado se persiste como archivo de evidencia mas esta decision, NO como delta_review del paquete. No se falsea el registro del paquete ni se edita el JSON a mano para simular un camino que la maquina de estados no tiene.
+- **Los tres paquetes de 028 se replantean porque fueron creados sin work items** — Se retiran los tres registros malformados con supersede-package, declarando en --reason el motivo REAL (creados sin work items, no una enmienda de alcance) y se recrean con los mismos acceptance criteria, sus work items reales y el diff_ref con SHA. No se edita el JSON a mano ni se declara una enmienda de alcance que no ocurrio.
+- **Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida** — No se fuerza. 028 queda en PACKAGE_GATES con su gate verde registrado; la revision independiente y las cinco reparaciones viven en docs/specs/028-narracion-que-ensena/evidence/N-package-review.md y en el codigo con sus mordidas probadas. Se registra blocker HUMAN_DECISION_REQUIRED.
 - **tests/test_narracion_digest.py nunca se creó** — Registrar como deuda. Diferencia es sólo el nombre del archivo; el comportamiento está cubierto. No bloquea el cierre.
 - **AC-16 AGENTS.codex.md: confirmación de deriva no registrada** — Fue deriva, no decisión. Registrar como deuda. El revisor verificó el origen pero no hay registro formal de la confirmación previa al unify.
 - **D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios** — No es defecto vivo. Registrado como deuda. No bloquea el cierre.
@@ -59,6 +83,7 @@ _Ventana: desde `2026-08-18T00:00:00` · generado 2026-08-18T16:02:10+00:00_
 - **Por que el harness agota cuotas: convierte un prompt humano en N prompts de proveedor** — La conclusion medida es que el harness no gasta de mas por prompt: gasta porque multiplica prompts. Cada spawn que el orquestador despacha por CLI es, para el proveedor, un prompt nuevo iniciado por el usuario, no una tool call autonoma adentro de una sesion. 246 despachos contra un tope de 300 mensuales explica exactamente 'dos prompts mios = un mes de cuota'. En opencode-go el mecanismo es otro pero el efecto es igual: tope diario, y el coordinador solo ya lo agotaba.
 - **Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final** — Implementar un paquete por vez hasta accepted, en este orden: PKG-4, PKG-5, PKG-2, PKG-3, PKG-1, PKG-6. No abrir el siguiente con el anterior a medias.
 - **Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada** — Delegar solo con subagentes nativos de Cursor (implementer, package-reviewer, finding-verifier, etc.). Registrar la degradacion same-model/clean-context en record-subreview --evidence y finalize-review-panel --evidence de cada paquete. Nunca --route-decide ni dispatch.
+- **PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git** — Un commit con el diff de PKG-4 mas los context packs y notas de 033, despues freeze-candidate --baseline HEAD^ --candidate-ref HEAD. No es un commit oportunista: es el invariante del freeze.
 
 ## Quick-fixes
 

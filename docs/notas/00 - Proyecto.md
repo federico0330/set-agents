@@ -32,7 +32,7 @@
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
-- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `PACKAGE_GATES` · paquetes 0/6
+- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `PACKAGE_GATES` · paquetes 1/6
 
 ## Qué falta
 
@@ -55,14 +55,14 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-18 033-pkg5-digest-no-ensucia-owned-paths|Digest no ensucia el diff de un paquete con bitacoras ajenas]]
+- [[decisiones/2026-08-18 033-pkg5-verify-reporter-modulo-python|El presenter del gate vive en un modulo Python testeable, no en el shell]]
 - [[decisiones/2026-08-18 033-pkg4-commit-antes-del-freeze|PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git]]
 - [[decisiones/2026-08-18 033-review-mismo-modelo-contexto-limpio|Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada]]
 - [[decisiones/2026-08-18 orden-paquetes-033-ci-gate-consola-lane|Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final]]
 - [[decisiones/2026-08-18 por-que-el-harness-agota-cuotas-convierte-un-prompt-humano-en-n-prompts-de-proveedor|Por que el harness agota cuotas: convierte un prompt humano en N prompts de proveedor]]
 - [[decisiones/2026-08-18 en-cursor-no-se-instalan-hooks-de-evento-en-esta-version|En Cursor no se instalan hooks de evento en esta version]]
 - [[decisiones/2026-08-18 cursor-entra-como-runtime-anfitrion-nunca-como-lane-de-ruteo|Cursor entra como runtime anfitrion, nunca como lane de ruteo]]
-- [[decisiones/2026-08-18 el-orquestador-de-opencode-sale-de-opencode-go-y-vuelve-a-la-lane-openai-codex|El orquestador de OpenCode sale de opencode-go y vuelve a la lane openai-codex]]
-- [[decisiones/2026-08-18 016-p1f01-y-020-f04-verificados-reparados|Los dos hallazgos abiertos dentro de features cerradas ya estaban reparados]]
 
 ## Convenciones
 
@@ -77,7 +77,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T17:37:04+00:00_
+_Actualizado: 2026-08-18T18:45:51+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

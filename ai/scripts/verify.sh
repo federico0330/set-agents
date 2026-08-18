@@ -19,7 +19,7 @@ if [[ "${SET_AGENTS_GUEST_VERIFY:-}" == "1" ]]; then
     tests.test_harness.HarnessTests.test_check_and_native_codex_agents \
     tests.test_harness.HarnessTests.test_shell_scripts_parse
 else
-  python3 -m unittest discover -s tests -v
+  python3 "$ROOT/ai/scripts/verify_reporter.py"  # python3 -m unittest discover -s tests -v
 fi
 python3 -m py_compile ai/scripts/*.py ai/scripts/routing_core/*.py ai/scripts/feature_state_lib/*.py \
   PROYECTO/ai/scripts/feature_state_lib/*.py tests/*.py

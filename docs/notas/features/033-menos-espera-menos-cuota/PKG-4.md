@@ -18,16 +18,22 @@
 
 ## Recorrido
 
+- review: pass (0 hallazgos)
+- testing: pass
+- runtime QA: pass
 - gate `check-owned-paths`: pass
 - gate `build-check`: pass
 - gate `verify`: pass
 - gate `git-diff-check`: pass
+- gate `risk-classification`: pass
 
 ## Spawns
 
 - SPAWN-001 package-planner · modelo cursor/inherit
 - SPAWN-002 implementer · modelo cursor/inherit
 - SPAWN-003 gate-runner · modelo cursor/inherit
+- SPAWN-004 package-reviewer · modelo cursor/inherit
+- SPAWN-005 security-auditor · modelo cursor/inherit
 
 context pack: `docs/specs/033-menos-espera-menos-cuota/context/PKG-4.md`
 
