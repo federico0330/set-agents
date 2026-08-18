@@ -68,7 +68,12 @@ class ScopedInstallDriftTests(unittest.TestCase):
             # the scope record must keep the drift check from counting them.
             drift = subprocess.run(
                 ["bash", "ai/scripts/check-drift.sh"],
-                cwd=ROOT, env={"PATH": "/usr/bin:/bin", "HOME": str(home), "DRIFT_HOME": str(home)},
+                cwd=ROOT, env={
+                    # Include sys.executable's directory first so check-drift.sh's
+                    # `python3` resolves to the same interpreter (which has tomllib).
+                    # On CI, /usr/bin/python3 may be Python 3.10 (no tomllib).
+                    "PATH": str(Path(sys.executable).parent) + ":/usr/bin:/bin",
+                    "HOME": str(home), "DRIFT_HOME": str(home)},
                 capture_output=True, text=True,
             )
             self.assertEqual(drift.returncode, 0, drift.stdout + drift.stderr)

@@ -4755,7 +4755,10 @@ class HarnessTests(unittest.TestCase):
                 cwd=guest, text=True, capture_output=True, env={**os.environ, **env}, check=False,
             )
             self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
-            self.assertTrue((home / ".claude/hooks/coord_policy.py").is_file())
+            self.assertTrue(
+                (home / ".claude/hooks/coord_policy.py").is_file(),
+                msg=f"coord_policy.py not installed.\ninstalled.stdout:\n{installed.stdout}\ninstalled.stderr:\n{installed.stderr}",
+            )
             descriptor = {"role": "implementer", "task_class": "mechanical", "selected_runtime": "codex"}
             decided = subprocess.run(
                 [sys.executable, str(guest / "ai/scripts/set_agents_app.py"), "--project", str(project),
