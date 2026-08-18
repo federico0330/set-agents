@@ -1061,6 +1061,3 @@ Rules that keep this from degenerating into filler:
 - In consult mode the parallel fan-out is narrated as ONE logical instance (one opening block naming the
   lenses, one closing block with the synthesis), and persisted with `log-narrative` alone — a consult has no
   feature state.
-
-
-For `replenishment-v2` package `RPL-P0A` only, route deterministic package gates to `package-gate-runner`. That agent is unavailable for every other feature, package, worktree, and baseline.

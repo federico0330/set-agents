@@ -7560,13 +7560,12 @@ class HarnessTests(unittest.TestCase):
         lowered = text.lower()
         for literal in (
             "/home/", "/users/", "/tmp/opencode/", "4ef70b0ab6da",
-            "contabilium-ingestion", "replenishment-v2", "rpl-p0a", "iey-ai",
+            "contabilium-ingestion", "iey-ai",
         ):
             self.assertNotIn(literal, lowered)
 
         orchestrator = (generated / "opencode/agents/orchestrator.md").read_text()
         self.assertIn('    "package-gate-runner": allow', orchestrator)
-        self.assertIn("For `replenishment-v2` package `RPL-P0A` only", orchestrator)
         self.assertNotIn(
             "package-gate-runner",
             (generated / "claude-code/agents/orchestrator.md").read_text(),

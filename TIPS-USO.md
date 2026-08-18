@@ -110,9 +110,8 @@ also runs (`.github/workflows/*.yml`, job `verify-macos`); besides being non-por
 fix the `| tail -N` case above.
 
 Known debt: `Global/_canonical/opencode-agents/package-gate-runner.md` hardcodes absolute paths from the
-original `~/iey/iey-ai` project in its allow-list. Outside that repo those permissions are inert (the agent
-is scoped to the `replenishment-v2` feature only), but new machines inherit dead paths until that prompt is
-parameterized.
+original `~/iey/iey-ai` project in its allow-list. Outside that repo those permissions are inert, but new
+machines inherit dead paths until that prompt is parameterized.
 
 ## Required lifecycle
 

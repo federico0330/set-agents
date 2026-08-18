@@ -470,12 +470,6 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
             ("hidden: true" if oc_hidden(row["role"]) else ""),
             oc_permissions(row["capability"], roles, row["role"], yolo, variant_names), "---", "", body,
         ])
-        if row["role"] == "orchestrator":
-            oc += (
-                "\n\nFor `replenishment-v2` package `RPL-P0A` only, route deterministic package gates to "
-                "`package-gate-runner`. That agent is unavailable for every other feature, package, worktree, "
-                "and baseline."
-            )
         oc = oc.replace("\n\npermission:", "\npermission:")
         path = out / "opencode/agents" / f"{row['role']}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
