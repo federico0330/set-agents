@@ -35,6 +35,13 @@ WAIVED = {
         "written by PROYECTO/ai/scripts/verify.sh:9 inside a scaffolded project, never by this "
         "repository's own verify.sh; named as an input by Global/_canonical/agents/debugger.md:16"
     ),
+    "ai/state/STATUS.md": (
+        "generated at runtime by `feature-state.py render-status` (ai/scripts/feature_state_lib/"
+        "render_status.py); never committed (ai/state/ is gitignored per ADR-0047). The orchestrator "
+        "and command prompts reference it as a file to regenerate-then-read, not as a pre-existing "
+        "artefact. Waiver confirmed: Global/_canonical/commands/status.md:7 and bitacora.md:9 "
+        "explicitly say to regenerate it first if missing."
+    ),
     "docs/adr/NNNN-slug.md": (
         "filename pattern for a new ADR at Global/_canonical/skills/system-design-decisions/SKILL.md:136, "
         "not a path to an existing file"
