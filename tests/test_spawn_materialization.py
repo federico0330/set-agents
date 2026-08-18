@@ -8,6 +8,7 @@ wizard policy panel, and the doctrine markers.
 """
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
