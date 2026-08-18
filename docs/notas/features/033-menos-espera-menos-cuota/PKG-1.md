@@ -4,6 +4,7 @@
 ## Motivo
 
 - objetivo: Una sola dimension opencode: colapsar go-zen/zen/openai-only en un solo valor por area
+- ruteo: cursor-host native subagent; no route-decide → implementer (inherit)
 - complejidad: high
 - riesgo: high
 - paths: `models.toml`, `ai/scripts/models_config.py`, `ai/scripts/setup_models.py`, `ai/scripts/generate.py`, `build.sh`, `active-profile`
@@ -15,6 +16,8 @@
 - [ ] setup_models y build.sh: sacar el eje lane de la UI y del flag --profile (planned)
 - [ ] AC-1.6: prueba de que un proveedor agotado falla ruidoso o rutea a otro, nunca en silencio (planned)
 - [ ] reescribir los 7 archivos de test que fijan las tres lanes conservando su invariante (planned)
+
+context pack: `docs/specs/033-menos-espera-menos-cuota/context/PKG-1.md`
 
 ↩ [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]]
 <!-- /notas:auto -->

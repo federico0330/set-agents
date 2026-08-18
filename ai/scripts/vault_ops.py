@@ -269,6 +269,16 @@ class VaultMigrationError(Exception):
     """The migration cannot proceed safely; the caller must stop, never guess."""
 
 
+def _plan_relpath(path, root):
+    """Relative path for vault plans, always POSIX.
+
+    The plan is a portable contract (AC-4.2.7): ``str(Path)`` on Windows emits
+    backslashes, so merge plans compared as ``features\\replenishment-v2.md`` vs
+    ``features/replenishment-v2.md``. ``Path / posix_rel`` still joins on Windows.
+    """
+    return path.relative_to(root).as_posix()
+
+
 def vault_migration_plan(project, vault_project_dir):
     """ADR-0012's merge-case algorithm (AC-16), read-only: never touches disk. `project` is the
     repo path (may not exist yet); `vault_project_dir` is the real vault-side directory (the
@@ -304,13 +314,13 @@ def vault_migration_plan(project, vault_project_dir):
     if unsafe_symlink is not None:
         return {
             "action": "unsafe-symlink", "project": str(project),
-            "path": str(unsafe_symlink.relative_to(vault_project_dir)),
+            "path": _plan_relpath(unsafe_symlink, vault_project_dir),
         }
     vault_files = [p for p in sorted(all_entries) if p.is_file()]
     if not notes.exists():
         return {
             "action": "pure-move", "project": str(project),
-            "files": [str(p.relative_to(vault_project_dir)) for p in vault_files],
+            "files": [_plan_relpath(p, vault_project_dir) for p in vault_files],
         }
     if not notes.is_dir():
         return {"action": "repo-side-conflict", "project": str(project)}
@@ -319,13 +329,13 @@ def vault_migration_plan(project, vault_project_dir):
         rel = path.relative_to(vault_project_dir)
         dest = notes / rel
         if not dest.exists():
-            to_copy.append(str(rel))
+            to_copy.append(_plan_relpath(path, vault_project_dir))
         elif dest.read_bytes() != path.read_bytes():
-            conflicts.append(str(rel))
+            conflicts.append(_plan_relpath(path, vault_project_dir))
         else:
             # Byte-identical: already migrated by a prior interrupted/partial run. Nothing to
             # copy, but the vault-side original still needs cleaning up to finish the migration.
-            already_present.append(str(rel))
+            already_present.append(_plan_relpath(path, vault_project_dir))
     if conflicts:
         return {"action": "conflict", "project": str(project), "conflicts": conflicts}
     return {"action": "merge", "project": str(project), "files": to_copy, "already_present": already_present}

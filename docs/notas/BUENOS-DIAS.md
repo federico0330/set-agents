@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-17T12:34:35` · generado 2026-08-18T15:34:35+00:00_
+_Ventana: desde `2026-08-18T00:00:00` · generado 2026-08-18T16:02:10+00:00_
 
 ## Necesita tu decisión
 
@@ -35,7 +35,6 @@ _Ventana: desde `2026-08-17T12:34:35` · generado 2026-08-18T15:34:35+00:00_
 
 ## Qué cambió en el software
 
-- **consola** — Los spawners de codex/opencode/claude ahora materializan el bloque de vault con degradacion honesta y sink protegido para fallas transitorias. (025-consola-minima-y-flexible/D5-vault-en-todo-spawn)
 - **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done (DONE→PACKAGE_PLANNING), cmd_amend_package (agrega tasks a paquetes no-accepted); amend-package y reopen-from-done en MUTATING_COMMANDS (031-registro-correctivo/P1-verbos-correctivos)
 - **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done, cmd_amend_package nuevo; MUTATING_COMMANDS actualizado (031-registro-correctivo/P1-verbos-correctivos)
 - **narracion-notas** — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación de flags requeridos (028-narracion-que-ensena/N1-campos-que-obligan)
@@ -47,9 +46,6 @@ _Ventana: desde `2026-08-17T12:34:35` · generado 2026-08-18T15:34:35+00:00_
 
 ## Decisiones nuevas
 
-- **La revision correctiva de D5 no puede aterrizar en el registro del paquete** — La delta review se ejecuta igual con un delta-reviewer independiente sobre el diff real 8091b0b..1014b02 acotado a los cuatro spawners, y su resultado se persiste como archivo de evidencia mas esta decision, NO como delta_review del paquete. No se falsea el registro del paquete ni se edita el JSON a mano para simular un camino que la maquina de estados no tiene.
-- **Los tres paquetes de 028 se replantean porque fueron creados sin work items** — Se retiran los tres registros malformados con supersede-package, declarando en --reason el motivo REAL (creados sin work items, no una enmienda de alcance) y se recrean con los mismos acceptance criteria, sus work items reales y el diff_ref con SHA. No se edita el JSON a mano ni se declara una enmienda de alcance que no ocurrio.
-- **Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida** — No se fuerza. 028 queda en PACKAGE_GATES con su gate verde registrado; la revision independiente y las cinco reparaciones viven en docs/specs/028-narracion-que-ensena/evidence/N-package-review.md y en el codigo con sus mordidas probadas. Se registra blocker HUMAN_DECISION_REQUIRED.
 - **tests/test_narracion_digest.py nunca se creó** — Registrar como deuda. Diferencia es sólo el nombre del archivo; el comportamiento está cubierto. No bloquea el cierre.
 - **AC-16 AGENTS.codex.md: confirmación de deriva no registrada** — Fue deriva, no decisión. Registrar como deuda. El revisor verificó el origen pero no hay registro formal de la confirmación previa al unify.
 - **D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios** — No es defecto vivo. Registrado como deuda. No bloquea el cierre.
@@ -61,6 +57,8 @@ _Ventana: desde `2026-08-17T12:34:35` · generado 2026-08-18T15:34:35+00:00_
 - **Cursor entra como runtime anfitrion, nunca como lane de ruteo** — Los 28 roles se emiten con 'model: inherit' y validate_cursor_target (ai/scripts/generate.py) mata el build si alguno pinea un id concreto. Cursor no entra en models_config.RUNTIMES ni en routing_core.domain.SELECTED_RUNTIMES: no es lane de despacho.
 - **En Cursor no se instalan hooks de evento en esta version** — El target cursor se instala sin hooks.json. La superficie que gobierna en Cursor es su propio modelo de permisos, y eso se dice explicitamente en README, INSTALACION y en la doctrina que el propio agente lee (Global/_shared/AGENTS.cursor.md).
 - **Por que el harness agota cuotas: convierte un prompt humano en N prompts de proveedor** — La conclusion medida es que el harness no gasta de mas por prompt: gasta porque multiplica prompts. Cada spawn que el orquestador despacha por CLI es, para el proveedor, un prompt nuevo iniciado por el usuario, no una tool call autonoma adentro de una sesion. 246 despachos contra un tope de 300 mensuales explica exactamente 'dos prompts mios = un mes de cuota'. En opencode-go el mecanismo es otro pero el efecto es igual: tope diario, y el coordinador solo ya lo agotaba.
+- **Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final** — Implementar un paquete por vez hasta accepted, en este orden: PKG-4, PKG-5, PKG-2, PKG-3, PKG-1, PKG-6. No abrir el siguiente con el anterior a medias.
+- **Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada** — Delegar solo con subagentes nativos de Cursor (implementer, package-reviewer, finding-verifier, etc.). Registrar la degradacion same-model/clean-context en record-subreview --evidence y finalize-review-panel --evidence de cada paquete. Nunca --route-decide ni dispatch.
 
 ## Quick-fixes
 

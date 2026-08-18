@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 import unittest
@@ -297,10 +298,23 @@ class ProviderVerifyLivenessScopeTests(unittest.TestCase):
         # D2-F01: the two-second liveness timeout is human work. After the 300 ms delay
         # it must report on stderr, while the machine-readable PROVIDER_* stdout line stays
         # exactly in its historical channel and contains no indicator bytes.
-        stdout, stderr = io.StringIO(), io.StringIO()
+        # AC-4.4: do not raise the sleep. On macOS CI the worker could finish before the
+        # main thread's first delay check, leaving only "listo". Keep the worker in-flight
+        # until the delayed indicator actually hits the stream.
+        stdout = io.StringIO()
+        progress_shown = threading.Event()
+
+        class Stderr(io.StringIO):
+            def write(self, text):
+                written = super().write(text)
+                if "· verificando proveedores…" in text:
+                    progress_shown.set()
+                return written
+
+        stderr = Stderr()
 
         def slow_liveness(_base_url):
-            time.sleep(0.35)
+            progress_shown.wait(timeout=2.0)
             return "alive"
 
         with mock.patch.object(app, "_load_providers_registry", return_value={"mine": _entry("user")}), \

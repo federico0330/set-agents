@@ -23,7 +23,7 @@ import uuid
 import filecmp
 import shutil
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest import mock
 
 import tests
@@ -40,7 +40,7 @@ COST_REPORT = ROOT / "ai/scripts/cost-report.py"
 _SYS_MODULES_ABSENT = object()
 
 
-def run(*args, env=None, check=True):
+def run(*args, env=None, check=True, cwd=None, timeout=None, stdin=None):
     # PYTHONUTF8=1 ensures subprocess calls (feature-state.py, build.sh, etc.) use
     # UTF-8 on Windows. Without it, Windows subprocess inherits cp1252 and writes
     # STATUS.md / other outputs with non-UTF-8 bytes that subsequent read_text(encoding="utf-8")
@@ -61,12 +61,24 @@ def run(*args, env=None, check=True):
         cmd = ["bash"] + cmd
     return subprocess.run(
         cmd,
-        cwd=ROOT,
+        cwd=ROOT if cwd is None else cwd,
         env={**os.environ, **utf8_env, **(env or {})},
         text=True,
         capture_output=True,
         check=check,
+        timeout=timeout,
+        stdin=stdin,
     )
+
+
+def windows_bootstrap_skip_count(unittest_output):
+    """Parse unittest's summary for the windows-bootstrap skip ceiling (AC-4.3)."""
+    match = re.search(r"skipped=(\d+)", unittest_output)
+    if match:
+        return int(match.group(1))
+    if re.search(r"^OK$", unittest_output, re.M):
+        return 0
+    raise ValueError("unittest output has no skip count to enforce the windows-bootstrap ceiling")
 
 
 def _generate_output():
@@ -503,24 +515,10 @@ class HarnessTests(unittest.TestCase):
             )
             target = guest / "Global/opencode/AGENTS.md"
             original = target.read_bytes()
-            clean = subprocess.run(
-                ["bash", str(guest / "build.sh"), "--check"],
-                cwd=guest,
-                env=os.environ.copy(),
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+            clean = run(str(guest / "build.sh"), "--check", cwd=guest, check=False)
             self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
             target.write_bytes(original + b"\nDIRT-MARKER-AC-03\n")
-            dirty = subprocess.run(
-                ["bash", str(guest / "build.sh"), "--check"],
-                cwd=guest,
-                env=os.environ.copy(),
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+            dirty = run(str(guest / "build.sh"), "--check", cwd=guest, check=False)
             self.assertNotEqual(dirty.returncode, 0, "build.sh --check must fail on a dirtied Global/ file")
             self.assertIn("AGENTS.md", dirty.stdout + dirty.stderr)
 
@@ -548,10 +546,7 @@ class HarnessTests(unittest.TestCase):
             (guest / ".git/hooks").mkdir(parents=True)
             target = guest / "Global/opencode/AGENTS.md"
             target.write_bytes(target.read_bytes() + b"\nDIRT-MARKER-AC-03\n")
-            result = subprocess.run(
-                ["bash", str(guest / "build.sh")],
-                cwd=guest, env=os.environ.copy(), text=True, capture_output=True, check=False,
-            )
+            result = run(str(guest / "build.sh"), cwd=guest, check=False)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             for harness in ("opencode", "claude-code", "codex", "pi"):
                 self.assertTrue((guest / "Global" / harness).is_dir(), harness)
@@ -1333,10 +1328,9 @@ class HarnessTests(unittest.TestCase):
                 'esac\n'
             )
             opencode.chmod(0o755)
-            result = subprocess.run(
-                ["bash", "install.sh", "--skip-deps", "--no-install", "--harness", "opencode", "--yes"],
-                cwd=ROOT, env={**os.environ, **env}, text=True, capture_output=True,
-                timeout=90, check=False,
+            result = run(
+                "bash", "install.sh", "--skip-deps", "--no-install", "--harness", "opencode", "--yes",
+                env=env, timeout=90, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("BOOTSTRAP_DONE", result.stdout)
@@ -1839,11 +1833,15 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = self._tools_root(td)
             marker = Path(td) / "marker"
+            # Case 5 (033/PKG-4): `str(marker)` on Windows is `C:\Users\...`. Interpolated
+            # into a TOML basic string, `\U` in `\Users` is a unicode escape, tomllib
+            # drops the overlay (`_load_local_catalog` degrades), and the command reports
+            # TOOL_UNKNOWN instead of TOOL_REJECTED. POSIX separators are valid TOML.
             (root / "tools.local.toml").write_text(
                 '[cli.backdoor]\n'
                 'detect = "backdoor-bin"\n'
                 '[cli.backdoor.install]\n'
-                f'npm = "true & touch {marker}"\n'
+                f'npm = "true & touch {marker.as_posix()}"\n'
             )
             with mock.patch.object(app, "ROOT", root), \
                  mock.patch.object(app.shutil, "which", return_value=None), \
@@ -3003,10 +3001,10 @@ class HarnessTests(unittest.TestCase):
             env, _ = self._bootstrap_env(td, ())
             env["SET_AGENTS_STATE"] = str(Path(td) / "state")
             with open(os.devnull, "rb") as devnull:
-                result = subprocess.run(
-                    ["bash", "set-agents"], cwd=ROOT, env={**os.environ, **env},
-                    stdin=devnull, capture_output=True, text=True, check=False,
-                )
+                # Same POSIX launcher as the sibling `--help` test above. On native
+                # Windows `bash` is the WSL stub without a distro (CI 32153232496);
+                # `run()` skips with the named toolchain reason instead of rc=1.
+                result = run("bash", "set-agents", env=env, stdin=devnull, check=False)
             self.assertEqual(result.returncode, 2)
             self.assertIn("usage:", result.stdout.lower())
             self.assertIn("README.md", result.stdout)  # main()'s epilog
@@ -3477,6 +3475,14 @@ class HarnessTests(unittest.TestCase):
                 sorted(plan["files"]),
                 sorted(["00 - Proyecto.md", "features/replenishment-v2.md", "features/replenishment-v2/P1.md"]),
             )
+
+    def test_vault_plan_relpath_is_posix_even_for_windows_paths(self):
+        # AC-4.2.7: str(PureWindowsPath) emits `\`; the plan contract is `/`.
+        import vault_ops
+        root = PureWindowsPath(r"C:\vault\iey-ai")
+        path = root / "features" / "replenishment-v2.md"
+        self.assertEqual(vault_ops._plan_relpath(path, root), "features/replenishment-v2.md")
+        self.assertNotIn("\\", vault_ops._plan_relpath(path, root))
 
     def test_vault_migration_plan_byte_conflict_aborts_whole_project_zero_files_moved(self):
         app = self._import("set_agents_app")
@@ -4758,9 +4764,9 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(scaffold.returncode, 0, scaffold.stderr)
             identity = json.loads((project / "ai/state/project.json").read_text())
             self.assertRegex(identity["project_key"], r"^proj1_[0-9a-f]{32}$")
-            installed = subprocess.run(
-                ["bash", str(guest / "build.sh"), "--install", "--yes"],
-                cwd=guest, text=True, capture_output=True, env={**os.environ, **env}, check=False,
+            installed = run(
+                str(guest / "build.sh"), "--install", "--yes",
+                cwd=guest, env=env, check=False,
             )
             self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
             self.assertTrue(
@@ -4786,9 +4792,9 @@ class HarnessTests(unittest.TestCase):
                     connection.execute("SELECT project_key FROM dispatches WHERE run_id=?", (envelope["data"]["run_id"],)).fetchone(),
                     (identity["project_key"],),
                 )
-            verified = subprocess.run(
-                ["bash", str(guest / "ai/scripts/verify.sh")],
-                cwd=guest, text=True, capture_output=True, env={**os.environ, **env}, timeout=90, check=False,
+            verified = run(
+                str(guest / "ai/scripts/verify.sh"),
+                cwd=guest, env=env, timeout=90, check=False,
             )
             self.assertEqual(verified.returncode, 0, verified.stdout + verified.stderr)
             self.assertIn("GLOBAL_PORTABILITY_OK", verified.stdout)
@@ -6180,13 +6186,17 @@ class HarnessTests(unittest.TestCase):
         # decision is persisted in decisions-log.jsonl naming the old slug.
         adr_dir = ROOT / "docs/adr"
         self.assertTrue((adr_dir / "0017-pi-interactive-target.md").exists())
-        readme = (adr_dir / "README.md").read_text()
+        readme = (adr_dir / "README.md").read_text(encoding="utf-8")
         self.assertIn("0017", readme)
         self.assertIn("superseded in part by 0017", readme.lower())
-        amended = (adr_dir / "0007-pi-lane.md").read_text()
+        amended = (adr_dir / "0007-pi-lane.md").read_text(encoding="utf-8")
         self.assertIn("0017", amended)
-        decisions_log = ROOT / "ai/state/decisions-log.jsonl"
-        self.assertIn("ac09-ac10-pi-minimal-target-accepted", decisions_log.read_text())
+        # Case 8 (033/PKG-4): `ai/state/` is gitignored (ADR-0047). windows-bootstrap
+        # runs unittest discover without verify.sh's seed-state.py, so the live log
+        # is absent (FileNotFoundError = ERROR). The tracked archive is the durable
+        # copy of that slug.
+        decisions_log = ROOT / "docs/historia/estado-2026-08/decisions-log.jsonl"
+        self.assertIn("ac09-ac10-pi-minimal-target-accepted", decisions_log.read_text(encoding="utf-8"))
 
     def test_roles_tsv_with_model_columns_rejected_with_hint(self):
         legacy_header = "\t".join([
@@ -10439,6 +10449,41 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("Corrección (2026-08-18)", adr)
         self.assertIn("bootstrap", adr.lower())
 
+    def test_windows_bootstrap_job_pins_a_skip_ceiling(self):
+        # AC-4.3: skips may exist; a skip count that grows without a commit
+        # bumping WINDOWS_BOOTSTRAP_SKIP_CEILING must fail the job.
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("windows-bootstrap:", text)
+        self.assertRegex(text, r"WINDOWS_BOOTSTRAP_SKIP_CEILING:\s*[\"']?660")
+        self.assertIn("WINDOWS_BOOTSTRAP_SKIPS=", text)
+        self.assertIn("exceeds ceiling", text)
+
+    def test_windows_bootstrap_skip_count_parser_reads_unittest_summaries(self):
+        self.assertEqual(
+            windows_bootstrap_skip_count("Ran 1276 tests in 1.0s\n\nOK (skipped=654)\n"), 654,
+        )
+        self.assertEqual(
+            windows_bootstrap_skip_count("FAILED (failures=7, errors=1, skipped=654)\n"), 654,
+        )
+        self.assertEqual(windows_bootstrap_skip_count("Ran 3 tests in 0.1s\n\nOK\n"), 0)
+        with self.assertRaises(ValueError):
+            windows_bootstrap_skip_count("no summary here")
+
+    def test_ac41_named_windows_failures_call_bash_only_through_run(self):
+        names = (
+            "test_build_check_detects_global_drift_and_names_the_file",
+            "test_build_sh_generate_mode_regenerates_global_and_installs_the_drift_hook",
+            "test_install_sh_yes_terminates_the_opencode_auth_loop",
+            "test_guest_copy_scaffolds_and_verifies_portably",
+        )
+        for name in names:
+            src = inspect.getsource(getattr(HarnessTests, name))
+            self.assertNotRegex(
+                src, r'subprocess\.run\(\s*\[\s*["\']bash["\']',
+                f"{name} still invokes bash without the toolchain guard",
+            )
+            self.assertIn("run(", src, name)
+
     def test_every_text_file_the_harness_writes_declares_its_encoding(self):
         """The locale never gets a vote on what the harness writes or reads.
 
@@ -13525,10 +13570,7 @@ class CursorRuntimeTargetTests(unittest.TestCase):
             )
             target = guest / "Global/cursor/AGENTS.md"
             target.write_text(target.read_text(encoding="utf-8") + "\nDRIFT-MARKER-032\n", encoding="utf-8")
-            result = subprocess.run(
-                ["bash", str(guest / "build.sh"), "--check"],
-                cwd=guest, env=os.environ.copy(), text=True, capture_output=True, check=False,
-            )
+            result = run(str(guest / "build.sh"), "--check", cwd=guest, check=False)
             self.assertNotEqual(result.returncode, 0, result.stdout)
             self.assertIn("GLOBAL_TREE_DRIFT", result.stdout)
 

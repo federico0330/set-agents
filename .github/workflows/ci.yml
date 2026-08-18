@@ -63,4 +63,23 @@ jobs:
           # code now declares encoding="utf-8" at every text read and write, so this is
           # a second line of defence rather than the mechanism.
           PYTHONUTF8: "1"
-        run: python -X utf8 -m unittest discover -s tests -v
+          # AC-4.3: 654 skipped of 1276 measured 2026-08-18 (spec), plus the tests that
+          # now skip via require_posix_toolchain instead of failing (four AC-4.1 bash
+          # sites, stdin-from-dev-null, cursor-tree drift check). A commit that adds
+          # skips must bump this number in the same change.
+          WINDOWS_BOOTSTRAP_SKIP_CEILING: "660"
+        run: |
+          python -X utf8 -m unittest discover -s tests -v *> windows-unittest.log
+          $code = $LASTEXITCODE
+          Get-Content windows-unittest.log
+          $ceiling = [int]$env:WINDOWS_BOOTSTRAP_SKIP_CEILING
+          $log = Get-Content -Raw windows-unittest.log
+          if ($log -match 'skipped=(\d+)') { $skips = [int]$Matches[1] }
+          elseif ($log -match '(?m)^OK$') { $skips = 0 }
+          else { Write-Error "could not parse skip count from unittest output"; exit 1 }
+          Write-Host "WINDOWS_BOOTSTRAP_SKIPS=$skips ceiling=$ceiling"
+          if ($skips -gt $ceiling) {
+            Write-Error "skip count $skips exceeds ceiling $ceiling; bump WINDOWS_BOOTSTRAP_SKIP_CEILING in .github/workflows/ci.yml if the new skips are declared"
+            exit 1
+          }
+          if ($code -ne 0) { exit $code }
