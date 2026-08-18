@@ -7,13 +7,16 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 QUIET="${1:-}"
+# Allow callers (typically the test suite) to force a specific Python interpreter,
+# e.g. to ensure the same interpreter that has tomllib is used without modifying PATH.
+PYTHON3="${PYTHON3_CMD:-python3}"
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-drift.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 
 # Generation failure is an internal error (2), never "stale" (1): the caller's
 # badge must not read a broken generator as a drifted install.
-if ! python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" >/dev/null; then
+if ! $PYTHON3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" >/dev/null; then
   echo "DRIFT_UNKNOWN: generate.py falló; corré ./build.sh --check para ver el detalle." >&2
   exit 2
 fi
@@ -27,7 +30,7 @@ SCOPE_FILE="$DRIFT_HOME_DIR/.local/state/set-agentes/install-targets.json"
 if [ -f "$SCOPE_FILE" ]; then
   while IFS= read -r target; do
     [ -n "$target" ] && TARGET_ARGS+=(--target "$target")
-  done < <(python3 - "$SCOPE_FILE" <<'PY'
+  done < <($PYTHON3 - "$SCOPE_FILE" <<'PY'
 import json, sys
 try:
     scope = json.load(open(sys.argv[1]))
@@ -41,7 +44,7 @@ PY
 )
 fi
 
-PREVIEW="$(python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$DRIFT_HOME_DIR" ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} --preview 2>/dev/null | tail -5)"
+PREVIEW="$($PYTHON3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$DRIFT_HOME_DIR" ${TARGET_ARGS[@]+"${TARGET_ARGS[@]}"} --preview 2>/dev/null | tail -5)"
 COUNT="$(sed -n 's/^MANAGED_DIFF_FILES=//p' <<<"$PREVIEW")"
 
 if [ -z "$COUNT" ]; then
