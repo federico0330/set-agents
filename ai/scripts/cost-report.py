@@ -196,7 +196,7 @@ def codex_rollout_breakdown(rollout_path):
     """Last cumulative token_count of a rollout → cached/reasoning split."""
     last = None
     try:
-        with open(rollout_path) as handle:
+        with open(rollout_path, encoding="utf-8") as handle:
             for line in handle:
                 if '"token_count"' not in line:
                     continue
@@ -271,7 +271,7 @@ def _pi_project_key(root):
     two independently-written derivations agree.
 
     007-P2 review findings (F-SEC-04/F-PR-05, both reviewers independently, upheld by
-    finding-verifier): the original version used `identity.read_text()` and treated ANY
+    finding-verifier): the original version used `identity.read_text(encoding="utf-8")` and treated ANY
     read/parse failure the same as "absent", silently falling back to the path hash. That
     diverges from `project_key_for` on exactly the case it treats as a deliberate refusal
     (`ProjectIdentityError`: "falling back would silently split history") -- a present but

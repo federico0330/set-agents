@@ -29,8 +29,11 @@ sys.path.insert(0, str(ROOT / "ai/scripts"))
 import provider_registry as pr  # noqa: E402
 import set_agents_app as app  # noqa: E402
 
+import tests
+
 
 def run(*args, env=None, check=True, cwd=ROOT):
+    tests.require_posix_toolchain()
     return subprocess.run(
         args, cwd=cwd, env={**os.environ, **(env or {})},
         text=True, capture_output=True, check=check,

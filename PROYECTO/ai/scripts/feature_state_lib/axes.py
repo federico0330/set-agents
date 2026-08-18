@@ -58,6 +58,32 @@ def append_axes_row(path: Path, row: dict[str, Any]) -> None:
         handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def validate_row(row: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    axis = row.get("axis")
+    if row.get("feature_id") in {None, ""}:
+        errors.append("missing feature_id")
+    if axis not in AXES:
+        errors.append("invalid axis")
+    if not row.get("stance") or str(row.get("stance")).strip().lower() in CONTENT_DENYLIST:
+        errors.append("invalid stance")
+    origin = row.get("origin")
+    if origin not in VALID_ORIGINS:
+        errors.append("invalid origin")
+    if origin == "n/a":
+        if not row.get("reason") or str(row.get("reason")).strip().lower() in CONTENT_DENYLIST:
+            errors.append("origin n/a requires reason")
+    elif not row.get("source"):
+        errors.append("source required")
+    if origin == "assumed":
+        for key in ("threshold", "next_stance", "revisit"):
+            if not row.get(key) or str(row.get(key)).strip().lower() in CONTENT_DENYLIST:
+                errors.append(f"assumed requires {key}")
+    if origin == "user" and axis in FIRST_CLASS_AXES and not row.get("asked_at"):
+        errors.append("first-class user axis requires asked_at")
+    return errors
+
+
 def latest_rows(rows: list[dict[str, Any]], feature_id: str) -> dict[str, dict[str, Any]]:
     latest: dict[str, dict[str, Any]] = {}
     for row in rows:

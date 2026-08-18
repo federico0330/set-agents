@@ -1,69 +1,55 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-16T20:09:09` · generado 2026-08-17T23:09:09+00:00_
+_Ventana: desde `2026-08-17T10:41:56` · generado 2026-08-18T13:41:56+00:00_
 
 ## Necesita tu decisión
 
 - **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 24 días)
 - **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 18 días)
-- **024-listo-para-terceros** — HUMAN_DECISION_REQUIRED: los cuatro paquetes estan aceptados con review independiente, pero la feature NO se cierra. generate.py:475 shippea el codename de un cliente real (replenishment-v2 / RPL-P0A) al orchestrator.md que se instala en la maquina de cada tercero, y el repo es PUBLICO (gh repo view -> visibility PUBLIC). Verificado por el orquestador: esta en Global/opencode/agents/orchestrator.md, en el ~/.config/opencode instalado, y en 8 archivos del repo, mas specs, dos ADRs y ~50 fixtures. Estaba registrado como deuda en 016 cuando el repo era privado; paso a publico alrededor del 2026-08-07 y eso lo convierte de deuda en exposicion viva. Una feature llamada 'listo para terceros' no puede cerrarse con un codename de cliente llegando a cada tercero. Decision del humano entre: sanear solo el arbol actual y aceptar el historial publico; reescribir historia con filter-repo y forzar push; o volver el repo privado mientras decide. Ninguna la toma el harness porque es informacion de un tercero y la remediacion completa es irreversible. Nota completa en docs/notas/decisiones/2026-08-14 HUMAN-DECISION-codename-de-cliente-real-en-repo-publico.md (hace 3 días)
-- **028-narracion-que-ensena** — HUMAN_DECISION_REQUIRED: los tres paquetes se crearon sin work items, asi que package_review_ready los niega (model.py:481-494) y no existe verbo que se los agregue: create-package no-opea sobre un id existente, update-package no tiene --task, y PACKAGE_PLANNING solo se alcanza desde PACKAGE_ACCEPTED. El codigo esta implementado, revisado de forma independiente y reparado (5 hallazgos), con gate verify pass: Ran 1261 tests, OK, VERIFY_PASS. Lo que falta es una capacidad del harness, no trabajo de la feature. (hace 0 días)
 
 ## Qué quedó listo
 
-- **025-consola-minima-y-flexible · D1-superficie-humana · finding-verifier** — De ocho objeciones a la consola, una no era real y las otras siete si merecian arreglo.
-- **025-consola-minima-y-flexible · D1-superficie-humana · delta-reviewer** — El arreglo de la consola se confirmo: los siete defectos reales quedaron cerrados.
-- **025-consola-minima-y-flexible · D1-superficie-humana · gate-runner** — La consola fue comprobada como se usa de verdad: sigue siendo simple y mantiene intacta la salida para automatizaciones.
-- **025-consola-minima-y-flexible · D1-superficie-humana · integrator** — La interfaz diaria quedó más clara sin quitar capacidades ni romper integraciones existentes.
-- **025-consola-minima-y-flexible · D2-trabajo-visible · package-reviewer** — Detectamos dos casos donde una tarea podría parecer congelada o imprimir después de terminar; se corrigen antes de entregar.
-- **025-consola-minima-y-flexible · D2-trabajo-visible · delta-reviewer** — El control independiente detectó dos bordes a corregir antes de cerrar el paquete: una espera lenta sin aviso y un indicador que puede tapar una pregunta interactiva.
-- **025-consola-minima-y-flexible · D2-trabajo-visible · finding-verifier** — La verificación confirmó los dos bordes; se corrigen antes de cerrar el paquete.
-- **025-consola-minima-y-flexible · D2-trabajo-visible · delta-reviewer** — La última mirada cerró los tres puntos: aviso claro y preguntas interactivas sin interferencia.
-- **025-consola-minima-y-flexible · D2-trabajo-visible · orchestrator** — El paquete de trabajo visible quedó cerrado: avisa cuando corresponde y respeta las preguntas interactivas.
-- **025-consola-minima-y-flexible · D3-posturas-de-autonomia · package-reviewer** — La revisión detectó que había que probar el comportamiento que usa el orquestador y alinear las configuraciones inválidas.
-- **025-consola-minima-y-flexible · D3-posturas-de-autonomia · finding-verifier** — La comprobación confirmó los tres puntos; ahora se corrigen sobre el camino que usa el orquestador.
+- _sin cierres registrados en la ventana_
 
 ## Qué se está haciendo
 
-- **006-execution-graph** — fase `PACKAGE_ACCEPTED` — ⚠️ estancada hace 15 días
-- **010-spawn-provenance** — fase `PACKAGE_ACCEPTED` — ⚠️ estancada hace 15 días
+- _ninguna feature activa_
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
-- **006-execution-graph** → P3-graph-view: falta declarar el impacto de módulo o marcarlo como exento
-- **010-spawn-provenance** → P1-spawn-provenance: falta declarar el impacto de módulo o marcarlo como exento
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 
 ## Qué cambió en el software
 
-- **consola** — La CLI ahora separa la ayuda cotidiana de los controles avanzados y muestra estado humano por defecto sin alterar los formatos JSON de automatización. (025-consola-minima-y-flexible/D1-superficie-humana)
-- **consola** — El trabajo visible se activa luego de 300 ms por stream y el handoff de hijos interactivos queda sin escritores concurrentes. (025-consola-minima-y-flexible/D2-trabajo-visible)
-- **consola** — La postura y metodología son preferencias persistidas con contrato runtime explícito, fallbacks comunes y precedencia ADR-0037. (025-consola-minima-y-flexible/D3-posturas-de-autonomia)
-- **consola** — Sesión virgen por CLI con HOME/XDG/CODEX_HOME temporales y argv hijo opcional. (025-consola-minima-y-flexible/D4-harness-por-CLI)
 - **consola** — Los spawners de codex/opencode/claude ahora materializan el bloque de vault con degradacion honesta y sink protegido para fallas transitorias. (025-consola-minima-y-flexible/D5-vault-en-todo-spawn)
+- **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done (DONE→PACKAGE_PLANNING), cmd_amend_package (agrega tasks a paquetes no-accepted); amend-package y reopen-from-done en MUTATING_COMMANDS (031-registro-correctivo/P1-verbos-correctivos)
+- **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done, cmd_amend_package nuevo; MUTATING_COMMANDS actualizado (031-registro-correctivo/P1-verbos-correctivos)
+- **narracion-notas** — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación de flags requeridos (028-narracion-que-ensena/N1-campos-que-obligan)
+- **narracion-notas** — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación (028-narracion-que-ensena/N1-campos-que-obligan)
+- **narracion-notas** — AC-18: orchestrator.md documenta cuándo correr digest; test actualizado para verificar contenido no nombre (028-narracion-que-ensena/N2-doctrina-que-explica)
+- **narracion-notas** — límite de render elevado a 400; campos learned/next/why/alternative visibles en bitácora y digest (028-narracion-que-ensena/N3b-los-campos-donde-se-leen)
+- **estado** — ai/scripts/check-feature-state.py: nuevo script que genera el grafo de ejecución de features y paquetes (006-execution-graph/P3-graph-view)
+- **estado** — spawn provenance node en el grafo de estado: cada spawn queda trazable al paquete que lo originó, con su decision_id de routing (010-spawn-provenance/P1-spawn-provenance)
 
 ## Decisiones nuevas
 
-- **D5 nunca produjo codigo, y el orquestador lo dio por implementado durante horas** — D5 vuelve a estado no-implementado y se relanza desde cero sobre la base, con una exigencia nueva: el commit tiene que existir ANTES de reportar. Y se incorpora al procedimiento del orquestador un paso que no tenia: antes de aceptar el reporte de cualquier implementer que trabajo en worktree, verificar el artefacto -git rev-parse de la rama contra la base, y grep de un simbolo que el trabajo deberia haber creado-. Verificar el reporte no es verificar el trabajo.
-- **D1 se reporto integrado sin estarlo: el exit code se leyo de head y la medicion se hizo en el lugar equivocado** — D1 recuperado del parche que sobrevivio en el scratchpad, reaplicado con el exit code leido correctamente -exit=0, cero conflictos-, y verificado POR COMPORTAMIENTO sobre el arbol integrado: 41 flags visibles contra 71 con --avanzado, cero items de menu con no-ASCII, ADR-0050 presente, --json en los prompts. Dos reglas nuevas para el orquestador: nunca leer $? despues de un pipe -usar PIPESTATUS o redirigir a archivo-, y medir SIEMPRE sobre el arbol integrado y despues de integrar, nunca en el worktree del agente.
-- **RDD queda cerrado con fuente: Receipt-Driven Development, verificado contra el upstream** — Verificado contra el upstream con gh api sobre el README de Gentleman-Programming/gentle-ai, cita textual: 'Receipt-Driven Development (RDD) is the supported stable path'. Y el mismo README data el origen: 'Receipt-Driven Development (RDD) started in gentle-ai v1.47.0 on 2026-07-10'. La expansion que la spec afirmaba es CORRECTA; lo que faltaba era la fuente. Se cita en el ADR-0054 y en la spec, con la URL del repo.
-- **Defecto vivo: un spawn hijo atribuye su trabajo al proyecto del padre, no al que se le pidio** — Arreglo autorizado en produccion, opcion mas especifica gana: cuando route_and_spawn recibe spawn_cwd explicito, _run_app_cli saca SET_AGENTS_PROJECT del env del hijo o la fija a la raiz descubierta desde ese cwd. Se descarto la alternativa de que main() deje de escribir en os.environ global: es mas limpia conceptualmente pero toca superficie compartida por todo el harness y no habia ventana para revisar ese radio. Del lado de los tests, el arreglo va en el test que ensucia -patch.dict sobre os.environ mas una asercion propia-, no en la victima, para que la proxima regresion se reporte en el archivo culpable y no en una asercion tres modulos despues.
-- **El arreglo de SET_AGENTS_PROJECT quedo solo en el carril de pi; faltan los otros tres** — El parche es identico y de tres lineas por archivo, y queda encolado para aplicarse cuando termine la reparacion de D5, que esta trabajando en esos mismos archivos ahora. No se aplica en paralelo: dos agentes editando los cuatro spawners a la vez es como se pierde trabajo. La forma elegida por el debugger se replica tal cual: pasar None en el env para significar 'desasigna esta variable en el hijo', que no cambia la firma de _run_app_cli y por lo tanto no rompe los fakes de tests/test_pi_effort.py y otros modulos fuera de alcance que la mockean con firma exacta.
-- **Error de secuencia: despache un agente contra main y commitee sobre main mientras trabajaba** — La base de D5 de main se queda: ya paso review de seguridad y su fence resistio los ocho payloads. De la version del agente se portan sus cuatro arreglos, que es lo que main no tiene: scrub de SET_AGENTS_PROJECT en los tres carriles restantes, vault por stdin en pi, y doctrina compartida en Global/_shared. El cuarto -degradacion honesta- se REHACE sobre la arquitectura de main en vez de portarse, porque portarlo reemplazaria codigo ya revisado. El agente hizo lo correcto al parar y reportar la divergencia en vez de forzar un merge; el error fue del orquestador.
-- **Retoma desde opencode con TRASPASO** — Modo feature en curso. Cerrar 025 por maquina de estados midiendo artefactos. Portar solo 4 arreglos de spawners sin mergear D5 divergente. Luego 028, 029 y state files.
-- **route-decide sin descriptor en host OpenCode** — Spawn BASE finding-verifier por Task host con MODEL_STATIC_FALLBACK declarado.
-- **La enmienda documental de 025 se formaliza antes de aceptar D1** — La instrucción actual de Federico de cerrar 025, junto con la aprobación ya registrada, autoriza formalizar la corrección documental mediante amend-spec; no se modifican AC ni alcance de producto.
-- **D2 entra al segundo y último ciclo de reparación** — Verificar F01 y DR01 de forma independiente y reparar F01/DR01/DR02 en un único pase mínimo; reservar el octavo spawn para el control delta final.
-- **D4 relanza el gate focal por evidencia incompleta** — No se registra como gate; se relanza una sola vez con pruebas temporales cerradas de AC-09..11 y sin unittest global.
-- **D4 relanza revisión de producto sin PoC de rutas** — Se descarta el análisis incompleto y se relanza una sola revisión read-only del comportamiento AC-11/documentación, sin pruebas de seguridad ofensivas.
-- **D4 usa el último repair batch con evidencia directa del delta** — Por presupuesto, el delta documentado opera como verificación de F01 para el segundo repair; se reserva el único spawn restante para implementar ambos cambios.
-- **D4 agotó su presupuesto de spawns antes del delta final** — No autoaprobar ni registrar un delta sin revisor independiente; bloquear la feature hasta que se autorice ampliar D4 en una instancia delta-reviewer o una excepción explícita.
-- **D5 relanzamiento único tras watchdog** — Relanzar una vez con otro modelo, conservar cambios/evidencia parciales y exigir commit o checkpoint final.
 - **La revision correctiva de D5 no puede aterrizar en el registro del paquete** — La delta review se ejecuta igual con un delta-reviewer independiente sobre el diff real 8091b0b..1014b02 acotado a los cuatro spawners, y su resultado se persiste como archivo de evidencia mas esta decision, NO como delta_review del paquete. No se falsea el registro del paquete ni se edita el JSON a mano para simular un camino que la maquina de estados no tiene.
 - **Los tres paquetes de 028 se replantean porque fueron creados sin work items** — Se retiran los tres registros malformados con supersede-package, declarando en --reason el motivo REAL (creados sin work items, no una enmienda de alcance) y se recrean con los mismos acceptance criteria, sus work items reales y el diff_ref con SHA. No se edita el JSON a mano ni se declara una enmienda de alcance que no ocurrio.
 - **Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida** — No se fuerza. 028 queda en PACKAGE_GATES con su gate verde registrado; la revision independiente y las cinco reparaciones viven en docs/specs/028-narracion-que-ensena/evidence/N-package-review.md y en el codigo con sus mordidas probadas. Se registra blocker HUMAN_DECISION_REQUIRED.
+- **tests/test_narracion_digest.py nunca se creó** — Registrar como deuda. Diferencia es sólo el nombre del archivo; el comportamiento está cubierto. No bloquea el cierre.
+- **AC-16 AGENTS.codex.md: confirmación de deriva no registrada** — Fue deriva, no decisión. Registrar como deuda. El revisor verificó el origen pero no hay registro formal de la confirmación previa al unify.
+- **D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios** — No es defecto vivo. Registrado como deuda. No bloquea el cierre.
+- **Windows nativo es objetivo de bootstrap, no de runtime** — No se construye soporte nativo de Windows. README.md:107 ya declara el camino de Windows como install.ps1 -> WSL administrado, o sea que el harness corre sobre Linux aunque la maquina sea Windows, y verify-linux es el gate que lo cubre. Los tests que necesitan la toolchain POSIX saltan con la razon nombrada (tests/__init__.py, require_posix_toolchain), que es el mecanismo que el repo ya usaba en tests/test_provider_registry.py:463. Se corrige ADR-0041, cuyo punto 4 certificaba que 'la suite pasa en Windows'.
+- **El espejo PROYECTO/ queda fijado entero, no por lista de nombres** — La paridad se afirma sobre el conjunto completo de archivos que existen en los dos arboles, con verify.sh como unica excepcion declarada y justificada (el del harness gatea este repo, el del template sniffea el stack de un proyecto generico: responden preguntas distintas). Las dos derivas se sincronizaron.
+- **El locale de la maquina no decide como se escriben los artefactos del harness** — encoding='utf-8' explicito en toda lectura y escritura de texto de ai/scripts (barrido completo, 15 archivos), el temporal parcial se borra en el fallo, y el fallo de render_status se rutea a _log_render_failure como ya hacian render_notes y render_modules en vez de desaparecer. Un test AST fija la propiedad sobre todo ai/scripts.
+- **Los dos hallazgos abiertos dentro de features cerradas ya estaban reparados** — Los dos estan reparados en el codigo. P1F-01 ('el pop de repair_entry anidado bajo if args.package_id'): ai/scripts/feature_state_lib/cli_lifecycle.py:277-285 resuelve por package_by_id con fallback a current_package_id y nombra el hallazgo en el comentario; el test que el suggested_fix pedia existe, tests/test_harness.py:8650 test_cmd_transition_pops_stale_repair_entry_without_package_id. F-04 ('CHECK_PASS y SELF_SCAFFOLD_SYNC_OK no comparan contra el estado real de Global/'): build.sh:117-127 ahora corre diff -ruN de los cuatro arboles contra una generacion fresca y emite GLOBAL_TREE_SYNC_OK o falla, que es la implementacion del punto 1 de ADR-0041. Ademas SELF_SCAFFOLD_SYNC_OK paso de dos archivos nombrados a mano a los 23 del espejo completo.
+
+## Quick-fixes
+
+- P1F-01 cerrado: fix validado — cmd_transition ya tiene try/except alrededor del pop de repair_entry, cubriendo el caso sin --package-id via fallback a current_package_id. Test test_cmd_transition_pop… (done)
+- F-04 (020-honest-dashboard/P2-anclas-verificables) cerrado: verify.sh ahora pasa --profile go-zen a ./build.sh --output al comparar contra Global/. En CI, auto_profile() devolvía openai-only (PROVIDE… (done)
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

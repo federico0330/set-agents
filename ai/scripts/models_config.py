@@ -97,7 +97,7 @@ class ModelsError(ValueError):
 def active_profile():
     """Per-machine lane selection; untracked, so a fresh clone defaults to go-zen."""
     try:
-        return (ROOT / "active-profile").read_text().strip() or "go-zen"
+        return (ROOT / "active-profile").read_text(encoding="utf-8").strip() or "go-zen"
     except OSError:
         return "go-zen"
 
@@ -139,7 +139,7 @@ def load_roster(roles_path=None):
 
 def load_config(models_path=None):
     path = Path(models_path or ROOT / "models.toml")
-    config = tomllib.loads(path.read_text())
+    config = tomllib.loads(path.read_text(encoding="utf-8"))
     schema = config.get("schema")
     if schema not in (1, 2):
         die("models.toml: unsupported schema (expected schema = 1 or 2)")
@@ -299,7 +299,7 @@ def load_subscriptions_overlay(path=None):
     subscription name -- no credential material lives in this file either."""
     overlay_path = Path(path) if path is not None else subscriptions_overlay_path()
     try:
-        raw = tomllib.loads(overlay_path.read_text())
+        raw = tomllib.loads(overlay_path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return {}
     values = raw.get("subscriptions")

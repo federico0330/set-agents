@@ -51,14 +51,14 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-18 016-p1f01-y-020-f04-verificados-reparados|Los dos hallazgos abiertos dentro de features cerradas ya estaban reparados]]
+- [[decisiones/2026-08-18 encoding-explicito-en-todo-artefacto-de-texto|El locale de la maquina no decide como se escriben los artefactos del harness]]
+- [[decisiones/2026-08-18 espejo-proyecto-fijado-completo|El espejo PROYECTO/ queda fijado entero, no por lista de nombres]]
+- [[decisiones/2026-08-18 windows-nativo-es-bootstrap-no-runtime|Windows nativo es objetivo de bootstrap, no de runtime]]
 - [[decisiones/2026-08-18 d5-dr03-asimetria-cobertura-anticacheo|D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios]]
 - [[decisiones/2026-08-18 028-deuda-ac16-codex-drift|AC-16 AGENTS.codex.md: confirmación de deriva no registrada]]
 - [[decisiones/2026-08-18 028-deuda-test-narracion-digest|tests/test_narracion_digest.py nunca se creó]]
 - [[decisiones/2026-08-17 replanteo-028-imposible-el-motor-no-tiene-salida|Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida]]
-- [[decisiones/2026-08-17 replanteo-028-paquetes-sin-work-items|Los tres paquetes de 028 se replantean porque fueron creados sin work items]]
-- [[decisiones/2026-08-17 d5-revision-correctiva-sin-camino-de-estado|La revision correctiva de D5 no puede aterrizar en el registro del paquete]]
-- [[decisiones/2026-08-17 d5-relanzamiento-único-tras-watchdog|D5 relanzamiento único tras watchdog]]
-- [[decisiones/2026-08-17 d4-presupuesto-spawn-agotado-antes-delta-final|D4 agotó su presupuesto de spawns antes del delta final]]
 
 ## Convenciones
 
@@ -71,7 +71,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T02:47:40+00:00_
+_Actualizado: 2026-08-18T02:48:54+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

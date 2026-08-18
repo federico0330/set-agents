@@ -21,9 +21,9 @@ if len(sys.argv) >= 3 and sys.argv[2] in {"confirm-publish", "confirm-merge"}:
     state_path, action = sys.argv[1], sys.argv[2]
     check(state_path, action)
     path = Path(state_path)
-    state = json.loads(path.read_text()) if path.exists() else {}
+    state = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     state["publish_confirmed" if action == "confirm-publish" else "merge_confirmed"] = True
-    path.write_text(json.dumps(state, indent=2) + "\n")
+    path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     print(f"RELEASE_{action.upper().replace('-', '_')}_RECORDED")
     raise SystemExit(0)
 

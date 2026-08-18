@@ -44,7 +44,7 @@ def check(state_path, action):
         # still independently enforces green verify/audits/judge, so an approval
         # can never substitute for a real gate result.
         return True
-    state = json.loads(Path(state_path).read_text())
+    state = json.loads(Path(state_path).read_text(encoding="utf-8"))
     if (state.get("verify"), state.get("audits"), state.get("judge")) != ("pass", "pass", "JUDGE_PASS"):
         fail("release blocked: local gates are not green")
     check_coverage(state)

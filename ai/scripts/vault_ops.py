@@ -62,7 +62,7 @@ def vault_registry_path(vault):
 def read_vault_registry(vault):
     path = vault_registry_path(vault)
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -190,7 +190,7 @@ def _git_exclude_path(project):
 
 def _notes_currently_excluded(project):
     exclude = _git_exclude_path(project)
-    return exclude is not None and exclude.exists() and "docs/notas" in exclude.read_text().splitlines()
+    return exclude is not None and exclude.exists() and "docs/notas" in exclude.read_text(encoding="utf-8").splitlines()
 
 
 def exclude_notes_from_git(project):
@@ -199,10 +199,10 @@ def exclude_notes_from_git(project):
     if exclude is None:
         return False
     exclude.parent.mkdir(parents=True, exist_ok=True)
-    lines = exclude.read_text().splitlines() if exclude.exists() else []
+    lines = exclude.read_text(encoding="utf-8").splitlines() if exclude.exists() else []
     if "docs/notas" in lines:
         return False
-    exclude.write_text("\n".join(lines + ["docs/notas"]) + "\n")
+    exclude.write_text("\n".join(lines + ["docs/notas"]) + "\n", encoding="utf-8")
     return True
 
 
@@ -247,7 +247,7 @@ def vault_link_private(project, target_vault, notes, notes_home):
         shutil.rmtree(notes)
     seed = notes_home / "00 - Proyecto.md"
     if not seed.exists():
-        seed.write_text(project_notes_seed(project.name))
+        seed.write_text(project_notes_seed(project.name), encoding="utf-8")
         print(f"VAULT_CREATED {seed}")
     notes.parent.mkdir(parents=True, exist_ok=True)
     try:

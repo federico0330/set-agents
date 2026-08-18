@@ -5,6 +5,7 @@ module docstring and the package-level notes for the split rationale.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -306,9 +307,33 @@ def render_status(state_file: Path) -> None:
             lines.append("- _sin narración registrada_")
         out_dir.mkdir(parents=True, exist_ok=True)
         payload = "\n".join(lines) + "\n"
-        with tempfile.NamedTemporaryFile("w", dir=str(out_dir), delete=False) as handle:
-            handle.write(payload)
-            tmp_name = handle.name
-        os.replace(tmp_name, out_dir / "STATUS.md")
-    except Exception:  # the dashboard is best-effort by contract, never blocks state
-        pass
+        # encoding="utf-8" is NOT decoration. Without it Python picks the machine's
+        # locale encoding, and every heading here is Spanish ("Bitácora", "Próximo
+        # paso"). Measured on 2026-08-18: under `PYTHONCOERCECLOCALE=0 LC_ALL=C` the
+        # write raised UnicodeEncodeError, the bare `except: pass` below swallowed it,
+        # `render-status` still exited 0, STATUS.md was NEVER written, and the partial
+        # temp file stayed behind in ai/state/. A silently stale dashboard reporting
+        # success is the exact false-green this harness exists to kill. Windows CI hit
+        # the mirror image: cp1252 bytes written here, then read back as UTF-8.
+        tmp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", dir=str(out_dir), delete=False, encoding="utf-8"
+            ) as handle:
+                handle.write(payload)
+                tmp_name = handle.name
+            os.replace(tmp_name, out_dir / "STATUS.md")
+        except Exception:
+            # Never leave the partial file behind: `ai/state/` is the durable record,
+            # not a scratch directory, and the turds accumulate one per failed render.
+            if tmp_name:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp_name)
+            raise
+    except Exception as exc:  # the dashboard is best-effort by contract, never blocks state
+        # ...but "best-effort" is not "invisible". render_notes and render_modules both
+        # route their failures to this log; STATUS.md -- the one artifact contracted to
+        # be "always fresh" -- was the only renderer that swallowed them into nothing.
+        with contextlib.suppress(Exception):
+            from feature_state_lib.render_notes import _log_render_failure
+            _log_render_failure(status_root(state_file)[1], "render_status", exc)

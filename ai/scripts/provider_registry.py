@@ -159,7 +159,7 @@ def parse_providers_toml(path) -> dict[str, ProviderEntry]:
     `_read_model_preference_raw` uses for its own sibling file) -- callers that need to
     bootstrap on absence do so explicitly via `seed_or_migrate`, never here."""
     try:
-        raw = path.read_text()
+        raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return {}
     except OSError as exc:

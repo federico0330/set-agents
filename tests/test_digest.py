@@ -5,6 +5,7 @@ established pattern: real subprocesses, never mocks).
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -599,6 +600,44 @@ class DigestRegenerationCadenceTests(unittest.TestCase):
             )
 
 
+class StatusRenderIsLocaleIndependentTests(unittest.TestCase):
+    """STATUS.md is Spanish prose; the machine's locale never gets a vote on it."""
+
+    def _render_under(self, tmp, env_extra):
+        state_dir = tmp / "ai/state"
+        _write_feature(state_dir, "900-acentos", {
+            "feature_id": "900-acentos", "phase": "PACKAGE_PLANNING",
+            "title": "Acentuación, bitácora y días",
+        })
+        env = {k: v for k, v in os.environ.items() if k not in {"LANG", "LC_ALL"}}
+        env.update(env_extra)
+        return subprocess.run(
+            [sys.executable, str(FEATURE_STATE), "render-status", "--state-dir", str(state_dir)],
+            capture_output=True, text=True, env=env,
+        ), state_dir
+
+    def test_a_non_utf8_locale_still_produces_the_dashboard_and_leaves_no_debris(self):
+        """Before this repair the command exited 0 while writing NOTHING.
+
+        Measured 2026-08-18 on Linux, `PYTHONCOERCECLOCALE=0 LC_ALL=C`: the write
+        raised UnicodeEncodeError on "Bitácora", a bare `except Exception: pass`
+        swallowed it, `render-status` returned 0, STATUS.md never appeared and the
+        half-written temp file stayed in ai/state/ -- one more per failed render.
+        The harness's own dashboard reporting success while going silently stale is
+        the precise failure mode it exists to prevent. Windows CI hit the same omission
+        from the other side, writing cp1252 that later reads rejected."""
+        with tempfile.TemporaryDirectory() as td:
+            result, state_dir = self._render_under(Path(td), {
+                "PYTHONCOERCECLOCALE": "0", "LC_ALL": "C", "PYTHONUTF8": "0",
+            })
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            status = state_dir / "STATUS.md"
+            self.assertTrue(status.is_file(), f"STATUS.md was never written: {result.stderr}")
+            self.assertIn("Bitácora", status.read_text(encoding="utf-8"))
+            debris = [p.name for p in state_dir.iterdir() if p.name.startswith("tmp")]
+            self.assertEqual(debris, [], f"partial renders left behind: {debris}")
+
+
 class DoctrineTests(unittest.TestCase):
     def test_milestone_narration_is_doctrine_in_all_shared_files(self):
         for path in ("Global/_shared/CLAUDE.md", "Global/_shared/AGENTS.opencode.md",
@@ -704,6 +743,22 @@ class NarrationSurfacesTests(unittest.TestCase):
             self.assertNotIn("None", digest)
 
     def test_bitacora_marks_render_truncation_explicitly(self):
+        """El largo sale del tope canónico, nunca de un número copiado a mano.
+
+        Este test usaba 340 caracteres fijos, elegidos cuando el render cortaba en 300.
+        La feature 028 (hallazgo N3b-F01) subió ese corte a 400 para alinearlo con
+        `narration_lint.LONG_FIELD_LIMIT`, que es lo que AC-05 concede al ESCRIBIR --
+        y el test siguió verde igual, porque corre la CLI de `PROYECTO/`, cuyo espejo
+        nunca recibió la reparación y seguía cortando en 300. O sea que este test
+        estaba fijando el comportamiento SIN reparar, y sólo se enteró el 2026-08-18,
+        cuando el espejo se sincronizó. Ahora el largo se deriva del tope real, así
+        que un cambio de tope no puede volver a dejarlo afirmando lo que no pasa."""
+        limit = int(re.search(
+            r"^NARRATION_FIELD_LIMIT = (\d+)$",
+            (ROOT / "ai/scripts/feature_state_lib/render_bitacora.py").read_text(encoding="utf-8"),
+            re.M,
+        ).group(1))
+        overflow = limit + 40
         with tempfile.TemporaryDirectory() as raw:
             tmp = Path(raw)
             state = tmp / "ai/state"
@@ -724,8 +779,8 @@ class NarrationSurfacesTests(unittest.TestCase):
                     "package_id": "N3b",
                     "role": "implementer",
                     "result": "done",
-                    "client": "x" * 340,
-                    "tech": "y" * 340,
+                    "client": "x" * overflow,
+                    "tech": "y" * overflow,
                     "actor": "orchestrator",
                 }
             ])

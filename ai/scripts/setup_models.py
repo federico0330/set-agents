@@ -100,7 +100,10 @@ def parse_address(config, roster, address):
 
 def validate(config, roles_path):
     """Every lane must stay generable: emit to a temp file and load each profile."""
-    with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as handle:
+    # TOML is UTF-8 by specification; the locale never gets a vote.
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".toml", delete=False, encoding="utf-8"
+    ) as handle:
         handle.write(models_config.emit(config))
         temp = handle.name
     try:

@@ -12,10 +12,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import tests
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "ai/scripts"))
 
 
+@unittest.skipUnless(tests._POSIX_TOOLCHAIN, tests._TOOLCHAIN_REASON)
 class InstallShPiTests(unittest.TestCase):
     def test_harness_pi_is_a_valid_flag_and_plans_the_lane(self):
         result = subprocess.run(

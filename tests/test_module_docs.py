@@ -26,6 +26,8 @@ sys.path.insert(0, str(ROOT / "ai/scripts"))
 from feature_state_lib import render_modules as rm  # noqa: E402
 from feature_state_lib.model import done_ready, module_impacts_ready  # noqa: E402
 
+import tests
+
 FEATURE_STATE = ROOT / "PROYECTO/ai/scripts/feature-state.py"
 
 DEMO_TOML = (
@@ -37,6 +39,7 @@ DEMO_TOML = (
 
 
 def _run(*args, cwd, check=True):
+    tests.require_posix_toolchain()
     return subprocess.run(
         ["python3", str(FEATURE_STATE), *args],
         cwd=cwd, env=os.environ.copy(), text=True, capture_output=True, check=check,

@@ -13,9 +13,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import tests
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@unittest.skipUnless(tests._POSIX_TOOLCHAIN, tests._TOOLCHAIN_REASON)
 class DoctorAllTests(unittest.TestCase):
     def test_doctor_all_reports_harnesses_tools_and_never_leaks_credentials(self):
         result = subprocess.run(
@@ -44,6 +47,7 @@ class DoctorAllTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["reason_codes"], ["DOCTOR_HARNESS_UNSUPPORTED"])
 
 
+@unittest.skipUnless(tests._POSIX_TOOLCHAIN, tests._TOOLCHAIN_REASON)
 class ScopedInstallDriftTests(unittest.TestCase):
     def test_targeted_install_records_scope_and_drift_check_honors_it(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,6 +109,7 @@ class ScopedInstallDriftTests(unittest.TestCase):
                              ["claude-code", "codex", "opencode", "pi"])
 
 
+@unittest.skipUnless(tests._POSIX_TOOLCHAIN, tests._TOOLCHAIN_REASON)
 class InstallShHarnessFlagTests(unittest.TestCase):
     def test_dry_run_with_harness_claude_never_mentions_opencode_or_codex_install(self):
         result = subprocess.run(

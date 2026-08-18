@@ -254,7 +254,7 @@ def revert_json_special(target, entries):
     modes can never diverge in what they report vs what they do)."""
     if not target.exists():
         return False, [], None
-    live = json.loads(target.read_text())
+    live = json.loads(target.read_text(encoding="utf-8"))
     changed, skipped = _revert_json_special(live, entries)
     return changed, skipped, (json.dumps(live, indent=2) + "\n") if changed else None
 
@@ -290,8 +290,8 @@ def substitute_root(data: bytes, *, json_escaped: bool = False) -> bytes:
 
 
 def merged_json(current, overlay, union_lists=False):
-    base = json.loads(current.read_text()) if current.exists() else {}
-    update = json.loads(overlay.read_text())
+    base = json.loads(current.read_text(encoding="utf-8")) if current.exists() else {}
+    update = json.loads(overlay.read_text(encoding="utf-8"))
     result = deep_merge(base, update)
     if union_lists:
         for key, value in update.items():
@@ -305,7 +305,7 @@ def merged_json(current, overlay, union_lists=False):
 def managed_files():
     result = []
     for harness, target in targets.items():
-        for relative in (staging / harness / "managed-files.txt").read_text().splitlines():
+        for relative in (staging / harness / "managed-files.txt").read_text(encoding="utf-8").splitlines():
             if not relative or (harness, relative) in SPECIAL or relative == "managed-files.txt":
                 continue
             source = staging / harness / relative
@@ -319,7 +319,7 @@ def _previous_provider_ids():
     if not JSON_MANIFEST.exists():
         return set()
     try:
-        stored = json.loads(JSON_MANIFEST.read_text())
+        stored = json.loads(JSON_MANIFEST.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return set()
     return set(stored.get("opencode.json", []))
@@ -376,7 +376,7 @@ def _read_json_or_empty(path):
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 
@@ -402,7 +402,7 @@ def effective_specials():
     if "codex" in targets:
         cx = targets["codex"] / "config.toml"
         flag_codex_model_change(cx)
-        before_text = cx.read_text() if cx.exists() else ""
+        before_text = cx.read_text(encoding="utf-8") if cx.exists() else ""
         content = merge_codex(cx)
         _PENDING_SPECIAL_KEYS[str(cx.relative_to(home))] = _codex_written_keys(before_text, content)
         result.append((content, cx))
@@ -468,7 +468,7 @@ def flag_codex_model_change(current):
     """
     if not current.exists():
         return
-    text = current.read_text()
+    text = current.read_text(encoding="utf-8")
     new_model, new_effort = roster_codex_orchestrator()
     changes = []
     for key, new_value in (("model", new_model), ("model_reasoning_effort", new_effort)):
@@ -480,7 +480,7 @@ def flag_codex_model_change(current):
 
 
 def merge_codex(current):
-    text = current.read_text() if current.exists() else ""
+    text = current.read_text(encoding="utf-8") if current.exists() else ""
     lines = text.splitlines()
 
     def set_top_key(key, value):
@@ -620,8 +620,8 @@ def revert_codex(current, entries):
     whether to persist)."""
     if not current.exists():
         return False, [], None
-    live = tomllib.loads(current.read_text())
-    lines = current.read_text().splitlines()
+    live = tomllib.loads(current.read_text(encoding="utf-8"))
+    lines = current.read_text(encoding="utf-8").splitlines()
     changed = False
     skipped = []
     for entry in entries:
@@ -663,7 +663,7 @@ def _read_manifest_raw():
     if not MANIFEST.exists():
         return False, []
     try:
-        return True, json.loads(MANIFEST.read_text())
+        return True, json.loads(MANIFEST.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return True, None
 
@@ -781,7 +781,7 @@ def take_backup(backup, paths):
             shutil.copy2(target, destination)
         else:
             missing.append(str(relative))
-    (backup / "missing.json").write_text(json.dumps(missing, indent=2))
+    (backup / "missing.json").write_text(json.dumps(missing, indent=2), encoding="utf-8")
 
 
 def restore_backup(backup, paths):
@@ -854,25 +854,25 @@ def run_install():
     if args.preview:
         changes = 0
         for source, target in files:
-            before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
+            before = target.read_text(errors="replace", encoding="utf-8").splitlines(True) if target.exists() else []
             after = substitute_root(source.read_bytes()).decode(errors="replace").splitlines(True)
             if before != after:
                 changes += 1
                 print("".join(difflib.unified_diff(before, after, fromfile=str(target), tofile=str(target) + " (managed)")), end="")
         for content, target in specials:
-            before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
+            before = target.read_text(errors="replace", encoding="utf-8").splitlines(True) if target.exists() else []
             after = content.splitlines(True)
             if before != after:
                 changes += 1
                 print("".join(difflib.unified_diff(before, after, fromfile=str(target), tofile=str(target) + " (managed merge)")), end="")
         for target in legacy:
-            before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
+            before = target.read_text(errors="replace", encoding="utf-8").splitlines(True) if target.exists() else []
             after = []
             if before != after:
                 changes += 1
                 print("".join(difflib.unified_diff(before, after, fromfile=str(target), tofile=str(target) + " (legacy delete)")), end="")
         for target in orphans:
-            before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
+            before = target.read_text(errors="replace", encoding="utf-8").splitlines(True) if target.exists() else []
             if before:
                 changes += 1
                 print("".join(difflib.unified_diff(before, [], fromfile=str(target), tofile=str(target) + " (prune orphan)")), end="")
@@ -906,18 +906,18 @@ def run_install():
             print("LEGACY_CONFLICTS=" + ",".join(sorted(legacy_conflicts)))
 
         if "opencode" in targets:
-            oc = json.loads((targets["opencode"] / "opencode.json").read_text())
+            oc = json.loads((targets["opencode"] / "opencode.json").read_text(encoding="utf-8"))
             # Only the managed servers must land disabled; user-added MCPs are theirs to run.
             if any(item.get("enabled") for name, item in oc.get("mcp", {}).items() if name in MANAGED_MCP):
                 raise RuntimeError("OpenCode MCP smoke check failed")
         if "claude-code" in targets:
-            cc = json.loads((targets["claude-code"] / "settings.json").read_text())
+            cc = json.loads((targets["claude-code"] / "settings.json").read_text(encoding="utf-8"))
             if cc.get("enabledPlugins", {}).get("engram@engram") is not False:
                 raise RuntimeError("Claude Engram smoke check failed")
         if "codex" in targets:
             for path in (targets["codex"] / "agents").glob("*.toml"):
-                tomllib.loads(path.read_text())
-            codex_config = tomllib.loads((targets["codex"] / "config.toml").read_text())
+                tomllib.loads(path.read_text(encoding="utf-8"))
+            codex_config = tomllib.loads((targets["codex"] / "config.toml").read_text(encoding="utf-8"))
             if codex_config.get("features", {}).get("multi_agent") is not True or codex_config.get("agents", {}).get("max_depth") != 1:
                 raise RuntimeError("Codex multi-agent smoke check failed")
             session_model, session_effort = roster_codex_orchestrator()
@@ -937,7 +937,7 @@ def run_install():
         selected_roots = set(targets.values())
         if MANIFEST.exists():
             try:
-                for relative in json.loads(MANIFEST.read_text()):
+                for relative in json.loads(MANIFEST.read_text(encoding="utf-8")):
                     candidate = home / relative
                     if not any(root in candidate.parents for root in selected_roots):
                         preserved.append(relative)
@@ -967,7 +967,7 @@ def run_install():
             json_manifest_data = {}
             if JSON_MANIFEST.exists():
                 try:
-                    json_manifest_data = json.loads(JSON_MANIFEST.read_text())
+                    json_manifest_data = json.loads(JSON_MANIFEST.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     json_manifest_data = {}
             json_manifest_data["opencode.json"] = sorted(provider_registry.parse_providers_toml(PROVIDERS_TOML))
@@ -979,7 +979,7 @@ def run_install():
         scope = set(targets)
         if SCOPE_PATH.exists():
             try:
-                scope |= set(json.loads(SCOPE_PATH.read_text()))
+                scope |= set(json.loads(SCOPE_PATH.read_text(encoding="utf-8")))
             except (OSError, json.JSONDecodeError):
                 pass
         if not args.target:
@@ -1027,7 +1027,7 @@ def run_uninstall():
     if args.preview:
         changes = 0
         for target in sorted(remove):
-            before = target.read_text(errors="replace").splitlines(True) if target.exists() else []
+            before = target.read_text(errors="replace", encoding="utf-8").splitlines(True) if target.exists() else []
             if before:
                 changes += 1
                 print("".join(difflib.unified_diff(before, [], fromfile=str(target), tofile=str(target) + " (uninstall remove)")), end="")
@@ -1035,7 +1035,7 @@ def run_uninstall():
             target, _kind = special_map[rel]
             if not changed:
                 continue
-            before = target.read_text(errors="replace").splitlines(True)
+            before = target.read_text(errors="replace", encoding="utf-8").splitlines(True)
             after = new_text.splitlines(True)
             changes += 1
             print("".join(difflib.unified_diff(before, after, fromfile=str(target), tofile=str(target) + " (uninstall de-merge)")), end="")
@@ -1087,7 +1087,7 @@ def run_uninstall():
             provider_ids = set(json_manifest_data.pop("opencode.json", []))
             oc_target = targets["opencode"] / "opencode.json"
             if provider_ids and oc_target.exists():
-                doc = json.loads(oc_target.read_text())
+                doc = json.loads(oc_target.read_text(encoding="utf-8"))
                 live_block = doc.get("provider")
                 if isinstance(live_block, dict):
                     for provider_id in provider_ids:

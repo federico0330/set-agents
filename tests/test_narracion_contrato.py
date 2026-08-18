@@ -31,11 +31,14 @@ import narration_lint as nl
 
 import tests  # noqa: F401 -- side effect: sandboxes HOME/TMPDIR, see tests/__init__.py
 
+import tests
+
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE_STATE = ROOT / "PROYECTO/ai/scripts/feature-state.py"
 
 
 def run(*args, check=False):
+    tests.require_posix_toolchain()
     return subprocess.run(
         args, cwd=ROOT, env=dict(os.environ), text=True, capture_output=True, check=check,
     )
@@ -604,18 +607,53 @@ class GuardCliTests(unittest.TestCase):
         self.assertIn("MILESTONE_REQUIRED", result.stderr)
         self.assertEqual(entries, [])
 
+    # `verify.sh` is the ONE deliberate divergence: `ai/scripts/verify.sh` gates this
+    # repository (Python suite, build.sh --check), while the template copy is the
+    # generic project gate that sniffs for package.json / *.csproj / pyproject and
+    # runs whatever stack it finds. They answer different questions on purpose.
+    MIRROR_EXEMPT = {"verify.sh"}
+
     def test_mirror_parity_ai_scripts_vs_proyecto(self):
-        """El espejo es obligatorio (encargo): ambas copias de narration_lint.py y
-        feature-state.py deben coincidir byte a byte."""
-        top = ROOT / "ai/scripts/narration_lint.py"
-        mirror = ROOT / "PROYECTO/ai/scripts/narration_lint.py"
-        self.assertEqual(top.read_bytes(), mirror.read_bytes())
-        top_fs = ROOT / "ai/scripts/feature-state.py"
-        mirror_fs = ROOT / "PROYECTO/ai/scripts/feature-state.py"
-        self.assertEqual(top_fs.read_bytes(), mirror_fs.read_bytes())
-        top_cr = ROOT / "ai/scripts/feature_state_lib/cli_reporting.py"
-        mirror_cr = ROOT / "PROYECTO/ai/scripts/feature_state_lib/cli_reporting.py"
-        self.assertEqual(top_cr.read_bytes(), mirror_cr.read_bytes())
+        """El espejo es obligatorio (encargo): TODO archivo que exista en los dos
+        árboles coincide byte a byte, salvo la excepción declarada arriba.
+
+        Antes esta prueba nombraba tres archivos (`narration_lint.py`,
+        `feature-state.py`, `cli_reporting.py`) y sólo esos tres. Medido el 2026-08-18
+        sobre HEAD=eb9b9ed: de los 24 archivos que viven en ambos árboles, 3 habían
+        derivado, y ninguno de ellos estaba en la lista -- así que la prueba pasaba en
+        verde mientras el template shippeaba código viejo:
+
+          - `feature_state_lib/render_bitacora.py`: el template seguía cortando la
+            narración en 300 caracteres. Eso ES el hallazgo N3b-F01 de la feature 028,
+            declarado reparado y cerrado; la reparación llegó a UNA de las dos copias.
+          - `feature_state_lib/axes.py`: al template le faltaba `validate_row` entera,
+            o sea la validación por eje de la feature 029, también cerrada.
+
+        Dos features en DONE estaban medio entregadas y nada lo decía. Fijar el
+        conjunto completo es lo que impide que la tercera pase inadvertida: una lista
+        por nombre sólo protege lo que alguien se acordó de anotar."""
+        top_root = ROOT / "ai/scripts"
+        mirror_root = ROOT / "PROYECTO/ai/scripts"
+        drifted = []
+        checked = 0
+        for mirror in sorted(mirror_root.rglob("*")):
+            if not mirror.is_file() or "__pycache__" in mirror.parts:
+                continue
+            rel = mirror.relative_to(mirror_root)
+            if str(rel) in self.MIRROR_EXEMPT:
+                continue
+            top = top_root / rel
+            if not top.exists():
+                continue  # template-only helpers are not a mirror at all
+            checked += 1
+            if top.read_bytes() != mirror.read_bytes():
+                drifted.append(str(rel))
+        self.assertGreaterEqual(checked, 23, f"el espejo se encogió: sólo {checked} archivos")
+        self.assertEqual(
+            drifted, [],
+            "el template PROYECTO/ shippea código distinto al del harness:\n  - "
+            + "\n  - ".join(drifted),
+        )
 
 
 if __name__ == "__main__":

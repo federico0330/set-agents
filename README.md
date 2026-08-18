@@ -106,8 +106,11 @@ preguntar, salvo que le pases `--yes`.
 | macOS (Intel y Apple Silicon) | nativo, necesita [Homebrew](https://brew.sh) |
 | Windows 10/11 | `install.ps1` → WSL administrado (no hace falta saber qué es WSL) |
 
-Los tres sistemas se prueban en CI en cada cambio: `ubuntu-latest`, `macos-latest` y
-`windows-latest` (`.github/workflows/ci.yml`).
+Los tres sistemas se prueban en CI en cada cambio (`.github/workflows/ci.yml`), y no todos prueban
+lo mismo: `ubuntu-latest` y `macos-latest` corren el gate completo, y `windows-latest` verifica el
+**bootstrap** — que `install.ps1` parsea, que corre en `-DryRun` y que los fuentes Python compilan.
+Es lo que corresponde: en Windows el harness vive adentro de WSL, así que el gate que de verdad lo
+cubre es el de Linux.
 
 ### Linux, macOS y WSL
 

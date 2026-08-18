@@ -386,7 +386,7 @@ def generate_pi_prompts(out):
         shutil.rmtree(out)
     out.mkdir(parents=True)
     for path in sorted((CANON / "commands").glob("*.md")):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         if not (text.startswith("---\n") and "\n---\n" in text[4:]):
             die(f"{path}: invalid frontmatter")
         end = text.index("\n---\n", 4)
@@ -408,14 +408,14 @@ def generate_pi_prompts(out):
             )
             out_lines.append("")
         out_lines.append(body)
-        (out / path.name).write_text("\n".join(out_lines))
+        (out / path.name).write_text("\n".join(out_lines), encoding="utf-8")
 
 
 def write_indexes(out):
     for harness in ("opencode", "claude-code", "codex", "pi"):
         base = out / harness
         files = sorted(str(p.relative_to(base)) for p in base.rglob("*") if p.is_file() and p.name != "managed-files.txt")
-        (base / "managed-files.txt").write_text("\n".join(files) + "\n")
+        (base / "managed-files.txt").write_text("\n".join(files) + "\n", encoding="utf-8")
 
 
 def yolofy(node):
@@ -460,7 +460,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
 
     bodies = {}
     for row in roles:
-        body = (CANON / "agents" / f"{row['role']}.md").read_text()
+        body = (CANON / "agents" / f"{row['role']}.md").read_text(encoding="utf-8")
         bodies[row["role"]] = body
         desc = description(body)
         oc = "\n".join([
@@ -473,7 +473,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         oc = oc.replace("\n\npermission:", "\npermission:")
         path = out / "opencode/agents" / f"{row['role']}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(oc)
+        path.write_text(oc, encoding="utf-8")
 
         # ADR-0029 (017 PKG-A2): the frontmatter only ever pins a UNIVERSAL alias —
         # one that resolves on any Claude account. A curated non-universal id (e.g.
@@ -488,7 +488,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         ])
         path = out / "claude-code/agents" / f"{row['role']}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(claude)
+        path.write_text(claude, encoding="utf-8")
 
         sandbox = "read-only" if (
             row["capability"] in READ_ONLY
@@ -508,7 +508,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         ])
         path = out / "codex/agents" / f"{row['role']}.toml"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(codex)
+        path.write_text(codex, encoding="utf-8")
 
         pi_lines = [
             "---", f"name: {row['role']}", f"description: {json.dumps(desc)}",
@@ -520,7 +520,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         pi = "\n".join(pi_lines)
         path = out / "pi/agents" / f"{row['role']}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(pi)
+        path.write_text(pi, encoding="utf-8")
 
     # Tier variants (contract 004 T-202): additive, OpenCode-ONLY `<role>@<tier>` agents
     # for the roles models.toml declares tiered (models_config.load_role_tiers). Same
@@ -543,7 +543,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
             ])
             oc = oc.replace("\n\npermission:", "\npermission:")
             path = out / "opencode/agents" / f"{row['role']}@{tier}.md"
-            path.write_text(oc)
+            path.write_text(oc, encoding="utf-8")
 
     copy_tree(CANON / "opencode-agents", out / "opencode/agents")
 
@@ -559,17 +559,17 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     shutil.copy2(SHARED / "config.codex.snippet.toml", out / "codex/config.snippet.toml")
     shutil.copy2(SHARED / "AGENTS.pi.md", out / "pi/AGENTS.md")
 
-    oc_config = json.loads((SHARED / "opencode.json").read_text())
+    oc_config = json.loads((SHARED / "opencode.json").read_text(encoding="utf-8"))
     oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
     oc_config["small_model"] = models_config.small_model(profile, models_path)
     if yolo:
         oc_config["permission"] = yolofy(oc_config.get("permission", {}))
     for item in oc_config.get("mcp", {}).values():
         item["enabled"] = False
-    (out / "opencode/opencode.json").write_text(json.dumps(oc_config, indent=2) + "\n")
+    (out / "opencode/opencode.json").write_text(json.dumps(oc_config, indent=2) + "\n", encoding="utf-8")
 
     overlay = {"enabledPlugins": {"engram@engram": False}, "disabledMcpjsonServers": ["engram", "context7", "playwright", "brave-cdp"]}
-    (out / "claude-code/settings.overlay.json").write_text(json.dumps(overlay, indent=2) + "\n")
+    (out / "claude-code/settings.overlay.json").write_text(json.dumps(overlay, indent=2) + "\n", encoding="utf-8")
     hooks = out / "claude-code/hooks"
     hooks.mkdir()
     shutil.copy2(ROOT / "ai/scripts/coord_policy.py", hooks / "coord_policy.py")
@@ -616,7 +616,7 @@ def _opencode_projected_route(model):
 
 def _load_routes(routes_path):
     path = Path(routes_path)
-    data = tomllib.loads(path.read_text())
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
     routes = data.get("routes")
     if not isinstance(routes, list):
         die(f"{path}: missing [[routes]]")
@@ -676,16 +676,16 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
         role_tiers = models_config.load_role_tiers(models_config.load_config(models_path), profile)
     role_tiers = _roster_filtered_role_tiers(roles, role_tiers)
     routes_path = routes_path or (ROOT / "ai/catalogs/routes.v1.toml")
-    json.loads((out / "opencode/opencode.json").read_text())
-    json.loads((out / "claude-code/settings.overlay.json").read_text())
+    json.loads((out / "opencode/opencode.json").read_text(encoding="utf-8"))
+    json.loads((out / "claude-code/settings.overlay.json").read_text(encoding="utf-8"))
     for path in (out / "codex/agents").glob("*.toml"):
-        data = tomllib.loads(path.read_text())
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
         for key in ("name", "description", "developer_instructions", "model", "sandbox_mode"):
             if not data.get(key):
                 die(f"{path}: missing {key}")
     for harness in ("opencode", "claude-code", "pi"):
         for path in (out / harness / "agents").glob("*.md"):
-            text = path.read_text()
+            text = path.read_text(encoding="utf-8")
             if not text.startswith("---\n") or "\n---\n" not in text[4:]:
                 die(f"{path}: invalid frontmatter")
     expected = {r["role"] for r in roles}
@@ -696,7 +696,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
         harness_expected = expected | opencode_only | variant_expected if harness == "opencode" else expected
         if actual != harness_expected:
             die(f"{harness}: generated role set mismatch")
-    orchestrator = (out / "opencode/agents/orchestrator.md").read_text()
+    orchestrator = (out / "opencode/agents/orchestrator.md").read_text(encoding="utf-8")
     for role in ORCHESTRATOR_TASK_ALLOW:
         if f'    "{role}": allow' not in orchestrator:
             die(f"orchestrator cannot delegate required role: {role}")

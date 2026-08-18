@@ -67,7 +67,7 @@ def infer_run_cmds(project_root: Path):
     pkg = project_root / "package.json"
     if pkg.exists():
         try:
-            scripts = json.loads(pkg.read_text()).get("scripts", {})
+            scripts = json.loads(pkg.read_text(encoding="utf-8")).get("scripts", {})
         except Exception:
             scripts = {}
         if "dev" in scripts:
@@ -95,11 +95,11 @@ notes = []
 for relative, content in FILES.items():
     path = root / relative
     if path.exists():
-        if path.read_text() != content:
+        if path.read_text(encoding="utf-8") != content:
             conflicts.append(relative)
         continue
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
+    path.write_text(content, encoding="utf-8")
     created.append(relative)
 
 # 2. Harness scripts copied from single-source templates; run.sh gets stack inference.
@@ -112,7 +112,7 @@ for name in SCRIPT_TEMPLATES:
     if not tpl.exists():
         notes.append(f"missing template: {name}")
         continue
-    content = tpl.read_text()
+    content = tpl.read_text(encoding="utf-8")
     if name == "run.sh":
         if backend_cmd:
             content = content.replace('BACKEND_CMD=""', f'BACKEND_CMD="{backend_cmd}"', 1)
@@ -123,7 +123,7 @@ for name in SCRIPT_TEMPLATES:
         else:
             notes.append("run.sh left as stub (stack not inferred — fill BACKEND_CMD/FRONTEND_CMD)")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(content)
+    dest.write_text(content, encoding="utf-8")
     dest.chmod(0o755)
     created.append(f"ai/scripts/{name}")
 
@@ -134,7 +134,7 @@ for name in SCRIPT_TEMPLATES:
 GITIGNORE_TEMPLATE = Path(__file__).resolve().parents[2] / "PROYECTO" / ".gitignore"
 gitignore_dest = root / ".gitignore"
 if not gitignore_dest.exists() and GITIGNORE_TEMPLATE.exists():
-    gitignore_dest.write_text(GITIGNORE_TEMPLATE.read_text())
+    gitignore_dest.write_text(GITIGNORE_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
     created.append(".gitignore")
 
 # 3. Per-domain knowledge seeds (create-if-missing, never overwrite: memory-scribe grows them,
@@ -144,7 +144,7 @@ for tpl in sorted(KNOWLEDGE_TEMPLATE_DIR.glob("*.md")) if KNOWLEDGE_TEMPLATE_DIR
     if dest.exists():
         continue
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(tpl.read_text())
+    dest.write_text(tpl.read_text(encoding="utf-8"), encoding="utf-8")
     created.append(f"docs/ai/knowledge/{tpl.name}")
 
 print("BOOTSTRAP_CREATED=" + ",".join(created))

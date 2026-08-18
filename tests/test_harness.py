@@ -1,6 +1,7 @@
 import argparse
 import ast
 import contextlib
+import errno
 import hashlib
 import importlib.util
 import inspect
@@ -46,6 +47,13 @@ def run(*args, env=None, check=True):
     # then fails on.  On Linux/macOS this is a no-op (they default to UTF-8 already).
     utf8_env = {"PYTHONUTF8": "1"}
     cmd = list(args)
+    # This helper exists to invoke the repository's own executables: bash scripts that
+    # `exec python3`, and `python3` itself. Where that toolchain is absent the test has
+    # not found a defect -- it cannot run at all, and says so by name instead of
+    # reporting a failure. See tests/__init__.py for why native Windows is a bootstrap
+    # target and not a runtime one. No effect whatsoever on Linux or macOS.
+    if cmd and cmd[0] != sys.executable:
+        tests.require_posix_toolchain()
     # On Windows, shell scripts need an explicit bash interpreter prefix since the OS
     # does not know how to execute .sh files natively.  GitHub-hosted Windows runners
     # include Git Bash at C:\Program Files\Git\bin\bash.exe and in PATH.
@@ -10351,6 +10359,11 @@ class HarnessTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertFalse(external_target.exists(), f"the boundary must block the write: {external_target}")
 
+    @unittest.skipIf(
+        os.name != "posix",
+        "os.open() on a DIRECTORY and the dir_fd= argument are POSIX-only; Windows "
+        "answers PermissionError to the open itself, so there is nothing to guard",
+    )
     def test_unittest_write_guard_rejects_symlink_parent_for_remove_rename_and_dir_fd(self):
         """P2-F02: final-link preservation must still resolve an escaping parent."""
         link = tests._TEST_SANDBOX / "p2-escaping-parent"
@@ -10366,6 +10379,198 @@ class HarnessTests(unittest.TestCase):
                 os.rename("p2-escaping-parent/never-rename", "safe", src_dir_fd=fd, dst_dir_fd=fd)
         finally:
             os.close(fd)
+
+    def test_the_posix_toolchain_is_present_on_every_platform_that_declares_it(self):
+        """The Windows skip must never become a silent skip everywhere else.
+
+        `tests.require_posix_toolchain()` sits inside the helper that runs every repo
+        executable, so a false negative would turn hundreds of real regressions into
+        quiet skips and the suite would still print OK. On POSIX the answer is True by
+        construction and this pins it: if `bash` or `python3` ever stops resolving on
+        Linux or macOS, the suite says so out loud instead of going green on nothing."""
+        if os.name != "posix":
+            self.skipTest("this pins the POSIX side of the switch, by definition")
+        self.assertTrue(
+            tests._POSIX_TOOLCHAIN,
+            "bash and python3 must both resolve on POSIX; without them the suite would "
+            "skip its way to a meaningless green",
+        )
+        self.assertIsNotNone(shutil.which("bash"))
+
+    def test_ci_never_claims_the_full_suite_passes_on_native_windows(self):
+        """ADR-0041 asserted something that has never once been true.
+
+        Its point 4 said the `windows-bootstrap` job proves "los scripts Python
+        compilan y la suite pasa en Windows". Measured 2026-08-18 over the 49 runs the
+        API still holds: the "Full unittest suite" step landed on 2026-08-01 and FAILED
+        on every run afterwards -- run 32102631508 closed at `FAILED (failures=21,
+        errors=96)`. The last fully green CI predates the step. README.md:107 declares
+        the Windows path as install.ps1 -> managed WSL, so the harness runs on Linux
+        there; native Windows is the bootstrap, which is what the job is named after.
+
+        A document that certifies a gate nobody passed is worse than no document: it is
+        why nobody looked at the red for three weeks."""
+        adr = (ROOT / "docs/adr/0041-build-check-verifies-global.md").read_text(encoding="utf-8")
+        # The full original sentence, not the fragment: the correction below quotes the
+        # fragment on purpose, and a test that cannot tell a retraction from the claim
+        # it retracts would just push the dishonesty one paragraph down.
+        self.assertNotIn("los scripts Python compilan y la suite pasa en Windows", adr)
+        self.assertIn("Corrección (2026-08-18)", adr)
+        self.assertIn("bootstrap", adr.lower())
+
+    def test_every_text_file_the_harness_writes_declares_its_encoding(self):
+        """The locale never gets a vote on what the harness writes or reads.
+
+        Python without an explicit `encoding=` uses the MACHINE's locale encoding.
+        Every artifact this harness produces -- STATUS.md, the bitácora, docs/notas/,
+        the generated agent files -- is Spanish prose, so the omission is not
+        theoretical. Measured on 2026-08-18, before this pin:
+
+          PYTHONCOERCECLOCALE=0 LC_ALL=C feature-state.py render-status
+            -> exit 0, STATUS.md NEVER WRITTEN, partial temp file left in ai/state/
+
+        The command reported success while the dashboard silently went stale -- and
+        Windows CI hit the mirror image, writing cp1252 bytes that every
+        `read_text(encoding="utf-8")` downstream then choked on (run 32102631508, 16
+        UnicodeDecodeError). A false green about the file that reports the state.
+
+        `"rb"`/`"wb"` are exempt: bytes carry no encoding to declare."""
+        offenders = []
+        for path in sorted((ROOT / "ai/scripts").rglob("*.py")):
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                name = None
+                if isinstance(node.func, ast.Attribute):
+                    name = node.func.attr
+                elif isinstance(node.func, ast.Name):
+                    name = node.func.id
+                if name not in {"write_text", "read_text", "open", "NamedTemporaryFile"}:
+                    continue
+                if name == "open" and isinstance(node.func, ast.Attribute):
+                    continue  # os.open / Path.open / webbrowser.open are not this call
+                modes = [
+                    a.value for a in node.args
+                    if isinstance(a, ast.Constant) and isinstance(a.value, str)
+                ]
+                if any("b" in m for m in modes if len(m) <= 3):
+                    continue  # binary: no encoding to declare
+                if any(kw.arg == "encoding" for kw in node.keywords):
+                    continue
+                rel = path.relative_to(ROOT)
+                offenders.append(f"{rel}:{node.lineno} {name}()")
+        self.assertEqual(
+            offenders, [],
+            "these let the machine locale choose the encoding:\n" + "\n".join(offenders),
+        )
+
+    def test_no_shell_script_expands_a_possibly_empty_array_under_set_u(self):
+        """macOS ships bash 3.2, where "${EMPTY[@]}" is an UNBOUND VARIABLE.
+
+        Under `set -u` (every script here sets it) bash 3.2 aborts on the plain
+        expansion of an array that is empty -- a bug fixed upstream only in 4.4, and
+        /bin/bash on macOS is still 3.2 because of GPLv3. Measured on macOS CI run
+        32102631508: `build.sh: line 90: TARGETS[@]: unbound variable`, which killed
+        `--install` for every invocation that passed no `--target`, i.e. the ordinary
+        one. Linux never sees it, so only CI or a real Mac catches the regression --
+        which is why the rule is pinned here as source, not left to the platform.
+
+        The `${NAME[@]+"${NAME[@]}"}` form expands to nothing at all when the array is
+        empty or unset, and is byte-identical to the plain form otherwise."""
+        offenders = []
+        for script in sorted(ROOT.glob("*.sh")) + sorted(ROOT.glob("ai/scripts/*.sh")):
+            text = script.read_text(encoding="utf-8")
+            if "set -u" not in text and "set -euo" not in text:
+                continue
+            empty = set(re.findall(r"(?:local\s+)?([A-Za-z_][A-Za-z0-9_]*)=\(\)", text))
+            for name in empty:
+                for lineno, line in enumerate(text.splitlines(), 1):
+                    if line.lstrip().startswith("#"):
+                        continue
+                    if '"${%s[@]}"' % name in line and ("%s[@]+" % name) not in line:
+                        rel = script.relative_to(ROOT)
+                        offenders.append(f"{rel}:{lineno} {line.strip()}")
+        self.assertEqual(
+            offenders, [],
+            "bash 3.2 aborts on these; use ${NAME[@]+\"${NAME[@]}\"}:\n" + "\n".join(offenders),
+        )
+
+    @unittest.skipIf(os.name != "posix", "dir_fd= is POSIX-only")
+    def test_unittest_write_guard_fails_closed_when_a_dir_fd_cannot_be_resolved(self):
+        """P2-F09: an unnameable dir_fd is a DENIAL, never a waiver.
+
+        The guard used to resolve descriptors through `/proc/self/fd/<n>` and nothing
+        else. That file exists only on Linux, so on macOS every read raised
+        `FileNotFoundError`, `_resolved_write_target` swallowed it and returned `None`,
+        and `_deny_if_outside_sandbox` waved the write through -- the sandbox failed
+        OPEN on a whole supported platform for two full releases. Measured on macOS CI
+        run 32102631508: the sibling test above reported `FileNotFoundError` from the
+        real `os.remove`, not the `PermissionError` the guard owes.
+
+        `/proc` is stubbed out here so the resolution genuinely fails on any platform,
+        which is the only way to assert the fail-closed contract from Linux. The Darwin
+        `F_GETPATH` fallback itself is proven by macOS CI, not by this test."""
+        real_readlink = os.readlink
+
+        def without_proc(path, *rest, **kwargs):
+            if str(path).startswith("/proc/"):
+                raise FileNotFoundError(errno.ENOENT, "No such file or directory", str(path))
+            return real_readlink(path, *rest, **kwargs)
+
+        outside = tests._TEST_SANDBOX / "p2f09-escaping-parent"
+        if not outside.exists():
+            outside.symlink_to(ROOT, target_is_directory=True)
+        fd = os.open(tests._TEST_SANDBOX, os.O_RDONLY)
+        with mock.patch.object(os, "readlink", without_proc), mock.patch.object(
+            tests, "fcntl", None
+        ):
+            try:
+                with self.assertRaises(PermissionError) as denial:
+                    os.remove("p2f09-escaping-parent/never-remove", dir_fd=fd)
+            finally:
+                os.close(fd)
+        self.assertIn("dir_fd", str(denial.exception))
+
+    def test_the_popen_replacement_is_still_subclassable(self):
+        """P2-F10: `subprocess.Popen` must stay a CLASS, or stdlib imports break.
+
+        The sandbox replaced it with a plain function. Anything doing `class
+        X(subprocess.Popen)` then failed at import time -- and on Windows the standard
+        library does precisely that: `unittest.mock` -> `asyncio` ->
+        `asyncio.windows_utils:125`. `from unittest import mock` at line 26 of THIS
+        file died with `TypeError: function() argument 'code' must be code, not str`
+        and the whole module never loaded (Windows CI run 32102631508). Linux and macOS
+        never import that module, so nothing here could ever have caught it -- which is
+        exactly why the shape is pinned rather than left to the platform."""
+        self.assertTrue(inspect.isclass(subprocess.Popen), subprocess.Popen)
+
+        class Derived(subprocess.Popen):
+            pass
+
+        self.assertTrue(issubclass(Derived, subprocess.Popen))
+        # And the boundary still applies to a direct instantiation.
+        proc = subprocess.Popen([sys.executable, "-c", "print('ok')"],
+                                stdout=subprocess.PIPE, text=True)
+        self.assertEqual(proc.communicate()[0].strip(), "ok")
+
+    def test_write_guard_resolves_descriptors_through_one_portable_choke_point(self):
+        """P2-F09: no call site reads /proc directly, so no platform loses the guard.
+
+        The bug was not a missing branch -- it was TWO independent hardcodings of a
+        Linux-only path, one of which had no test at all. Pinning the choke point is
+        what keeps a third one from appearing the next time a descriptor needs naming."""
+        source = (ROOT / "tests/__init__.py").read_text(encoding="utf-8")
+        readers = [
+            line for line in source.splitlines()
+            if 'os.readlink(f"/proc/self/fd/' in line
+        ]
+        self.assertEqual(
+            len(readers), 1,
+            f"/proc/self/fd/ must be read only inside _descriptor_path: {readers}",
+        )
+        self.assertIn("F_GETPATH", source, "the Darwin fallback must survive")
 
     def test_unittest_child_home_implicitly_moves_state_to_that_fixture_home(self):
         """P2-F03: HOME-only fixture overrides never inherit the suite-global state."""

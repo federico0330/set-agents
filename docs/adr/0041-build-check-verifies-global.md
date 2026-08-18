@@ -90,7 +90,24 @@ completa cuando ambos se citan como evidencia de un gate**, sea la secuencia int
 files=2`, como dos líneas de evidencia independientes). El job `windows-bootstrap`
 (`.github/workflows/ci.yml:32-51`) corre la suite sola (no puede correr `build.sh`, que es bash) —
 eso es aceptable porque **nunca** se cita como prueba de que `Global/` no tiene drift, solo de que
-los scripts Python compilan y la suite pasa en Windows.
+los scripts Python compilan.
+
+**Corrección (2026-08-18).** Este párrafo decía además "y la suite pasa en Windows". Eso nunca fue
+cierto: el paso `Full unittest suite` entró el 2026-08-01 y falló en **todas** las corridas
+posteriores — la última medida, la 32102631508, cerró en `FAILED (failures=21, errors=96)`, y el
+último CI enteramente verde es anterior al paso. El ADR certificaba un gate que nadie pasó, y esa
+certificación es la razón por la que el rojo sobrevivió tres semanas sin que nadie lo mirara.
+
+Lo que el job prueba de verdad es el **bootstrap**, que es como se llama: `install.ps1` parsea, corre
+en `-DryRun` y los fuentes Python compilan bajo el Python de Windows. La suite completa no es un
+objetivo nativo ahí, porque `README.md:107` declara el camino de Windows como `install.ps1` → WSL
+administrado: el harness CORRE sobre Linux aunque la máquina sea Windows. Los tests que invocan la
+toolchain POSIX (`bash` + `python3`: `set-agents`, `build.sh`, `install.sh`) ahora **saltan con la
+razón nombrada** en una máquina que no la tiene, en vez de fallar como si hubieran encontrado un
+defecto — el mismo mecanismo que el repo ya usaba en `tests/test_provider_registry.py:463`. En Linux
+y macOS no cambia nada, y `test_the_posix_toolchain_is_present_on_every_platform_that_declares_it`
+falla ruidosamente si esa condición dejara de valer ahí, para que el salto no pueda volverse un verde
+vacío.
 
 ### 5. AC-05 — la evidencia histórica de 019/020 queda anotada, no reabierta
 

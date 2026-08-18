@@ -89,20 +89,35 @@ fi
 
 case "$MODE" in
   check)
+    # Every file that lives in BOTH trees, not a hand-written pair. Until 2026-08-18 this
+    # named exactly two, and the drift that mattered happened in the ones nobody named:
+    # PROYECTO/ still shipped render_bitacora.py truncating narration at 300 chars (the
+    # N3b-F01 finding of feature 028, closed as repaired) and an axes.py missing
+    # validate_row entirely (feature 029, also closed). Two features in DONE were half
+    # delivered and the gate said SELF_SCAFFOLD_SYNC_OK. `verify.sh` is the ONE declared
+    # exception: the harness copy gates this repo, the template copy sniffs a generic
+    # project's stack. Mirrored by tests/test_narracion_contrato.py's parity test.
     drift=0
-    for name in feature-state.py check-owned-paths.py; do
-      source="$ROOT/PROYECTO/ai/scripts/$name"
-      target="$ROOT/ai/scripts/$name"
-      if [ ! -e "$source" ] || [ ! -e "$target" ]; then
-        echo "SELF_SCAFFOLD_DRIFT file=ai/scripts/$name template=PROYECTO/ai/scripts/$name reason=missing"
-        drift=1
-      elif ! cmp -s "$source" "$target"; then
-        echo "SELF_SCAFFOLD_DRIFT file=ai/scripts/$name template=PROYECTO/ai/scripts/$name reason=differs"
+    checked=0
+    while IFS= read -r source; do
+      rel="${source#"$ROOT/PROYECTO/ai/scripts/"}"
+      case "$rel" in verify.sh|*/__pycache__/*|__pycache__/*) continue ;; esac
+      target="$ROOT/ai/scripts/$rel"
+      [ -e "$target" ] || continue
+      checked=$((checked + 1))
+      if ! cmp -s "$source" "$target"; then
+        echo "SELF_SCAFFOLD_DRIFT file=ai/scripts/$rel template=PROYECTO/ai/scripts/$rel reason=differs"
         drift=1
       fi
-    done
+    done <<EOF
+$(find "$ROOT/PROYECTO/ai/scripts" -type f | sort)
+EOF
+    if [ "$checked" -lt 23 ]; then
+      echo "SELF_SCAFFOLD_DRIFT reason=mirror-shrank checked=$checked expected>=23"
+      drift=1
+    fi
     [ "$drift" -eq 0 ] || exit 1
-    echo "SELF_SCAFFOLD_SYNC_OK files=2"
+    echo "SELF_SCAFFOLD_SYNC_OK files=$checked"
 
     # AC-01 (ADR-0041): the self-scaffold comparison above never looked at Global/ -- this is
     # the check that was missing. Forced to --profile go-zen ALWAYS, ignoring $PROFILE/--profile
@@ -144,15 +159,19 @@ case "$MODE" in
     ;;
   install)
     target_args=()
-    for target in "${TARGETS[@]}"; do
+    # bash 3.2 -- still /bin/bash on macOS -- treats "${EMPTY[@]}" as an unbound
+    # variable under `set -u` (fixed upstream only in 4.4).  With no --target flag
+    # TARGETS is empty, so the plain expansion aborted every macOS `--install`; the
+    # `+` form expands to nothing at all when the array is unset or empty.
+    for target in ${TARGETS[@]+"${TARGETS[@]}"}; do
       target_args+=(--target "$target")
     done
-    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" "${target_args[@]}" --preview
+    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" ${target_args[@]+"${target_args[@]}"} --preview
     if [ "$YES" -ne 1 ]; then
       read -r -p "Install this managed diff globally? [y/N] " answer
       case "$answer" in y|Y|yes|YES) ;; *) echo "Installation cancelled."; exit 1;; esac
     fi
-    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" "${target_args[@]}"
+    python3 "$ROOT/ai/scripts/install.py" --staging "$STAGING" --home "$HOME" ${target_args[@]+"${target_args[@]}"}
     ensure_drift_hook
     ;;
 esac

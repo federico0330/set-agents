@@ -63,7 +63,7 @@ run_uninstall_flow() {
     all) target_args=(--target opencode --target claude-code --target codex --target pi) ;;
   esac
   echo "Vista previa de lo que --uninstall va a borrar/des-fusionar (harness=$HARNESS):"
-  python3 "$ROOT/ai/scripts/install.py" --home "$HOME" --uninstall "${target_args[@]}" --preview
+  python3 "$ROOT/ai/scripts/install.py" --home "$HOME" --uninstall ${target_args[@]+"${target_args[@]}"} --preview
   if [ "$DRY" -eq 1 ]; then
     # F01: --dry-run must actually stop here, in EVERY mode -- it must never
     # reach the destructive branch below, uninstall included.
@@ -74,7 +74,7 @@ run_uninstall_flow() {
     echo "Desinstalación cancelada."
     return 1
   }
-  python3 "$ROOT/ai/scripts/install.py" --home "$HOME" --uninstall "${target_args[@]}"
+  python3 "$ROOT/ai/scripts/install.py" --home "$HOME" --uninstall ${target_args[@]+"${target_args[@]}"}
 }
 
 harness_wanted() {

@@ -30,7 +30,7 @@ def check(state_path, package_id, action):
     if action in {"freeze-candidate", "record-receipt"}:
         return True
     try:
-        data = json.loads(Path(state_path).read_text())
+        data = json.loads(Path(state_path).read_text(encoding="utf-8"))
         package = package_by_id(data, package_id)
     except (OSError, json.JSONDecodeError, StateError) as exc:
         fail(f"integration blocked: cannot read package state: {exc}")

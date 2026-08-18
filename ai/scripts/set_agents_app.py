@@ -219,7 +219,7 @@ def _read_model_preference_raw():
     """Fail-closed parse only -- never `app_config()`'s silent `except: return {}}` swallow
     (round-3 R3-F-04(a)); a malformed file loudly fails every caller, load or write alike."""
     try:
-        raw = MODEL_PREFERENCE_PATH.read_text()
+        raw = MODEL_PREFERENCE_PATH.read_text(encoding="utf-8")
     except FileNotFoundError:
         return {}
     except OSError as exc:
@@ -934,7 +934,7 @@ def _install_scope():
     if not scope_path.exists():
         return None
     try:
-        return sorted(t for t in json.loads(scope_path.read_text()) if isinstance(t, str))
+        return sorted(t for t in json.loads(scope_path.read_text(encoding="utf-8")) if isinstance(t, str))
     except (OSError, json.JSONDecodeError):
         return "unreadable"
 
@@ -1059,7 +1059,7 @@ def platform_label():
     if sys.platform == "darwin":
         return "macOS"
     try:
-        if "microsoft" in Path("/proc/version").read_text().lower():
+        if "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower():
             return "WSL"
     except OSError:
         pass
@@ -1074,7 +1074,7 @@ def first_run():
 
 def app_config():
     try:
-        return tomllib.loads(APP_CONFIG.read_text())
+        return tomllib.loads(APP_CONFIG.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return {}
 
@@ -1085,7 +1085,7 @@ def auto_update_enabled():
 
 def write_app_config(**updates):
     """Read-merge-write over app_config() — the ONE writer every config mutation goes through
-    (AC-15). A raw `APP_CONFIG.write_text(...)` anywhere else would silently clobber whatever
+    (AC-15). A raw `APP_CONFIG.write_text(..., encoding="utf-8")` anywhere else would silently clobber whatever
     this call didn't know about (e.g. a `vault` key persisted by a prior, unrelated run)."""
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     config = {**app_config(), **updates}
@@ -1093,7 +1093,7 @@ def write_app_config(**updates):
         f"{key} = {'true' if value else 'false'}" if isinstance(value, bool) else f"{key} = {json.dumps(value)}"
         for key, value in sorted(config.items())
     ]
-    APP_CONFIG.write_text("\n".join(lines) + "\n")
+    APP_CONFIG.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return config
 
 
@@ -1501,7 +1501,7 @@ def _load_local_catalog():
     if not path.is_file():
         return {}
     try:
-        raw = tomllib.loads(path.read_text())
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         print(f"WARNING: {path} no se pudo leer ({exc}) -- el catálogo local se ignora "
               f"hasta que se corrija o se borre el archivo", file=sys.stderr)
@@ -1547,7 +1547,7 @@ def load_catalog():
     must never be able to shadow e.g. `vercel`. This is defense in depth for a hand-edited
     `tools.local.toml`; the normal path (`cmd_tools_approve`) refuses the collision outright
     at write time instead of ever producing an entry this merge would just hide."""
-    curated = tomllib.loads((ROOT / "tools.toml").read_text())
+    curated = tomllib.loads((ROOT / "tools.toml").read_text(encoding="utf-8"))
     for section, entries in _load_local_catalog().items():
         merged = dict(curated.get(section, {}))
         for name, entry in entries.items():
@@ -1565,7 +1565,7 @@ def _is_local_only_entry(kind, name):
     `load_catalog()`'s own curated-wins collision rule byte for byte: a name present in
     BOTH is curated for every purpose, including this one -- never treated as local just
     because a local block with that name also exists."""
-    curated = tomllib.loads((ROOT / "tools.toml").read_text())
+    curated = tomllib.loads((ROOT / "tools.toml").read_text(encoding="utf-8"))
     if name in curated.get(kind, {}):
         return False
     return name in _load_local_catalog().get(kind, {})
@@ -1702,7 +1702,7 @@ def _read_tools_proposals():
     proposal entry that isn't itself an object is dropped the same way."""
     path = ROOT / "tools.proposals.json"
     try:
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return {}
     if not isinstance(raw, dict):
@@ -1930,7 +1930,7 @@ def cmd_tools_approve(name):
     if reason:
         print(f"TOOLS_APPROVE_REJECTED {name} — {reason}")
         return 2
-    curated = tomllib.loads((ROOT / "tools.toml").read_text())
+    curated = tomllib.loads((ROOT / "tools.toml").read_text(encoding="utf-8"))
     if any(name in curated.get(section, {}) for section in _TOOL_KINDS):
         print(f"TOOLS_APPROVE_REJECTED {name} — colisiona con el catálogo curado (tools.toml); "
               f"el curado siempre gana, elegí otro nombre")
@@ -2295,7 +2295,7 @@ def atomic_write(path, content):
 
 def read_json(path):
     try:
-        return json.loads(Path(path).read_text())
+        return json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
 
@@ -2307,7 +2307,7 @@ def read_json_for_write(path):
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise SystemExit(f"MCP_ABORT {path} existe pero no parsea como JSON ({exc}); arreglalo antes de tocarlo")
 
@@ -2371,7 +2371,7 @@ def mcp_state(harness, target, name):
     path = target["path"]
     if harness == "codex":
         try:
-            section = tomllib.loads(path.read_text()).get("mcp_servers", {}).get(name)
+            section = tomllib.loads(path.read_text(encoding="utf-8")).get("mcp_servers", {}).get(name)
         except (OSError, tomllib.TOMLDecodeError):
             section = None
         if section is None:
@@ -2389,7 +2389,7 @@ def mcp_write(harness, target, name, spec=None, enabled=None, remove=False):
     """Add (spec), toggle (enabled) or remove a server in the target's native format."""
     path = target["path"]
     if harness == "codex":
-        lines = path.read_text().splitlines() if path.exists() else []
+        lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
         span = _codex_span(lines, name)
         if remove and span:
             del lines[span[0]:span[1]]
@@ -2885,7 +2885,7 @@ def cmd_vault_init(target, company=None):
     for path, content in seeds.items():
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content)
+            path.write_text(content, encoding="utf-8")
             print(f"VAULT_CREATED {path.relative_to(target)}")
             created = True
     projects = vault / "Proyectos"
@@ -2970,7 +2970,7 @@ def _git_exclude_path(project):
 
 def _notes_currently_excluded(project):
     exclude = _git_exclude_path(project)
-    return exclude is not None and exclude.exists() and "docs/notas" in exclude.read_text().splitlines()
+    return exclude is not None and exclude.exists() and "docs/notas" in exclude.read_text(encoding="utf-8").splitlines()
 
 
 def exclude_notes_from_git(project):
@@ -2979,10 +2979,10 @@ def exclude_notes_from_git(project):
     if exclude is None:
         return False
     exclude.parent.mkdir(parents=True, exist_ok=True)
-    lines = exclude.read_text().splitlines() if exclude.exists() else []
+    lines = exclude.read_text(encoding="utf-8").splitlines() if exclude.exists() else []
     if "docs/notas" in lines:
         return False
-    exclude.write_text("\n".join(lines + ["docs/notas"]) + "\n")
+    exclude.write_text("\n".join(lines + ["docs/notas"]) + "\n", encoding="utf-8")
     return True
 
 
@@ -3027,7 +3027,7 @@ def vault_link_private(project, target_vault, notes, notes_home):
         shutil.rmtree(notes)
     seed = notes_home / "00 - Proyecto.md"
     if not seed.exists():
-        seed.write_text(project_notes_seed(project.name))
+        seed.write_text(project_notes_seed(project.name), encoding="utf-8")
         print(f"VAULT_CREATED {seed}")
     notes.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -3061,7 +3061,7 @@ def cmd_vault_link(project, vault=None, private=False):
     seed = notes / "00 - Proyecto.md"
     if not seed.exists():
         notes.mkdir(parents=True, exist_ok=True)
-        seed.write_text(project_notes_seed(project.name))
+        seed.write_text(project_notes_seed(project.name), encoding="utf-8")
         print(f"VAULT_CREATED {seed}")
     link = target_vault / "Proyectos" / project.name
     if link.is_symlink():
@@ -3251,7 +3251,7 @@ def cmd_vault_doctor(project=None, vault=None, dry_run=False, repair=False, excl
             "fingerprint": _plan_fingerprint(plan),
             "exclude_notes": bool(exclude_notes),
             "at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        }))
+        }), encoding="utf-8")
         print(f"VAULT_DOCTOR_PLAN project={project_path} action={plan['action']}")
         for key in ("files", "already_present", "conflicts"):
             if plan.get(key):
@@ -3587,7 +3587,7 @@ def _scaffold_attempt_obsidian_once(root):
     marker.write_text(json.dumps({
         "outcome": outcome,
         "at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-    }))
+    }), encoding="utf-8")
 
 
 def cmd_routing_migrate() -> int:

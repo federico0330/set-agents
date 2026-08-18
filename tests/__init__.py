@@ -8,6 +8,11 @@ import tempfile
 import urllib.parse
 from pathlib import Path
 
+try:  # POSIX only; Windows resolves no descriptor to a path at all.
+    import fcntl
+except ImportError:  # pragma: no cover - exercised only on Windows CI
+    fcntl = None
+
 # AC-02 (027/P1). Dozens of test modules do `import provider_registry` (and siblings)
 # by bare name from inside ai/scripts/*.py -- that only resolves once ai/scripts/ is on
 # sys.path. Every individual test_*.py used to do its own `sys.path.insert(0, ...)` at
@@ -162,24 +167,96 @@ def _sandboxed_popen(args, *popen_args, **popen_kwargs):
     return _SandboxPopen(boundary, *popen_args, **popen_kwargs)
 
 
-subprocess.Popen = _sandboxed_popen
+class _BoundaryPopen(_ORIGINAL_POPEN):
+    """`subprocess.Popen`'s replacement, as a CLASS and not a bare function.
+
+    P2-F10 (Windows CI, 2026-08-18): this used to be `subprocess.Popen =
+    _sandboxed_popen`, a plain function. Anything that later did `class
+    X(subprocess.Popen)` then blew up at import time, because a function cannot be a
+    base class. On Windows the CPython standard library does exactly that:
+    `unittest.mock` imports `asyncio`, which imports `asyncio.windows_utils`, whose
+    line 125 is `class Popen(subprocess.Popen)`. So `from unittest import mock` --
+    line 26 of tests/test_harness.py -- died with `TypeError: function() argument
+    'code' must be code, not str`, and the ENTIRE module failed to load. Linux and
+    macOS never import `asyncio.windows_utils`, so the landmine sat there unseen.
+
+    `__new__` dispatches only when instantiated as this exact class; a genuine
+    subclass builds itself normally. `_sandboxed_popen` returns an instance of a
+    DIFFERENT class (`_ORIGINAL_POPEN` or `_SandboxPopen`, both parents rather than
+    children of this one), so Python correctly skips calling `__init__` on it again.
+    """
+
+    def __new__(cls, args=(), *popen_args, **popen_kwargs):
+        if cls is not _BoundaryPopen:
+            return super().__new__(cls)
+        return _sandboxed_popen(args, *popen_args, **popen_kwargs)
+
+
+subprocess.Popen = _BoundaryPopen
+
+
+def _descriptor_path(fd):
+    """The filesystem path an open descriptor points at, portably.
+
+    P2-F09 (macOS CI, 2026-08-18): both fd-resolving call sites below read
+    ``/proc/self/fd/<n>``, which exists ONLY on Linux.  On macOS every read raised
+    ``FileNotFoundError``, both sites swallowed it as "unresolvable", and the guard
+    returned ``None`` -- so the whole write sandbox FAILED OPEN for every fd-based and
+    ``dir_fd``-based write on that platform.  The one test that would have caught it
+    (``test_unittest_write_guard_rejects_symlink_parent_for_remove_rename_and_dir_fd``)
+    was itself the macOS failure: the real ``os.remove`` ran unguarded and reported
+    ``FileNotFoundError`` instead of the ``PermissionError`` the guard owes.
+
+    Darwin/BSD answer the same question through ``fcntl(fd, F_GETPATH, buf)``.  CPython
+    only exposes ``fcntl.F_GETPATH`` from 3.13, so the Darwin constant (50) is the
+    fallback.  Raises ``OSError`` when the descriptor has no path at all -- a pipe or a
+    socket -- which both callers already treat as "not a filesystem destination".
+    """
+    try:
+        return os.readlink(f"/proc/self/fd/{fd}")
+    except OSError:
+        if fcntl is None:
+            raise
+        buf = fcntl.fcntl(fd, getattr(fcntl, "F_GETPATH", 50), b"\0" * 1024)
+        return buf.split(b"\0", 1)[0].decode()
 
 
 def _resolved_write_target(value, *, dir_fd=None, follow_final_symlink=True):
     """Return a stable absolute destination without requiring it to exist."""
     if isinstance(value, int):
         try:
-            target = Path(os.readlink(f"/proc/self/fd/{value}"))
+            target = Path(_descriptor_path(value))
             # Pipes/sockets are file descriptors, not filesystem destinations.  Treating
             # their kernel labels (for example ``pipe:[123]``) as relative paths would
             # falsely resolve them below the repository and block subprocess stdout.
+            # Darwin's F_GETPATH answers `/dev/fd/<n>` for a descriptor with no name of
+            # its own -- absolute, but self-referential, so it is the same non-answer
+            # `pipe:[123]` is on Linux and must not be mistaken for a real destination.
+            if target.parent == Path("/dev/fd"):
+                return None
             return target.resolve(strict=False) if target.is_absolute() else None
         except OSError:
             return None
     try:
         target = Path(os.fspath(value))
-        if not target.is_absolute() and isinstance(dir_fd, int) and dir_fd >= 0:
-            target = Path(os.readlink(f"/proc/self/fd/{dir_fd}")) / target
+    except (TypeError, ValueError):
+        return None
+    # Resolved HERE and never inside the block below: PermissionError is itself an
+    # OSError, so a denial raised in there would be swallowed by that same handler and
+    # silently downgraded to "unresolvable" -- fail open, the very bug P2-F09 fixes.
+    # An absolute path ignores dir_fd (POSIX), so it is never resolved for one.
+    if not target.is_absolute() and isinstance(dir_fd, int) and dir_fd >= 0:
+        try:
+            target = Path(_descriptor_path(dir_fd)) / target
+        except OSError as exc:
+            # Fail CLOSED: a write relative to a directory this process cannot name
+            # cannot be proven to land inside the sandbox, so it is denied rather than
+            # waved through.
+            raise PermissionError(
+                f"test write outside private sandbox denied: dir_fd {dir_fd} is not "
+                f"resolvable on this platform, so {value!r} cannot be proven inside it"
+            ) from exc
+    try:
         if follow_final_symlink:
             return target.resolve(strict=False)
         # unlink/rename mutate a directory entry rather than the target of a final
@@ -283,3 +360,64 @@ def _test_write_audit(event, args):
 
 
 sys.addaudithook(_test_write_audit)
+
+
+# ---------------------------------------------------------------------------
+# The POSIX shell toolchain this harness is built on.
+#
+# `set-agents`, `build.sh`, `install.sh`, `verify.sh`, `mcp.sh` and friends are bash
+# scripts that `exec python3`. That is not incidental: README.md:107 declares the
+# Windows path as `install.ps1` -> managed WSL, i.e. the harness RUNS on Linux even
+# when the machine is a Windows machine. Native Windows is a BOOTSTRAP target (parse
+# install.ps1, dry-run it, compile the Python sources), never a runtime one.
+#
+# The CI job is even named `windows-bootstrap`. Its "Full unittest suite" step was
+# added on 2026-08-01 and has failed on every single run since -- it has never once
+# been green. It was asserting a claim the product does not make.
+#
+# So the tests that shell out to that toolchain SKIP on a machine that lacks it, with
+# the reason named, rather than failing as if a defect had been found. This changes
+# nothing on Linux or macOS: `_POSIX_TOOLCHAIN` is True there by construction, and
+# `test_the_posix_toolchain_is_present_on_posix` fails loudly if it ever is not, so a
+# broken PATH can never silently skip the suite on the platforms that do support it.
+_TOOLCHAIN_REASON = (
+    "requires the POSIX shell toolchain (bash + python3); on Windows the harness runs "
+    "inside WSL per README.md:107, and this job only proves the bootstrap"
+)
+
+
+def _detect_posix_toolchain():
+    """Can a bash script here hand a path to python3 and have it work?
+
+    That, and not "is there a bash binary", is what every script in this repo needs:
+    `set-agents` is `exec python3 "$ROOT/ai/scripts/set_agents_app.py"`, where $ROOT
+    comes from bash. Git Bash on Windows computes `/d/a/set-agents` and native Windows
+    Python cannot open that path -- both binaries exist and are perfectly functional,
+    and the composition still fails. A probe that only checked `bash -c true` would
+    answer True there and the tests would go right back to failing.
+
+    The probe runs ONLY off-POSIX; on Linux and macOS the answer is True with no
+    subprocess at all, so nothing about the normal path changes or slows down."""
+    if os.name == "posix":
+        return True
+    bash = shutil.which("bash")
+    if not bash or not shutil.which("python3"):
+        return False
+    try:
+        return subprocess.run(
+            [bash, "-c",
+             'python3 -c "import os,sys; sys.exit(0 if os.path.isdir(sys.argv[1]) else 1)" "$(pwd)"'],
+            capture_output=True, timeout=60,
+        ).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+_POSIX_TOOLCHAIN = _detect_posix_toolchain()
+
+
+def require_posix_toolchain():
+    """Skip the calling test when the POSIX shell toolchain is absent."""
+    if not _POSIX_TOOLCHAIN:
+        import unittest
+        raise unittest.SkipTest(_TOOLCHAIN_REASON)

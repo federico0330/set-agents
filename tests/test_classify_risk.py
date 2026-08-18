@@ -133,6 +133,11 @@ class ClassifyRiskUnitTests(unittest.TestCase):
             self.assertEqual(level, "high")
             self.assertTrue(any("subprocess-spawn" in r for r in reasons), reasons)
 
+    @unittest.skipIf(
+        os.name != "posix",
+        "the executable bit is a POSIX file mode: on Windows os.chmod(0o755) is a "
+        "no-op, git sees no change, and the commit that stages it fails outright",
+    )
     def test_executable_mode_added_is_high(self):
         with tempfile.TemporaryDirectory() as td:
             repo = Path(td) / "repo"

@@ -329,7 +329,7 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
 
 def load_state(path: Path) -> dict[str, Any]:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise StateError(f"state file not found: {path}") from exc
     if not isinstance(data, dict):
@@ -340,7 +340,12 @@ def load_state(path: Path) -> dict[str, Any]:
 def atomic_write(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(data, indent=2, sort_keys=True) + "\n"
-    with tempfile.NamedTemporaryFile("w", dir=str(path.parent), delete=False) as handle:
+    # Explicit UTF-8, even though json.dumps defaults to ensure_ascii=True and this
+    # payload is ASCII today: this is the DURABLE state record, and the day someone
+    # passes ensure_ascii=False the locale would silently decide the file's encoding.
+    with tempfile.NamedTemporaryFile(
+        "w", dir=str(path.parent), delete=False, encoding="utf-8"
+    ) as handle:
         handle.write(payload)
         tmp_name = handle.name
     os.replace(tmp_name, path)

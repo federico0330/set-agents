@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `DONE` · modo: scoped · revisión 180
+- fase: `DONE` · modo: scoped · revisión 181
 - estado final: **DONE**
 - spec: `docs/specs/025-consola-minima-y-flexible/spec.md` (hash `f113d8233aa7`)
 
@@ -83,7 +83,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/025-consola-minima-y-flexible/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/025-consola-minima-y-flexible/bitacora.md`
 
-_Actualizado: 2026-08-18T01:15:24+00:00_
+_Actualizado: 2026-08-18T02:48:54+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

@@ -46,10 +46,19 @@ jobs:
       # AC-11 (005-P2/DEC-7): machine-verified tier stops being parse-only. This proves the
       # SELECTION logic (platform_pm/pick_method, path resolution, JSON envelopes) works on real
       # Windows Python — it does not prove Obsidian's GUI actually installs (DEC-7's manual tier).
+      # Native Windows is a BOOTSTRAP target, not a runtime one: README.md:107 declares
+      # the Windows path as install.ps1 -> managed WSL, so the harness itself runs on
+      # Linux there and `verify-linux` is the gate that covers it. The tests that shell
+      # out to the POSIX toolchain (bash + python3: set-agents, build.sh, install.sh)
+      # skip here with the reason named -- see tests/__init__.py -- instead of failing
+      # as if they had found a defect. What stays proven is the platform-independent
+      # core plus the bootstrap above.
       - name: Full unittest suite
         shell: pwsh
-        # PYTHONUTF8=1 mirrors -X utf8: forces UTF-8 for file I/O on Windows so tests
-        # that read markdown/Python files (which contain non-cp1252 characters) do not
-        # fail with UnicodeDecodeError.  Python 3.7+ supports the env-var form, which
-        # works with `python -m` without needing a custom shim.
+        env:
+          # The env-var form, not `-X utf8`: the flag applies to THIS interpreter only,
+          # while the tests spawn feature-state.py and friends as children. Production
+          # code now declares encoding="utf-8" at every text read and write, so this is
+          # a second line of defence rather than the mechanism.
+          PYTHONUTF8: "1"
         run: python -X utf8 -m unittest discover -s tests -v
