@@ -45,8 +45,14 @@ def run(*args, env=None, check=True):
     # STATUS.md / other outputs with non-UTF-8 bytes that subsequent read_text(encoding="utf-8")
     # then fails on.  On Linux/macOS this is a no-op (they default to UTF-8 already).
     utf8_env = {"PYTHONUTF8": "1"}
+    cmd = list(args)
+    # On Windows, shell scripts need an explicit bash interpreter prefix since the OS
+    # does not know how to execute .sh files natively.  GitHub-hosted Windows runners
+    # include Git Bash at C:\Program Files\Git\bin\bash.exe and in PATH.
+    if os.name != "posix" and cmd and isinstance(cmd[0], str) and cmd[0].endswith(".sh"):
+        cmd = ["bash"] + cmd
     return subprocess.run(
-        args,
+        cmd,
         cwd=ROOT,
         env={**os.environ, **utf8_env, **(env or {})},
         text=True,
