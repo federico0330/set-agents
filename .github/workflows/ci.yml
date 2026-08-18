@@ -48,4 +48,8 @@ jobs:
       # Windows Python — it does not prove Obsidian's GUI actually installs (DEC-7's manual tier).
       - name: Full unittest suite
         shell: pwsh
-        run: python -m unittest discover -s tests -v
+        # PYTHONUTF8=1 mirrors -X utf8: forces UTF-8 for file I/O on Windows so tests
+        # that read markdown/Python files (which contain non-cp1252 characters) do not
+        # fail with UnicodeDecodeError.  Python 3.7+ supports the env-var form, which
+        # works with `python -m` without needing a custom shim.
+        run: python -X utf8 -m unittest discover -s tests -v

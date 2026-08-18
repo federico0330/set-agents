@@ -211,6 +211,7 @@ _CANONICAL_DDL_FINGERPRINTS = {
 }
 
 
+@unittest.skipIf(os.name != "posix", "routing store requires POSIX file locking (WAL mode)")
 class RoutingTests(unittest.TestCase):
     def setUp(self):
         self.config=models_config.load_config(ROOT/"models.toml")
