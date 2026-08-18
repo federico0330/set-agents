@@ -66,13 +66,17 @@ class ScopedInstallDriftTests(unittest.TestCase):
             self.assertEqual(json.loads(scope_path.read_text()), ["claude-code", "pi"])
             # The opencode/codex trees were never installed on this "machine";
             # the scope record must keep the drift check from counting them.
+            # Create a python3 shim so check-drift.sh uses the same interpreter
+            # as the test suite (which has tomllib; system python3 may not).
+            bin_dir = tmp / "bin"
+            bin_dir.mkdir()
+            python3_shim = bin_dir / "python3"
+            python3_shim.write_text(f"#!/bin/sh\nexec {sys.executable} \"$@\"\n")
+            python3_shim.chmod(0o755)
             drift = subprocess.run(
                 ["bash", "ai/scripts/check-drift.sh"],
                 cwd=ROOT, env={
-                    # Include sys.executable's directory first so check-drift.sh's
-                    # `python3` resolves to the same interpreter (which has tomllib).
-                    # On CI, /usr/bin/python3 may be Python 3.10 (no tomllib).
-                    "PATH": str(Path(sys.executable).parent) + ":/usr/bin:/bin",
+                    "PATH": str(bin_dir) + ":/usr/bin:/bin",
                     "HOME": str(home), "DRIFT_HOME": str(home)},
                 capture_output=True, text=True,
             )
