@@ -83,6 +83,8 @@ MUTATING_COMMANDS = {
     "amend-spec",
     "supersede-package",
     "record-module-impact",
+    "amend-package",
+    "reopen-from-done",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
 # Refuting retires a blocking finding with no code change: it is an authorization verb,

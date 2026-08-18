@@ -519,15 +519,46 @@ def cmd_reopen(args: argparse.Namespace) -> int:
     The reset is directed, never a blanket clear of every counter on the package: see
     `block_with_reason`'s docstring for the structured `counter` key this reads, and
     `_reset_blocker_counter` for the reset itself.
+
+    031-registro-correctivo: `--from-done` extends this to DONE phase.  The flag is required
+    when reopening from DONE so the caller explicitly acknowledges the non-standard path.
+    Unlike reopening from BLOCKED, no blocker counters are reset (DONE has none), and the
+    event written is `reopen-from-done` so the prior closure remains visible in the history.
     """
     path = state_file_arg(args)
 
     def update(data: dict[str, Any]) -> bool:
         from_phase = data["phase"]
-        if from_phase != "BLOCKED":
-            raise StateError(f"cannot reopen from phase {from_phase}; reopen only applies to BLOCKED")
         if not args.reason or not args.authorized_by:
             raise StateError("reopen requires explicit --reason and --authorized-by")
+        if from_phase == "DONE":
+            if not getattr(args, "from_done", False):
+                raise StateError(
+                    "cannot reopen from phase DONE without --from-done; "
+                    "use --from-done to explicitly reopen a closed feature"
+                )
+            data["phase"] = "PACKAGE_PLANNING"
+            data.pop("final_state", None)
+            model.record_event(
+                data,
+                "reopen-from-done",
+                from_phase,
+                "PACKAGE_PLANNING",
+                args.actor,
+                args.package_id,
+                {"reason": args.reason, "authorized_by": args.authorized_by},
+                args.event_id,
+            )
+            return True
+        if getattr(args, "from_done", False) and from_phase != "DONE":
+            raise StateError(
+                f"--from-done is only valid when phase is DONE; current phase is {from_phase}"
+            )
+        if from_phase != "BLOCKED":
+            raise StateError(
+                f"cannot reopen from phase {from_phase}; "
+                "reopen only applies to BLOCKED (or DONE with --from-done)"
+            )
         resolved_at = now()
         for blocker in data.get("blockers", []):
             newly_resolved = "resolved_at" not in blocker
@@ -551,6 +582,70 @@ def cmd_reopen(args: argparse.Namespace) -> int:
         return True
 
     data, changed = model.mutate(path, args, "reopen", update)
+    return output_state(data, changed, path)
+
+
+MIN_AMEND_REASON_LEN = 80
+
+
+def cmd_amend_package(args: argparse.Namespace) -> int:
+    """031-registro-correctivo: add work items to an existing, non-accepted package.
+
+    `create-package` no-ops on a duplicate package_id and `update-package` has no
+    --task flag, so a package created without tasks has no repair path -- the cycle
+    can never reach `package_review_ready` because `tasks_complete` requires at least
+    one completed task.  This verb closes that gap.
+
+    Guard: only operates on packages that have not yet been accepted.  Once a package
+    carries `status == "accepted"`, `package_accept_ready` has already run against its
+    task list; adding tasks after the fact would silently invalidate that verdict.
+    The right path after acceptance is a new package.
+
+    The --reason requirement mirrors `record-late-review`: no phase gate witnessed this
+    change, so the reason IS the audit trail.
+    """
+    path = state_file_arg(args)
+    reason = (args.reason or "").strip()
+    if len(reason) < MIN_AMEND_REASON_LEN:
+        raise StateError(
+            f"amend-package requires --reason of at least {MIN_AMEND_REASON_LEN} characters: "
+            "the reason is the only audit trail for a post-creation task addition"
+        )
+    new_tasks = args.task or []
+    if not new_tasks:
+        raise StateError("amend-package requires at least one --task")
+
+    def update(data: dict[str, Any]) -> bool:
+        package = package_by_id(data, args.package_id)
+        if package.get("status") == "accepted":
+            raise StateError(
+                f"cannot amend accepted package {args.package_id}; "
+                "create a new package for additional work"
+            )
+        existing_ids = {t["id"] for t in package.get("tasks", [])}
+        added: list[str] = []
+        for task_id in new_tasks:
+            if task_id in existing_ids:
+                continue
+            package.setdefault("tasks", []).append(
+                {"id": task_id, "status": "planned", "local_validations": [], "blockers": []}
+            )
+            added.append(task_id)
+        if not added:
+            return False
+        model.record_event(
+            data,
+            "amend-package",
+            data["phase"],
+            data["phase"],
+            args.actor,
+            args.package_id,
+            {"added_tasks": added, "reason": reason},
+            args.event_id,
+        )
+        return True
+
+    data, changed = model.mutate(path, args, "amend-package", update)
     return output_state(data, changed, path)
 
 

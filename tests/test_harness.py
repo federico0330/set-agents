@@ -9285,7 +9285,176 @@ class HarnessTests(unittest.TestCase):
             data = json.loads(state.read_text())
             self.assertEqual(data["phase"], "PACKAGE_REVIEW")
 
-    def test_reopen_resets_only_the_counter_that_produced_the_blocker(self):
+    # 031-registro-correctivo: tests for reopen --from-done and amend-package
+
+    def _reach_done(self, td: str) -> "Path":
+        """Return a state file for a feature that has just reached DONE."""
+        state = self.create_ready_package(td)
+        self.run_state(
+            state, "record-repair", "PKG-01", "--actor", "repair-agent",
+            "--finding-id", "F-001", "--finding-id", "F-002",
+            "--changed-file", "src/example.py", "--verification", "focused-test",
+        )
+        self.run_state(
+            state, "record-delta-review", "PKG-01", "pass",
+            "--actor", "delta-reviewer",
+            "--closed-finding", "F-001", "--closed-finding", "F-002",
+        )
+        self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+        self.run_state(
+            state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier",
+            "--url", "http://localhost:3000", "--browser", "playwright", "--check", "customer-visible flow works",
+        )
+        self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator")
+        self.run_state(state, "record-module-impact", "--package-id", "PKG-01",
+                       "--module-impact-waived", "--reason", "fixture: no real module touched")
+        self.run_state(state, "transition", "INTEGRATION")
+        self.run_state(state, "record-gate", "global verify", "pass", "--global-gate", "--evidence", "ok")
+        self.run_state(state, "transition", "DONE")
+        data = json.loads(state.read_text())
+        self.assertEqual(data["phase"], "DONE")
+        return state
+
+    def test_reopen_from_done_moves_to_planning_and_records_event(self):
+        # AC-01: reopen --from-done on DONE feature reaches PACKAGE_PLANNING with event
+        # reopen-from-done so the prior closure remains visible.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._reach_done(td)
+            self.run_state(
+                state, "reopen",
+                "--reason", "correctiva: delta review D5 no pudo registrarse antes de DONE",
+                "--authorized-by", "Federico — autorización explícita",
+                "--from-done",
+            )
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "PACKAGE_PLANNING")
+            self.assertNotIn("final_state", data)
+            last_event = data["history"][-1]
+            self.assertEqual(last_event["event"], "reopen-from-done")
+            self.assertEqual(last_event["from"], "DONE")
+            self.assertEqual(last_event["to"], "PACKAGE_PLANNING")
+            self.assertIn("authorized_by", last_event["metadata"])
+
+    def test_reopen_from_done_requires_flag(self):
+        # AC-03: reopen without --from-done on DONE feature returns error.
+        # Regression guard: the flag must be explicit; silence must not be enough.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._reach_done(td)
+            result = self.run_state(
+                state, "reopen",
+                "--reason", "missing from-done flag",
+                "--authorized-by", "test",
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "DONE")  # not mutated
+
+    def test_reopen_from_done_rejected_on_non_done_feature(self):
+        # AC-02: --from-done on a non-DONE feature is an error.
+        # Guards against using --from-done as a shortcut to bypass blocked logic.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, max_cycles=1)
+            self.run_state(state, "record-repair", "PKG-01", "--actor", "repair-agent", "--finding-id", "F-001")
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "repair_required",
+                "--actor", "delta-reviewer", "--requires-full-review", "--reason", "contract changed",
+            )
+            # Feature is now BLOCKED
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "BLOCKED")
+            result = self.run_state(
+                state, "reopen",
+                "--reason", "trying --from-done on BLOCKED should fail",
+                "--authorized-by", "test",
+                "--from-done",
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            data = json.loads(state.read_text())
+            self.assertEqual(data["phase"], "BLOCKED")  # not mutated
+
+    def test_amend_package_adds_tasks_to_non_accepted_package(self):
+        # AC-07: amend-package adds tasks; tasks arrive as "planned".
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            # After create_ready_package(review=False) the package is in PACKAGE_REVIEW
+            # (not yet accepted), so amend-package must accept it.
+            data = json.loads(state.read_text())
+            self.assertNotEqual(data["packages"][0].get("status"), "accepted")
+            original_task_count = len(data["packages"][0]["tasks"])
+            self.run_state(
+                state, "amend-package",
+                "--package-id", "PKG-01",
+                "--task", "extra-task-from-amend",
+                "--reason",
+                "adding extra task because the original package was created without it; "
+                "audit trail: this is a correction, not invented work",
+            )
+            data = json.loads(state.read_text())
+            tasks = data["packages"][0]["tasks"]
+            self.assertEqual(len(tasks), original_task_count + 1)
+            new_task = next(t for t in tasks if t["id"] == "extra-task-from-amend")
+            self.assertEqual(new_task["status"], "planned")
+            # Event must appear in history
+            amend_events = [e for e in data["history"] if e["event"] == "amend-package"]
+            self.assertEqual(len(amend_events), 1)
+            self.assertIn("extra-task-from-amend", amend_events[0]["metadata"]["added_tasks"])
+
+    def test_amend_package_rejected_on_accepted_package(self):
+        # AC-08: amend-package on accepted package is an error.
+        # Guard: adding tasks after acceptance would silently invalidate package_accept_ready.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td)
+            self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-001", "--finding-id", "F-002",
+                "--changed-file", "src/example.py", "--verification", "focused-test",
+            )
+            self.run_state(
+                state, "record-delta-review", "PKG-01", "pass",
+                "--actor", "delta-reviewer",
+                "--closed-finding", "F-001", "--closed-finding", "F-002",
+            )
+            self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+            self.run_state(
+                state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier",
+                "--url", "http://localhost:3000", "--browser", "playwright", "--check", "customer-visible flow works",
+            )
+            self.run_state(state, "accept-package", "PKG-01", "--actor", "orchestrator")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["packages"][0]["status"], "accepted")
+            result = self.run_state(
+                state, "amend-package",
+                "--package-id", "PKG-01",
+                "--task", "post-acceptance-task",
+                "--reason",
+                "trying to add task after acceptance should fail per AC-08 spec; "
+                "this guard exists to prevent invalidating accepted packages",
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            data = json.loads(state.read_text())
+            tasks = [t["id"] for t in data["packages"][0]["tasks"]]
+            self.assertNotIn("post-acceptance-task", tasks)
+
+    def test_amend_package_requires_long_reason(self):
+        # AC-10: --reason must be at least 80 chars.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            result = self.run_state(
+                state, "amend-package",
+                "--package-id", "PKG-01",
+                "--task", "t-short-reason",
+                "--reason", "too short",
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            data = json.loads(state.read_text())
+            tasks = [t["id"] for t in data["packages"][0]["tasks"]]
+            self.assertNotIn("t-short-reason", tasks)
+
+
         # ADR-0039 regression, the full cycle: exhaust max_verifications_per_package on
         # PKG-01 -> confirm it blocks with a structured counter on the blocker -> reopen
         # -> confirm a verdict can be registered again -> confirm every OTHER counter on

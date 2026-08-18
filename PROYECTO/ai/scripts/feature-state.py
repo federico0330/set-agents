@@ -58,7 +58,9 @@ from feature_state_lib.cli_lifecycle import (
     cmd_transition, cmd_create_package, cmd_update_package, cmd_start_task, cmd_complete_task,
     cmd_fail_task, cmd_resume, cmd_reopen, cmd_block, block_with_reason,
     cmd_amend_spec, cmd_supersede_package, cmd_record_axis,
+    cmd_amend_package, MIN_AMEND_REASON_LEN,
 )
+import feature_state_lib.cli_lifecycle as cli_lifecycle
 from feature_state_lib.cli_review import (
     cmd_record_review, panel_roles, cmd_record_subreview, cmd_finalize_review_panel,
     _verdict_text, normalize_verdicts, _repair_entered_from_review, merge_finding,
@@ -1112,7 +1114,19 @@ def build_parser() -> argparse.ArgumentParser:
     reopen.add_argument("--package-id")
     reopen.add_argument("--reason", required=True)
     reopen.add_argument("--authorized-by", required=True)
+    reopen.add_argument("--from-done", action="store_true", default=False,
+                        help="required when reopening from DONE phase (031-registro-correctivo)")
     reopen.set_defaults(func=cmd_reopen)
+
+    amend = sub.add_parser("amend-package")
+    add_common_state_args(amend)
+    amend.add_argument("--feature-id")
+    amend.add_argument("--package-id", required=True)
+    amend.add_argument("--task", action="append",
+                       help="task id to add; may be repeated")
+    amend.add_argument("--reason", required=True,
+                       help=f"at least {cli_lifecycle.MIN_AMEND_REASON_LEN} chars; this is the audit trail")
+    amend.set_defaults(func=cmd_amend_package)
 
     render = sub.add_parser("render-status")
     render.add_argument("--state-dir")
