@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-18T14:19:56+00:00
+Actualizado: 2026-08-18T15:14:04+00:00
 
 [2026-08-13T00:13:18+00:00] P1-registro-de-proveedores · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Unificar la lista de proveedores de IA que hoy esta repetida en siete lugares del codigo, para que sumar uno nuevo sea una linea y no siete.

@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-17T11:27:12` · generado 2026-08-18T14:27:12+00:00_
+_Ventana: desde `2026-08-17T12:14:04` · generado 2026-08-18T15:14:04+00:00_
 
 ## Necesita tu decisión
 
@@ -22,14 +22,13 @@ _Ventana: desde `2026-08-17T11:27:12` · generado 2026-08-18T14:27:12+00:00_
 
 ## Qué se está haciendo
 
-- **032-cursor-como-runtime** — fase `PACKAGE_IMPLEMENTATION`
+- **032-cursor-como-runtime** — fase `PACKAGE_GATES`
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
-- **032-cursor-como-runtime** → sigue la implementación local del paquete
-- **032-cursor-como-runtime** 1 tarea pendientes en C2
+- **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
 
 ## Qué cambió en el software
 

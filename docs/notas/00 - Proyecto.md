@@ -31,7 +31,7 @@
 - [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
-- [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/2
+- [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
 
 ## Qué falta
 
@@ -41,8 +41,7 @@
 - **011-quota-failover** → corresponde tu decisión (ver Blocker)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
-- **032-cursor-como-runtime** → sigue la implementación local del paquete
-- **032-cursor-como-runtime** 1 tarea pendientes en C2
+- **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
 
 ## Quick-fixes recientes
 
@@ -75,7 +74,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T14:18:10+00:00_
+_Actualizado: 2026-08-18T15:14:03+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

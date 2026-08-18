@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_IMPLEMENTATION` · modo: scoped · revisión 14
+- fase: `PACKAGE_GATES` · modo: scoped · revisión 25
 - spec: `docs/specs/032-cursor-como-runtime/spec.md` (hash `180fc0a3e1fa`)
 
 ## Criterios de aceptación
@@ -45,8 +45,7 @@
 
 ## Qué falta
 
-- → sigue la implementación local del paquete
-- 1 tarea pendientes en C2
+- → el paquete está listo para la revisión profunda
 
 ## Presupuestos
 
@@ -54,7 +53,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/032-cursor-como-runtime/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/032-cursor-como-runtime/bitacora.md`
 
-_Actualizado: 2026-08-18T14:18:10+00:00_
+_Actualizado: 2026-08-18T15:14:03+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

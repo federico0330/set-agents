@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-18T14:19:56+00:00
+Actualizado: 2026-08-18T15:14:04+00:00
 
 [2026-08-12T13:35:29+00:00] P1-check-que-verifica · implementer · started · modelo openai-codex/gpt-5.6-sol · effort medium
 Cliente: Arreglar el control que decia verificar que los archivos generados estaban al dia y en realidad no verificaba nada.

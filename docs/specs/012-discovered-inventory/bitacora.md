@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-18T14:19:56+00:00
+Actualizado: 2026-08-18T15:14:04+00:00
 
 [2026-07-30T20:07:45+00:00] P1-discovered-inventory · implementer · started
 Cliente: Arranca la implementación del catálogo dinámico de modelos.
