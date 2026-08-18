@@ -99,7 +99,8 @@ class PickerState:
       visible list — wrap-around is one keystroke cheaper for reaching the last item and never
       strands the user against an invisible wall.
     - Three modes, not two: `navigate` (arrow list), `search` (typeahead entered via `/` from
-      navigate — F-08: `query` live-filters `items` by substring/casefold, arrow-navigable
+      navigate, or by typing a CHAR in navigate — AC-3.6; PASTE in navigate stays ignored.
+      F-08: `query` live-filters `items` by substring/casefold, arrow-navigable
       exactly like `navigate` over just the matches; Enter resolves to `Selected` on whichever
       match is highlighted, or to `FreeText` when `freetext_allowed` and the query matches
       nothing at all — this is the AC-24 replacement for `setup_models.choose()`'s "number or
@@ -135,6 +136,9 @@ class PickerState:
     query: str = ""
     freetext_allowed: bool = False
     result: object = PENDING
+    headers: frozenset[int] = frozenset()
+    suffixes: tuple[str, ...] = ()
+    current: str | None = None
 
 
 def reduce(state: PickerState, key: KeyEvent) -> PickerState:
@@ -154,18 +158,41 @@ def reduce(state: PickerState, key: KeyEvent) -> PickerState:
     return state
 
 
+def _selectable_indices(state: PickerState, indices: tuple[int, ...] | None = None) -> tuple[int, ...]:
+    """Item indices the cursor may rest on. Headers (AC-3.1) are never selectable;
+    an empty `headers` set (the default) keeps every existing flat picker wrapping
+    through all items."""
+    source = range(len(state.items)) if indices is None else indices
+    return tuple(i for i in source if i not in state.headers)
+
+
+def _step_cursor(state: PickerState, delta: int, *, indices: tuple[int, ...] | None = None) -> PickerState:
+    selectable = _selectable_indices(state, indices)
+    if not selectable:
+        return state
+    if state.cursor in selectable:
+        pos = selectable.index(state.cursor)
+    else:
+        pos = -1 if delta > 0 else 0
+    return replace(state, cursor=selectable[(pos + delta) % len(selectable)])
+
+
 def _reduce_navigate(state: PickerState, key: KeyEvent) -> PickerState:
     n = len(state.items)
     if key.kind == "UP":
-        return state if n == 0 else replace(state, cursor=(state.cursor - 1) % n)
+        return state if n == 0 else _step_cursor(state, -1)
     if key.kind == "DOWN":
-        return state if n == 0 else replace(state, cursor=(state.cursor + 1) % n)
+        return state if n == 0 else _step_cursor(state, 1)
     if key.kind == "ENTER":
-        return state if n == 0 else replace(state, result=Selected(state.cursor))
+        if n == 0 or state.cursor in state.headers:
+            return state
+        return replace(state, result=Selected(state.cursor))
     if key.kind == "ESCAPE":
         return replace(state, result=None)
     if key.kind == "SEARCH":
         return replace(state, mode="search", query="")
+    if key.kind == "CHAR" and key.char:
+        return _retarget_cursor(replace(state, mode="search", query=key.char), is_search=True)
     return state
 
 
@@ -181,16 +208,18 @@ def _sanitize_paste(payload: str) -> str:
     return "".join(ch for ch in first_line if ch == "\t" or ch >= " ")
 
 
-def _search_matches(items: tuple[str, ...], query: str) -> tuple[int, ...]:
+def _search_matches(items: tuple[str, ...], query: str, headers: frozenset[int] = frozenset()) -> tuple[int, ...]:
     """F-08: which `items` indices survive `search` mode's live filter -- substring, case-
     insensitive, against `query`. An empty query matches everything (an arrow-navigable full
     list with a live query bar on top, the same list `navigate` already shows, plus the
     ability to start narrowing it by typing) -- this is what makes `/` "type to filter and
-    pick with arrows" instead of the old "type the exact item name from memory, Enter"."""
+    pick with arrows" instead of the old "type the exact item name from memory, Enter".
+    Section headers (AC-3.1) never match: they are chrome, not options."""
+    eligible = tuple(i for i in range(len(items)) if i not in headers)
     if not query:
-        return tuple(range(len(items)))
+        return eligible
     needle = query.casefold()
-    return tuple(i for i, item in enumerate(items) if needle in item.casefold())
+    return tuple(i for i in eligible if needle in items[i].casefold())
 
 
 def _retarget_cursor(state: PickerState, *, is_search: bool) -> PickerState:
@@ -201,7 +230,7 @@ def _retarget_cursor(state: PickerState, *, is_search: bool) -> PickerState:
     retarget against) and when the current cursor is already among the matches."""
     if not is_search:
         return state
-    matches = _search_matches(state.items, state.query)
+    matches = _search_matches(state.items, state.query, state.headers)
     if not matches or state.cursor in matches:
         return state
     return replace(state, cursor=matches[0])
@@ -219,7 +248,7 @@ def _reduce_text_entry(state: PickerState, key: KeyEvent, *, cancels_to_navigate
     if is_search and key.kind in ("UP", "DOWN"):
         # F-08: arrows move the cursor among the FILTERED matches only, wrapping within that
         # subset -- never landing on an item the current query has hidden.
-        matches = _search_matches(state.items, state.query)
+        matches = _search_matches(state.items, state.query, state.headers)
         if not matches:
             return state
         position = matches.index(state.cursor) if state.cursor in matches else 0
@@ -245,7 +274,7 @@ def _reduce_text_entry(state: PickerState, key: KeyEvent, *, cancels_to_navigate
         # casefold match against the typed text -- "type to filter, arrows to pick" instead of
         # "type the item's full name from memory". The free-text fallback (a query that
         # matches nothing, `freetext_allowed=True`) is unchanged.
-        matches = _search_matches(state.items, state.query)
+        matches = _search_matches(state.items, state.query, state.headers)
         if matches and state.cursor in matches:
             return replace(state, result=Selected(state.cursor))
         if state.freetext_allowed and state.query:
@@ -728,21 +757,47 @@ def _viewport_slice(cursor: int, total: int, rows: int) -> tuple[int, int]:
     return start, start + rows
 
 
-def _render_items(lines: list[str], style, cursor: int, indices: tuple[int, ...], items: tuple[str, ...], rows_available: int) -> None:
+def _render_items(lines: list[str], style, state: PickerState, indices: tuple[int, ...], rows_available: int) -> tuple[int, int]:
     """Append the visible, viewport-clamped rows for `indices` (either every item, in
     `navigate`, or only the F-08 search matches) to `lines`. `cursor` is always an index into
     `items` (never into `indices` itself) -- shared by both modes so the same marker/bold-
-    current-row logic and the same `_viewport_slice` clamp apply to both."""
-    bold = style["bold"]
+    current-row logic and the same `_viewport_slice` clamp apply to both. Returns the
+    `[start, end)` window so the caller can draw ▲/▼ (AC-3.3) without recomputing it."""
+    bold, dim = style["bold"], style["dim"]
     total = len(indices)
-    local_cursor = indices.index(cursor) if cursor in indices else 0
+    local_cursor = indices.index(state.cursor) if state.cursor in indices else 0
     start, end = _viewport_slice(local_cursor, total, rows_available)
     for position in range(start, end):
         index = indices[position]
-        item = items[index]
-        marker = "›" if index == cursor else " "
-        text = bold(item) if index == cursor else item
-        lines.append(f"{marker} {text}")
+        item = state.items[index]
+        if index in state.headers:
+            lines.append(item)
+            continue
+        marks = ["›"] if index == state.cursor else [" "]
+        if state.current is not None and item == state.current:
+            marks.append("●")
+        text = bold(item) if index == state.cursor else item
+        suffix = ""
+        if index < len(state.suffixes) and state.suffixes[index]:
+            suffix = " " + dim(state.suffixes[index])
+        lines.append(f"{' '.join(marks)} {text}{suffix}")
+    return start, end
+
+
+def _position_caption(state: PickerState, visible: tuple[int, ...], start: int, end: int, dim) -> str:
+    """AC-3.2 / AC-3.3: `n de total`, or `n de coincidencias (de total)` while filtering,
+    plus ▲/▼ when the viewport has content above/below."""
+    selectable_all = _selectable_indices(state)
+    selectable_now = _selectable_indices(state, visible)
+    total = len(selectable_all)
+    n = selectable_now.index(state.cursor) + 1 if state.cursor in selectable_now else 0
+    if state.mode == "search" and state.query:
+        text = f"{n} de {len(selectable_now)} (de {total})"
+    else:
+        text = f"{n} de {total}"
+    left = "▲ " if start > 0 else ""
+    right = " ▼" if end < len(visible) else ""
+    return dim(f"{left}{text}{right}")
 
 
 def _clamp_prefix(prefix: list[str], rows: int, *, min_trailer: int) -> list[str]:
@@ -778,18 +833,20 @@ def _render(stdout, state: PickerState, style, prompt=None, header=None) -> None
         prefix.append("")
     if prompt:
         prefix.append(bold(prompt))
-    # D-03: `navigate` always appends exactly 1 trailer line (the hint) below its own
-    # (always >= 1 row) item viewport; `search`/`freetext` ALSO have a fixed `> query` row
-    # before that, one more line of guaranteed trailer than `navigate` has.
-    min_trailer = 2 if state.mode == "navigate" else 3 if state.mode == "search" else 2
+    # D-03: `navigate` appends caption + hint below its (>= 1 row) item viewport;
+    # `search` also has a fixed `> query` row, so it needs one more line of headroom;
+    # `freetext` stays query + hint.
+    min_trailer = 3 if state.mode == "navigate" else 4 if state.mode == "search" else 2
     lines = _clamp_prefix(prefix, rows, min_trailer=min_trailer)  # never push cursor/hint off-screen
 
     if state.mode == "navigate":
-        reserved = len(lines) + 1  # + the hint line appended after the items below
+        reserved = len(lines) + 2  # caption + hint
         viewport = max(rows - reserved, 1)
-        _render_items(lines, style, state.cursor, tuple(range(len(state.items))), state.items, viewport)
+        indices = tuple(range(len(state.items)))
+        start, end = _render_items(lines, style, state, indices, viewport)
         if not state.items:
             lines.append(dim("(sin opciones)"))
+        lines.append(_position_caption(state, indices, start, end, dim))
         hint = "↑↓ mover · Enter elegir · Esc cancelar"
         if state.freetext_allowed or state.items:
             hint += " · / buscar"
@@ -799,13 +856,16 @@ def _render(stdout, state: PickerState, style, prompt=None, header=None) -> None
         # requiring the item's exact name typed from memory -- navigable with arrows exactly
         # like `navigate`; Enter selects whichever match is highlighted (see `reduce()`).
         lines.append(f"{dim('>')} {state.query}")
-        reserved = len(lines) + 1
+        reserved = len(lines) + 2  # caption + hint
         viewport = max(rows - reserved, 1)
-        matches = _search_matches(state.items, state.query)
+        matches = _search_matches(state.items, state.query, state.headers)
         if matches:
-            _render_items(lines, style, state.cursor, matches, state.items, viewport)
-        elif state.items:
-            lines.append(dim("(sin coincidencias)"))
+            start, end = _render_items(lines, style, state, matches, viewport)
+        else:
+            start, end = 0, 0
+            if state.items:
+                lines.append(dim("(sin coincidencias)"))
+        lines.append(_position_caption(state, matches, start, end, dim))
         if state.freetext_allowed:
             hint = "↑↓ mover · Enter elegir · Esc vuelve · sin coincidencia = texto libre"
         else:
@@ -815,12 +875,28 @@ def _render(stdout, state: PickerState, style, prompt=None, header=None) -> None
         lines.append(f"{dim('>')} {state.query}")
         lines.append(dim("Enter acepta · Esc cancela"))
 
-    stdout.write("\x1b[H\x1b[2J")
+    stdout.write("\x1b[H\x1b[J")
     stdout.write("\r\n".join(lines) + "\r\n")
     stdout.flush()
 
 
-def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=None, stderr=None, prompt=None, header=None):
+def _initial_cursor(items: tuple[str, ...], headers: frozenset[int], current: str | None) -> int:
+    """AC-3.4: land on the cell's current value when it is in the list; otherwise the
+    first selectable row. Headers are never the starting cursor."""
+    if current is not None:
+        try:
+            idx = items.index(current)
+        except ValueError:
+            idx = None
+        if idx is not None and idx not in headers:
+            return idx
+    for i in range(len(items)):
+        if i not in headers:
+            return i
+    return 0
+
+
+def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=None, stderr=None, prompt=None, header=None, current=None, headers=(), suffixes=()):
     """The render loop (layer 4). Returns `Selected(index)` | `FreeText(value)` | `None`
     (cancelled — Esc, Ctrl-C, or EOF). `style` is a dict of `color`/`bold`/`dim` callables
     (defaults to identity/passthrough, per the module docstring, so `tui.py` stays importable
@@ -859,8 +935,20 @@ def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=
         return None
     resolved_style = {**_IDENTITY_STYLE, **(style or {})}
     items = tuple(items)
+    header_set = frozenset(headers)
+    suffix_t = tuple(suffixes) if suffixes else ()
+    if suffix_t and len(suffix_t) < len(items):
+        suffix_t = suffix_t + ("",) * (len(items) - len(suffix_t))
     initial_mode = "freetext" if not items and freetext_allowed else "navigate"
-    state = PickerState(items=items, mode=initial_mode, freetext_allowed=freetext_allowed)
+    state = PickerState(
+        items=items,
+        cursor=_initial_cursor(items, header_set, current),
+        mode=initial_mode,
+        freetext_allowed=freetext_allowed,
+        headers=header_set,
+        suffixes=suffix_t,
+        current=current,
+    )
 
     if _ACTIVE_SESSION is not None:
         state = _drive_loop(state, stdin, render_stdout, resolved_style, prompt, header)

@@ -369,17 +369,97 @@ def _safe_input(prompt):
         return ""
 
 
-def choose(prompt, options):
+def choose(prompt, options, current=None, *, group_by_provider=False, used_by=None):
     """Arrow-key picker with an explicit `/`-triggered free-text fallback (AC-24, P3-tui):
     same "pick a listed option, or type a value that isn't listed" contract the old numbered
     menu + input() line had -- `/` then Enter on an unmatched query is accepted as free text,
-    Esc/Ctrl-C/EOF is the new empty-input-cancels equivalent (returns `None` either way)."""
-    result = tui.run_picker(options, freetext_allowed=True, prompt=f"{prompt}:")
+    Esc/Ctrl-C/EOF is the new empty-input-cancels equivalent (returns `None` either way).
+
+    `group_by_provider` (AC-3.1) is opt-in: only the OpenCode model catalog uses section
+    headers. Selected.index is mapped back through the rendered items so a header string is
+    never returned as the chosen value."""
+    items = list(options)
+    headers = []
+    suffixes = []
+    if group_by_provider:
+        items, headers = _group_models_by_provider(options)
+        usage = used_by or {}
+        suffixes = [
+            "" if i in headers else _model_suffix(item, usage)
+            for i, item in enumerate(items)
+        ]
+    result = tui.run_picker(
+        items,
+        freetext_allowed=True,
+        prompt=f"{prompt}:",
+        current=current,
+        headers=headers,
+        suffixes=suffixes,
+    )
     if result is None:
         return None
     if isinstance(result, tui.Selected):
-        return options[result.index]
+        if result.index in set(headers):
+            return None
+        return items[result.index]
     return result.value or None
+
+
+def _provider_prefix(model_id):
+    return model_id.split("/", 1)[0] if "/" in model_id else model_id
+
+
+def _group_models_by_provider(models):
+    """Keep first-seen provider order. Header copy is `{prefix} ({n})` (AC-3.1)."""
+    groups = []
+    by_prefix = {}
+    for model in models:
+        prefix = _provider_prefix(model)
+        if prefix not in by_prefix:
+            by_prefix[prefix] = []
+            groups.append(prefix)
+        by_prefix[prefix].append(model)
+    items = []
+    headers = []
+    for prefix in groups:
+        members = by_prefix[prefix]
+        headers.append(len(items))
+        items.append(f"{prefix} ({len(members)})")
+        items.extend(members)
+    return items, headers
+
+
+def _models_in_use(config):
+    """Map model id -> area/role names that currently point at it (AC-3.5)."""
+    used = {}
+
+    def _add(name, value):
+        if isinstance(value, str) and value:
+            used.setdefault(value, []).append(name)
+        elif isinstance(value, dict):
+            for inner in value.values():
+                if isinstance(inner, str) and inner:
+                    used.setdefault(inner, []).append(name)
+
+    for duty, area in config.get("areas", {}).items():
+        _add(duty, area.get("claude"))
+        _add(duty, area.get("codex"))
+        _add(duty, area.get("opencode"))
+    for role, override in config.get("roles", {}).items():
+        _add(role, override.get("claude"))
+        _add(role, override.get("codex"))
+        _add(role, override.get("opencode"))
+    return used
+
+
+def _model_suffix(model_id, used_by):
+    parts = []
+    if isinstance(model_id, str) and model_id.endswith("-free"):
+        parts.append("free")
+    names = used_by.get(model_id) or []
+    if names:
+        parts.append("← " + ", ".join(names))
+    return " ".join(parts)
 
 
 def _load_subscription_panel_state(now=None):
@@ -504,12 +584,21 @@ def wizard(config, roster, profile, roles_path, models_out):
             field = choose("Campo", ["claude", "codex", "codex_effort"] + [f"opencode.{lane}" for lane in LANES])
             if not field:
                 continue
+            cell, cell_key = parse_address(config, roster, f"{prefix}.{field}")
+            current_value = cell.get(cell_key) if isinstance(cell, dict) else None
             if field.startswith("opencode."):
-                value = choose("Modelo", available_opencode_models(config))
+                value = choose(
+                    "Modelo", available_opencode_models(config),
+                    current=current_value, group_by_provider=True,
+                    used_by=_models_in_use(config),
+                )
             elif field == "codex_effort":
-                value = choose("Effort", sorted(config["catalog"]["codex_effort"]))
+                value = choose("Effort", sorted(config["catalog"]["codex_effort"]), current=current_value)
             else:
-                value = choose("Modelo", sorted(config["catalog"][field.split(".")[0]]))
+                value = choose(
+                    "Modelo", sorted(config["catalog"][field.split(".")[0]]),
+                    current=current_value,
+                )
             if not value:
                 continue
             snapshot = copy.deepcopy(config)

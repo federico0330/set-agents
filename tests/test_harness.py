@@ -13490,6 +13490,120 @@ class TuiTests(unittest.TestCase):
         time.sleep(0.15)
         self.assertEqual(stream.getvalue(), stable)
 
+    # ------------------------------------------------------------- 033/PKG-3: model picker
+
+    def test_default_picker_state_has_no_headers(self):
+        tui = self._import()
+        state = tui.PickerState(items=("a", "b"))
+        self.assertEqual(state.headers, frozenset())
+        self.assertEqual(state.suffixes, ())
+        self.assertIsNone(state.current)
+
+    def test_reduce_skips_section_headers_on_up_down_and_never_selects_them(self):
+        tui = self._import()
+        items = ("opencode-go (2)", "opencode-go/a", "opencode-go/b", "openai (1)", "openai/x")
+        headers = frozenset({0, 3})
+        state = tui.PickerState(items=items, headers=headers, cursor=1)
+        state = tui.reduce(state, tui.KeyEvent("DOWN"))
+        self.assertEqual(state.cursor, 2)
+        state = tui.reduce(state, tui.KeyEvent("DOWN"))
+        self.assertEqual(state.cursor, 4)  # skipped the openai header
+        state = tui.reduce(state, tui.KeyEvent("DOWN"))
+        self.assertEqual(state.cursor, 1)  # wrap to first selectable, not header 0
+        state = tui.reduce(state, tui.KeyEvent("UP"))
+        self.assertEqual(state.cursor, 4)
+        parked = tui.PickerState(items=items, headers=headers, cursor=0)
+        parked = tui.reduce(parked, tui.KeyEvent("ENTER"))
+        self.assertIs(parked.result, tui.PENDING)  # header is not a choice
+        chosen = tui.reduce(
+            tui.PickerState(items=items, headers=headers, cursor=2), tui.KeyEvent("ENTER"),
+        )
+        self.assertEqual(chosen.result, tui.Selected(2))
+
+    def test_render_shows_position_counter_and_match_count_when_filtering(self):
+        tui = self._import()
+        items = ("model-a", "model-b", "other-c", "model-d", "zzz-e")
+        stdout = _FakeStdout()
+        tui._render(stdout, tui.PickerState(items=items, cursor=0), tui._IDENTITY_STYLE)
+        self.assertIn("1 de 5", stdout.getvalue())
+        self.assertNotIn("(de 5)", stdout.getvalue())
+        stdout2 = _FakeStdout()
+        tui._render(
+            stdout2,
+            tui.PickerState(items=items, mode="search", cursor=0, query="mo"),
+            tui._IDENTITY_STYLE,
+        )
+        self.assertIn("1 de 3 (de 5)", stdout2.getvalue())
+
+    def test_render_shows_scroll_arrows_when_content_is_outside_the_viewport(self):
+        tui = self._import()
+        items = tuple(f"item-{i}" for i in range(50))
+        with mock.patch.object(tui.os, "get_terminal_size", return_value=os.terminal_size((80, 10))):
+            top = _FakeStdout()
+            tui._render(top, tui.PickerState(items=items, cursor=0), tui._IDENTITY_STYLE)
+            top_frame = top.getvalue()
+            self.assertIn("▼", top_frame)
+            self.assertNotIn("▲", top_frame)
+            bottom = _FakeStdout()
+            tui._render(bottom, tui.PickerState(items=items, cursor=49), tui._IDENTITY_STYLE)
+            bottom_frame = bottom.getvalue()
+            self.assertIn("▲", bottom_frame)
+            self.assertNotIn("▼", bottom_frame)
+
+    def test_render_marks_current_value_and_run_picker_starts_the_cursor_on_it(self):
+        tui = self._import()
+        stdout = _FakeStdout()
+        state = tui.PickerState(items=("alpha", "beta", "gamma"), cursor=1, current="beta")
+        tui._render(stdout, state, tui._IDENTITY_STYLE)
+        self.assertIn("› ● beta", stdout.getvalue())
+        result = self._run_with_scripted_bytes(
+            tui, [b"\r"], items=["alpha", "beta", "gamma"], current="beta",
+        )
+        self.assertEqual(result, tui.Selected(1))
+
+    def test_render_dims_free_and_used_by_suffixes(self):
+        tui = self._import()
+        style = {**tui._IDENTITY_STYLE, "dim": lambda text: f"«{text}»"}
+        state = tui.PickerState(
+            items=("prov/a-free", "prov/b"),
+            suffixes=("free", "← implementer"),
+            current="prov/b",
+            cursor=0,
+        )
+        stdout = _FakeStdout()
+        tui._render(stdout, state, style)
+        frame = stdout.getvalue()
+        self.assertIn("«free»", frame)
+        self.assertIn("«← implementer»", frame)
+        self.assertIn("●", frame)
+
+    def test_reduce_a_letter_in_navigate_enters_search_without_slash(self):
+        # AC-3.6: a CHAR in navigate is the initial query, not a no-op. `/` still enters
+        # search with an empty query; Esc still returns to navigate. PASTE stays ignored
+        # (see test_reduce_paste_is_ignored_in_navigate_but_appended_in_search_and_freetext).
+        tui = self._import()
+        state = tui.PickerState(items=("gpt-a", "gpt-b", "other"))
+        state = tui.reduce(state, tui.KeyEvent("CHAR", "g"))
+        self.assertEqual(state.mode, "search")
+        self.assertEqual(state.query, "g")
+        via_slash = tui.reduce(
+            tui.PickerState(items=("gpt-a", "gpt-b")), tui.KeyEvent("SEARCH"),
+        )
+        self.assertEqual(via_slash.mode, "search")
+        self.assertEqual(via_slash.query, "")
+        back = tui.reduce(state, tui.KeyEvent("ESCAPE"))
+        self.assertEqual(back.mode, "navigate")
+        self.assertEqual(back.query, "")
+        self.assertIs(back.result, tui.PENDING)
+
+    def test_render_redraw_does_not_emit_full_screen_wipe_2j(self):
+        tui = self._import()
+        stdout = _FakeStdout()
+        tui._render(stdout, tui.PickerState(items=("a", "b")), tui._IDENTITY_STYLE)
+        frame = stdout.getvalue()
+        self.assertNotIn("[2J", frame)
+        self.assertIn("\x1b[H\x1b[J", frame)
+
 
 class CursorRuntimeTargetTests(unittest.TestCase):
     """032/C1-C2: Cursor as a host runtime of the harness.

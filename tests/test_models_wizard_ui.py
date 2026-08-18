@@ -317,5 +317,43 @@ class WizardBehaviorTests(unittest.TestCase):
         self.assertIn("opencode-zen", second)
 
 
+class GroupedModelPickerTests(unittest.TestCase):
+    def test_choose_groups_by_provider_and_maps_selected_index_to_the_model_id(self):
+        models = ["opencode-go/a", "opencode-go/b-free", "openai/x"]
+        captured = {}
+
+        def fake_picker(items, **kwargs):
+            captured["items"] = list(items)
+            captured["headers"] = list(kwargs.get("headers") or [])
+            captured["suffixes"] = list(kwargs.get("suffixes") or [])
+            captured["current"] = kwargs.get("current")
+            return setup_models.tui.Selected(2)  # second model under opencode-go
+
+        with mock.patch.object(setup_models.tui, "run_picker", side_effect=fake_picker):
+            result = setup_models.choose(
+                "Modelo", models, current="opencode-go/b-free",
+                group_by_provider=True,
+                used_by={"opencode-go/a": ["implementer"]},
+            )
+        self.assertEqual(result, "opencode-go/b-free")
+        self.assertEqual(captured["items"][0], "opencode-go (2)")
+        self.assertEqual(captured["items"][3], "openai (1)")
+        self.assertEqual(captured["headers"], [0, 3])
+        self.assertEqual(captured["current"], "opencode-go/b-free")
+        self.assertIn("free", captured["suffixes"][2])
+        self.assertIn("← implementer", captured["suffixes"][1])
+        self.assertNotIn(captured["items"][0], models)  # a header is never a model id
+
+    def test_choose_without_grouping_keeps_a_flat_index_into_options(self):
+        options = ["claude", "codex", "effort"]
+        with mock.patch.object(
+            setup_models.tui, "run_picker", return_value=setup_models.tui.Selected(1),
+        ) as picker:
+            result = setup_models.choose("Campo", options)
+        self.assertEqual(result, "codex")
+        self.assertEqual(list(picker.call_args.args[0]), options)
+        self.assertEqual(list(picker.call_args.kwargs.get("headers") or []), [])
+
+
 if __name__ == "__main__":
     unittest.main()
