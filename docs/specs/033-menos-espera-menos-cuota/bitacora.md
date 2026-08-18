@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-18T18:45:51+00:00
+Actualizado: 2026-08-18T20:06:44+00:00
 
 [2026-08-18T15:48:35+00:00] PKG-4 · package-planner · started · modelo cursor/inherit
 Cliente: Se estan armando las hojas de ruta de cada paquete para que quien implemente no tenga que rebuscar el repo.
@@ -75,3 +75,26 @@ Ingeniería: implementer Cursor inherit. Causa: sys.path[0]=ai/scripts al invoca
 [2026-08-18T18:18:55+00:00] PKG-5 · gate-runner · started · modelo cursor/inherit
 Cliente: Se vuelve a correr la verificacion completa ahora que el chequeo encuentra los tests.
 Ingeniería: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara. Gate failures 1/3 ya gastado.
+
+[2026-08-18T18:46:41+00:00] PKG-5 · package-reviewer · started · modelo cursor/inherit
+Cliente: Un revisor mira si el chequeo se puede seguir de verdad y si el conjunto de tests sigue siendo el mismo.
+Ingeniería: package-reviewer Cursor inherit readonly. Diff 779671b. same-model inherit / clean-context only. No parchea.
+
+[2026-08-18T18:46:41+00:00] PKG-5 · security-auditor · started · modelo cursor/inherit
+Cliente: Un auditor mira si el reporter o el script del gate abren un agujero.
+Ingeniería: security-auditor Cursor inherit readonly. same-model inherit / clean-context only. Superficie: verify.sh y verify_reporter.py. No parchea.
+
+[2026-08-18T19:36:51+00:00] PKG-5 · orchestrator · done
+Cliente: El segundo paquete quedo aceptado: los veinte minutos de chequeo ahora muestran progreso, la falla apenas ocurre, y un resumen con los tests mas lentos. Un primer intento se cayo porque el reporter no encontraba los tests; se arreglo y se clavo con una prueba.
+Ingeniería: El presenter del gate vive en un modulo Python que verify.sh invoca. La ETA sale del ritmo medido. La suite completa paso: mil doscientos noventa y ocho tests en veinticuatro minutos, cero fallas. El panel de revision paso. Un fallo de gate se gasto en el ImportError, despues verde. No se paralelizo.
+Aprendimos: Invocar un script deja el path de import en la carpeta del archivo; cambiar el directorio de trabajo no lo arregla. Un probe dentro del mismo proceso no ve ese crash porque tests ya era importable.
+Conviene ahora: Implementar el paquete del menu Modelos para que pinte en menos de 300 ms con lo que ya esta en disco, y los datos vivos lleguen despues.
+Por qué ahora: Sin eso, abrir Modelos sigue congelando unos dieciseis segundos, que es lo que mas se siente al usarlo.
+
+[2026-08-18T19:37:08+00:00] PKG-2 · implementer · started · modelo cursor/inherit
+Cliente: Se arregla el menu Modelos para que deje de congelarse dieciseis segundos: primero pinta lo de disco y despues refresca.
+Ingeniería: implementer Cursor inherit. Context pack PKG-2.md. owned setup_models.py models_config.py mas excepciones de tests. No reescribir tui.with_progress. No sacar lanes (PKG-1).
+
+[2026-08-18T19:52:21+00:00] PKG-2 · gate-runner · started · modelo cursor/inherit
+Cliente: Se verifica que el menu ya no congela y que la suite completa sigue verde.
+Ingeniería: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara.

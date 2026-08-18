@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_GATES` · modo: scoped · revisión 73
+- fase: `PACKAGE_GATES` · modo: scoped · revisión 105
 - spec: `docs/specs/033-menos-espera-menos-cuota/spec.md` (hash `18dcffafa809`)
 
 ## Criterios de aceptación
@@ -49,10 +49,10 @@
 ## Paquetes
 
 - [[features/033-menos-espera-menos-cuota/PKG-1|PKG-1]] — planned · Una sola dimension opencode: colapsar go-zen/zen/openai-only en un solo valor por area
-- [[features/033-menos-espera-menos-cuota/PKG-2|PKG-2]] — planned · El menu Modelos no congela: probe asincronico, cache con TTL y degradacion con nombre
+- [[features/033-menos-espera-menos-cuota/PKG-2|PKG-2]] — package_gates · El menu Modelos no congela: probe asincronico, cache con TTL y degradacion con nombre
 - [[features/033-menos-espera-menos-cuota/PKG-3|PKG-3]] — planned · Elegir modelo sin scrollear: agrupado por proveedor, contador, valor actual marcado, sin …
 - [[features/033-menos-espera-menos-cuota/PKG-4|PKG-4]] — accepted · Windows sin mentiras: cerrar las 8 fallas residuales y el flaky de macOS, con techo de sk…
-- [[features/033-menos-espera-menos-cuota/PKG-5|PKG-5]] — package_gates · El gate se ve: progreso en vivo, falla temprana, resumen final y los 10 tests mas lentos
+- [[features/033-menos-espera-menos-cuota/PKG-5|PKG-5]] — accepted · El gate se ve: progreso en vivo, falla temprana, resumen final y los 10 tests mas lentos
 - [[features/033-menos-espera-menos-cuota/PKG-6|PKG-6]] — planned · Cuotas que alcanzan: context pack obligatorio, gates sin modelo, panel por riesgo y presu…
 
 ## Approach y decisiones
@@ -63,12 +63,12 @@
 - ruteo PKG-4: cursor-host native subagent; no route-decide
 - ruteo PKG-5: cursor-host native subagent; no route-decide
 - ruteo PKG-6: cursor-host native subagent; no route-decide
-- [2026-08-18] package-reviewer: Panel RP-01 pass. package-reviewer: AC-4.1 a 4.4 cubiertos en 1f5a24f, techo 660=654+6, probe intacto. security-auditor: SECURITY_PASS, relative_to no emite puntos-puntos, run() s…
-- [2026-08-18] orchestrator: PKG-4 accepted. Candidato 1f5a24f. Gates VERIFY_PASS 1290/1393s. Panel RP-01 pass. AC-4.5 residual: SHA de verify-linux, verify-macos y windows-bootstrap en la misma corrida, pend…
-- [2026-08-18] implementer: implementer nativo Cursor, inherit, sin route-decide. Context pack PKG-5.md. Archivos: verify.sh, ai/scripts/verify_reporter.py, tests/test_verify_reporter.py. No paralelizar.
-- [2026-08-18] gate-runner: gate-runner nativo Cursor, readonly, inherit, sin route-decide. heartbeat-run verify.sh ~20 min. No repara.
-- [2026-08-18] implementer: implementer Cursor inherit. Causa: sys.path[0]=ai/scripts al invocar el archivo; chdir ROOT no alcanza. Bite: rojo contra el crash, luego verde.
 - [2026-08-18] gate-runner: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara. Gate failures 1/3 ya gastado.
+- [2026-08-18] package-reviewer: package-reviewer Cursor inherit readonly. Diff 779671b. same-model inherit / clean-context only. No parchea.
+- [2026-08-18] security-auditor: security-auditor Cursor inherit readonly. same-model inherit / clean-context only. Superficie: verify.sh y verify_reporter.py. No parchea.
+- [2026-08-18] orchestrator: El presenter del gate vive en un modulo Python que verify.sh invoca. La ETA sale del ritmo medido. La suite completa paso: mil doscientos noventa y ocho tests en veinticuatro minu…
+- [2026-08-18] implementer: implementer Cursor inherit. Context pack PKG-2.md. owned setup_models.py models_config.py mas excepciones de tests. No reescribir tui.with_progress. No sacar lanes (PKG-1).
+- [2026-08-18] gate-runner: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara.
 - decisión: [[decisiones/2026-08-18 orden-paquetes-033-ci-gate-consola-lane|Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final]]
 - decisión: [[decisiones/2026-08-18 033-review-mismo-modelo-contexto-limpio|Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada]]
 - decisión: [[decisiones/2026-08-18 033-pkg4-commit-antes-del-freeze|PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git]]
@@ -96,11 +96,11 @@
 
 ## Presupuestos
 
-- spawns: 9 (máx 8/paquete) · deep review máx 2 ciclos
+- spawns: 13 (máx 8/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/033-menos-espera-menos-cuota/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/033-menos-espera-menos-cuota/bitacora.md`
 
-_Actualizado: 2026-08-18T18:45:51+00:00_
+_Actualizado: 2026-08-18T20:06:44+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -197,14 +198,36 @@ def status(config, roster, profile):
         print(line)
 
 
-def _panel_lines(config, roster, profile, detected=None):
+_LIVE_UNSET = object()
+SUBSCRIPTION_PROBE_FAILED = "suscripciones: no se pudo medir — mostrando pins"
+REFRESH_ITEM = "Refrescar suscripciones y catálogo"
+
+
+def _subscription_headline(subs, age_s=None, error=False):
+    """AC-2.3/AC-2.4: age stamp or named degradation, then the tri-state pins."""
+    detail = " ".join(subs) or "-"
+    if error:
+        return f"{SUBSCRIPTION_PROBE_FAILED} · {detail}"
+    if age_s is not None:
+        minutes = int(max(0.0, age_s) // 60)
+        return f"suscripciones: hace {minutes} min · {detail}"
+    return f"suscripciones: {detail}"
+
+
+def _panel_lines(config, roster, profile, detected=None, *,
+                 subscription_age_s=None, subscription_error=False,
+                 live_discovered=_LIVE_UNSET):
     """The wizard's COMPACT header — replaces the old full `_status_lines` dump
     (10 wide area rows + one line per role override, printed to the normal screen
     AND repeated as header) that the owner reported as "una lista interminable".
     Area table stays (it's the useful core), overrides collapse to a count, and
     each subscription shows its tri-state origin (ADR-0029): ✓pin (true), ✗off
     (false), auto (absent — the probe decides; live state when `detected` came
-    from a successful probe). `--status` keeps the full machine dump."""
+    from a successful probe). `--status` keeps the full machine dump.
+
+    `live_discovered=_LIVE_UNSET` keeps the historical "probe now" path for
+    direct unit tests. The wizard always passes an explicit value (cached or
+    None) so the first paint never calls probe_inventory (AC-2.1)."""
     subs = []
     # ADR-0048 (024 C2): the EFFECTIVE view (tracked [subscriptions] merged with this
     # machine's overlay) -- a neutral tracked file (AC-03) alone would show every
@@ -227,7 +250,7 @@ def _panel_lines(config, roster, profile, detected=None):
         "discovered_providers", models_config.ROUTING_DEFAULTS["discovered_providers"])
     tiered = len({key for key, value in config.get("roles", {}).items() if "tiers" in value})
     lines = [
-        f"lane: {profile} (auto)    suscripciones: {' '.join(subs) or '-'}",
+        f"lane: {profile} (auto)    {_subscription_headline(subs, subscription_age_s, subscription_error)}",
         "routing dinámico: el router decide por spawn para TODOS los roles (ADR-0030; --route-explain)"
         + (f" · variantes @tier: {tiered} roles" if tiered else ""),
     ]
@@ -250,7 +273,8 @@ def _panel_lines(config, roster, profile, detected=None):
     # this replaces, reproduced live before this fix: "proveedores descubiertos rutables:
     # a, u, t, o"). An explicit list is still shown as-is, unchanged from before.
     if discovered == "auto":
-        live = _resolve_live_discovered(config)
+        live = (_resolve_live_discovered(config)
+                if live_discovered is _LIVE_UNSET else live_discovered)
         if live is None:
             lines.append("proveedores descubiertos rutables: auto → no verificable ahora (probe falló; ver --route-doctor)")
         elif not live:
@@ -300,8 +324,8 @@ def atomic_write(path, content):
             os.unlink(temp)
 
 
-def available_opencode_models(config):
-    """Suggestions for the wizard: live `opencode models` when possible, config otherwise."""
+def _fetch_opencode_models(config):
+    """Live `opencode models` (or config fallback). No cache, no progress."""
     models = set()
     if shutil.which("opencode"):
         result = subprocess.run(
@@ -315,6 +339,21 @@ def available_opencode_models(config):
         for override in config.get("roles", {}).values():
             models |= set(override.get("opencode", {}).values())
     return sorted(models)
+
+
+def available_opencode_models(config, *, force=False, now=None):
+    """Suggestions for the wizard: disk cache (AC-2.3, 60 min TTL), else live
+    `opencode models` behind tui.with_progress (AC-2.2). Config fallback if the
+    CLI is missing or empty — same as before, just not on the first-paint path."""
+    now = time.time() if now is None else now
+    if not force:
+        cached = models_config.load_wizard_live_cache().get("catalog")
+        if models_config.wizard_cache_entry_fresh(
+                cached, models_config.WIZARD_CATALOG_TTL_SECONDS, now=now):
+            return list(cached["ids"])
+    models = tui.with_progress("listando modelos", lambda: _fetch_opencode_models(config))
+    models_config.write_wizard_live_cache("catalog", {"at": now, "ids": models})
+    return models
 
 
 def _safe_input(prompt):
@@ -341,6 +380,59 @@ def choose(prompt, options):
     return result.value or None
 
 
+def _load_subscription_panel_state(now=None):
+    """Disk only — never probes. First paint (AC-2.1) reads this."""
+    now = time.time() if now is None else now
+    entry = models_config.load_wizard_live_cache().get("subscriptions")
+    if not isinstance(entry, dict):
+        return {"detected": None, "sub_at": None, "sub_error": False, "stale": True}
+    fresh = models_config.wizard_cache_entry_fresh(
+        entry, models_config.WIZARD_SUBSCRIPTIONS_TTL_SECONDS, now=now)
+    error = bool(entry.get("error"))
+    names = entry.get("names")
+    detected = None if error or names is None else set(names)
+    return {
+        "detected": detected,
+        "sub_at": entry.get("at"),
+        "sub_error": error,
+        "stale": not fresh,
+    }
+
+
+def _measure_subscriptions(config, now=None):
+    """AC-2.4: named degradation, never a mute except, never an unusable wizard."""
+    now = time.time() if now is None else now
+    error = False
+    try:
+        detected = models_config.detect_subscriptions(config)
+        if detected is None:
+            error = True
+            detected = None
+        else:
+            detected = set(detected)
+    except Exception:
+        detected = None
+        error = True
+    payload = {
+        "at": now,
+        "names": None if error else sorted(detected),
+        "error": error,
+    }
+    models_config.write_wizard_live_cache("subscriptions", payload)
+    return {
+        "detected": detected,
+        "sub_at": now,
+        "sub_error": error,
+        "stale": False,
+        "live_discovered": None,
+    }
+
+
+def _refresh_subscriptions_live(config):
+    """AC-2.2: live probe off the first-paint path, via tui.with_progress."""
+    return tui.with_progress("midiendo suscripciones", lambda: _measure_subscriptions(config))
+
+
 def wizard(config, roster, profile, roles_path, models_out):
     if not sys.stdin.isatty():
         print("Sin cambios pedidos y sin TTY: usá --status/--check/--set (ver --help).", file=sys.stderr)
@@ -350,19 +442,33 @@ def wizard(config, roster, profile, roles_path, models_out):
     # Selected(N)); new actions append AFTER them, never reorder.
     WIZARD_ITEMS = ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar",
                     "Ver detalle completo", "Proveedores descubiertos (routing)",
-                    "Routing: fijar modelo / automático")
-    # Probe once per wizard run (shared cache): live subscription state for the
-    # header's tri-state origins. None on any failure — panel degrades to pins.
-    try:
-        detected = models_config.detect_subscriptions(config)
-    except Exception:
-        detected = None
+                    "Routing: fijar modelo / automático",
+                    REFRESH_ITEM)
+    # AC-2.1: first paint is disk only. detect_subscriptions is NOT called
+    # here — the historical try/except Exception mute at this site is gone.
+    panel_state = _load_subscription_panel_state()
+    panel_state.setdefault("live_discovered", None)
+    force_refresh = False
     while True:
+        # Live probe only on the refresh action (AC-2.3) — never before the
+        # first run_picker (AC-2.1/AC-2.5) and never as a hidden second-loop
+        # tax on every other wizard action.
+        if force_refresh:
+            panel_state = _refresh_subscriptions_live(config)
+            available_opencode_models(config, force=True)
+            force_refresh = False
         # AC-24/AC-29: Esc/Ctrl-C/EOF resolve to `None` inside run_picker itself -- treated
         # the same as "salir sin guardar", never a raised EOFError/KeyboardInterrupt here.
         # F-03/UI refresh: the state travels ONLY as the picker's `header=` (compact panel);
         # the old duplicate print() to the normal screen is gone with the avalanche.
-        panel = _panel_lines(config, roster, profile, detected)
+        age_s = None if panel_state.get("sub_at") is None else max(
+            0.0, time.time() - panel_state["sub_at"])
+        panel = _panel_lines(
+            config, roster, profile, panel_state.get("detected"),
+            subscription_age_s=age_s,
+            subscription_error=bool(panel_state.get("sub_error")),
+            live_discovered=panel_state.get("live_discovered"),
+        )
         choice = tui.run_picker(WIZARD_ITEMS, header="\n".join(panel))
         option = str(choice.index + 1) if isinstance(choice, tui.Selected) else "5"
         if option == "1" or option == "2":
@@ -549,6 +655,11 @@ def wizard(config, roster, profile, roles_path, models_out):
                       "el router lo respeta como override y lo registra como MODEL_PINNED)")
             else:
                 print("RECHAZADO: ver el error de arriba (--model-pin-set)")
+        elif option == "9":
+            # AC-2.3: refresh is a new action appended AFTER indexes 0-4.
+            force_refresh = True
+            panel_state["stale"] = True
+            continue
 
 
 def main():

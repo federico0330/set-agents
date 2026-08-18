@@ -13,6 +13,7 @@ import csv
 import json
 import re
 import sys
+import time
 import tomllib
 import os
 import tempfile
@@ -390,6 +391,136 @@ def detect_subscriptions(config):
         for (_, provider), models in inventory.items()
         if models and provider in _PROVIDER_SUBSCRIPTION
     }
+
+
+# AC-2.3 (033 PKG-2): wizard-only disk cache for the Models menu. TTL starts
+# at 10 min (subscriptions) / 60 min (opencode catalog); adjust from measurement,
+# not memory. Content is subscription names + model ids only — never secrets,
+# PII, or raw env. `detect_subscriptions` itself is unchanged (load_roles still
+# calls it live); the wizard reads/writes this file so the first paint never
+# waits on a probe.
+WIZARD_SUBSCRIPTIONS_TTL_SECONDS = 10 * 60
+WIZARD_CATALOG_TTL_SECONDS = 60 * 60
+_WIZARD_CACHE_NAME = "wizard-live-cache.json"
+_WIZARD_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+_WIZARD_MODEL_ID_RE = re.compile(r"^[^/\s]+/[^/\s]+$")
+
+
+def wizard_live_cache_path():
+    """Same private STATE_DIR as the subscriptions overlay (lazy import to
+    avoid the models_config ↔ set_agents_app cycle). Honors SET_AGENTS_STATE
+    at call time so tests can isolate without patching the imported constant."""
+    root = os.environ.get("SET_AGENTS_STATE")
+    if root:
+        return Path(root) / _WIZARD_CACHE_NAME
+    import set_agents_app
+    return set_agents_app.STATE_DIR / _WIZARD_CACHE_NAME
+
+
+def _sanitize_wizard_names(values):
+    if not isinstance(values, list):
+        return None
+    cleaned = []
+    for item in values:
+        if not isinstance(item, str) or not _WIZARD_NAME_RE.match(item):
+            return None
+        cleaned.append(item)
+    return cleaned
+
+
+def _sanitize_wizard_ids(values):
+    if not isinstance(values, list):
+        return None
+    cleaned = []
+    for item in values:
+        if not isinstance(item, str) or not _WIZARD_MODEL_ID_RE.match(item):
+            return None
+        cleaned.append(item)
+    return cleaned
+
+
+def _wizard_section(raw, kind):
+    if not isinstance(raw, dict):
+        return None
+    at = raw.get("at")
+    if not isinstance(at, (int, float)) or isinstance(at, bool):
+        return None
+    if kind == "subscriptions":
+        error = bool(raw.get("error"))
+        names = raw.get("names")
+        if error:
+            return {"at": float(at), "names": None, "error": True}
+        cleaned = _sanitize_wizard_names(names)
+        if cleaned is None:
+            return None
+        return {"at": float(at), "names": cleaned, "error": False}
+    ids = _sanitize_wizard_ids(raw.get("ids"))
+    if ids is None:
+        return None
+    return {"at": float(at), "ids": ids}
+
+
+def load_wizard_live_cache(path=None):
+    """Best-effort wizard cache. {} on any failure. TTL is NOT applied here;
+    callers use wizard_cache_entry_fresh. Never returns credential material."""
+    cache_path = Path(path) if path is not None else wizard_live_cache_path()
+    try:
+        doc = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+    if not isinstance(doc, dict):
+        return {}
+    out = {}
+    subscriptions = _wizard_section(doc.get("subscriptions"), "subscriptions")
+    if subscriptions is not None:
+        out["subscriptions"] = subscriptions
+    catalog = _wizard_section(doc.get("catalog"), "catalog")
+    if catalog is not None:
+        out["catalog"] = catalog
+    return out
+
+
+def wizard_cache_entry_fresh(entry, ttl_seconds, now=None):
+    if not isinstance(entry, dict):
+        return False
+    at = entry.get("at")
+    if not isinstance(at, (int, float)) or isinstance(at, bool):
+        return False
+    now = time.time() if now is None else now
+    age = now - at
+    return 0 <= age <= ttl_seconds
+
+
+def write_wizard_live_cache(section, payload, path=None):
+    """Atomic read-modify-write of one cache section (subscriptions|catalog).
+    Merges with whatever is already on disk so a catalog write cannot drop
+    subscription state. 0600, tmp+replace."""
+    if section not in ("subscriptions", "catalog"):
+        raise ValueError(f"unknown wizard cache section: {section}")
+    cache_path = Path(path) if path is not None else wizard_live_cache_path()
+    current = load_wizard_live_cache(cache_path)
+    cleaned = _wizard_section(payload, section)
+    if cleaned is None:
+        return current
+    current[section] = cleaned
+    doc = {}
+    if "subscriptions" in current:
+        doc["subscriptions"] = current["subscriptions"]
+    if "catalog" in current:
+        doc["catalog"] = current["catalog"]
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{cache_path.name}.", dir=cache_path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(doc, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, cache_path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return current
 
 
 def auto_profile(config=None):

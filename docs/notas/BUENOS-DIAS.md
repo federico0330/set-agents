@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-17T14:49:01` · generado 2026-08-18T17:49:01+00:00_
+_Ventana: desde `2026-08-18T00:00:00` · generado 2026-08-18T19:36:26+00:00_
 
 ## Necesita tu decisión
 
@@ -55,7 +55,6 @@ _Ventana: desde `2026-08-17T14:49:01` · generado 2026-08-18T17:49:01+00:00_
 
 ## Qué cambió en el software
 
-- **consola** — Los spawners de codex/opencode/claude ahora materializan el bloque de vault con degradacion honesta y sink protegido para fallas transitorias. (025-consola-minima-y-flexible/D5-vault-en-todo-spawn)
 - **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done (DONE→PACKAGE_PLANNING), cmd_amend_package (agrega tasks a paquetes no-accepted); amend-package y reopen-from-done en MUTATING_COMMANDS (031-registro-correctivo/P1-verbos-correctivos)
 - **estado** — dos nuevos verbos: cmd_reopen extendido con --from-done, cmd_amend_package nuevo; MUTATING_COMMANDS actualizado (031-registro-correctivo/P1-verbos-correctivos)
 - **narracion-notas** — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación de flags requeridos (028-narracion-que-ensena/N1-campos-que-obligan)
@@ -67,9 +66,6 @@ _Ventana: desde `2026-08-17T14:49:01` · generado 2026-08-18T17:49:01+00:00_
 
 ## Decisiones nuevas
 
-- **La revision correctiva de D5 no puede aterrizar en el registro del paquete** — La delta review se ejecuta igual con un delta-reviewer independiente sobre el diff real 8091b0b..1014b02 acotado a los cuatro spawners, y su resultado se persiste como archivo de evidencia mas esta decision, NO como delta_review del paquete. No se falsea el registro del paquete ni se edita el JSON a mano para simular un camino que la maquina de estados no tiene.
-- **Los tres paquetes de 028 se replantean porque fueron creados sin work items** — Se retiran los tres registros malformados con supersede-package, declarando en --reason el motivo REAL (creados sin work items, no una enmienda de alcance) y se recrean con los mismos acceptance criteria, sus work items reales y el diff_ref con SHA. No se edita el JSON a mano ni se declara una enmienda de alcance que no ocurrio.
-- **Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida** — No se fuerza. 028 queda en PACKAGE_GATES con su gate verde registrado; la revision independiente y las cinco reparaciones viven en docs/specs/028-narracion-que-ensena/evidence/N-package-review.md y en el codigo con sus mordidas probadas. Se registra blocker HUMAN_DECISION_REQUIRED.
 - **tests/test_narracion_digest.py nunca se creó** — Registrar como deuda. Diferencia es sólo el nombre del archivo; el comportamiento está cubierto. No bloquea el cierre.
 - **AC-16 AGENTS.codex.md: confirmación de deriva no registrada** — Fue deriva, no decisión. Registrar como deuda. El revisor verificó el origen pero no hay registro formal de la confirmación previa al unify.
 - **D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios** — No es defecto vivo. Registrado como deuda. No bloquea el cierre.
@@ -84,6 +80,8 @@ _Ventana: desde `2026-08-17T14:49:01` · generado 2026-08-18T17:49:01+00:00_
 - **Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final** — Implementar un paquete por vez hasta accepted, en este orden: PKG-4, PKG-5, PKG-2, PKG-3, PKG-1, PKG-6. No abrir el siguiente con el anterior a medias.
 - **Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada** — Delegar solo con subagentes nativos de Cursor (implementer, package-reviewer, finding-verifier, etc.). Registrar la degradacion same-model/clean-context en record-subreview --evidence y finalize-review-panel --evidence de cada paquete. Nunca --route-decide ni dispatch.
 - **PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git** — Un commit con el diff de PKG-4 mas los context packs y notas de 033, despues freeze-candidate --baseline HEAD^ --candidate-ref HEAD. No es un commit oportunista: es el invariante del freeze.
+- **El presenter del gate vive en un modulo Python testeable, no en el shell** — El implementer escribe ai/scripts/verify_reporter.py y tests/test_verify_reporter.py. Esas dos rutas se registran como excepciones de owned_paths (update-package no expone --owned-path). verify.sh solo invoca el reporter. AC-5.6 no se implementa en este paquete salvo prueba de aislamiento.
+- **Digest no ensucia el diff de un paquete con bitacoras ajenas** — Revertir esas bitacoras a HEAD. Registrar excepciones docs/notas y docs/specs/033-menos-espera-menos-cuota, igual que en PKG-4. El fallo de producto es otro: ImportError tests al invocar verify_reporter.py como script.
 
 ## Quick-fixes
 

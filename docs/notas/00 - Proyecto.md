@@ -32,7 +32,7 @@
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
-- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `PACKAGE_GATES` · paquetes 1/6
+- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `PACKAGE_GATES` · paquetes 2/6
 
 ## Qué falta
 
@@ -77,7 +77,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T18:45:51+00:00_
+_Actualizado: 2026-08-18T20:06:44+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

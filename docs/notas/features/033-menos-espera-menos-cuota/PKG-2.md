@@ -11,10 +11,22 @@
 
 ## Tareas
 
-- [ ] primer render antes de 300 ms con lo que ya esta en disco (planned)
-- [ ] probe y catalogo de modelos fuera del camino critico, con with_progress (planned)
-- [ ] cache en disco con TTL y antiguedad visible, mas tecla de refresco (planned)
-- [ ] reemplazar el except Exception mudo de setup_models.py:356-359 por degradacion nombrada (planned)
+- [x] primer render antes de 300 ms con lo que ya esta en disco (completed) · unittest tests.test_models_wizard_first_paint, unittest tests.test_models_wizard_ui.test_first_paint_does_not_call_detect_subscriptions
+- [x] probe y catalogo de modelos fuera del camino critico, con with_progress (completed) · unittest tests.test_models_wizard_ui.test_refresh_key_probes_via_with_progress_and_redraws, unittest tests.test_harness.TuiTests.test_with_progress_without_a_tty_writes_not_one_byte_to_stdout
+- [x] cache en disco con TTL y antiguedad visible, mas tecla de refresco (completed) · unittest tests.test_probe_subscriptions.test_wizard_cache_ttl_starts_at_10_and_60_minutes, unittest tests.test_models_wizard_ui.test_refresh_is_appended_indexes_0_4_stay_pinned
+- [x] reemplazar el except Exception mudo de setup_models.py:356-359 por degradacion nombrada (completed) · unittest tests.test_models_wizard_ui.test_refresh_degrades_named_when_probe_raises_and_stays_usable, BUILD_CHECK_PASS
+
+## Recorrido
+
+- gate `check-owned-paths`: pass
+- gate `build-check`: pass
+- gate `verify`: pass
+- gate `git-diff-check`: pass
+
+## Spawns
+
+- SPAWN-001 implementer · modelo cursor/inherit
+- SPAWN-002 gate-runner · modelo cursor/inherit
 
 context pack: `docs/specs/033-menos-espera-menos-cuota/context/PKG-2.md`
 

@@ -7,7 +7,9 @@ discovered-providers toggle.
 """
 
 import io
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -78,11 +80,41 @@ class PanelLinesTests(unittest.TestCase):
         self.assertIn("auto → no verificable ahora", text)
 
 
+class PanelAgeAndDegradeTests(unittest.TestCase):
+    def test_panel_shows_subscription_age(self):
+        lines = setup_models._panel_lines(
+            _config(), [], "go-zen", detected={"openai"},
+            subscription_age_s=4 * 60 + 20,
+        )
+        self.assertIn("suscripciones: hace 4 min", lines[0])
+        self.assertIn("openai=auto✓", lines[0])
+
+    def test_panel_degrades_named_when_probe_failed(self):
+        lines = setup_models._panel_lines(
+            _config(), [], "go-zen", detected=None, subscription_error=True,
+        )
+        self.assertIn(setup_models.SUBSCRIPTION_PROBE_FAILED, lines[0])
+        self.assertIn("anthropic=✓pin", lines[0])
+
+    def test_wizard_passes_explicit_live_discovered_so_first_paint_does_not_probe(self):
+        config = _config()
+        config["routing"]["discovered_providers"] = "auto"
+        with mock.patch.object(setup_models, "_resolve_live_discovered") as probe:
+            text = "\n".join(setup_models._panel_lines(
+                config, [], "go-zen", live_discovered=None))
+        probe.assert_not_called()
+        self.assertIn("auto → no verificable ahora", text)
+
+
 class WizardBehaviorTests(unittest.TestCase):
     def _run(self, picks, config=None):
         config = config or _config()
-        with mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
              mock.patch.object(setup_models.models_config, "detect_subscriptions", return_value=None), \
+             mock.patch.object(setup_models.tui, "with_progress",
+                               side_effect=lambda msg, fn, **kwargs: fn()), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=picks) as picker:
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
@@ -146,6 +178,98 @@ class WizardBehaviorTests(unittest.TestCase):
             setup_models.tui.Selected(4),   # Salir sin guardar
         ])
         self.assertEqual(config["routing"]["discovered_providers"], [])
+
+    def test_refresh_is_appended_indexes_0_4_stay_pinned(self):
+        _, _, picker = self._run([None])
+        items = picker.call_args.args[0]
+        self.assertEqual(
+            items[:5],
+            ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar"),
+        )
+        self.assertEqual(items[-1], setup_models.REFRESH_ITEM)
+
+    def test_first_paint_does_not_call_detect_subscriptions(self):
+        config = _config()
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+             mock.patch.object(setup_models.models_config, "detect_subscriptions") as probe, \
+             mock.patch.object(setup_models.tui, "run_picker",
+                               return_value=setup_models.tui.Selected(4)):
+            setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                                Path("roles.tsv"), Path("models.toml"))
+        probe.assert_not_called()
+
+    def test_refresh_key_probes_via_with_progress_and_redraws(self):
+        config = _config()
+        progress_messages = []
+
+        def fake_progress(message, fn, **kwargs):
+            progress_messages.append(message)
+            return fn()
+
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+             mock.patch.object(setup_models.models_config, "detect_subscriptions",
+                               return_value={"openai"}), \
+             mock.patch.object(setup_models.tui, "with_progress", side_effect=fake_progress), \
+             mock.patch.object(setup_models, "_fetch_opencode_models",
+                               return_value=["openai/gpt-5.5"]), \
+             mock.patch.object(setup_models.tui, "run_picker", side_effect=[
+                 setup_models.tui.Selected(8),  # refresh (last item)
+                 setup_models.tui.Selected(4),  # salir
+             ]) as picker:
+            setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                                Path("roles.tsv"), Path("models.toml"))
+        self.assertIn("midiendo suscripciones", progress_messages)
+        self.assertIn("listando modelos", progress_messages)
+        second_header = picker.call_args_list[1].kwargs["header"]
+        self.assertIn("openai=auto✓", second_header)
+        self.assertIn("suscripciones: hace 0 min", second_header)
+
+    def test_refresh_degrades_named_when_probe_raises_and_stays_usable(self):
+        config = _config()
+
+        def boom(_config):
+            raise RuntimeError("probe down")
+
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
+             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+             mock.patch.object(setup_models.models_config, "detect_subscriptions", side_effect=boom), \
+             mock.patch.object(setup_models.tui, "with_progress",
+                               side_effect=lambda msg, fn, **kwargs: fn()), \
+             mock.patch.object(setup_models, "_fetch_opencode_models", return_value=[]), \
+             mock.patch.object(setup_models.tui, "run_picker", side_effect=[
+                 setup_models.tui.Selected(8),
+                 setup_models.tui.Selected(4),
+             ]) as picker:
+            rc = setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                                     Path("roles.tsv"), Path("models.toml"))
+        self.assertEqual(rc, 0)
+        second_header = picker.call_args_list[1].kwargs["header"]
+        self.assertIn(setup_models.SUBSCRIPTION_PROBE_FAILED, second_header)
+        self.assertIn("anthropic=✓pin", second_header)
+
+    def test_disk_cache_age_is_on_the_first_frame(self):
+        config = _config()
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}):
+            setup_models.models_config.write_wizard_live_cache(
+                "subscriptions",
+                {"at": setup_models.time.time() - 4 * 60, "names": ["openai"], "error": False},
+            )
+            with mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
+                 mock.patch.object(setup_models.models_config, "detect_subscriptions") as probe, \
+                 mock.patch.object(setup_models.tui, "run_picker",
+                                   return_value=setup_models.tui.Selected(4)) as picker:
+                setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                                    Path("roles.tsv"), Path("models.toml"))
+        probe.assert_not_called()
+        header = picker.call_args.kwargs["header"]
+        self.assertIn("suscripciones: hace 4 min", header)
+        self.assertIn("openai=auto✓", header)
 
 
 if __name__ == "__main__":

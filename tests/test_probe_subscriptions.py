@@ -134,6 +134,54 @@ class SubscriptionTriStateTests(unittest.TestCase):
             self.assertIsInstance(result, set)
             self.assertTrue(result <= {"openai", "anthropic", "zen", "ollama"})
 
+    def test_wizard_cache_ttl_starts_at_10_and_60_minutes(self):
+        self.assertEqual(models_config.WIZARD_SUBSCRIPTIONS_TTL_SECONDS, 10 * 60)
+        self.assertEqual(models_config.WIZARD_CATALOG_TTL_SECONDS, 60 * 60)
+
+    def test_wizard_cache_round_trip_is_names_and_ids_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "wizard-live-cache.json"
+            now = 1_700_000_000.0
+            models_config.write_wizard_live_cache(
+                "subscriptions",
+                {"at": now, "names": ["openai", "anthropic"], "error": False},
+                path=path,
+            )
+            models_config.write_wizard_live_cache(
+                "catalog",
+                {"at": now, "ids": ["openai/gpt-5.5", "anthropic/claude-opus-4"]},
+                path=path,
+            )
+            doc = models_config.load_wizard_live_cache(path)
+            self.assertEqual(set(doc["subscriptions"]["names"]), {"openai", "anthropic"})
+            self.assertEqual(doc["catalog"]["ids"], ["openai/gpt-5.5", "anthropic/claude-opus-4"])
+            raw = path.read_text(encoding="utf-8")
+            self.assertNotIn("sk-", raw)
+            self.assertNotIn("KEY=", raw)
+            self.assertNotIn("HOME", raw)
+            self.assertTrue(
+                models_config.wizard_cache_entry_fresh(
+                    doc["subscriptions"], models_config.WIZARD_SUBSCRIPTIONS_TTL_SECONDS,
+                    now=now + 9 * 60,
+                ),
+            )
+            self.assertFalse(
+                models_config.wizard_cache_entry_fresh(
+                    doc["subscriptions"], models_config.WIZARD_SUBSCRIPTIONS_TTL_SECONDS,
+                    now=now + 11 * 60,
+                ),
+            )
+
+    def test_wizard_cache_rejects_non_id_payloads(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "wizard-live-cache.json"
+            models_config.write_wizard_live_cache(
+                "subscriptions",
+                {"at": 1.0, "names": ["OPENAI_API_KEY=secret"], "error": False},
+                path=path,
+            )
+            self.assertEqual(models_config.load_wizard_live_cache(path), {})
+
 
 class UniversalAliasFrontmatterTests(unittest.TestCase):
     def test_every_claude_agent_pins_a_universal_alias_or_omits_model(self):

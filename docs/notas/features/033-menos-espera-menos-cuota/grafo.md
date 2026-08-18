@@ -10,6 +10,8 @@ subgraph sg_033_menos_espera_menos_cuota["033-menos-espera-menos-cuota"]
   end
   subgraph sg_033_menos_espera_menos_cuota_pkg_2["PKG-2"]
     package_033_menos_espera_menos_cuota_pkg_2_1["package: PKG-2"]
+    spawn_033_menos_espera_menos_cuota_pkg_2_1["SPAWN-001 implementer implementar AC-2.1 a 2.5: primer frame #60;300ms, with_progress, cache TTL, degradacion nombrada #91;in…"]
+    spawn_033_menos_espera_menos_cuota_pkg_2_2["SPAWN-002 gate-runner gates PKG-2: owned-paths, build-check, verify.sh, git diff --check #91;inherit#93;"]
   end
   subgraph sg_033_menos_espera_menos_cuota_pkg_3["PKG-3"]
     package_033_menos_espera_menos_cuota_pkg_3_1["package: PKG-3"]
@@ -28,6 +30,8 @@ subgraph sg_033_menos_espera_menos_cuota["033-menos-espera-menos-cuota"]
     spawn_033_menos_espera_menos_cuota_pkg_5_2["SPAWN-002 gate-runner gates PKG-5: owned-paths, build-check, verify.sh #40;ejercita el reporter#41;, git diff --check #91;inheri…"]
     spawn_033_menos_espera_menos_cuota_pkg_5_3["SPAWN-003 implementer arreglar ImportError de discover cuando verify_reporter.py corre como script #91;inherit#93;"]
     spawn_033_menos_espera_menos_cuota_pkg_5_4["SPAWN-004 gate-runner re-run PKG-5 gates after discover ImportError fix #91;inherit#93;"]
+    spawn_033_menos_espera_menos_cuota_pkg_5_5["SPAWN-005 package-reviewer revision profunda PKG-5 AC-5.1..5.5 contra 779671b #91;inherit#93;"]
+    spawn_033_menos_espera_menos_cuota_pkg_5_6["SPAWN-006 security-auditor subreview seguridad PKG-5 por classify-risk high #40;shebang/subprocess#41; #91;inherit#93;"]
   end
   subgraph sg_033_menos_espera_menos_cuota_pkg_6["PKG-6"]
     package_033_menos_espera_menos_cuota_pkg_6_1["package: PKG-6"]
