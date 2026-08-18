@@ -30,17 +30,17 @@ SCOPE_FILE="$DRIFT_HOME_DIR/.local/state/set-agentes/install-targets.json"
 if [ -f "$SCOPE_FILE" ]; then
   while IFS= read -r target; do
     [ -n "$target" ] && TARGET_ARGS+=(--target "$target")
-  done < <($PYTHON3 - "$SCOPE_FILE" <<'PY'
+  done < <($PYTHON3 -c "
 import json, sys
 try:
-    scope = json.load(open(sys.argv[1]))
+    scope = json.load(open('$SCOPE_FILE'))
 except Exception:
     scope = []
-known = {"opencode", "claude-code", "codex", "pi"}
+known = {'opencode', 'claude-code', 'codex', 'pi'}
 scope = [t for t in scope if t in known]
 if scope and set(scope) != known:
-    print("\n".join(scope))
-PY
+    print('\n'.join(scope))
+"
 )
 fi
 
