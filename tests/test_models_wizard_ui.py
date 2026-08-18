@@ -23,7 +23,7 @@ import setup_models  # noqa: E402
 def _config():
     return {
         "areas": {"audit": {"claude": "opus", "codex": "gpt-5.5", "codex_effort": "high",
-                            "opencode": {"go-zen": "openai/gpt-5.5"}}},
+                            "opencode": "openai/gpt-5.5"}},
         "roles": {"debugger": {"claude": "opus"}, "implementer": {"codex": "gpt-5.4"}},
         "subscriptions": {"anthropic": True, "ollama": False},
         "routing": {"discovered_providers": []},
@@ -32,14 +32,17 @@ def _config():
 
 class PanelLinesTests(unittest.TestCase):
     def test_panel_is_compact_overrides_collapse_to_a_count(self):
-        lines = setup_models._panel_lines(_config(), [], "go-zen", detected=None)
+        lines = setup_models._panel_lines(_config(), [], detected=None)
         text = "\n".join(lines)
         self.assertIn("audit", text)
         self.assertIn("overrides de rol: 2", text)
         self.assertNotIn("debugger:", text)  # the old per-role dump is gone
+        self.assertNotIn("lane:", text)
+        self.assertNotIn("OPENCODE[", text)
+        self.assertRegex(text, r"EFFORT\s+OPENCODE\n")
 
     def test_tri_state_origins_pin_off_and_auto(self):
-        lines = setup_models._panel_lines(_config(), [], "go-zen", detected={"openai", "anthropic"})
+        lines = setup_models._panel_lines(_config(), [], detected={"openai", "anthropic"})
         subs_line = lines[0]
         self.assertIn("anthropic=✓pin", subs_line)
         self.assertIn("ollama=✗off", subs_line)
@@ -48,7 +51,7 @@ class PanelLinesTests(unittest.TestCase):
     def test_discovered_providers_surface_when_configured(self):
         config = _config()
         config["routing"]["discovered_providers"] = ["opencode-zen"]
-        text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+        text = "\n".join(setup_models._panel_lines(config, []))
         self.assertIn("opencode-zen", text)
 
     def test_auto_resolves_the_live_inventory_never_iterates_the_string(self):
@@ -60,7 +63,7 @@ class PanelLinesTests(unittest.TestCase):
         config["routing"]["discovered_providers"] = "auto"
         with mock.patch.object(setup_models, "_resolve_live_discovered",
                                return_value=("opencode-zen", "opencode-go")):
-            text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+            text = "\n".join(setup_models._panel_lines(config, []))
         self.assertIn("proveedores descubiertos rutables: auto → opencode-zen (metered), "
                       "opencode-go (suscripción)", text)
         self.assertNotIn("a, u, t, o", text)
@@ -69,21 +72,21 @@ class PanelLinesTests(unittest.TestCase):
         config = _config()
         config["routing"]["discovered_providers"] = "auto"
         with mock.patch.object(setup_models, "_resolve_live_discovered", return_value=()):
-            text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+            text = "\n".join(setup_models._panel_lines(config, []))
         self.assertIn("auto → ninguno vivo ahora", text)
 
     def test_auto_probe_failure_degrades_to_an_explicit_message(self):
         config = _config()
         config["routing"]["discovered_providers"] = "auto"
         with mock.patch.object(setup_models, "_resolve_live_discovered", return_value=None):
-            text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+            text = "\n".join(setup_models._panel_lines(config, []))
         self.assertIn("auto → no verificable ahora", text)
 
 
 class PanelAgeAndDegradeTests(unittest.TestCase):
     def test_panel_shows_subscription_age(self):
         lines = setup_models._panel_lines(
-            _config(), [], "go-zen", detected={"openai"},
+            _config(), [], detected={"openai"},
             subscription_age_s=4 * 60 + 20,
         )
         self.assertIn("suscripciones: hace 4 min", lines[0])
@@ -91,7 +94,7 @@ class PanelAgeAndDegradeTests(unittest.TestCase):
 
     def test_panel_degrades_named_when_probe_failed(self):
         lines = setup_models._panel_lines(
-            _config(), [], "go-zen", detected=None, subscription_error=True,
+            _config(), [], detected=None, subscription_error=True,
         )
         self.assertIn(setup_models.SUBSCRIPTION_PROBE_FAILED, lines[0])
         self.assertIn("anthropic=✓pin", lines[0])
@@ -101,7 +104,7 @@ class PanelAgeAndDegradeTests(unittest.TestCase):
         config["routing"]["discovered_providers"] = "auto"
         with mock.patch.object(setup_models, "_resolve_live_discovered") as probe:
             text = "\n".join(setup_models._panel_lines(
-                config, [], "go-zen", live_discovered=None))
+                config, [], live_discovered=None))
         probe.assert_not_called()
         self.assertIn("auto → no verificable ahora", text)
 
@@ -118,7 +121,7 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.object(setup_models.tui, "run_picker", side_effect=picks) as picker:
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
-                setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                setup_models.wizard(config, [{"role": "audit"}],
                                     Path("roles.tsv"), Path("models.toml"))
         return config, buf.getvalue(), picker
 
@@ -196,7 +199,7 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.object(setup_models.models_config, "detect_subscriptions") as probe, \
              mock.patch.object(setup_models.tui, "run_picker",
                                return_value=setup_models.tui.Selected(4)):
-            setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+            setup_models.wizard(config, [{"role": "audit"}],
                                 Path("roles.tsv"), Path("models.toml"))
         probe.assert_not_called()
 
@@ -220,7 +223,7 @@ class WizardBehaviorTests(unittest.TestCase):
                  setup_models.tui.Selected(8),  # refresh (last item)
                  setup_models.tui.Selected(4),  # salir
              ]) as picker:
-            setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+            setup_models.wizard(config, [{"role": "audit"}],
                                 Path("roles.tsv"), Path("models.toml"))
         self.assertIn("midiendo suscripciones", progress_messages)
         self.assertIn("listando modelos", progress_messages)
@@ -245,7 +248,7 @@ class WizardBehaviorTests(unittest.TestCase):
                  setup_models.tui.Selected(8),
                  setup_models.tui.Selected(4),
              ]) as picker:
-            rc = setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+            rc = setup_models.wizard(config, [{"role": "audit"}],
                                      Path("roles.tsv"), Path("models.toml"))
         self.assertEqual(rc, 0)
         second_header = picker.call_args_list[1].kwargs["header"]
@@ -264,7 +267,7 @@ class WizardBehaviorTests(unittest.TestCase):
                  mock.patch.object(setup_models.models_config, "detect_subscriptions") as probe, \
                  mock.patch.object(setup_models.tui, "run_picker",
                                    return_value=setup_models.tui.Selected(4)) as picker:
-                setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+                setup_models.wizard(config, [{"role": "audit"}],
                                     Path("roles.tsv"), Path("models.toml"))
         probe.assert_not_called()
         header = picker.call_args.kwargs["header"]
@@ -285,7 +288,7 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.object(setup_models.tui, "with_progress",
                                side_effect=lambda msg, fn, **kw: progress.append(msg) or fn()), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=fake_picker):
-            setup_models.wizard(_config(), [{"role": "audit"}], "go-zen",
+            setup_models.wizard(_config(), [{"role": "audit"}],
                                 Path("roles.tsv"), Path("models.toml"))
         self.assertEqual(counts[:2], [0, 0])
         self.assertGreaterEqual(counts[2], 1)
@@ -309,7 +312,7 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.object(setup_models.tui, "with_progress",
                                side_effect=lambda msg, fn, **kw: fn()), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=picks) as picker:
-            setup_models.wizard(config, [{"role": "audit"}], "go-zen",
+            setup_models.wizard(config, [{"role": "audit"}],
                                 Path("roles.tsv"), Path("models.toml"))
         first, second = picker.call_args_list[0].kwargs["header"], picker.call_args_list[2].kwargs["header"]
         self.assertNotIn("probe falló", first)
@@ -323,7 +326,7 @@ class WizardBehaviorTests(unittest.TestCase):
             self._run([
                 setup_models.tui.Selected(1),  # Cambiar un rol
                 setup_models.tui.Selected(0),  # audit (absent from roles)
-                setup_models.tui.Selected(3),  # opencode.go-zen
+                setup_models.tui.Selected(3),  # opencode
                 None,                          # Esc
                 setup_models.tui.Selected(4),
             ], config=config)
@@ -333,7 +336,7 @@ class WizardBehaviorTests(unittest.TestCase):
 
     def test_existing_current_is_passed_without_inserting_keys(self):
         config = _config()
-        config["roles"]["audit"] = {"opencode": {"go-zen": "openai/kept"}}
+        config["roles"]["audit"] = {"opencode": "openai/kept"}
         with mock.patch.object(setup_models, "available_opencode_models",
                                return_value=["openai/kept", "openai/other"]):
             _, _, picker = self._run([
@@ -343,8 +346,26 @@ class WizardBehaviorTests(unittest.TestCase):
                 None,
                 setup_models.tui.Selected(4),
             ], config=config)
-        self.assertEqual(config["roles"]["audit"], {"opencode": {"go-zen": "openai/kept"}})
+        self.assertEqual(config["roles"]["audit"], {"opencode": "openai/kept"})
         self.assertEqual(picker.call_args_list[3].kwargs.get("current"), "openai/kept")
+
+    def test_campo_is_exactly_the_four_axes(self):
+        captured = []
+
+        def fake_choose(prompt, options, **kwargs):
+            captured.append((prompt, list(options)))
+            if prompt == "Área":
+                return options[0]
+            return None
+
+        with mock.patch.object(setup_models, "choose", side_effect=fake_choose):
+            self._run([
+                setup_models.tui.Selected(0),  # Cambiar un área
+                setup_models.tui.Selected(4),  # Salir
+            ])
+        campo = [item for item in captured if item[0] == "Campo"]
+        self.assertTrue(campo)
+        self.assertEqual(campo[0][1], ["claude", "codex", "codex_effort", "opencode"])
 
 
 class GroupedModelPickerTests(unittest.TestCase):
@@ -388,14 +409,10 @@ class GroupedModelPickerTests(unittest.TestCase):
 class ModelsInUseTests(unittest.TestCase):
     def test_models_in_use_unique_first_seen_and_walks_tier_pins(self):
         used = setup_models._models_in_use({
-            "areas": {"coord": {"opencode": {
-                "go-zen": "openai/gpt-5.5", "zen": "openai/gpt-5.5",
-            }}},
+            "areas": {"coord": {"opencode": "openai/gpt-5.5"}},
             "roles": {
-                "debugger": {"opencode": {"go-zen": "openai/gpt-5.5"}},
-                "implementer": {"tiers": {"fast": {"opencode": {
-                    "go-zen": "openai/gpt-5.6-luna", "zen": "openai/gpt-5.6-luna",
-                }}}},
+                "debugger": {"opencode": "openai/gpt-5.5"},
+                "implementer": {"tiers": {"fast": {"opencode": "openai/gpt-5.6-luna"}}},
             },
         })
         self.assertEqual(

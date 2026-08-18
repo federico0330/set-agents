@@ -326,7 +326,7 @@ class WizardPanelTests(unittest.TestCase):
 
     def test_panel_declares_automatic_policy_and_keeps_the_frozen_markers(self):
         with mock.patch.object(setup_models, "_load_pins", return_value={}):
-            text = "\n".join(setup_models._panel_lines(self._CONFIG, [], "go-zen"))
+            text = "\n".join(setup_models._panel_lines(self._CONFIG, []))
         self.assertIn("Automático (recomendado)", text)
         self.assertIn("DEFAULTS CURADOS", text)
         self.assertIn("ADR-0030", text)
@@ -334,7 +334,7 @@ class WizardPanelTests(unittest.TestCase):
     def test_panel_shows_pinned_roles_with_their_source(self):
         pins = {"architect": ("openai-codex", "gpt-5.6-terra")}
         with mock.patch.object(setup_models, "_load_pins", return_value=pins):
-            text = "\n".join(setup_models._panel_lines(self._CONFIG, [], "go-zen"))
+            text = "\n".join(setup_models._panel_lines(self._CONFIG, []))
         self.assertIn("1 pin(s)", text)
         self.assertIn("architect=openai-codex/gpt-5.6-terra", text)
 

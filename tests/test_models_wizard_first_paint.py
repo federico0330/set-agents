@@ -24,7 +24,7 @@ PROBE_FREEZE_S = 5.0
 def _config():
     return {
         "areas": {"audit": {"claude": "opus", "codex": "gpt-5.5", "codex_effort": "high",
-                            "opencode": {"go-zen": "openai/gpt-5.5"}}},
+                            "opencode": "openai/gpt-5.5"}},
         "roles": {},
         "subscriptions": {"anthropic": True},
         "routing": {"discovered_providers": []},
@@ -54,7 +54,7 @@ class FirstPaintTests(unittest.TestCase):
              mock.patch.object(setup_models.tui, "run_picker", side_effect=fake_picker):
             started = time.monotonic()
             rc = setup_models.wizard(
-                _config(), [{"role": "audit"}], "go-zen",
+                _config(), [{"role": "audit"}],
                 Path("roles.tsv"), Path("models.toml"),
             )
 

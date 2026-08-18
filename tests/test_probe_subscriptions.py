@@ -53,7 +53,7 @@ class SubscriptionTriStateTests(unittest.TestCase):
         try:
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
-                roles = models_config.load_roles("go-zen", models_path=path)
+                roles = models_config.load_roles(models_path=path)
             return roles, stderr.getvalue()
         finally:
             os.unlink(path)
@@ -105,7 +105,7 @@ class SubscriptionTriStateTests(unittest.TestCase):
         config = models_config.load_config()
         config["subscriptions"]["openai"] = False
         with self.assertRaises(models_config.ModelsError):
-            models_config.load_role_tiers(config, "go-zen")
+            models_config.load_role_tiers(config)
 
     def test_tier_table_absent_and_detected_loads_silently(self):
         config = models_config.load_config()
@@ -113,7 +113,7 @@ class SubscriptionTriStateTests(unittest.TestCase):
         models_config.detect_subscriptions = lambda cfg: {"openai", "anthropic", "zen"}
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
-            tiers = models_config.load_role_tiers(config, "go-zen")
+            tiers = models_config.load_role_tiers(config)
         self.assertTrue(tiers)
         self.assertNotIn("WARN degraded", stderr.getvalue())
 
@@ -123,7 +123,7 @@ class SubscriptionTriStateTests(unittest.TestCase):
         models_config.detect_subscriptions = lambda cfg: {"anthropic"}
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
-            tiers = models_config.load_role_tiers(config, "go-zen")
+            tiers = models_config.load_role_tiers(config)
         self.assertTrue(tiers)
         self.assertIn("WARN degraded", stderr.getvalue())
 

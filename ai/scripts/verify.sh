@@ -27,7 +27,7 @@ git diff --check
 
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
-./build.sh --output "$STAGING" --profile go-zen >/dev/null
+./build.sh --output "$STAGING" >/dev/null
 for harness in opencode claude-code codex pi cursor; do
   diff -ruN "Global/$harness" "$STAGING/$harness"
 done

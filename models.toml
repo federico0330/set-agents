@@ -47,11 +47,9 @@ opencode_zen = ["big-pickle", "claude-fable-5", "claude-haiku-4-5", "claude-opus
 opencode_go = ["deepseek-v4-flash", "deepseek-v4-pro", "glm-5.1", "glm-5.2", "gpt-5.6-luna", "grok-4.5", "hy3", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "mimo-v2.5", "mimo-v2.5-pro", "minimax-m2.7", "minimax-m3", "qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-max"]
 
 [session]
-# AC-04 (024 C2): the openai-only lane cannot require the Zen subscription its own
-# name says it doesn't have -- `opencode/north-mini-code-free` is a zen-namespace
-# model (SUBSCRIPTION_BY_PREFIX). `openai/gpt-5.4-mini` is the same cheap workhorse
-# already curated for every other openai-only cell in this file.
-opencode_small_model = { "go-zen" = "opencode/north-mini-code-free", "zen" = "opencode/north-mini-code-free", "openai-only" = "openai/gpt-5.4-mini" }
+# Single OpenCode dimension (033 PKG-1): keep the former go-zen small model.
+# openai-only's gpt-5.4-mini is dropped with that lane.
+opencode_small_model = "opencode/north-mini-code-free"
 
 [permissions]
 profile = "yolo"
@@ -94,31 +92,31 @@ codex_effort = "high"
 # un techo mas duro y menos visible. Decision del usuario: el orquestador vuelve a la lane
 # openai-codex. `openai/gpt-5.5` ya esta curado en [catalog].opencode_zen y en [areas.audit] /
 # [areas.judge], y no colisiona con ningun [roles.<role>.tiers.*] (todos son luna/sol/terra).
-opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "opencode/grok-4.5", "openai-only" = "opencode/grok-4.5" }
+opencode = "openai/gpt-5.5"
 
 [areas.analysis]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = { "go-zen" = "openai/gpt-5.4-fast", "zen" = "openai/gpt-5.4-mini", "openai-only" = "openai/gpt-5.4" }
+opencode = "openai/gpt-5.4-fast"
 
 [areas.docs]
 claude = "sonnet"
 codex = "gpt-5.6-sol"
 codex_effort = "high"
-opencode = { "go-zen" = "openai/gpt-5.4-fast", "zen" = "opencode/glm-5.2", "openai-only" = "openai/gpt-5.5" }
+opencode = "openai/gpt-5.4-fast"
 
 [areas.implement]
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
-opencode = { "go-zen" = "openai/gpt-5.6-fast", "zen" = "opencode/kimi-k2.7-code", "openai-only" = "openai/gpt-5.4" }
+opencode = "openai/gpt-5.6-fast"
 
 [areas.gate]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "opencode/deepseek-v4-flash-free", "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.4-mini"
 
 [areas.audit]
 # 015-anthropic-dispatch-parity AC-06(b) (round 3, decision 1): was "opus" -- collided with the
@@ -136,7 +134,7 @@ codex_effort = "xhigh"
 # BASE (non-routed) audit reviewer on OpenCode coincide with a DYNAMICALLY tiered implementer@balanced
 # writer. Realigned to "openai/gpt-5.5", matching this area's own zen/openai-only lanes, which collides with
 # no [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree.
-opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "openai/gpt-5.5", "openai-only" = "openai/gpt-5.5" }
+opencode = "openai/gpt-5.5"
 
 [areas.judge]
 # 015 AC-06(b): same fix, same reason as [areas.audit].claude above.
@@ -151,19 +149,19 @@ codex_effort = "xhigh"
 # and SAME reasoning as [areas.audit].opencode."go-zen" -- collides with no
 # [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value
 # is one of luna/sol/terra, never "gpt-5.5"). See docs/adr/0019-anthropic-dispatch-parity.md D8.
-opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "openai/gpt-5.5", "openai-only" = "openai/gpt-5.5" }
+opencode = "openai/gpt-5.5"
 
 [areas.release]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "opencode/deepseek-v4-flash-free", "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.4-mini"
 
 [areas.memory]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "opencode/deepseek-v4-flash-free", "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.4-mini"
 
 [areas.ops]
 claude = "haiku"
@@ -181,14 +179,14 @@ codex_effort = "low"
 # and already used this exact go-zen value) -- collides with no
 # [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value is
 # one of luna/sol/terra, never "gpt-5.4-mini").
-opencode = { "go-zen" = "openai/gpt-5.4-mini", "zen" = "openai/gpt-5.4-mini", "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.4-mini"
 
 [roles.agent-factory]
 claude = "opus"
 codex_effort = "xhigh"
 
 [roles.app-runner]
-opencode = { "go-zen" = "opencode/deepseek-v4-flash-free", "zen" = "opencode/deepseek-v4-flash-free" }
+opencode = "opencode/deepseek-v4-flash-free"
 
 [roles.architect]
 claude = "opus"
@@ -198,89 +196,81 @@ codex_effort = "xhigh"
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
-opencode = { "go-zen" = "opencode/nemotron-3-ultra-free", "zen" = "opencode/nemotron-3-ultra-free" }
+opencode = "opencode/nemotron-3-ultra-free"
 
 [roles.debugger]
 codex_effort = "high"
-opencode = { "zen" = "openai/gpt-5.4" }
 
-# Per-role OpenCode-lane tier tables (contract 004 / AC-06). These are the ONLY
-# consumers of MODEL_TIERS: the tier table IS the declaration of the OpenCode-lane
+# Per-role OpenCode tier tables (contract 004 / AC-06). These are the ONLY
+# consumers of MODEL_TIERS: the tier table IS the declaration of the OpenCode
 # row per (role, tier); generate.py's build-time coherence gate requires every
 # declared model here to project to EXACTLY ONE routes.v1.toml row (openai-codex
 # provider, matching tier, role-compatible) — see models_config.load_role_tiers.
-# The three lanes carry the same model on purpose: only the openai-codex family
-# projects from the OpenCode namespace, so lane variance would only ever produce
-# a coherence-gate failure, not a real choice.
+# Collapsed from three identical lane values (033 PKG-1 AC-1.5).
 [roles.debugger.tiers.fast]
-opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "openai-only" = "openai/gpt-5.6-luna" }
+opencode = "openai/gpt-5.6-luna"
 
 [roles.debugger.tiers.balanced]
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "openai-only" = "openai/gpt-5.6-sol" }
+opencode = "openai/gpt-5.6-sol"
 
 [roles.debugger.tiers.frontier]
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "openai-only" = "openai/gpt-5.6-terra" }
+opencode = "openai/gpt-5.6-terra"
 
 [roles.delta-reviewer.tiers.fast]
-opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "openai-only" = "openai/gpt-5.6-luna" }
+opencode = "openai/gpt-5.6-luna"
 
 [roles.delta-reviewer.tiers.balanced]
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "openai-only" = "openai/gpt-5.6-sol" }
+opencode = "openai/gpt-5.6-sol"
 
 [roles.delta-reviewer.tiers.frontier]
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "openai-only" = "openai/gpt-5.6-terra" }
+opencode = "openai/gpt-5.6-terra"
 
 [roles.finding-verifier.tiers.fast]
-opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "openai-only" = "openai/gpt-5.6-luna" }
+opencode = "openai/gpt-5.6-luna"
 
 [roles.finding-verifier.tiers.balanced]
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "openai-only" = "openai/gpt-5.6-sol" }
+opencode = "openai/gpt-5.6-sol"
 
 [roles.finding-verifier.tiers.frontier]
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "openai-only" = "openai/gpt-5.6-terra" }
+opencode = "openai/gpt-5.6-terra"
 
 [roles.frontend-engineer]
-opencode = { "go-zen" = "openai/gpt-5.3-codex-spark", "openai-only" = "openai/gpt-5.4-mini" }
-
-[roles.image-describer]
-opencode = { "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.3-codex-spark"
 
 [roles.implementer.tiers.fast]
-opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "openai-only" = "openai/gpt-5.6-luna" }
+opencode = "openai/gpt-5.6-luna"
 
 [roles.implementer.tiers.balanced]
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "openai-only" = "openai/gpt-5.6-sol" }
+opencode = "openai/gpt-5.6-sol"
 
 [roles.implementer.tiers.frontier]
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "openai-only" = "openai/gpt-5.6-terra" }
+opencode = "openai/gpt-5.6-terra"
 
 [roles.local-gate-runner]
-opencode = { "go-zen" = "opencode/deepseek-v4-flash-free" }
+opencode = "opencode/deepseek-v4-flash-free"
 
 [roles.package-planner]
 codex = "gpt-5.6-terra"
 
 [roles.package-reviewer.tiers.fast]
-opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "openai-only" = "openai/gpt-5.6-luna" }
+opencode = "openai/gpt-5.6-luna"
 
 [roles.package-reviewer.tiers.balanced]
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "openai-only" = "openai/gpt-5.6-sol" }
+opencode = "openai/gpt-5.6-sol"
 
 [roles.package-reviewer.tiers.frontier]
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "openai-only" = "openai/gpt-5.6-terra" }
+opencode = "openai/gpt-5.6-terra"
 
 [roles.product-analyst]
 codex = "gpt-5.6-terra"
-opencode = { "zen" = "opencode/deepseek-v4-pro", "openai-only" = "openai/gpt-5.4" }
 
 [roles.project-bootstrapper]
 codex = "gpt-5.6-luna"
 codex_effort = "medium"
-opencode = { "zen" = "opencode/deepseek-v4-pro", "openai-only" = "openai/gpt-5.4-mini" }
 
 [roles.refactor-specialist]
 codex = "gpt-5.6-luna"
-opencode = { "go-zen" = "openai/gpt-5.3-codex-spark", "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.3-codex-spark"
 
 [roles.runtime-verifier]
 claude = "sonnet"
@@ -288,13 +278,10 @@ codex = "gpt-5.6-terra"
 codex_effort = "medium"
 
 [roles.security-auditor.tiers.fast]
-opencode = { "go-zen" = "openai/gpt-5.6-luna", "zen" = "openai/gpt-5.6-luna", "openai-only" = "openai/gpt-5.6-luna" }
+opencode = "openai/gpt-5.6-luna"
 
 [roles.security-auditor.tiers.balanced]
-opencode = { "go-zen" = "openai/gpt-5.6-sol", "zen" = "openai/gpt-5.6-sol", "openai-only" = "openai/gpt-5.6-sol" }
+opencode = "openai/gpt-5.6-sol"
 
 [roles.security-auditor.tiers.frontier]
-opencode = { "go-zen" = "openai/gpt-5.6-terra", "zen" = "openai/gpt-5.6-terra", "openai-only" = "openai/gpt-5.6-terra" }
-
-[roles.test-writer]
-opencode = { "zen" = "opencode/deepseek-v4-flash-free", "openai-only" = "openai/gpt-5.4-mini" }
+opencode = "openai/gpt-5.6-terra"

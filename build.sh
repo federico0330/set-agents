@@ -3,36 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODE="generate"
-# Env override honored (PROFILE=zen ./build.sh); --profile flag wins below.
-PROFILE="${PROFILE:-}"
 OUTPUT=""
 YES=0
 TARGETS=()
 
 usage() {
-  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|openai-only] [--output DIR] [--target opencode|claude-code|codex|pi|cursor] [--yes]"
-}
-
-ensure_active_profile() {
-  # The lane is auto-derived from the probe (models_config.auto_profile); the old
-  # use-go-zen.sh/use-zen.sh/use-local.sh scripts are gone. Only a MISSING
-  # active-profile is written here — an existing one (earlier auto run, or a
-  # deliberate hand edit / --profile override) is never flipped silently, so
-  # tracked artifacts can't churn because a probe changed its mind.
-  [ -n "$PROFILE" ] && return 0
-  [ -f "$ROOT/active-profile" ] && return 0
-  local lane
-  lane="$(python3 - "$ROOT" <<'PY'
-import sys
-sys.path.insert(0, sys.argv[1] + "/ai/scripts")
-import models_config
-print(models_config.auto_profile() or "")
-PY
-)" || lane=""
-  if [ -n "$lane" ]; then
-    printf '%s\n' "$lane" > "$ROOT/active-profile"
-    echo "PROFILE_AUTO $lane"
-  fi
+  echo "usage: ./build.sh [--check|--diff|--install] [--output DIR] [--target opencode|claude-code|codex|pi|cursor] [--yes]"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -40,7 +16,6 @@ while [ "$#" -gt 0 ]; do
     --check) MODE="check" ;;
     --diff) MODE="diff" ;;
     --install) MODE="install" ;;
-    --profile) shift; PROFILE="${1:-}" ;;
     --output) shift; OUTPUT="${1:-}" ;;
     --target) shift; TARGETS+=("${1:-}") ;;
     --yes) YES=1 ;;
@@ -50,12 +25,8 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-ensure_active_profile
-
 if [ -n "$OUTPUT" ]; then
-  args=(python3 "$ROOT/ai/scripts/generate.py" --output "$OUTPUT")
-  [ -z "$PROFILE" ] || args+=(--profile "$PROFILE")
-  "${args[@]}"
+  python3 "$ROOT/ai/scripts/generate.py" --output "$OUTPUT"
   exit
 fi
 
@@ -74,17 +45,12 @@ HOOK
 }
 
 # check never reads this generic STAGING (it always compared self-scaffold files directly, and
-# now also diffs a SEPARATE tree forced to --profile go-zen below, per ADR-0041 point 1) -- build
-# it only for the modes that actually consume it, so `--check` doesn't run generate.py twice
-# under two different profiles and doesn't print generate.py's own "CHECK_PASS: generated and
-# validated profile X" (that line is "ran without exploding", not a drift verdict; printing it
-# here read as a second, contradictory verdict next to build.sh's own).
+# now also diffs a SEPARATE tree below, per ADR-0041 point 1) -- build it only for the modes
+# that actually consume it, so `--check` doesn't run generate.py twice.
 if [ "$MODE" != "check" ]; then
   STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes.XXXXXX")"
   trap 'rm -rf "$STAGING"' EXIT
-  args=(python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING")
-  [ -z "$PROFILE" ] || args+=(--profile "$PROFILE")
-  "${args[@]}"
+  python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING"
 fi
 
 case "$MODE" in
@@ -120,15 +86,11 @@ EOF
     echo "SELF_SCAFFOLD_SYNC_OK files=$checked"
 
     # AC-01 (ADR-0041): the self-scaffold comparison above never looked at Global/ -- this is
-    # the check that was missing. Forced to --profile go-zen ALWAYS, ignoring $PROFILE/--profile
-    # and the local active-profile file: Global/ is committed under go-zen, and a local lane
-    # would break install.sh:370 (onboarding, before any "go" pair is live) and
-    # setup_models.py:397,570 (every model change, their whole reason to exist). Reuses
-    # verify.sh:26-28's diff pattern (a real gate, no `|| true`), not --diff's (:99-104 below,
-    # which always exits 0 and stays untouched as the "show me" mode).
+    # the check that was missing. Reuses verify.sh's diff pattern (a real gate, no `|| true`),
+    # not --diff's (which always exits 0 and stays untouched as the "show me" mode).
     CHECK_STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-check.XXXXXX")"
     trap 'rm -rf "$CHECK_STAGING"' EXIT
-    python3 "$ROOT/ai/scripts/generate.py" --output "$CHECK_STAGING" --profile go-zen >/dev/null
+    python3 "$ROOT/ai/scripts/generate.py" --output "$CHECK_STAGING" >/dev/null
     tree_drift=0
     for harness in opencode claude-code codex pi cursor; do
       if ! diff -ruN "$ROOT/Global/$harness" "$CHECK_STAGING/$harness"; then
@@ -136,9 +98,9 @@ EOF
       fi
     done
     if [ "$tree_drift" -eq 0 ]; then
-      echo "GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=5"
+      echo "GLOBAL_TREE_SYNC_OK harnesses=5"
     else
-      echo "GLOBAL_TREE_DRIFT profile=go-zen"
+      echo "GLOBAL_TREE_DRIFT"
       exit 1
     fi
     echo "BUILD_CHECK_PASS"
@@ -155,7 +117,7 @@ EOF
       rm -rf "$ROOT/Global/$harness"
       cp -a "$STAGING/$harness" "$ROOT/Global/$harness"
     done
-    echo "Generated tracked artifacts for ${PROFILE:-$(cat "$ROOT/active-profile" 2>/dev/null || echo go-zen)}."
+    echo "Generated tracked artifacts."
     ensure_drift_hook
     ;;
   install)

@@ -709,27 +709,22 @@ class HarnessTests(unittest.TestCase):
         mc = self._import("models_config")
         roles = {
             row["role"]: row
-            for row in mc.load_roles("zen", self.FIXTURES / "roles.tsv", self.FIXTURES / "models.toml")
+            for row in mc.load_roles(self.FIXTURES / "roles.tsv", self.FIXTURES / "models.toml")
         }
-        # Pure area inheritance.
-        self.assertEqual(roles["implementer"]["opencode_model"], "opencode/kimi-k2.7-code")
+        # Pure area inheritance (go-zen value conserved as the single OpenCode string).
+        self.assertEqual(roles["implementer"]["opencode_model"], "openai/gpt-5.6-terra")
         self.assertEqual(roles["implementer"]["codex_effort"], "medium")
         # Role override wins field by field; untouched fields fall back to the area.
+        # debugger's former zen-only opencode override is gone (it never applied to go-zen).
         self.assertEqual(roles["debugger"]["codex_effort"], "high")
-        self.assertEqual(roles["debugger"]["opencode_model"], "openai/gpt-5.4")
+        self.assertEqual(roles["debugger"]["opencode_model"], "openai/gpt-5.6-terra")
         self.assertEqual(roles["debugger"]["codex_model"], "gpt-5.6-terra")
-        # Lane merge is per lane: the go-zen lane is not overridden for debugger.
-        go = {
-            row["role"]: row
-            for row in mc.load_roles("go-zen", self.FIXTURES / "roles.tsv", self.FIXTURES / "models.toml")
-        }
-        self.assertEqual(go["debugger"]["opencode_model"], "openai/gpt-5.6-terra")
 
     def test_repo_go_zen_routes_hot_path_to_fast_variants_and_keeps_reviewers_apart(self):
         mc = self._import("models_config")
         rows = {
             row["role"]: row
-            for row in mc.load_roles("go-zen", ROOT / "roles.tsv", ROOT / "models.toml")
+            for row in mc.load_roles(ROOT / "roles.tsv", ROOT / "models.toml")
         }
         # Hot path latency policy, ADR-0044: measured, `-fast` is a naming convention that only
         # exists on opencode's `openai` provider (`gpt-5.6-{luna,sol,terra}-fast`) -- neither
@@ -766,17 +761,22 @@ class HarnessTests(unittest.TestCase):
                 del config["areas"]["coord"]["codex"]
             mc, models = self._models_fixture(td, drop_field)
             with self.assertRaisesRegex(ValueError, "unresolved codex_model"):
-                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+                mc.load_roles(self.FIXTURES / "roles.tsv", models)
 
     def test_models_config_rejects_inactive_subscription(self):
+        with tempfile.TemporaryDirectory() as td:
+            def drop_openai(config):
+                config["subscriptions"]["openai"] = False
+            mc, models = self._models_fixture(td, drop_openai)
+            with self.assertRaisesRegex(ValueError, "needs the 'openai' subscription"):
+                mc.load_roles(self.FIXTURES / "roles.tsv", models)
+
         with tempfile.TemporaryDirectory() as td:
             def drop_zen(config):
                 config["subscriptions"]["zen"] = False
             mc, models = self._models_fixture(td, drop_zen)
-            with self.assertRaisesRegex(ValueError, "needs the 'zen' subscription"):
-                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
-            # The go-zen lane of the fixture uses no zen-subscription model: still fine.
-            mc.load_roles("go-zen", self.FIXTURES / "roles.tsv", models)
+            # Fixture OpenCode cells are openai/* (the conserved go-zen values); zen off is fine.
+            mc.load_roles(self.FIXTURES / "roles.tsv", models)
 
     def test_models_config_rejects_orphan_role_override(self):
         with tempfile.TemporaryDirectory() as td:
@@ -784,7 +784,7 @@ class HarnessTests(unittest.TestCase):
                 config["roles"]["ghost-role"] = {"codex_effort": "low"}
             mc, models = self._models_fixture(td, orphan)
             with self.assertRaisesRegex(ValueError, r"roles.ghost-role.*does not match"):
-                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+                mc.load_roles(self.FIXTURES / "roles.tsv", models)
 
     def test_models_config_rejects_legacy_roster_header(self):
         mc = self._import("models_config")
@@ -795,7 +795,7 @@ class HarnessTests(unittest.TestCase):
                 "\topencode_local\tclaude_model\tcodex_model\tcodex_effort\n"
             )
             with self.assertRaisesRegex(ValueError, "migrated model routing"):
-                mc.load_roles("zen", legacy, self.FIXTURES / "models.toml")
+                mc.load_roles(legacy, self.FIXTURES / "models.toml")
 
     def test_models_config_separation_violation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -804,7 +804,7 @@ class HarnessTests(unittest.TestCase):
                 config["areas"]["judge"]["codex"] = "gpt-5.6-terra"
             mc, models = self._models_fixture(td, collide)
             with self.assertRaisesRegex(ValueError, "separation violation"):
-                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+                mc.load_roles(self.FIXTURES / "roles.tsv", models)
 
     def test_models_config_families_override_separation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -814,13 +814,13 @@ class HarnessTests(unittest.TestCase):
                 config["areas"]["judge"]["codex"] = "gpt-5.4-mini"
             mc, models = self._models_fixture(td, collide_by_suffix)
             with self.assertRaisesRegex(ValueError, "separation violation"):
-                mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+                mc.load_roles(self.FIXTURES / "roles.tsv", models)
 
             def separate_by_family(config):
                 collide_by_suffix(config)
                 config["families"]["gpt-5.4-mini"] = "gpt-5.4-mini-reviewer"
             mc, models = self._models_fixture(td, separate_by_family)
-            mc.load_roles("zen", self.FIXTURES / "roles.tsv", models)
+            mc.load_roles(self.FIXTURES / "roles.tsv", models)
 
     def test_models_config_emit_roundtrip(self):
         with tempfile.TemporaryDirectory() as td:
@@ -835,6 +835,103 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("schema = 2", emitted)
             models.write_text(emitted)
             self.assertEqual(emitted, mc.emit(mc.load_config(models)))
+
+    def test_manual_lane_scripts_and_profile_axis_are_gone(self):
+        # Invariant that remains from test_auto_profile.WrappersAreGoneTests:
+        # the use-*.sh wrappers stay deleted. The auto_profile/active-profile
+        # mapping itself ceased (033 PKG-1).
+        for name in ("use-go-zen.sh", "use-zen.sh", "use-local.sh"):
+            self.assertFalse((ROOT / name).exists(), name)
+        self.assertFalse((ROOT / "active-profile").exists())
+        build = (ROOT / "build.sh").read_text()
+        self.assertNotIn("--profile", build)
+        self.assertNotIn("ensure_active_profile", build)
+        mc = self._import("models_config")
+        self.assertFalse(hasattr(mc, "LANES"))
+        self.assertFalse(hasattr(mc, "auto_profile"))
+        self.assertFalse(hasattr(mc, "active_profile"))
+
+    def test_generate_rejects_the_dead_profile_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            result = run(
+                "python3", "ai/scripts/generate.py", "--profile", "go-zen",
+                "--output", str(Path(td) / "out"), check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--profile", result.stderr)
+
+    TIER_OPENCODE_IDENTITY = {
+        "fast": "openai/gpt-5.6-luna",
+        "balanced": "openai/gpt-5.6-sol",
+        "frontier": "openai/gpt-5.6-terra",
+    }
+    AC15_TIERED_ROLES = (
+        "debugger", "delta-reviewer", "finding-verifier",
+        "implementer", "package-reviewer", "security-auditor",
+    )
+
+    def test_ac15_eighteen_tier_opencode_cells_are_the_proven_identical_strings(self):
+        # Pre-collapse proof (command output in PKG-1 evidence): all 18 maps had
+        # identical go-zen/zen/openai-only values. After collapse they are that string.
+        mc = self._import("models_config")
+        config = mc.load_config(ROOT / "models.toml")
+        count = 0
+        for role in self.AC15_TIERED_ROLES:
+            for tier, expected in self.TIER_OPENCODE_IDENTITY.items():
+                value = config["roles"][role]["tiers"][tier]["opencode"]
+                self.assertIsInstance(value, str, (role, tier))
+                self.assertEqual(value, expected, (role, tier))
+                count += 1
+        self.assertEqual(count, 18)
+
+    def test_ac15_local_gate_runner_keeps_only_the_go_zen_string(self):
+        mc = self._import("models_config")
+        config = mc.load_config(ROOT / "models.toml")
+        self.assertEqual(
+            config["roles"]["local-gate-runner"]["opencode"],
+            "opencode/deepseek-v4-flash-free",
+        )
+
+    def test_opencode_cells_reject_a_restored_lane_map(self):
+        mc = self._import("models_config")
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "models.toml"
+            text = (self.FIXTURES / "models.toml").read_text()
+            text = text.replace(
+                'opencode = "openai/gpt-5.6-terra"',
+                'opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "opencode/grok-4.5", "openai-only" = "opencode/grok-4.5" }',
+                1,
+            )
+            path.write_text(text)
+            with self.assertRaisesRegex(ValueError, "not a lane map"):
+                mc.load_roles(self.FIXTURES / "roles.tsv", path)
+
+    def test_ac16_exhausted_provider_fails_loudly_naming_provider_and_action(self):
+        mc = self._import("models_config")
+        with self.assertRaises(mc.ModelsError) as ctx:
+            mc.load_roles(
+                ROOT / "roles.tsv", ROOT / "models.toml",
+                exhausted_providers=("openai",),
+            )
+        msg = str(ctx.exception)
+        self.assertIn("PROVIDER_QUOTA_EXHAUSTED", msg)
+        self.assertIn("provider=openai", msg)
+        self.assertIn("./setup-models.sh", msg)
+        self.assertNotIn("Traceback", msg)
+
+    def test_ac16_does_not_silently_substitute_another_model(self):
+        mc = self._import("models_config")
+        roles = {
+            row["role"]: row
+            for row in mc.load_roles(ROOT / "roles.tsv", ROOT / "models.toml")
+        }
+        self.assertEqual(roles["orchestrator"]["opencode_model"], "openai/gpt-5.5")
+        with self.assertRaises(mc.ModelsError) as ctx:
+            mc.require_opencode_provider_usable(
+                "openai/gpt-5.5", area="coord", exhausted_providers=("openai",),
+            )
+        self.assertIn("PROVIDER_QUOTA_EXHAUSTED", str(ctx.exception))
+        self.assertEqual(roles["orchestrator"]["opencode_model"], "openai/gpt-5.5")
 
     # -------------------------------------------------------- setup-models
     def _setup_models(self, td, *args, check=False):
@@ -851,7 +948,7 @@ class HarnessTests(unittest.TestCase):
         state = Path(td) / "state"
         return run(
             "python3", "ai/scripts/setup_models.py",
-            "--models", str(models), "--profile", "go-zen", *args, check=check,
+            "--models", str(models), *args, check=check,
             env={"SET_AGENTS_STATE": str(state)},
         ), models
 
@@ -910,7 +1007,7 @@ class HarnessTests(unittest.TestCase):
         # área" (option 1) and "Cambiar un rol" (option 2).
         setup_models = self._import("setup_models")
         config = {
-            "areas": {"audit": {"claude": "x", "codex": "y", "codex_effort": "high", "opencode": {"go-zen": "m"}}},
+            "areas": {"audit": {"claude": "x", "codex": "y", "codex_effort": "high", "opencode": "m"}},
             "roles": {},
             "subscriptions": {"zen": True},
         }
@@ -923,7 +1020,7 @@ class HarnessTests(unittest.TestCase):
              mock.patch.object(setup_models.tui, "with_progress",
                                side_effect=lambda msg, fn, **kw: fn()), \
              mock.patch.object(
-                 setup_models, "dropped_cells", return_value=[("audit", "go-zen", "provider/model-a")],
+                 setup_models, "dropped_cells", return_value=[("audit", "provider/model-a")],
              ), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=[
                  setup_models.tui.Selected(2),  # WIZARD_ITEMS[2] == "Suscripciones"
@@ -934,22 +1031,19 @@ class HarnessTests(unittest.TestCase):
              ]):
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
-                setup_models.wizard(config, roster, "go-zen", Path("roles.tsv"), Path("models.toml"))
+                setup_models.wizard(config, roster, Path("roles.tsv"), Path("models.toml"))
         output = buf.getvalue()
         self.assertNotIn("opción 1/2", output)
         self.assertIn("Cambiar un área", output)
         self.assertIn("Cambiar un rol", output)
 
-    def test_setup_models_check_validates_all_lanes(self):
+    def test_setup_models_check_rejects_opencode_separation_violation(self):
         with tempfile.TemporaryDirectory() as td:
-            # Break only the zen lane: judge model into the implementer family.
             result, models = self._setup_models(
-                td, "--set", "judge.opencode.zen=opencode/kimi-k2.7-code",
+                td, "--set", "judge.opencode=openai/gpt-5.6-fast",
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("separation violation", result.stderr)
-            # The active profile (go-zen) alone would have validated: prove --check
-            # covers every lane by checking the untouched copy still passes.
             result, _ = self._setup_models(td, "--check")
             self.assertIn("MODELS_CHECK_PASS", result.stdout)
 
@@ -4837,7 +4931,7 @@ class HarnessTests(unittest.TestCase):
             "gate-runner": 12,
         }
         with tempfile.TemporaryDirectory() as td:
-            run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"))
+            run("python3", "ai/scripts/generate.py", "--output", str(Path(td) / "out"))
             for role, floor in floors.items():
                 text = (Path(td) / "out/opencode/agents" / f"{role}.md").read_text()
                 match = re.search(r"^steps: (\d+)$", text, re.MULTILINE)
@@ -5256,17 +5350,15 @@ class HarnessTests(unittest.TestCase):
         before = (ROOT / "roles.tsv").read_bytes()
         models_before = (ROOT / "models.toml").read_bytes()
         with tempfile.TemporaryDirectory() as td:
-            run("./build.sh", "--profile", "zen", "--output", td)
+            run("./build.sh", "--output", td)
         self.assertEqual(before, (ROOT / "roles.tsv").read_bytes())
         self.assertEqual(models_before, (ROOT / "models.toml").read_bytes())
 
-    def test_openai_only_profile_generates_and_validates(self):
-        # ADR-0048 (024 C2, AC-04): the third lane, renamed from "local" -- it never ran
-        # anything locally, every one of its own catalog cells is a remote openai/* call
-        # (COMO-CAMBIAR-MODELO.md already documented that). Must generate and pass
-        # separation-of-duties just like go-zen/zen.
+    def test_single_opencode_dimension_generates_and_validates(self):
+        # Was openai-only-lane generate (ADR-0048). That lane is gone; the remaining
+        # single OpenCode assignment must still generate and pass separation-of-duties.
         with tempfile.TemporaryDirectory() as td:
-            result = run("python3", "ai/scripts/generate.py", "--profile", "openai-only",
+            result = run("python3", "ai/scripts/generate.py",
                          "--output", str(Path(td) / "out"), check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -5297,7 +5389,7 @@ class HarnessTests(unittest.TestCase):
                 models = self._repo_models_variant(
                     td, lambda c, p=profile: c["permissions"].__setitem__("profile", p))
                 out = Path(td) / "out"
-                run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
+                run("python3", "ai/scripts/generate.py",
                     "--output", str(out), "--models", str(models))
                 gate = (out / "opencode/agents/gate-runner.md").read_text()
                 self.assertIn(f'    "*": {expected}', gate)
@@ -5319,9 +5411,9 @@ class HarnessTests(unittest.TestCase):
     def test_invalid_separation_graph_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             def judge_on_implementer_model(config):
-                config["areas"]["judge"]["opencode"]["go-zen"] = "openai/gpt-5.6-fast"
+                config["areas"]["judge"]["opencode"] = "openai/gpt-5.6-fast"
             models = self._repo_models_variant(td, judge_on_implementer_model)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
+            result = run("python3", "ai/scripts/generate.py", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("separation violation", result.stderr)
 
@@ -5332,7 +5424,7 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"
             roles.write_text(mutating_reviewer)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
+            result = run("python3", "ai/scripts/generate.py", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("mutating capability", result.stderr)
 
@@ -5340,7 +5432,7 @@ class HarnessTests(unittest.TestCase):
             def audit_on_implementer_codex(config):
                 config["areas"]["audit"]["codex"] = "gpt-5.6-terra"
             models = self._repo_models_variant(td, audit_on_implementer_codex)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
+            result = run("python3", "ai/scripts/generate.py", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("gpt-5.6-terra", result.stderr)
 
@@ -5357,7 +5449,7 @@ class HarnessTests(unittest.TestCase):
         # Code/Codex never receive a variant (additive, OpenCode-only).
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "out"
-            run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(out))
+            run("python3", "ai/scripts/generate.py", "--output", str(out))
             orchestrator = (out / "opencode/agents/orchestrator.md").read_text()
 
             def strip_model(text):
@@ -5563,7 +5655,7 @@ class HarnessTests(unittest.TestCase):
             def drop_debugger_tiers(config):
                 del config["roles"]["debugger"]["tiers"]
             models = self._repo_models_variant(td, drop_debugger_tiers)
-            run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", staging_reduced, "--models", str(models))
+            run("python3", "ai/scripts/generate.py", "--output", staging_reduced, "--models", str(models))
             result = run("python3", "ai/scripts/install.py", "--staging", staging_reduced, "--home", str(home))
             self.assertIn("PRUNED_ORPHANS=", result.stdout)
             for tier in self.TIERS:
@@ -5760,11 +5852,9 @@ class HarnessTests(unittest.TestCase):
         # fail the build — never a silently-generated, non-honorable variant.
         with tempfile.TemporaryDirectory() as td:
             def unprojectable_openai(config):
-                config["roles"]["debugger"]["tiers"]["fast"]["opencode"] = {
-                    lane: "openai/gpt-5.6-fast" for lane in ("go-zen", "zen", "openai-only")
-                }
+                config["roles"]["debugger"]["tiers"]["fast"]["opencode"] = "openai/gpt-5.6-fast"
             models = self._repo_models_variant(td, unprojectable_openai)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
+            result = run("python3", "ai/scripts/generate.py",
                          "--output", str(Path(td) / "out"), "--models", str(models), check=False)
             self.assertEqual(result.returncode, 2)
             self.assertIn("variant coherence", result.stderr)
@@ -5772,11 +5862,9 @@ class HarnessTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             def zen_aggregator_namespace(config):
-                config["roles"]["implementer"]["tiers"]["balanced"]["opencode"] = {
-                    lane: "opencode/kimi-k2.7-code" for lane in ("go-zen", "zen", "openai-only")
-                }
+                config["roles"]["implementer"]["tiers"]["balanced"]["opencode"] = "opencode/kimi-k2.7-code"
             models = self._repo_models_variant(td, zen_aggregator_namespace)
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen",
+            result = run("python3", "ai/scripts/generate.py",
                          "--output", str(Path(td) / "out"), "--models", str(models), check=False)
             self.assertEqual(result.returncode, 2)
             self.assertIn("variant coherence", result.stderr)
@@ -5841,7 +5929,7 @@ class HarnessTests(unittest.TestCase):
         # Claude Code's for the same role — `subagent` is the one documented exception,
         # allowed only for the coord-ro capability.
         gen = self._import("generate")
-        roles = gen.load_roles(gen.models_config.active_profile())
+        roles = gen.load_roles()
 
         def pi_classes(tools):
             tokens = {t.strip() for t in tools.split(",")}
@@ -6182,7 +6270,7 @@ class HarnessTests(unittest.TestCase):
             clean = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[()][A-Za-z0-9]", "", raw)
             clean = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", clean)
             gen = self._import("generate")
-            roles = gen.load_roles(gen.models_config.active_profile())
+            roles = gen.load_roles()
             for row in roles:
                 self.assertIn(row["role"], clean)
 
@@ -6216,7 +6304,7 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             roles = Path(td) / "roles.tsv"
             roles.write_text(legacy_header + "\n" + legacy_row + "\n")
-            result = run("python3", "ai/scripts/generate.py", "--profile", "go-zen", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
+            result = run("python3", "ai/scripts/generate.py", "--output", str(Path(td) / "out"), "--roles", str(roles), check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("models.toml", result.stderr)
 

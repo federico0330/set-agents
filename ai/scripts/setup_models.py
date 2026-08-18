@@ -6,7 +6,7 @@ Interactive wizard (no arguments): menu over the same primitives, then offers
 a full-generate smoke test (`build.sh --output`, see `_generate_smoke_test`;
 NOT `build.sh --check`, whose job since ADR-0041 is comparing Global/, not
 validating a config nothing has regenerated Global/ from yet) and --install.
-Writing is atomic and always validated in memory first (all three lanes); an
+Writing is atomic and always validated in memory first; an
 invalid change never reaches the file.
 
 ADR-0048 (024 C2): [subscriptions] is the one field this file never writes into
@@ -29,7 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import models_config
 import tui
-from models_config import LANES, ModelsError, die
+from models_config import ModelsError, die
 
 ROOT = Path(__file__).resolve().parents[2]
 AREA_SIMPLE_FIELDS = ("claude", "codex", "codex_effort")
@@ -81,19 +81,18 @@ def _current_cell_value(config, prefix, field):
         target = (config.get("areas") or {}).get(prefix)
     if not isinstance(target, dict):
         return None
-    if field.startswith("opencode."):
-        cell = target.get("opencode")
-        return cell.get(field.split(".", 1)[1]) if isinstance(cell, dict) else None
+    if field == "opencode":
+        return target.get("opencode")
     return target.get(field)
 
 
 def parse_address(config, roster, address):
-    """<duty>.<field> | <duty>.opencode.<lane> | role:<role>... | session.opencode_small_model.<lane>"""
+    """<duty>.<field> | <duty>.opencode | role:<role>... | session.opencode_small_model"""
     tokens = address.split(".")
     if tokens[0] == "session":
-        if len(tokens) != 3 or tokens[1] != "opencode_small_model" or tokens[2] not in LANES:
+        if tokens[1:] != ["opencode_small_model"]:
             die(f"invalid address: {address}")
-        return config["session"]["opencode_small_model"], tokens[2]
+        return config["session"], "opencode_small_model"
     if tokens[0].startswith("role:"):
         role = tokens[0][len("role:"):]
         if role not in {row["role"] for row in roster}:
@@ -106,15 +105,13 @@ def parse_address(config, roster, address):
             die(f"unknown area: {duty}")
         target = config["areas"][duty]
         tokens = tokens[1:]
-    if len(tokens) == 1 and tokens[0] in AREA_SIMPLE_FIELDS:
+    if len(tokens) == 1 and tokens[0] in AREA_SIMPLE_FIELDS + ("opencode",):
         return target, tokens[0]
-    if len(tokens) == 2 and tokens[0] == "opencode" and tokens[1] in LANES:
-        return target.setdefault("opencode", {}), tokens[1]
     die(f"invalid address: {address}")
 
 
 def validate(config, roles_path):
-    """Every lane must stay generable: emit to a temp file and load each profile."""
+    """The config must stay generable: emit to a temp file and load_roles."""
     # TOML is UTF-8 by specification; the locale never gets a vote.
     with tempfile.NamedTemporaryFile(
         "w", suffix=".toml", delete=False, encoding="utf-8"
@@ -122,42 +119,39 @@ def validate(config, roles_path):
         handle.write(models_config.emit(config))
         temp = handle.name
     try:
-        for lane in LANES:
-            models_config.load_roles(lane, roles_path, temp)
+        models_config.load_roles(roles_path, temp)
     finally:
         os.unlink(temp)
 
 
-def _generate_smoke_test(profile):
-    """Full generate() pipeline for `profile`, to a throwaway dir -- never Global/.
+def _generate_smoke_test():
+    """Full generate() pipeline, to a throwaway dir -- never Global/.
 
     Before ADR-0041, `build.sh --check` doubled as this smoke test purely as a side effect of
     always building its STAGING tree, and never actually compared it against anything. Now that
-    `--check` means "does Global/ match a fresh go-zen build" (AC-01), it is the wrong question
+    `--check` means "does Global/ match a fresh build" (AC-01), it is the wrong question
     right after writing a NEW models.toml that nothing has regenerated Global/ from yet -- every
-    real edit would report drift against a tree the edit hasn't touched. `build.sh --output DIR
-    --profile P` is the same "does this fully generate" validation `--check` used to provide
+    real edit would report drift against a tree the edit hasn't touched. `build.sh --output DIR`
+    is the same "does this fully generate" validation `--check` used to provide
     (same generate.py call, same die()s on an incoherent config), without the Global/ diff.
     """
     with tempfile.TemporaryDirectory() as tmp:
         return subprocess.run(
-            [str(ROOT / "build.sh"), "--output", tmp, "--profile", profile],
+            [str(ROOT / "build.sh"), "--output", tmp],
         )
 
 
 def dropped_cells(config, roster, subscription):
-    """Every role/lane whose resolved opencode model consumes the given subscription."""
+    """Every role whose resolved opencode model consumes the given subscription."""
     affected = []
     for row in roster:
-        for lane in LANES:
-            resolved = models_config.resolve_role(row, config, lane)
-            model = resolved["opencode_model"]
-            if models_config.subscription_of(model, config) == subscription:
-                affected.append((row["role"], lane, model))
-    for lane in LANES:
-        model = config["session"]["opencode_small_model"][lane]
+        resolved = models_config.resolve_role(row, config)
+        model = resolved["opencode_model"]
         if models_config.subscription_of(model, config) == subscription:
-            affected.append(("(session small_model)", lane, model))
+            affected.append((row["role"], model))
+    model = config["session"]["opencode_small_model"]
+    if isinstance(model, str) and models_config.subscription_of(model, config) == subscription:
+        affected.append(("(session small_model)", model))
     return affected
 
 
@@ -175,15 +169,20 @@ def _subscription_candidates(config):
     return sorted(names)
 
 
-def _status_lines(config, roster, profile):
+def _opencode_display(area):
+    value = area.get("opencode") if isinstance(area, dict) else None
+    return value if isinstance(value, str) else "-"
+
+
+def _status_lines(config, roster):
     """The lines `status()` prints -- factored out so `wizard()` can ALSO pass them as the
     WIZARD_ITEMS picker's `header=` (F-03): the config table used to be print()ed to the normal
     screen right before `run_picker` cleared it into the alternate screen, invisible exactly
     while the user is choosing what to change."""
     subs = ", ".join(f"{k}={'on' if v else 'off'}" for k, v in sorted(models_config.effective_subscriptions(config).items()))
     lines = [
-        f"profile: {profile}    subscriptions: {subs}",
-        f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]",
+        f"subscriptions: {subs}",
+        f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE",
     ]
     duties = [d for d in models_config.DUTY_ORDER if d in config["areas"]]
     duties += sorted(set(config["areas"]) - set(duties))
@@ -191,7 +190,7 @@ def _status_lines(config, roster, profile):
         area = config["areas"][duty]
         lines.append(
             f"{duty:<10} {area.get('claude', '-'):<8} {area.get('codex', '-'):<14} "
-            f"{area.get('codex_effort', '-'):<7} {area.get('opencode', {}).get(profile, '-')}"
+            f"{area.get('codex_effort', '-'):<7} {_opencode_display(area)}"
         )
     overrides = config.get("roles", {})
     if overrides:
@@ -200,15 +199,15 @@ def _status_lines(config, roster, profile):
             fields = []
             for key, value in overrides[role].items():
                 if key == "opencode":
-                    fields += [f"opencode.{lane}={model}" for lane, model in value.items()]
+                    fields.append(f"opencode={value}")
                 else:
                     fields.append(f"{key}={value}")
             lines.append(f"  {role}: " + ", ".join(fields))
     return lines
 
 
-def status(config, roster, profile):
-    for line in _status_lines(config, roster, profile):
+def status(config, roster):
+    for line in _status_lines(config, roster):
         print(line)
 
 
@@ -229,7 +228,7 @@ def _subscription_headline(subs, age_s=None, error=False):
     return f"suscripciones: {detail}"
 
 
-def _panel_lines(config, roster, profile, detected=None, *,
+def _panel_lines(config, roster, detected=None, *,
                  subscription_age_s=None, subscription_error=False,
                  live_discovered=_LIVE_UNSET):
     """The wizard's COMPACT header — replaces the old full `_status_lines` dump
@@ -264,7 +263,7 @@ def _panel_lines(config, roster, profile, detected=None, *,
         "discovered_providers", models_config.ROUTING_DEFAULTS["discovered_providers"])
     tiered = len({key for key, value in config.get("roles", {}).items() if "tiers" in value})
     lines = [
-        f"lane: {profile} (auto)    {_subscription_headline(subs, subscription_age_s, subscription_error)}",
+        _subscription_headline(subs, subscription_age_s, subscription_error),
         "routing dinámico: el router decide por spawn para TODOS los roles (ADR-0030; --route-explain)"
         + (f" · variantes @tier: {tiered} roles" if tiered else ""),
     ]
@@ -311,15 +310,15 @@ def _panel_lines(config, roster, profile, detected=None, *,
         lines.append(f"proveedores descubiertos rutables: valor de configuración inesperado ({discovered!r})")
     elif discovered:
         lines.append(f"proveedores descubiertos rutables: {', '.join(discovered)}")
-    lines.append("DEFAULTS CURADOS (fallback cuando el lane no aplica la decisión; ADR-0034/ADR-0035):")
-    lines.append(f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE[{profile}]")
+    lines.append("DEFAULTS CURADOS (fallback cuando el modelo no aplica la decisión; ADR-0034/ADR-0035):")
+    lines.append(f"{'AREA':<10} {'CLAUDE':<8} {'CODEX':<14} {'EFFORT':<7} OPENCODE")
     duties = [d for d in models_config.DUTY_ORDER if d in config.get("areas", {})]
     duties += sorted(set(config.get("areas", {})) - set(duties))
     for duty in duties:
         area = config["areas"][duty]
         lines.append(
             f"{duty:<10} {area.get('claude', '-'):<8} {area.get('codex', '-'):<14} "
-            f"{area.get('codex_effort', '-'):<7} {area.get('opencode', {}).get(profile, '-')}"
+            f"{area.get('codex_effort', '-'):<7} {_opencode_display(area)}"
         )
     overrides = config.get("roles", {})
     if overrides:
@@ -350,10 +349,19 @@ def _fetch_opencode_models(config):
         if result.returncode == 0:
             models = {line.strip() for line in result.stdout.splitlines() if "/" in line.strip()}
     if not models:
+        def _collect(value):
+            if isinstance(value, str) and "/" in value:
+                models.add(value)
+            elif isinstance(value, dict):
+                for inner in value.values():
+                    _collect(inner)
         for area in config["areas"].values():
-            models |= set(area.get("opencode", {}).values())
+            _collect(area.get("opencode"))
         for override in config.get("roles", {}).values():
-            models |= set(override.get("opencode", {}).values())
+            _collect(override.get("opencode"))
+            for tier in (override.get("tiers") or {}).values():
+                if isinstance(tier, dict):
+                    _collect(tier.get("opencode"))
     return sorted(models)
 
 
@@ -549,7 +557,7 @@ def _refresh_subscriptions_live(config):
     return tui.with_progress("midiendo suscripciones", lambda: _measure_subscriptions(config))
 
 
-def wizard(config, roster, profile, roles_path, models_out):
+def wizard(config, roster, roles_path, models_out):
     if not sys.stdin.isatty():
         print("Sin cambios pedidos y sin TTY: usá --status/--check/--set (ver --help).", file=sys.stderr)
         return 2
@@ -584,7 +592,7 @@ def wizard(config, roster, profile, roles_path, models_out):
         age_s = None if panel_state.get("sub_at") is None else max(
             0.0, time.time() - panel_state["sub_at"])
         panel = _panel_lines(
-            config, roster, profile, panel_state.get("detected"),
+            config, roster, panel_state.get("detected"),
             subscription_age_s=age_s,
             subscription_error=bool(panel_state.get("sub_error")),
             live_discovered=panel_state.get("live_discovered", _LIVE_PENDING),
@@ -602,11 +610,11 @@ def wizard(config, roster, profile, roles_path, models_out):
                 prefix = f"role:{subject}" if subject else None
             if not subject:
                 continue
-            field = choose("Campo", ["claude", "codex", "codex_effort"] + [f"opencode.{lane}" for lane in LANES])
+            field = choose("Campo", ["claude", "codex", "codex_effort", "opencode"])
             if not field:
                 continue
             current_value = _current_cell_value(config, prefix, field)
-            if field.startswith("opencode."):
+            if field == "opencode":
                 value = choose(
                     "Modelo", available_opencode_models(config),
                     current=current_value, group_by_provider=True,
@@ -648,8 +656,8 @@ def wizard(config, roster, profile, roles_path, models_out):
                 affected = dropped_cells(config, roster, subscription)
                 if affected:
                     print(f"AFFECTED={len(affected)} — celdas que usan '{subscription}':")
-                    for role, lane, model in affected:
-                        print(f"  {role} [{lane}] {model}")
+                    for role, model in affected:
+                        print(f"  {role} {model}")
                     # D-05: same defect as F-09 (fixed in set_agents_app.py) -- "opción 1/2"
                     # stopped meaning anything the day the numbered grid was replaced by the
                     # arrow selector. Reference the actual WIZARD_ITEMS labels directly so this
@@ -686,9 +694,9 @@ def wizard(config, roster, profile, roles_path, models_out):
             models_config.emit_atomic(models_out, config)
             print(f"MODELS_WRITTEN {models_out}")
             if _safe_input("¿Generar y validar ahora? [Y/n] ").strip().lower() not in {"n", "no"}:
-                if _generate_smoke_test(profile).returncode != 0:
-                    print(f"MODELS_GENERATE_FAIL — el archivo quedó escrito; corré "
-                          f"./build.sh --output /tmp/x --profile {profile} para ver el detalle")
+                if _generate_smoke_test().returncode != 0:
+                    print("MODELS_GENERATE_FAIL — el archivo quedó escrito; corré "
+                          "./build.sh --output /tmp/x para ver el detalle")
                     return 1
                 if _safe_input("¿Instalar globalmente (./build.sh --install)? [y/N] ").strip().lower() in {"y", "yes", "s", "si"}:
                     subprocess.run([str(ROOT / "build.sh"), "--install"], check=False)
@@ -699,7 +707,7 @@ def wizard(config, roster, profile, roles_path, models_out):
             # On demand, on the NORMAL screen (survives after the wizard exits);
             # the picker's header clamps long content, a pause here doesn't.
             print()
-            for line in _status_lines(config, roster, profile):
+            for line in _status_lines(config, roster):
                 print(line)
             _safe_input("Enter para volver… ")
         elif option == "7":
@@ -805,14 +813,12 @@ def main():
     parser.add_argument("--models")
     parser.add_argument("--roles")
     parser.add_argument("--output-models")
-    parser.add_argument("--profile")
     args = parser.parse_args()
 
     models_path = Path(args.models or ROOT / "models.toml")
     roles_path = Path(args.roles) if args.roles else ROOT / "roles.tsv"
     output = Path(args.output_models or models_path)
     plumbing = bool(args.models or args.output_models)
-    profile = args.profile or models_config.active_profile()
 
     try:
         config = models_config.load_config(models_path)
@@ -824,7 +830,7 @@ def main():
         roster = models_config.load_roster(roles_path)
 
         if args.status:
-            status(config, roster, profile)
+            status(config, roster)
             return 0
         if args.check:
             validate(config, roles_path)
@@ -860,8 +866,8 @@ def main():
             affected = dropped_cells(config, roster, args.drop)
             if affected:
                 print(f"AFFECTED={len(affected)}")
-                for role, lane, model in affected:
-                    print(f"  {role} [{lane}] {model}")
+                for role, model in affected:
+                    print(f"  {role} {model}")
                 print(f"MODELS_NOT_WRITTEN: reassign those cells before dropping '{args.drop}'")
                 return 2
             if args.drop in ("anthropic", "openai"):
@@ -871,16 +877,16 @@ def main():
             subscription_written = True
 
         if not mutated:
-            return 0 if subscription_written else wizard(config, roster, profile, roles_path, output)
+            return 0 if subscription_written else wizard(config, roster, roles_path, output)
 
         validate(config, roles_path)
         models_config.emit_atomic(output, config)
         print(f"MODELS_WRITTEN {output}")
         if not plumbing:
-            smoke = _generate_smoke_test(profile)
+            smoke = _generate_smoke_test()
             if smoke.returncode != 0:
                 print(f"MODELS_GENERATE_FAIL rc={smoke.returncode} — corré "
-                      f"./build.sh --output /tmp/x --profile {profile} para ver el detalle", file=sys.stderr)
+                      "./build.sh --output /tmp/x para ver el detalle", file=sys.stderr)
                 return 1
             if not args.no_install:
                 install = [str(ROOT / "build.sh"), "--install"]

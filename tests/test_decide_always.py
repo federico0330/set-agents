@@ -70,7 +70,7 @@ class PanelRelabelTests(unittest.TestCase):
     def test_panel_names_the_table_as_curated_fallback(self):
         import setup_models
         config = {"areas": {}, "roles": {"debugger": {"tiers": {}}}, "subscriptions": {}}
-        text = "\n".join(setup_models._panel_lines(config, [], "go-zen"))
+        text = "\n".join(setup_models._panel_lines(config, []))
         self.assertIn("DEFAULTS CURADOS", text)
         self.assertIn("ADR-0030", text)
         self.assertIn("variantes @tier: 1", text)

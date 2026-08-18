@@ -3,10 +3,9 @@
 
 roles.tsv holds structure only (role, mode, temperature, capability, duty);
 models.toml declares subscriptions, the model catalog, and the model assigned
-to each area (duty), with optional per-role overrides. The go-zen/zen/openai-only
-profiles survive as lanes of the opencode dimension (ADR-0048, 024 C2: the third
-lane was called "local" although every one of its own catalog cells is a remote
-API call -- COMO-CAMBIAR-MODELO.md already documented it as "openai/* only").
+to each area (duty), with optional per-role overrides. OpenCode is a single
+string per cell (033 PKG-1); provider prefixes (openai/, opencode/, opencode-go/)
+remain. The go-zen/zen/openai-only lane presets are gone.
 """
 
 import csv
@@ -22,14 +21,13 @@ from pathlib import Path
 # ADR-0042 (022 PKG-1): the single provider registry. Deliberately NOT a `routing_core`
 # import -- `provider_registry.py` has zero dependencies of its own (no `routing_core`, no
 # `models_config`), so importing it here at module scope costs nothing, unlike
-# `routing_core.catalog` (see `detect_subscriptions`/`auto_profile` below, both of which
-# still lazily import that ONE module for a real reason: any `routing_core` submodule
-# import runs `routing_core/__init__.py`, which loads `service.py`/`store.py` -- sqlite3,
+# `routing_core.catalog` (see `detect_subscriptions` below, which still lazily
+# imports that ONE module for a real reason: any `routing_core` submodule import
+# runs `routing_core/__init__.py`, which loads `service.py`/`store.py` -- sqlite3,
 # subprocess -- at import time).
 import provider_registry
 
 ROOT = Path(__file__).resolve().parents[2]
-LANES = ("go-zen", "zen", "openai-only")
 PERMISSION_PROFILES = ("guarded", "yolo")
 DUTY_ORDER = ("coord", "analysis", "docs", "implement", "gate", "audit", "judge", "release", "memory", "ops")
 ROSTER_COLUMNS = {"role", "mode", "temperature", "capability", "duty"}
@@ -39,9 +37,9 @@ READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
 AREA_FIELDS = ("claude", "codex", "codex_effort", "opencode")
-# The one role-override field that is NOT an area field: a lane-aware tier table
-# consumed only by load_role_tiers, never by resolve_role's base merge. Areas never
-# declare it — only [roles.<role>] may.
+# The one role-override field that is NOT an area field: a per-role OpenCode
+# tier table consumed only by load_role_tiers, never by resolve_role's base merge.
+# Areas never declare it — only [roles.<role>] may.
 TIER_FIELD = "tiers"
 RUNTIMES = ("opencode", "claude-code", "codex", "pi")
 MODEL_TIERS = ("fast", "balanced", "frontier")
@@ -95,16 +93,40 @@ class ModelsError(ValueError):
     pass
 
 
-def active_profile():
-    """Per-machine lane selection; untracked, so a fresh clone defaults to go-zen."""
-    try:
-        return (ROOT / "active-profile").read_text(encoding="utf-8").strip() or "go-zen"
-    except OSError:
-        return "go-zen"
+# AC-1.6(b): quota exhaustion is a named harness failure, never a silent swap.
+# Feature 011-quota-failover is BLOCKED; this path does not invent live failover.
+PROVIDER_QUOTA_ACTION = (
+    "reassign the area with ./setup-models.sh (Campo: opencode) "
+    "or wait until that provider's quota resets"
+)
 
 
 def die(message):
     raise ModelsError(message)
+
+
+def fail_provider_exhausted(provider, model, *, area=None):
+    """Named harness failure for an exhausted OpenCode provider (AC-1.6(b))."""
+    where = f" area={area}" if area else ""
+    die(
+        f"PROVIDER_QUOTA_EXHAUSTED provider={provider} model={model}{where} — "
+        f"{PROVIDER_QUOTA_ACTION}"
+    )
+
+
+def require_opencode_provider_usable(model, *, area=None, exhausted_providers=()):
+    """Refuse a chosen OpenCode model whose provider is known exhausted.
+
+    Production callers pass `exhausted_providers` from the runtime that observed
+    the exhaustion. An empty set is a no-op: this harness does not probe live
+    quota (011 is BLOCKED). Never substitutes another model.
+    """
+    if not model or not isinstance(model, str) or "/" not in model:
+        return model
+    provider = model.split("/", 1)[0]
+    if provider in exhausted_providers:
+        fail_provider_exhausted(provider, model, area=area)
+    return model
 
 
 # --------------------------------------------------------------------- load
@@ -175,8 +197,10 @@ def load_config(models_path=None):
                 or len(values) != len(set(values))):
             die(f"models.toml: [catalog].{key} must be a list of unique non-empty strings ([] is a valid veto)")
     small = config["session"].get("opencode_small_model")
-    if not isinstance(small, dict) or set(small) != set(LANES):
-        die("models.toml: [session].opencode_small_model must cover exactly the lanes " + ", ".join(LANES))
+    if isinstance(small, dict):
+        die("models.toml: [session].opencode_small_model must be a provider/model string, not a lane map")
+    if not isinstance(small, str) or not small or not OPENCODE_MODEL_RE.fullmatch(small):
+        die("models.toml: [session].opencode_small_model must be a non-empty provider/model string")
     config.setdefault("families", {})
     config.setdefault("roles", {})
     config.setdefault("providers", {})
@@ -525,25 +549,6 @@ def write_wizard_live_cache(section, payload, path=None):
     return current
 
 
-def auto_profile(config=None):
-    """The lane is derived from the probe, never hand-picked (the old use-*.sh
-    scripts are gone). Both opencode pairs live → go-zen; only opencode-zen →
-    zen; probe fine but no opencode pair → openai-only. None on probe failure —
-    the caller keeps whatever active-profile already says and never dies."""
-    try:
-        from routing_core.catalog import probe_inventory
-        cfg = config if config is not None else load_config()
-        inventory = probe_inventory(cfg, cache_root=_probe_cache_root())
-    except Exception:
-        return None
-    live = {provider for (_, provider), models in inventory.items() if models}
-    if "opencode-go" in live:
-        return "go-zen"
-    if "opencode-zen" in live:
-        return "zen"
-    return "openai-only"
-
-
 def subscription_of(model, config):
     prefix = model.split("/", 1)[0]
     providers = {**SUBSCRIPTION_BY_PREFIX, **config["providers"]}
@@ -563,8 +568,19 @@ def family(field, value, families):
     return value
 
 
-def resolve_role(row, config, profile):
-    """Field-by-field merge: [roles.<role>] over [areas.<duty>]; opencode lane by lane."""
+def _opencode_string(value, label):
+    """OpenCode cells are a single provider/model string (033 PKG-1)."""
+    if isinstance(value, dict):
+        die(f"models.toml: [{label}].opencode must be a string, not a lane map")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        die(f"models.toml: [{label}].opencode must be a non-empty string")
+    return value
+
+
+def resolve_role(row, config, exhausted_providers=()):
+    """Field-by-field merge: [roles.<role>] over [areas.<duty>]; OpenCode is a string."""
     area = config["areas"].get(row["duty"])
     if area is None:
         die(f"{row['role']}: no [areas.{row['duty']}] in models.toml")
@@ -575,27 +591,26 @@ def resolve_role(row, config, profile):
                 continue
             if key not in AREA_FIELDS:
                 die(f"models.toml: [{label}] has unknown field {key}")
-    lanes = {**area.get("opencode", {}), **override.get("opencode", {})}
-    for lane_map, label in ((area.get("opencode", {}), f"areas.{row['duty']}"), (override.get("opencode", {}), f"roles.{row['role']}")):
-        for lane in lane_map:
-            if lane not in LANES:
-                die(f"models.toml: [{label}].opencode has unknown lane {lane}")
+    area_oc = _opencode_string(area.get("opencode"), f"areas.{row['duty']}")
+    override_oc = _opencode_string(override.get("opencode"), f"roles.{row['role']}") if "opencode" in override else None
+    opencode_model = override_oc if override_oc is not None else area_oc
     resolved = {
         "claude_model": override.get("claude", area.get("claude")),
         "codex_model": override.get("codex", area.get("codex")),
         "codex_effort": override.get("codex_effort", area.get("codex_effort")),
-        "opencode_model": lanes.get(profile),
+        "opencode_model": opencode_model,
     }
     for key, value in resolved.items():
         if not value:
-            die(f"{row['role']}: unresolved {key} for profile {profile} (area {row['duty']})")
+            die(f"{row['role']}: unresolved {key} (area {row['duty']})")
+    require_opencode_provider_usable(
+        resolved["opencode_model"], area=row["duty"], exhausted_providers=exhausted_providers,
+    )
     return resolved
 
 
-def load_roles(profile, roles_path=None, models_path=None):
-    """Full contract: roster + models.toml resolved and validated for one profile."""
-    if profile not in LANES:
-        die(f"unsupported profile: {profile}")
+def load_roles(roles_path=None, models_path=None, exhausted_providers=()):
+    """Full contract: roster + models.toml resolved and validated."""
     roles = load_roster(roles_path)
     config = load_config(models_path)
     known = {row["role"] for row in roles}
@@ -606,7 +621,7 @@ def load_roles(profile, roles_path=None, models_path=None):
     catalog = config["catalog"]
     detected_subscriptions = None  # ADR-0029: lazily probed, only when an absent key is hit
     for row in roles:
-        row.update(resolve_role(row, config, profile))
+        row.update(resolve_role(row, config, exhausted_providers=exhausted_providers))
         if row["claude_model"] not in catalog["claude"]:
             die(f"{row['role']}: claude model {row['claude_model']} not in [catalog].claude")
         if row["codex_model"] not in catalog["codex"]:
@@ -651,20 +666,18 @@ def load_roles(profile, roles_path=None, models_path=None):
     return roles
 
 
-def load_role_tiers(config, profile):
-    """Per-role, OpenCode-lane tier tables: {role: {tier: opencode_model}}.
+def load_role_tiers(config, exhausted_providers=()):
+    """Per-role OpenCode tier tables: {role: {tier: opencode_model}}.
 
     A role with no [roles.<role>.tiers] table is absent from the result (base-only,
     one emitted agent). A role WITH a tiers table must cover the full closed
     vocabulary — fast, balanced, frontier — no partial fan-out. Each [roles.<role>.
-    tiers.<tier>] declares exactly one field, `opencode`, a lane map covering every
-    LANE (or an explicit "default" fallback). Every resolved model passes the SAME
-    validation any other role's opencode_model passes: OPENCODE_MODEL_RE + an active
-    subscription (subscription_of) — never a codex/claude catalog-list membership
-    check, since tiers are an OpenCode-only surface with no claude/codex twin.
+    tiers.<tier>] declares exactly one field, `opencode`, a provider/model string.
+    Every resolved model passes the SAME validation any other role's opencode_model
+    passes: OPENCODE_MODEL_RE + an active subscription (subscription_of) — never a
+    codex/claude catalog-list membership check, since tiers are an OpenCode-only
+    surface with no claude/codex twin.
     """
-    if profile not in LANES:
-        die(f"unsupported profile: {profile}")
     subscriptions = config["subscriptions"]
     detected_subscriptions = None  # ADR-0029/ADR-0048: lazily probed, only when an absent key is hit
     result = {}
@@ -686,22 +699,10 @@ def load_role_tiers(config, profile):
             table = tiers[tier]
             if not isinstance(table, dict) or set(table) != {"opencode"}:
                 die(f"models.toml: [{label}] must declare exactly 'opencode'")
-            lane_map = table["opencode"]
-            if not isinstance(lane_map, dict):
-                die(f"models.toml: [{label}.opencode] must be a table")
-            lane_unknown = set(lane_map) - set(LANES) - {"default"}
-            if lane_unknown:
-                die(f"models.toml: [{label}.opencode] has unknown lane {sorted(lane_unknown)[0]}")
-            if profile in lane_map:
-                model = lane_map[profile]
-            elif "default" in lane_map:
-                model = lane_map["default"]
-            else:
-                die(f"models.toml: [{label}.opencode] missing lane {profile} and no default")
-            if not isinstance(model, str) or not model:
-                die(f"models.toml: [{label}.opencode] lane {profile} must be a non-empty string")
+            model = _opencode_string(table["opencode"], label)
             if not OPENCODE_MODEL_RE.fullmatch(model):
                 die(f"{role}: invalid OpenCode tier model id for tier {tier}")
+            require_opencode_provider_usable(model, area=f"{role}@{tier}", exhausted_providers=exhausted_providers)
             subscription = subscription_of(model, config)
             if not subscriptions.get(subscription):
                 # ADR-0048 (024 C2): parity with `load_roles`'s own ADR-0029 tri-state
@@ -729,16 +730,16 @@ def load_role_tiers(config, profile):
     return result
 
 
-def small_model(profile, models_path=None):
-    return load_config(models_path)["session"]["opencode_small_model"][profile]
+def small_model(models_path=None):
+    return load_config(models_path)["session"]["opencode_small_model"]
 
 
 def codex_orchestrator(roles_path=None, models_path=None):
-    """Session-level Codex model/effort: profile-independent orchestrator resolution."""
+    """Session-level Codex model/effort: orchestrator resolution."""
     config = load_config(models_path)
     for row in load_roster(roles_path):
         if row["role"] == "orchestrator":
-            resolved = resolve_role(row, config, LANES[0])
+            resolved = resolve_role(row, config)
             return resolved["codex_model"], resolved["codex_effort"]
     die("orchestrator row missing from roles.tsv")
 
@@ -747,11 +748,6 @@ def codex_orchestrator(roles_path=None, models_path=None):
 
 def _value(item):
     return json.dumps(item)
-
-
-def _inline(mapping, keys):
-    parts = [f"{_value(key)} = {_value(mapping[key])}" for key in keys if key in mapping]
-    return "{ " + ", ".join(parts) + " }"
 
 
 def emit(config):
@@ -788,7 +784,7 @@ def emit(config):
             lines.append(f"{_value(key)} = {_value(config['families'][key])}")
     lines.append("")
     lines.append("[session]")
-    lines.append(f"opencode_small_model = {_inline(config['session']['opencode_small_model'], LANES)}")
+    lines.append(f"opencode_small_model = {_value(config['session']['opencode_small_model'])}")
     if config.get("permissions"):
         lines.append("")
         lines.append("[permissions]")
@@ -826,7 +822,7 @@ def emit(config):
             if field in area:
                 lines.append(f"{field} = {_value(area[field])}")
         if "opencode" in area:
-            lines.append(f"opencode = {_inline(area['opencode'], LANES)}")
+            lines.append(f"opencode = {_value(area['opencode'])}")
     for role in sorted(config.get("roles", {})):
         override = config["roles"][role]
         lines.append("")
@@ -835,7 +831,7 @@ def emit(config):
             if field in override:
                 lines.append(f"{field} = {_value(override[field])}")
         if "opencode" in override:
-            lines.append(f"opencode = {_inline(override['opencode'], LANES)}")
+            lines.append(f"opencode = {_value(override['opencode'])}")
         if TIER_FIELD in override:
             tiers = override[TIER_FIELD]
             for tier in MODEL_TIERS:
@@ -843,7 +839,7 @@ def emit(config):
                     continue
                 lines.append("")
                 lines.append(f"[roles.{role}.{TIER_FIELD}.{tier}]")
-                lines.append(f"opencode = {_inline(tiers[tier]['opencode'], (*LANES, 'default'))}")
+                lines.append(f"opencode = {_value(tiers[tier]['opencode'])}")
     return "\n".join(lines) + "\n"
 
 

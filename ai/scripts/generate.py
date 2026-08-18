@@ -52,9 +52,9 @@ def die(message):
     raise ValueError(message)
 
 
-def load_roles(profile, roles_path=None, models_path=None):
+def load_roles(roles_path=None, models_path=None):
     """Resolution and doctrine validation live in models_config; this adds the prompt check."""
-    roles = models_config.load_roles(profile, roles_path, models_path)
+    roles = models_config.load_roles(roles_path, models_path)
     for row in roles:
         if not (CANON / "agents" / f"{row['role']}.md").is_file():
             die(f"{row['role']}: missing canonical prompt")
@@ -487,10 +487,10 @@ def _roster_filtered_role_tiers(roles, role_tiers):
     return role_tiers
 
 
-def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
-    roles = load_roles(profile, roles_path, models_path)
+def generate(out, roles_path=None, models_path=None, routes_path=None):
+    roles = load_roles(roles_path, models_path)
     config = models_config.load_config(models_path)
-    role_tiers = _roster_filtered_role_tiers(roles, models_config.load_role_tiers(config, profile))
+    role_tiers = _roster_filtered_role_tiers(roles, models_config.load_role_tiers(config))
     variant_names = sorted(f"{role}@{tier}" for role, tiers in role_tiers.items() for tier in tiers)
     yolo = models_config.permission_profile(models_path) == "yolo"
     if out.exists():
@@ -624,7 +624,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
 
     oc_config = json.loads((SHARED / "opencode.json").read_text(encoding="utf-8"))
     oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
-    oc_config["small_model"] = models_config.small_model(profile, models_path)
+    oc_config["small_model"] = models_config.small_model(models_path)
     if yolo:
         oc_config["permission"] = yolofy(oc_config.get("permission", {}))
     for item in oc_config.get("mcp", {}).values():
@@ -751,10 +751,9 @@ def validate_cursor_target(out):
 
 
 def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=None):
-    profile = models_config.active_profile()
-    roles = roles or load_roles(profile, models_path=models_path)
+    roles = roles or load_roles(models_path=models_path)
     if role_tiers is None:
-        role_tiers = models_config.load_role_tiers(models_config.load_config(models_path), profile)
+        role_tiers = models_config.load_role_tiers(models_config.load_config(models_path))
     role_tiers = _roster_filtered_role_tiers(roles, role_tiers)
     routes_path = routes_path or (ROOT / "ai/catalogs/routes.v1.toml")
     json.loads((out / "opencode/opencode.json").read_text(encoding="utf-8"))
@@ -793,18 +792,16 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
-    parser.add_argument("--profile")
     parser.add_argument("--roles")
     parser.add_argument("--models")
     parser.add_argument("--routes")
     args = parser.parse_args()
-    profile = args.profile or models_config.active_profile()
     try:
-        generate(Path(args.output), profile, args.roles, args.models, args.routes)
+        generate(Path(args.output), args.roles, args.models, args.routes)
     except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
         print(f"CHECK_FAILED: {exc}", file=sys.stderr)
         return 2
-    print(f"CHECK_PASS: generated and validated profile {profile}")
+    print("CHECK_PASS: generated and validated")
     return 0
 
 

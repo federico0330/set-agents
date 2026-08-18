@@ -1354,14 +1354,14 @@ class RoutingTests(unittest.TestCase):
         tiered_go_zen_values = set()
         for role in tiered_roles:
             for tier, table in config["roles"][role].get("tiers", {}).items():
-                value = table.get("opencode", {}).get("go-zen") if isinstance(table.get("opencode"), dict) else None
+                value = table.get("opencode") if isinstance(table.get("opencode"), str) else None
                 if value is not None:
                     tiered_go_zen_values.add(value)
         self.assertTrue(tiered_go_zen_values)  # not vacuous: real ladder values exist
 
         area_go_zen_values = {}
         for duty, area in config.get("areas", {}).items():
-            value = area.get("opencode", {}).get("go-zen") if isinstance(area.get("opencode"), dict) else None
+            value = area.get("opencode") if isinstance(area.get("opencode"), str) else None
             if value is not None:
                 area_go_zen_values[duty] = value
         self.assertIn("audit", area_go_zen_values); self.assertIn("judge", area_go_zen_values)  # not vacuous
@@ -5402,7 +5402,7 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(app_source.count("cache_root=_probe_cache_root()"), 4)
         mc_source = (ROOT / "ai/scripts/models_config.py").read_text()
         self.assertNotIn('Path.home() / ".local/state/set-agentes"', mc_source)
-        self.assertEqual(mc_source.count("cache_root=_probe_cache_root()"), 2)
+        self.assertEqual(mc_source.count("cache_root=_probe_cache_root()"), 1)
 
     # --------------------------------------------------- ADR-0034 (019 PKG-1, AC-02..09)
 
@@ -6503,13 +6503,13 @@ class RoutingTests(unittest.TestCase):
         # The mirror image of AC-04(c)'s proof: presence of a model-preference.toml file
         # has literally zero effect on the OLD, static [areas.<duty>] mechanism.
         row = next(r for r in self.roster if r["role"] == "implementer")
-        before = models_config.resolve_role(row, self.config, "go-zen")
+        before = models_config.resolve_role(row, self.config)
         before_orch = models_config.codex_orchestrator(ROOT / "roles.tsv", ROOT / "models.toml")
         with tempfile.TemporaryDirectory() as td:
             mp_path = Path(td) / "model-preference.toml"
             mp_path.write_text('[preference]\nbuild = ["anthropic", "openai-codex"]\n')
             with mock.patch.object(set_agents_app, "MODEL_PREFERENCE_PATH", mp_path):
-                after = models_config.resolve_role(row, self.config, "go-zen")
+                after = models_config.resolve_role(row, self.config)
                 after_orch = models_config.codex_orchestrator(ROOT / "roles.tsv", ROOT / "models.toml")
         self.assertEqual(before, after)
         self.assertEqual(before_orch, after_orch)
