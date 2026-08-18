@@ -19,6 +19,11 @@ root = Path(args.target)
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "PROYECTO" / "ai" / "scripts"
 SCRIPT_TEMPLATES = ["run.sh", "verify.sh", "loop.sh", "e2e.sh", "mcp.sh", "audit-readonly.sh"]
 KNOWLEDGE_TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "PROYECTO" / "docs" / "ai" / "knowledge"
+# 032/C2 (AC-05): Cursor reads rules and slash commands ONLY from the project tree -- there is
+# no user-level equivalent for either (verified 2026-08-18, https://cursor.com/docs/context/rules).
+# Agents and skills DO install globally into ~/.cursor, so those are not projected here; without
+# this step a project opened in Cursor would have the roles but not the doctrine that governs them.
+CURSOR_TARGET_DIR = Path(__file__).resolve().parents[2] / "Global" / "cursor"
 
 FILES = {
     "AGENTS.md": "# Project agent rules\n\nRun `ai/scripts/verify.sh` before review. Preserve existing project contracts.\n",
@@ -136,6 +141,28 @@ gitignore_dest = root / ".gitignore"
 if not gitignore_dest.exists() and GITIGNORE_TEMPLATE.exists():
     gitignore_dest.write_text(GITIGNORE_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
     created.append(".gitignore")
+
+# 2c. 032/C2 (AC-05): the Cursor project surface -- the always-applied doctrine rule and the
+#     slash commands. Create-if-missing like everything else here, and a divergent existing file
+#     is reported as a conflict rather than silently replaced: the user may have edited it.
+for relative, source in (
+    [(".cursor/rules/00-harness.mdc", CURSOR_TARGET_DIR / "rules" / "00-harness.mdc")]
+    + [(f".cursor/commands/{tpl.name}", tpl)
+       for tpl in (sorted((CURSOR_TARGET_DIR / "commands").glob("*.md"))
+                   if (CURSOR_TARGET_DIR / "commands").is_dir() else [])]
+):
+    if not source.exists():
+        notes.append(f"missing cursor template: {relative}")
+        continue
+    dest = root / relative
+    content = source.read_text(encoding="utf-8")
+    if dest.exists():
+        if dest.read_text(encoding="utf-8") != content:
+            conflicts.append(relative)
+        continue
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(content, encoding="utf-8")
+    created.append(relative)
 
 # 3. Per-domain knowledge seeds (create-if-missing, never overwrite: memory-scribe grows them,
 #    so an existing file with more content is the expected state, not a conflict).

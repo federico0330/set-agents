@@ -15,6 +15,10 @@ Deriva STATUS.md, bitácora y docs/notas/ (Obsidian-ready) del estado en cada mu
 
 ## Últimos cambios estructurales
 
+- 2026-08-18 028-narracion-que-ensena/N2-doctrina-que-explica — AC-18: orchestrator.md documenta cuándo correr digest; test actualizado para verificar contenido no nombre
+- 2026-08-18 028-narracion-que-ensena/N3b-los-campos-donde-se-leen — límite de render elevado a 400; campos learned/next/why/alternative visibles en bitácora y digest
+- 2026-08-18 028-narracion-que-ensena/N1-campos-que-obligan — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación
+- 2026-08-18 028-narracion-que-ensena/N1-campos-que-obligan — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación de flags requeridos
 - 2026-08-14 024-listo-para-terceros/C4-higiene-de-repo-publico — LICENSE MIT, CONTRIBUTING, CHANGELOG, SECURITY, matriz de soporte medida y upstream re-apuntable
 - 2026-08-14 024-listo-para-terceros/C1-estado-fuera-del-producto — El estado deja de viajar en el clon: historial a docs/historia, ai/state gitignoreado y sembrado
 - 2026-08-12 020-honest-dashboard/P2-anclas-verificables — Nuevo motor check_anchors.py y comando feature-state.py check-anchors: extrae las referencias file:line de docs/modules/, resuelve el basename SOLO dentro de los paths que el modulo declara en module…

@@ -118,6 +118,32 @@ def oc_hidden(role):
 # Claude account tier. Anything else is omitted from claude-code frontmatter.
 CLAUDE_UNIVERSAL_ALIASES = {"sonnet", "opus", "haiku"}
 
+CURSOR_DELEGATION_OVERRIDE = """
+
+## Delegation in Cursor (this runtime only — overrides the routing section above)
+
+Cursor is a HOST runtime of this harness, not a routing lane: it is deliberately absent from
+`models_config.RUNTIMES` and `routing_core.domain.SELECTED_RUNTIMES` (032/C1). Two consequences,
+and they override every `--route-decide` instruction above while you are hosted here:
+
+1. **Never call `--route-decide`, and never call any `*_spawn.py --dispatch-*`.** A routing
+   decision taken here can only ever name SOMEONE ELSE'S lane, so obeying it would spend the
+   OpenCode, Codex or Claude subscription instead of the Cursor session you are actually running
+   in. That is the exact failure this target exists to prevent.
+2. **Delegate through Cursor's own subagents**: `/implementer <task>`, `/package-reviewer <task>`,
+   or "use the <role> subagent to ...". Every roster role is installed as one
+   (`~/.cursor/agents/<role>.md`); the read-only ones carry `readonly: true`, and each starts with
+   a clean context — which is what reviewer independence rests on here, because every role inherits
+   the single model you picked in Cursor. Record that degradation in the review evidence
+   (`record-subreview --evidence` / `finalize-review-panel --evidence`): a shared model keeps
+   correlated blind spots that a clean context does not remove.
+
+Everything else in this doctrine — the phase machine, the gates, the file-first state, the
+narration, the question policy — is unchanged and still binds.
+"""
+
+
+
 # ADR-0026: analysis roles whose claims need CURRENT sources (docs, prices, CVEs,
 # library APIs) get the web tools; mechanical/gate roles never do (least privilege).
 WEB_ANALYSIS_ROLES = {
@@ -411,8 +437,22 @@ def generate_pi_prompts(out):
         (out / path.name).write_text("\n".join(out_lines), encoding="utf-8")
 
 
+def write_cursor_rule(path, doctrine):
+    """032/C1 (AC-05): the harness doctrine as a Cursor PROJECT rule.
+
+    Cursor has no user-level rules file: `~/.cursor/agents` and `~/.cursor/skills` are
+    global, rules are not (verified 2026-08-18, https://cursor.com/docs/context/rules).
+    `alwaysApply: true` is therefore the only shape that puts this doctrine in EVERY
+    session without the user remembering to @-mention it. The body is the very same
+    AGENTS.cursor.md the target ships, so the two can never say different things.
+    """
+    body = doctrine.lstrip("\n")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("---\nalwaysApply: true\n---\n\n" + body, encoding="utf-8")
+
+
 def write_indexes(out):
-    for harness in ("opencode", "claude-code", "codex", "pi"):
+    for harness in ("opencode", "claude-code", "codex", "pi", "cursor"):
         base = out / harness
         files = sorted(str(p.relative_to(base)) for p in base.rglob("*") if p.is_file() and p.name != "managed-files.txt")
         (base / "managed-files.txt").write_text("\n".join(files) + "\n", encoding="utf-8")
@@ -455,7 +495,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     yolo = models_config.permission_profile(models_path) == "yolo"
     if out.exists():
         shutil.rmtree(out)
-    for harness in ("opencode", "claude-code", "codex", "pi"):
+    for harness in ("opencode", "claude-code", "codex", "pi", "cursor"):
         (out / harness).mkdir(parents=True)
 
     bodies = {}
@@ -522,6 +562,22 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(pi, encoding="utf-8")
 
+        # 032/C1 (AC-01, AC-06): Cursor subagents. Frontmatter fields verified 2026-08-18
+        # against https://cursor.com/docs/subagents -- name/description/model/readonly/
+        # is_background, and NOTHING else. `model: inherit` is the whole point: Cursor is a
+        # host runtime, not a routing lane, so no models.toml value reaches it and no role
+        # can spend a quota the user did not pick in the UI. `readonly` reuses the SAME
+        # predicate Codex's `sandbox_mode` already uses above -- one audited definition of
+        # "this role must not write", not a second one that could drift from it.
+        cursor = "\n".join([
+            "---", f"name: {row['role']}", f"description: {json.dumps(desc)}",
+            "model: inherit", f"readonly: {'true' if sandbox == 'read-only' else 'false'}",
+            "---", "", body + (CURSOR_DELEGATION_OVERRIDE if row["capability"] == "coord-ro" else ""),
+        ])
+        path = out / "cursor/agents" / f"{row['role']}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(cursor, encoding="utf-8")
+
     # Tier variants (contract 004 T-202): additive, OpenCode-ONLY `<role>@<tier>` agents
     # for the roles models.toml declares tiered (models_config.load_role_tiers). Same
     # prompt body, same permissions, same step budget as the base agent — the ONLY line
@@ -547,9 +603,13 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
 
     copy_tree(CANON / "opencode-agents", out / "opencode/agents")
 
-    for harness in ("opencode", "claude-code"):
+    # 032/C1 (AC-05): Cursor reads slash commands ONLY from a project's `.cursor/commands/`
+    # -- there is no user-level equivalent (verified 2026-08-18). They are emitted into the
+    # target anyway so `bootstrap_project.py` has one installed source to project into a
+    # project, exactly as it already does for `ai/scripts` templates.
+    for harness in ("opencode", "claude-code", "cursor"):
         copy_tree(CANON / "commands", out / harness / "commands")
-    for harness in ("opencode", "claude-code", "codex", "pi"):
+    for harness in ("opencode", "claude-code", "codex", "pi", "cursor"):
         copy_tree(CANON / "skills", out / harness / "skills")
     generate_pi_prompts(out / "pi/prompts")
 
@@ -558,6 +618,9 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     shutil.copy2(SHARED / "AGENTS.codex.md", out / "codex/AGENTS.md")
     shutil.copy2(SHARED / "config.codex.snippet.toml", out / "codex/config.snippet.toml")
     shutil.copy2(SHARED / "AGENTS.pi.md", out / "pi/AGENTS.md")
+    shutil.copy2(SHARED / "AGENTS.cursor.md", out / "cursor/AGENTS.md")
+    write_cursor_rule(out / "cursor/rules/00-harness.mdc",
+                      (SHARED / "AGENTS.cursor.md").read_text(encoding="utf-8"))
 
     oc_config = json.loads((SHARED / "opencode.json").read_text(encoding="utf-8"))
     oc_config["model"] = next(r["opencode_model"] for r in roles if r["role"] == "orchestrator")
@@ -578,7 +641,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     shutil.copy2(ROOT / "ai/scripts/claude_local_gate_guard.py", hooks / "claude_local_gate_guard.py")
     shutil.copy2(ROOT / "ai/scripts/claude_release_guard.py", hooks / "claude_release_guard.py")
     shutil.copy2(ROOT / "ai/scripts/release_action.py", hooks / "release_action.py")
-    for harness in ("opencode", "codex"):
+    for harness in ("opencode", "codex", "cursor"):
         hooks = out / harness / "hooks"
         hooks.mkdir()
         shutil.copy2(ROOT / "ai/scripts/release_action.py", hooks / "release_action.py")
@@ -591,7 +654,7 @@ def generate(out, profile, roles_path=None, models_path=None, routes_path=None):
     # the hooks directory. A live hooks install has no other feature_state_lib on
     # its sys.path (hooks live outside any project's ai/scripts/, per ADR-0008's
     # HARNESS_HOME/PROJECT_ROOT split), so the package is copied alongside it.
-    for harness in ("claude-code", "opencode", "codex"):
+    for harness in ("claude-code", "opencode", "codex", "cursor"):
         hooks = out / harness / "hooks"
         shutil.copy2(ROOT / "ai/scripts/integration_gate.py", hooks / "integration_gate.py")
         shutil.copy2(ROOT / "ai/scripts/integration_action.py", hooks / "integration_action.py")
@@ -669,6 +732,24 @@ def validate_pi_target(roles):
             die(f"pi target: {row['role']}: missing canonical prompt")
 
 
+def validate_cursor_target(out):
+    """032/C1 (AC-01, AC-06): Cursor is a host runtime, never a routing lane.
+
+    The one thing that must never regress here is the model line: the moment a concrete
+    model id lands in a Cursor agent, the harness starts spending a subscription the user
+    never chose in the UI -- which is the exact failure that motivated this target.
+    """
+    rule = out / "cursor/rules/00-harness.mdc"
+    if not rule.exists() or not rule.read_text(encoding="utf-8").startswith("---\nalwaysApply: true\n---\n"):
+        die("cursor: rules/00-harness.mdc must declare alwaysApply: true")
+    for path in (out / "cursor/agents").glob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        if "\nmodel: inherit\n" not in text:
+            die(f"{path}: cursor agents must inherit the session model")
+        if "\nreadonly: true\n" not in text and "\nreadonly: false\n" not in text:
+            die(f"{path}: cursor agents must declare readonly explicitly")
+
+
 def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=None):
     profile = models_config.active_profile()
     roles = roles or load_roles(profile, models_path=models_path)
@@ -683,7 +764,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
         for key in ("name", "description", "developer_instructions", "model", "sandbox_mode"):
             if not data.get(key):
                 die(f"{path}: missing {key}")
-    for harness in ("opencode", "claude-code", "pi"):
+    for harness in ("opencode", "claude-code", "pi", "cursor"):
         for path in (out / harness / "agents").glob("*.md"):
             text = path.read_text(encoding="utf-8")
             if not text.startswith("---\n") or "\n---\n" not in text[4:]:
@@ -691,7 +772,8 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
     expected = {r["role"] for r in roles}
     variant_expected = {f"{role}@{tier}" for role, tiers in role_tiers.items() for tier in tiers}
     opencode_only = {p.stem for p in (CANON / "opencode-agents").glob("*.md")}
-    for harness, suffix in (("opencode", ".md"), ("claude-code", ".md"), ("codex", ".toml"), ("pi", ".md")):
+    for harness, suffix in (("opencode", ".md"), ("claude-code", ".md"), ("codex", ".toml"),
+                            ("pi", ".md"), ("cursor", ".md")):
         actual = {p.stem for p in (out / harness / "agents").glob(f"*{suffix}")}
         harness_expected = expected | opencode_only | variant_expected if harness == "opencode" else expected
         if actual != harness_expected:
@@ -705,6 +787,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
             die(f"orchestrator cannot delegate required tier variant: {name}")
     check_variant_catalog_coherence(role_tiers, routes_path)
     validate_pi_target(roles)
+    validate_cursor_target(out)
 
 
 def main():

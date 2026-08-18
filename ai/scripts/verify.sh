@@ -28,7 +28,7 @@ git diff --check
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 ./build.sh --output "$STAGING" --profile go-zen >/dev/null
-for harness in opencode claude-code codex pi; do
+for harness in opencode claude-code codex pi cursor; do
   diff -ruN "Global/$harness" "$STAGING/$harness"
 done
 python3 - "$ROOT" <<'PY'

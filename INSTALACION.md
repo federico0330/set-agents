@@ -70,6 +70,12 @@ Esc/Ctrl-C volver) con estas opciones, en orden:
   Nunca toca un repo con cambios locales sin commitear.
 - **Herramientas**: catálogo opcional (supabase, vercel, gcloud, gh, docker, jq, obsidian,
   syncthing) definido en `tools.toml` — agregar una herramienta es un bloque de datos, no código.
+- **Cursor**: `./build.sh --install --target cursor` deja los 28 roles y las 42 skills en `~/.cursor`.
+  Reglas y slash commands NO tienen ubicación global en Cursor, así que entran por proyecto:
+  `python3 ai/scripts/bootstrap_project.py <proyecto>` escribe `.cursor/rules/00-harness.mdc`
+  (`alwaysApply: true`, la doctrina del harness en cada sesión) y `.cursor/commands/*.md`.
+  Ningún rol fija modelo: todos heredan el que elijas en Cursor. No se instalan hooks de evento,
+  así que la política de comandos del harness no corre ahí.
 - **MCPs**: agrega servers (supabase, context7, playwright) a los harnesses que detecte
   instalados: opencode, claude, codex, y también cursor y gemini CLI si están. En opencode se
   agregan apagados (política del repo) y se togglean desde el menú.

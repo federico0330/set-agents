@@ -31,6 +31,7 @@
 - [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
+- [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_IMPLEMENTATION` · paquetes 0/2
 
 ## Qué falta
 
@@ -40,6 +41,8 @@
 - **011-quota-failover** → corresponde tu decisión (ver Blocker)
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
+- **032-cursor-como-runtime** → sigue la implementación local del paquete
+- **032-cursor-como-runtime** 1 tarea pendientes en C2
 
 ## Quick-fixes recientes
 
@@ -51,27 +54,28 @@
 
 ## Decisiones
 
+- [[decisiones/2026-08-18 por-que-el-harness-agota-cuotas-convierte-un-prompt-humano-en-n-prompts-de-proveedor|Por que el harness agota cuotas: convierte un prompt humano en N prompts de proveedor]]
+- [[decisiones/2026-08-18 en-cursor-no-se-instalan-hooks-de-evento-en-esta-version|En Cursor no se instalan hooks de evento en esta version]]
+- [[decisiones/2026-08-18 cursor-entra-como-runtime-anfitrion-nunca-como-lane-de-ruteo|Cursor entra como runtime anfitrion, nunca como lane de ruteo]]
+- [[decisiones/2026-08-18 el-orquestador-de-opencode-sale-de-opencode-go-y-vuelve-a-la-lane-openai-codex|El orquestador de OpenCode sale de opencode-go y vuelve a la lane openai-codex]]
 - [[decisiones/2026-08-18 016-p1f01-y-020-f04-verificados-reparados|Los dos hallazgos abiertos dentro de features cerradas ya estaban reparados]]
 - [[decisiones/2026-08-18 encoding-explicito-en-todo-artefacto-de-texto|El locale de la maquina no decide como se escriben los artefactos del harness]]
 - [[decisiones/2026-08-18 espejo-proyecto-fijado-completo|El espejo PROYECTO/ queda fijado entero, no por lista de nombres]]
 - [[decisiones/2026-08-18 windows-nativo-es-bootstrap-no-runtime|Windows nativo es objetivo de bootstrap, no de runtime]]
-- [[decisiones/2026-08-18 d5-dr03-asimetria-cobertura-anticacheo|D5-DR03: asimetría de cobertura anti-cacheo de fallos transitorios]]
-- [[decisiones/2026-08-18 028-deuda-ac16-codex-drift|AC-16 AGENTS.codex.md: confirmación de deriva no registrada]]
-- [[decisiones/2026-08-18 028-deuda-test-narracion-digest|tests/test_narracion_digest.py nunca se creó]]
-- [[decisiones/2026-08-17 replanteo-028-imposible-el-motor-no-tiene-salida|Correccion: los paquetes de 028 tampoco se pueden replantear -- el motor no tiene salida]]
 
 ## Convenciones
 
 | Feature | Cobertura | Orígenes |
 |---|---|---|
 | 031-registro-correctivo | 10/10 | n/a, notas |
+| 032-cursor-como-runtime | 10/10 | n/a, request |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T02:48:54+00:00_
+_Actualizado: 2026-08-18T14:18:10+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-17T10:41:56` · generado 2026-08-18T13:41:56+00:00_
+_Ventana: desde `2026-08-17T11:27:12` · generado 2026-08-18T14:27:12+00:00_
 
 ## Necesita tu decisión
 
@@ -10,16 +10,26 @@ _Ventana: desde `2026-08-17T10:41:56` · generado 2026-08-18T13:41:56+00:00_
 
 ## Qué quedó listo
 
-- _sin cierres registrados en la ventana_
+- **032-cursor-como-runtime · orchestrator** — Aviso honesto: esta tanda la escribi y la probe yo mismo, sin un revisor independiente, porque la sesion tiene la delegacion desactivada. Los tests estan y pasan, pero la revision cruzada que el harness normalmente exige quedo pendiente.
+  - aprendimos: La prohibicion de delegar no bloquea el trabajo, bloquea la aceptacion: se puede entregar codigo probado y dejar el sello pendiente sin mentir en el estado.
+  - conviene ahora: Cuando haya un proveedor con cuota, correr un revisor independiente sobre los dos paquetes y recien ahi aceptarlos.
+  - por qué ahora: Registrar la degradacion es la unica forma de que despues no se lea como un paquete aceptado normalmente.
+  - alternativa: La alternativa era aceptarlos igual apoyandose en que los tests pasan, o revisarlos yo mismo con contexto limpio; las dos convierten la separacion de deberes en un tramite.
+- **032-cursor-como-runtime · C1 · orchestrator** — Cursor ya puede correr el harness: quedan instalados los 28 roles y las 42 habilidades, y cada proyecto recibe las reglas y los comandos. Ningun rol elige modelo por su cuenta: usan el que vos elijas en Cursor, justamente para que no vuelva a pasar lo de las cuotas.
+  - aprendimos: Cursor tambien lee subagentes desde los directorios de Claude Code, pero su frontmatter propio no coincide con el de ese runtime, asi que el atajo de reusar la instalacion existente habria mentido sobre lo que el agente puede hacer.
+  - conviene ahora: Revision independiente de los dos paquetes, y hooks de evento de Cursor como trabajo siguiente.
+  - por qué ahora: Federico agoto las cuotas de opencode, codex y claude; Cursor es el unico runtime pago disponible y era el unico que el harness no sabia configurar.
 
 ## Qué se está haciendo
 
-- _ninguna feature activa_
+- **032-cursor-como-runtime** — fase `PACKAGE_IMPLEMENTATION`
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
+- **032-cursor-como-runtime** → sigue la implementación local del paquete
+- **032-cursor-como-runtime** 1 tarea pendientes en C2
 
 ## Qué cambió en el software
 
@@ -45,6 +55,10 @@ _Ventana: desde `2026-08-17T10:41:56` · generado 2026-08-18T13:41:56+00:00_
 - **El espejo PROYECTO/ queda fijado entero, no por lista de nombres** — La paridad se afirma sobre el conjunto completo de archivos que existen en los dos arboles, con verify.sh como unica excepcion declarada y justificada (el del harness gatea este repo, el del template sniffea el stack de un proyecto generico: responden preguntas distintas). Las dos derivas se sincronizaron.
 - **El locale de la maquina no decide como se escriben los artefactos del harness** — encoding='utf-8' explicito en toda lectura y escritura de texto de ai/scripts (barrido completo, 15 archivos), el temporal parcial se borra en el fallo, y el fallo de render_status se rutea a _log_render_failure como ya hacian render_notes y render_modules en vez de desaparecer. Un test AST fija la propiedad sobre todo ai/scripts.
 - **Los dos hallazgos abiertos dentro de features cerradas ya estaban reparados** — Los dos estan reparados en el codigo. P1F-01 ('el pop de repair_entry anidado bajo if args.package_id'): ai/scripts/feature_state_lib/cli_lifecycle.py:277-285 resuelve por package_by_id con fallback a current_package_id y nombra el hallazgo en el comentario; el test que el suggested_fix pedia existe, tests/test_harness.py:8650 test_cmd_transition_pops_stale_repair_entry_without_package_id. F-04 ('CHECK_PASS y SELF_SCAFFOLD_SYNC_OK no comparan contra el estado real de Global/'): build.sh:117-127 ahora corre diff -ruN de los cuatro arboles contra una generacion fresca y emite GLOBAL_TREE_SYNC_OK o falla, que es la implementacion del punto 1 de ADR-0041. Ademas SELF_SCAFFOLD_SYNC_OK paso de dos archivos nombrados a mano a los 23 del espejo completo.
+- **El orquestador de OpenCode sale de opencode-go y vuelve a la lane openai-codex** — models.toml [areas.coord].opencode go-zen pasa de 'opencode-go/grok-4.5' a 'openai/gpt-5.5'. openai/gpt-5.5 ya esta curado en [catalog].opencode_zen y usado por [areas.audit] y [areas.judge], y no colisiona con ningun [roles.<rol>.tiers.*] (todos luna/sol/terra). Las lanes zen y openai-only quedan como estaban.
+- **Cursor entra como runtime anfitrion, nunca como lane de ruteo** — Los 28 roles se emiten con 'model: inherit' y validate_cursor_target (ai/scripts/generate.py) mata el build si alguno pinea un id concreto. Cursor no entra en models_config.RUNTIMES ni en routing_core.domain.SELECTED_RUNTIMES: no es lane de despacho.
+- **En Cursor no se instalan hooks de evento en esta version** — El target cursor se instala sin hooks.json. La superficie que gobierna en Cursor es su propio modelo de permisos, y eso se dice explicitamente en README, INSTALACION y en la doctrina que el propio agente lee (Global/_shared/AGENTS.cursor.md).
+- **Por que el harness agota cuotas: convierte un prompt humano en N prompts de proveedor** — La conclusion medida es que el harness no gasta de mas por prompt: gasta porque multiplica prompts. Cada spawn que el orquestador despacha por CLI es, para el proveedor, un prompt nuevo iniciado por el usuario, no una tool call autonoma adentro de una sesion. 246 despachos contra un tope de 300 mensuales explica exactamente 'dos prompts mios = un mes de cuota'. En opencode-go el mecanismo es otro pero el efecto es igual: tope diario, y el coordinador solo ya lo agotaba.
 
 ## Quick-fixes
 

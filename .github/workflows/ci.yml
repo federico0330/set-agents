@@ -49,27 +49,12 @@ jobs:
       # Native Windows is a BOOTSTRAP target, not a runtime one: README.md:107 declares
       # the Windows path as install.ps1 -> managed WSL, so the harness itself runs on
       # Linux there and `verify-linux` is the gate that covers it. The tests that shell
-      # out to the POSIX toolchain (bash + python3: set-agents, build.sh, install.sh)
-      # skip here with the reason named -- see tests/__init__.py -- instead of failing
-      # as if they had found a defect. What stays proven is the platform-independent
+      # out to the POSIX toolchain skip here with the reason named -- see
+      # tests/__init__.py -- instead of failing as if they had found a defect. The
+      # capability they need is narrow and was measured, not guessed (run 32144718950):
+      # bash and python3 both exist on this runner, but CreateProcess has no shebang
+      # handling, so `subprocess.run([".../check-drift.sh"])` raises WinError 193. What stays proven is the platform-independent
       # core plus the bootstrap above.
-      # TEMPORARY (2026-08-18): the suite still fails here and the tests swallow the
-      # child's stderr behind check=True, so the actual reason is invisible in the log.
-      # This prints it once. Remove it as soon as the cause is fixed.
-      - name: Diagnose the POSIX toolchain
-        shell: bash
-        continue-on-error: true
-        run: |
-          echo "--- which ---";   which bash python3 python || true
-          echo "--- versions ---"; bash --version | head -1; python3 -V || true
-          echo "--- pwd as bash sees it ---"; pwd
-          echo "--- can python3 stat that pwd? ---"
-          python3 -c "import os,sys; print('isdir', os.path.isdir(sys.argv[1]))" "$(pwd)" || true
-          echo "--- set-agents --status ---"
-          bash set-agents --status; echo "exit=$?"
-          echo "--- build.sh --check ---"
-          bash ./build.sh --check 2>&1 | tail -20; echo "exit=${PIPESTATUS[0]}"
-
       - name: Full unittest suite
         shell: pwsh
         env:

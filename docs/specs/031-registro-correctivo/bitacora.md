@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-18T02:12:10+00:00
+Actualizado: 2026-08-18T14:19:56+00:00
 
 [2026-08-18T01:01:25+00:00] P1-verbos-correctivos · package-reviewer · started · modelo anthropic/claude-sonnet-4.6
 Cliente: Orquestador revisando P1-verbos-correctivos: los tests son el panel independiente.

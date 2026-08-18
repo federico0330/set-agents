@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser()
 # argparse's required=True.
 parser.add_argument("--staging")
 parser.add_argument("--home", required=True)
-parser.add_argument("--target", action="append", choices=("opencode", "claude-code", "codex", "pi"))
+parser.add_argument("--target", action="append", choices=("opencode", "claude-code", "codex", "pi", "cursor"))
 parser.add_argument("--preview", action="store_true")
 # D4/AC-10: uninstall from exactly the target(s) named by --target, and ONLY
 # those -- there is deliberately no "uninstall everything" default the way
@@ -43,7 +43,7 @@ if args.uninstall:
         print(
             "UNINSTALL_ABORTED_NO_TARGET\n"
             "  --uninstall requires at least one explicit --target -- there is no\n"
-            "  'uninstall everything' default. Pass --target claude-code/opencode/codex/pi.",
+            "  'uninstall everything' default. Pass --target claude-code/opencode/codex/pi/cursor.",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -57,6 +57,11 @@ all_targets = {
     "claude-code": home / ".claude",
     "codex": home / ".codex",
     "pi": home / ".pi/agent",
+    # 032/C1 (AC-03): global Cursor config root. `agents/` and `skills/` are read from
+    # here by Cursor itself; `commands/` and `rules/` ride along as the source
+    # bootstrap_project.py projects into a project, because Cursor reads those two
+    # ONLY from the project tree (verified 2026-08-18).
+    "cursor": home / ".cursor",
 }
 selected = set(args.target or all_targets)
 targets = {name: path for name, path in all_targets.items() if name in selected}

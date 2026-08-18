@@ -289,13 +289,14 @@ Add Folder de su vault; sin repos nuevos.
 
 ## Matriz de soporte (medida, no prometida)
 
-Los tres harnesses no tienen el mismo nivel de soporte — esto es lo que se pudo **confirmar**
+Los harnesses soportados no tienen el mismo nivel de soporte — esto es lo que se pudo **confirmar**
 hasta hoy, no una promesa de paridad. Lo que no está en esta tabla no se midió.
 
 | Harness | Estado medido |
 |---|---|
 | **opencode** | De primera clase. 47 agentes instalados (`~/.config/opencode/agents/*.md`, y en la fuente `Global/opencode/agents/`); de esos, solo `orchestrator.md` declara `mode: primary` — los otros 46 son `mode: subagent`. Consecuencia (medida el 2026-08-13, al intentar despachar un `package-reviewer`): `opencode run --agent <rol>` **no despacha un subagent** — cae al agente por defecto con un warning, porque `run --agent` solo sabe arrancar un `primary`. *(Medido: 2026-08-14, última fila 2026-08-13.)* |
 | **codex** | **Cero comandos.** `Global/codex/` no tiene directorio `commands/` (a diferencia de `Global/opencode/commands/`); en una instalación real, `~/.codex/commands` no existe. *(Medido: 2026-08-14.)* |
+| **cursor** | Runtime anfitrión desde 032. Recibe los 28 roles como subagentes nativos (`~/.cursor/agents/*.md`, fuente `Global/cursor/agents/`), las skills canónicas (`~/.cursor/skills/<nombre>/SKILL.md`) y, **por proyecto**, la doctrina como regla siempre activa (`.cursor/rules/00-harness.mdc`, `alwaysApply: true`) más los slash commands (`.cursor/commands/`) — reglas y comandos no tienen equivalente global en Cursor. **Cero modelos**: cada rol declara `model: inherit`, así que el harness no rutea ni gasta cuota que el usuario no eligió en el selector de Cursor; el costo es que escritor y revisor comparten modelo y la independencia queda apoyada sólo en el contexto limpio del subagente. **Cero hooks de evento**: `hooks.json` no se instala, así que `coord_policy.py` NO gobierna en Cursor — quien gobierna es el modelo de permisos del propio Cursor. *(Contrato verificado 2026-08-18 contra la documentación oficial de Cursor; ver `docs/specs/032-cursor-como-runtime/spec.md`.)* |
 | **pi** | **Cero hooks**, y su lane de dispatch corre con `--no-skills` (guard incondicional, `ai/scripts/set_agents_spawn.py:249-261`). `Global/pi/` no tiene directorio `hooks/`; en una instalación real, `~/.pi` no tiene subdirectorio `hooks` (a diferencia de `~/.codex/hooks` y `~/.config/opencode/hooks`, que sí existen). *(Medido: 2026-08-14.)* |
 
 ## Más documentación

@@ -87,12 +87,14 @@ incident_spawns = 2
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "high"
-# ADR-0044: the coordinator drops the openai-only `-fast` latency policy (it is a single
-# long-lived instance, not a high-volume dispatch) and moves to a subscription, non-GPT
-# model. `opencode-go` on the go-zen lane because it is subscription-billed (does not
-# consume Copilot's nor zen's per-token budget). `grok-4.6` is NOT in [catalog].opencode_zen
-# (verified live), so zen/openai-only stay on `grok-4.5`, same model already curated there.
-opencode = { "go-zen" = "opencode-go/grok-4.5", "zen" = "opencode/grok-4.5", "openai-only" = "opencode/grok-4.5" }
+# ADR-0044 puso al coordinador en `opencode-go/grok-4.5` porque esa lane es subscription-billed
+# y no consumia el presupuesto por token de Copilot ni de zen. Medido en uso real (Federico,
+# 2026-08-18): la cuota DIARIA de opencode-go se agota antes de terminar una sola sesion de
+# coordinacion, asi que "subscription-billed" no significo "presupuesto suficiente" — significo
+# un techo mas duro y menos visible. Decision del usuario: el orquestador vuelve a la lane
+# openai-codex. `openai/gpt-5.5` ya esta curado en [catalog].opencode_zen y en [areas.audit] /
+# [areas.judge], y no colisiona con ningun [roles.<role>.tiers.*] (todos son luna/sol/terra).
+opencode = { "go-zen" = "openai/gpt-5.5", "zen" = "opencode/grok-4.5", "openai-only" = "opencode/grok-4.5" }
 
 [areas.analysis]
 claude = "haiku"

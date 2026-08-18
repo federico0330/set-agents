@@ -106,7 +106,7 @@ class ScopedInstallDriftTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             scope_path = home / ".local/state/set-agentes/install-targets.json"
             self.assertEqual(json.loads(scope_path.read_text()),
-                             ["claude-code", "codex", "opencode", "pi"])
+                             ["claude-code", "codex", "cursor", "opencode", "pi"])
 
 
 @unittest.skipUnless(tests._POSIX_TOOLCHAIN, tests._TOOLCHAIN_REASON)

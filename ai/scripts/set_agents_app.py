@@ -3527,6 +3527,32 @@ def cmd_scaffold(target: str | None) -> int:
         destination.write_bytes(source.read_bytes())
         destination.chmod(0o755)
         created.append(f"ai/scripts/{name}")
+    # 032/C2 (AC-05): the Cursor doctrine rule. `bootstrap_project.py` covers a NEW project;
+    # this command is the one run inside a project that already exists, which is the common
+    # case. Cursor has no user-level rules file, so without this a project opened in Cursor
+    # would have the 28 roles installed globally and nothing governing them.
+    cursor_rule_source = ROOT / "Global/cursor/rules/00-harness.mdc"
+    cursor_rule = root / ".cursor/rules/00-harness.mdc"
+    if not cursor_rule_source.is_file():
+        conflicts.append(".cursor/rules/00-harness.mdc")
+        print("SCAFFOLD_CONFLICT path=.cursor/rules/00-harness.mdc reason=template_missing")
+    else:
+        expected = cursor_rule_source.read_bytes()
+        try:
+            existing = cursor_rule.read_bytes()
+        except FileNotFoundError:
+            cursor_rule.parent.mkdir(parents=True, exist_ok=True)
+            cursor_rule.write_bytes(expected)
+            created.append(".cursor/rules/00-harness.mdc")
+        except OSError:
+            conflicts.append(".cursor/rules/00-harness.mdc")
+            print("SCAFFOLD_CONFLICT path=.cursor/rules/00-harness.mdc reason=unreadable")
+        else:
+            if existing == expected:
+                skips.append(".cursor/rules/00-harness.mdc")
+            else:
+                conflicts.append(".cursor/rules/00-harness.mdc")
+                print("SCAFFOLD_CONFLICT path=.cursor/rules/00-harness.mdc reason=differs")
     identity = root / "ai/state/project.json"
     try:
         identity.lstat()

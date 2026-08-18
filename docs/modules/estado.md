@@ -13,6 +13,10 @@ Máquina de estados de paquetes/features: fases legales, gates, reviews, finding
 
 ## Últimos cambios estructurales
 
+- 2026-08-18 010-spawn-provenance/P1-spawn-provenance — spawn provenance node en el grafo de estado: cada spawn queda trazable al paquete que lo originó, con su decision_id de routing
+- 2026-08-18 006-execution-graph/P3-graph-view — ai/scripts/check-feature-state.py: nuevo script que genera el grafo de ejecución de features y paquetes
+- 2026-08-18 031-registro-correctivo/P1-verbos-correctivos — dos nuevos verbos: cmd_reopen extendido con --from-done, cmd_amend_package nuevo; MUTATING_COMMANDS actualizado
+- 2026-08-18 031-registro-correctivo/P1-verbos-correctivos — dos nuevos verbos: cmd_reopen extendido con --from-done (DONE→PACKAGE_PLANNING), cmd_amend_package (agrega tasks a paquetes no-accepted); amend-package y reopen-from-done en MUTATING_COMMANDS
 - 2026-08-11 019-harness-evolution/P3-cognitive-module-docs — Se agregaron module_impacts/module_impact_waiver a compact_package, module_impacts_ready() y el gate duro en check_transition/done_ready para INTEGRATION (ADR-0036), más los comandos record-module-im…
 
 _Debajo de esta línea la prosa es mantenida a mano — contrastala con la fecha del último cambio estructural._

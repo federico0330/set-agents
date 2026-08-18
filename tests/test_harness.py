@@ -7228,10 +7228,10 @@ class HarnessTests(unittest.TestCase):
         names = ("managed-files.json", "managed-json-paths.json", "managed-special-keys.json", "install-targets.json")
         return {name: json.loads((state_dir / name).read_text()) for name in names if (state_dir / name).exists()}
 
-    def test_uninstall_one_target_leaves_the_other_three_byte_identical(self):
+    def test_uninstall_one_target_leaves_every_other_byte_identical(self):
         # The test that matters most (D4/AC-10): install everything, hand-edit
         # user config the way a real person would, uninstall exactly ONE
-        # target, and prove the other three harness trees come out
+        # target, and prove every other harness tree comes out
         # byte-identical, AND that the shared state registry -- which
         # legitimately SHRINKS by exactly the uninstalled target's own
         # entries -- keeps every OTHER target's entries byte-for-byte intact
@@ -7246,7 +7246,7 @@ class HarnessTests(unittest.TestCase):
             live["disabledMcpjsonServers"].append("mi-servidor-propio")
             settings.write_text(json.dumps(live, indent=2))
 
-            before_trees = self._tree_hashes(home, (".config/opencode", ".codex", ".pi"))
+            before_trees = self._tree_hashes(home, (".config/opencode", ".codex", ".pi", ".cursor"))
             before_state = self._state_files(home)
 
             preview = run(
@@ -7258,7 +7258,7 @@ class HarnessTests(unittest.TestCase):
             # real run too, not just after.
             self.assertEqual(json.loads(settings.read_text())["enabledPlugins"]["mi-plugin@mio"], True)
             self.assertTrue((home / ".claude/CLAUDE.md").exists())
-            self.assertEqual(self._tree_hashes(home, (".config/opencode", ".codex", ".pi")), before_trees)
+            self.assertEqual(self._tree_hashes(home, (".config/opencode", ".codex", ".pi", ".cursor")), before_trees)
 
             result = run(
                 "python3", "ai/scripts/install.py", "--home", str(home),
@@ -7267,8 +7267,8 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("UNINSTALL_PASS", result.stdout)
             self.assertFalse((home / ".claude/CLAUDE.md").exists())
 
-            after_trees = self._tree_hashes(home, (".config/opencode", ".codex", ".pi"))
-            self.assertEqual(before_trees, after_trees, "uninstalling claude-code must not touch the opencode/codex/pi trees")
+            after_trees = self._tree_hashes(home, (".config/opencode", ".codex", ".pi", ".cursor"))
+            self.assertEqual(before_trees, after_trees, "uninstalling claude-code must not touch the opencode/codex/pi/cursor trees")
 
             after_state = self._state_files(home)
             # Untouched this run (claude-code was the only selected target):
@@ -7280,7 +7280,7 @@ class HarnessTests(unittest.TestCase):
             surviving_before = {e for e in before_state["managed-files.json"] if not e.startswith(".claude/")}
             surviving_after = set(after_state["managed-files.json"])
             self.assertEqual(surviving_before, surviving_after)
-            # Same for the special-keys delta registry: the OTHER two specials'
+            # Same for the special-keys delta registry: the OTHER specials'
             # recorded delta entries survive verbatim; only claude's is gone.
             self.assertNotIn(".claude/settings.json", after_state["managed-special-keys.json"])
             for key in (".config/opencode/opencode.json", ".codex/config.toml"):
@@ -7293,7 +7293,7 @@ class HarnessTests(unittest.TestCase):
 
             # F07/F08: scope narrows to exactly what remains, never guessed.
             scope = json.loads((home / ".local/state/set-agentes/install-targets.json").read_text())
-            self.assertEqual(sorted(scope), ["codex", "opencode", "pi"])
+            self.assertEqual(sorted(scope), ["codex", "cursor", "opencode", "pi"])
             manifest = json.loads((home / ".local/state/set-agentes/managed-files.json").read_text())
             self.assertFalse(any(entry.startswith(".claude/") for entry in manifest))
 
@@ -10397,6 +10397,27 @@ class HarnessTests(unittest.TestCase):
         )
         self.assertIsNotNone(shutil.which("bash"))
 
+    def test_the_toolchain_probe_measures_exec_of_a_shebang_not_mere_presence(self):
+        """Two earlier probes answered True on Windows and the skip never engaged.
+
+        The first checked that `bash` and `python3` exist; the second that a path bash
+        computed could be stat'ed by python3. Both are true on the Windows runner (CI run
+        32144718950, `Diagnose the POSIX toolchain`) while the thing the repo's Python
+        actually does -- `subprocess.run([".../check-drift.sh", "--quiet"])`,
+        set_agents_app.py:1266 -- still dies with `[WinError 193] %1 is not a valid Win32
+        application`, because CreateProcess has no shebang handling. So the probe is
+        pinned to that exact capability: hand a shebang-ed .sh to exec and see.
+        """
+        source = (ROOT / "tests/__init__.py").read_text(encoding="utf-8")
+        probe = source[source.index("def _detect_posix_toolchain"):source.index("_POSIX_TOOLCHAIN = ")]
+        self.assertIn("#!/usr/bin/env bash", probe,
+                      "the probe must WRITE a shebang-ed script, not reason about one")
+        self.assertIn("subprocess.run([probe]", probe,
+                      "the probe must exec that script as argv[0] -- the exact shape that "
+                      "raises WinError 193 -- never via an explicit `bash <path>` prefix, "
+                      "which would succeed on Windows and re-break the skip")
+        self.assertNotIn("os.path.isdir", probe, "that was the second probe, and it measured the wrong layer")
+
     def test_ci_never_claims_the_full_suite_passes_on_native_windows(self):
         """ADR-0041 asserted something that has never once been true.
 
@@ -13417,6 +13438,140 @@ class TuiTests(unittest.TestCase):
         stable = stream.getvalue()
         time.sleep(0.15)
         self.assertEqual(stream.getvalue(), stable)
+
+
+class CursorRuntimeTargetTests(unittest.TestCase):
+    """032/C1-C2: Cursor as a host runtime of the harness.
+
+    Cursor is the runtime Federico is left with once the other three subscriptions are
+    exhausted, so "the roles are installed" is not enough on its own -- what must hold is
+    that the target never acquires a model of its own (the failure that emptied those
+    quotas) and never loses the doctrine that governs the roles.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        tests.require_posix_toolchain()
+        cls.out = _generate_output()
+        run("./build.sh", "--output", str(cls.out))
+
+    def _roster_roles(self):
+        rows = (ROOT / "roles.tsv").read_text(encoding="utf-8").splitlines()
+        return {line.split("\t")[0] for line in rows[1:] if line.strip()}
+
+    def test_every_roster_role_reaches_the_cursor_target(self):
+        # AC-01: same role set as the roster -- a role the harness declares but Cursor
+        # cannot delegate to is a silently missing separation of duties, not a cosmetic gap.
+        actual = {path.stem for path in (self.out / "cursor/agents").glob("*.md")}
+        self.assertEqual(actual, self._roster_roles())
+
+    def test_no_cursor_agent_pins_a_model(self):
+        # AC-06: `model: inherit` on every role. A concrete id here would make the harness
+        # spend a subscription the user never chose in Cursor's own model picker.
+        for path in sorted((self.out / "cursor/agents").glob("*.md")):
+            head = path.read_text(encoding="utf-8").split("\n---\n", 1)[0]
+            model_lines = [line for line in head.splitlines() if line.startswith("model:")]
+            self.assertEqual(model_lines, ["model: inherit"], path.name)
+
+    def test_readonly_reuses_the_codex_sandbox_predicate_rather_than_a_second_one(self):
+        # AC-01: `readonly: true` must agree with Codex's already-audited `sandbox_mode`
+        # for the SAME role. Two independent definitions of "this role must not write"
+        # is how a reviewer silently gains write access in one runtime only.
+        for path in sorted((self.out / "cursor/agents").glob("*.md")):
+            cursor_head = path.read_text(encoding="utf-8").split("\n---\n", 1)[0]
+            codex = (self.out / "codex/agents" / f"{path.stem}.toml").read_text(encoding="utf-8")
+            expected = 'sandbox_mode = "read-only"' in codex
+            self.assertIn(f"readonly: {'true' if expected else 'false'}", cursor_head, path.name)
+
+    def test_the_doctrine_rule_is_always_applied_and_is_the_shipped_doctrine(self):
+        # AC-05: Cursor has no user-level rules file, so `alwaysApply: true` in the project
+        # is the only shape that reaches every session. And it must BE the target's AGENTS.md:
+        # a rule that drifted from the doctrine would govern while claiming not to.
+        rule = (self.out / "cursor/rules/00-harness.mdc").read_text(encoding="utf-8")
+        doctrine = (self.out / "cursor/AGENTS.md").read_text(encoding="utf-8")
+        self.assertEqual(rule, "---\nalwaysApply: true\n---\n\n" + doctrine.lstrip("\n"))
+
+    def test_the_canonical_skills_reach_cursor_verbatim(self):
+        # AC-02: Cursor reads ~/.cursor/skills/<name>/SKILL.md natively.
+        canonical = sorted(p.name for p in (ROOT / "Global/_canonical/skills").iterdir() if p.is_dir())
+        self.assertTrue(canonical)
+        for name in canonical:
+            shipped = (self.out / "cursor/skills" / name / "SKILL.md").read_text(encoding="utf-8")
+            self.assertEqual(shipped, (ROOT / "Global/_canonical/skills" / name / "SKILL.md").read_text(encoding="utf-8"), name)
+
+    def test_the_installer_knows_where_cursor_config_lives(self):
+        # AC-03: ~/.cursor, and nothing outside it.
+        home = Path(tempfile.mkdtemp())
+        result = run("python3", "ai/scripts/install.py", "--staging", str(self.out),
+                     "--home", str(home), "--target", "cursor", "--preview")
+        # The preview is unified diffs, so the FILE HEADERS are the paths it would write --
+        # the bodies quote other runtimes' paths as prose and must not be read as targets.
+        touched = {line.split(" ", 1)[1].split(" (")[0]
+                   for line in result.stdout.splitlines() if line.startswith("+++ ")}
+        self.assertTrue(touched, result.stdout[:400])
+        self.assertIn(str(home / ".cursor/agents/orchestrator.md"), touched)
+        self.assertTrue(any(path.startswith(str(home / ".cursor/skills/")) for path in touched))
+        outside = sorted(path for path in touched if not path.startswith(str(home / ".cursor")))
+        self.assertEqual(outside, [], "--target cursor must write nothing outside ~/.cursor")
+
+    def test_build_check_fails_when_the_tracked_cursor_tree_drifts(self):
+        # AC-04: the committed Global/cursor tree is under the same drift gate as the
+        # other four. Without this, cursor could rot in the repo while --check said PASS.
+        with tempfile.TemporaryDirectory(prefix="set-agentes-cursor-drift-") as td:
+            guest = Path(td) / "repo"
+            shutil.copytree(
+                ROOT, guest,
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".env", ".env.*", "secrets"),
+            )
+            target = guest / "Global/cursor/AGENTS.md"
+            target.write_text(target.read_text(encoding="utf-8") + "\nDRIFT-MARKER-032\n", encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(guest / "build.sh"), "--check"],
+                cwd=guest, env=os.environ.copy(), text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("GLOBAL_TREE_DRIFT", result.stdout)
+
+    def test_bootstrap_projects_the_cursor_surface_into_a_project(self):
+        # AC-05: rules and slash commands are project-only in Cursor. A bootstrapped
+        # project that got the global agents but not these would run the roles with no
+        # doctrine attached -- worse than not installing them.
+        project = Path(tempfile.mkdtemp())
+        run("python3", "ai/scripts/bootstrap_project.py", str(project))
+        rule = project / ".cursor/rules/00-harness.mdc"
+        self.assertTrue(rule.is_file())
+        self.assertTrue(rule.read_text(encoding="utf-8").startswith("---\nalwaysApply: true\n---\n"))
+        canonical = {p.name for p in (ROOT / "Global/_canonical/commands").glob("*.md")}
+        self.assertEqual({p.name for p in (project / ".cursor/commands").glob("*.md")}, canonical)
+
+    def test_the_cursor_coordinator_is_told_not_to_dispatch_through_another_lane(self):
+        # The canonical orchestrator doctrine is written for the CLI-dispatch runtimes: it
+        # calls --route-decide and then shells out to <runtime>_spawn.py. Hosted in Cursor
+        # that decision can only ever name SOMEONE ELSE'S lane, so obeying it would spend
+        # the very subscriptions this target exists because they ran out. The coordinator --
+        # and only the coordinator, the role that dispatches -- carries the override.
+        orchestrator = (self.out / "cursor/agents/orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Delegation in Cursor", orchestrator)
+        self.assertIn("--route-decide", orchestrator.split("Delegation in Cursor", 1)[1],
+                      "the override must name the instruction it overrides")
+        self.assertIn("subagent", orchestrator.split("Delegation in Cursor", 1)[1])
+        carriers = {path.stem for path in (self.out / "cursor/agents").glob("*.md")
+                    if "Delegation in Cursor" in path.read_text(encoding="utf-8")}
+        self.assertEqual(carriers, {"orchestrator"})
+
+    def test_scaffold_leaves_the_doctrine_rule_in_an_existing_project(self):
+        # AC-05: bootstrap_project.py is the greenfield path; `set-agents --scaffold` is the
+        # one run inside a project that already exists -- the common case. Without the rule
+        # there, an existing project opened in Cursor gets the 28 globally installed roles
+        # and nothing governing them. Re-running must skip, never conflict.
+        project = Path(tempfile.mkdtemp())
+        first = run("./set-agents", "--scaffold", str(project))
+        rule = project / ".cursor/rules/00-harness.mdc"
+        self.assertIn("SCAFFOLD_CREATED path=.cursor/rules/00-harness.mdc", first.stdout)
+        self.assertEqual(rule.read_bytes(), (ROOT / "Global/cursor/rules/00-harness.mdc").read_bytes())
+        second = run("./set-agents", "--scaffold", str(project))
+        self.assertIn("SCAFFOLD_SKIP path=.cursor/rules/00-harness.mdc", second.stdout)
+        self.assertNotIn("SCAFFOLD_CONFLICT", second.stdout)
 
 
 if __name__ == "__main__":

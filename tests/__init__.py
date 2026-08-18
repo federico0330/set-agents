@@ -381,36 +381,48 @@ sys.addaudithook(_test_write_audit)
 # `test_the_posix_toolchain_is_present_on_posix` fails loudly if it ever is not, so a
 # broken PATH can never silently skip the suite on the platforms that do support it.
 _TOOLCHAIN_REASON = (
-    "requires the POSIX shell toolchain (bash + python3); on Windows the harness runs "
-    "inside WSL per README.md:107, and this job only proves the bootstrap"
+    "requires the POSIX shell toolchain (a shebang-ed .sh that a process can exec "
+    "directly); on Windows the harness runs inside WSL per README.md:107, and this "
+    "job only proves the bootstrap"
 )
 
 
 def _detect_posix_toolchain():
-    """Can a bash script here hand a path to python3 and have it work?
+    """Can a process exec a shebang-ed `.sh` file directly?
 
-    That, and not "is there a bash binary", is what every script in this repo needs:
-    `set-agents` is `exec python3 "$ROOT/ai/scripts/set_agents_app.py"`, where $ROOT
-    comes from bash. Git Bash on Windows computes `/d/a/set-agents` and native Windows
-    Python cannot open that path -- both binaries exist and are perfectly functional,
-    and the composition still fails. A probe that only checked `bash -c true` would
-    answer True there and the tests would go right back to failing.
+    That, and not "is there a bash binary", is what this repo's Python actually needs.
+    Measured on the Windows runner, CI run 32144718950, `Diagnose the POSIX toolchain`:
+    bash 5.3 and python3 3.12 are both present, `bash` computes `/d/a/set-agents` and
+    native Python stats it fine -- the composition every earlier hypothesis blamed WORKS.
+    What fails is one layer down:
+
+        set_agents_app.py:1266  subprocess.run([str(script), "--quiet"], ...)
+        OSError: [WinError 193] %1 is not a valid Win32 application
+
+    `CreateProcess` has no shebang handling, so a `.sh` path handed to it as argv[0] is
+    not an executable image at all. `ai/scripts/check-drift.sh` is only the first of many
+    such call sites, and a probe that measured anything else (as the previous two did)
+    answers True here and the tests go right back to failing.
 
     The probe runs ONLY off-POSIX; on Linux and macOS the answer is True with no
     subprocess at all, so nothing about the normal path changes or slows down."""
     if os.name == "posix":
         return True
-    bash = shutil.which("bash")
-    if not bash or not shutil.which("python3"):
+    if not shutil.which("bash") or not shutil.which("python3"):
         return False
+    probe = None
     try:
-        return subprocess.run(
-            [bash, "-c",
-             'python3 -c "import os,sys; sys.exit(0 if os.path.isdir(sys.argv[1]) else 1)" "$(pwd)"'],
-            capture_output=True, timeout=60,
-        ).returncode == 0
+        directory = tempfile.mkdtemp(prefix="set-agentes-toolchain-")
+        probe = os.path.join(directory, "probe.sh")
+        with open(probe, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write("#!/usr/bin/env bash\nexit 0\n")
+        os.chmod(probe, 0o755)
+        return subprocess.run([probe], capture_output=True, timeout=60).returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
+    finally:
+        if probe is not None:
+            shutil.rmtree(os.path.dirname(probe), ignore_errors=True)
 
 
 _POSIX_TOOLCHAIN = _detect_posix_toolchain()

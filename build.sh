@@ -10,7 +10,7 @@ YES=0
 TARGETS=()
 
 usage() {
-  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|openai-only] [--output DIR] [--target opencode|claude-code|codex|pi] [--yes]"
+  echo "usage: ./build.sh [--check|--diff|--install] [--profile go-zen|zen|openai-only] [--output DIR] [--target opencode|claude-code|codex|pi|cursor] [--yes]"
 }
 
 ensure_active_profile() {
@@ -130,13 +130,13 @@ EOF
     trap 'rm -rf "$CHECK_STAGING"' EXIT
     python3 "$ROOT/ai/scripts/generate.py" --output "$CHECK_STAGING" --profile go-zen >/dev/null
     tree_drift=0
-    for harness in opencode claude-code codex pi; do
+    for harness in opencode claude-code codex pi cursor; do
       if ! diff -ruN "$ROOT/Global/$harness" "$CHECK_STAGING/$harness"; then
         tree_drift=1
       fi
     done
     if [ "$tree_drift" -eq 0 ]; then
-      echo "GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=4"
+      echo "GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=5"
     else
       echo "GLOBAL_TREE_DRIFT profile=go-zen"
       exit 1
@@ -148,9 +148,10 @@ EOF
     diff -ruN "$ROOT/Global/claude-code" "$STAGING/claude-code" || true
     diff -ruN "$ROOT/Global/codex" "$STAGING/codex" || true
     diff -ruN "$ROOT/Global/pi" "$STAGING/pi" || true
+    diff -ruN "$ROOT/Global/cursor" "$STAGING/cursor" || true
     ;;
   generate)
-    for harness in opencode claude-code codex pi; do
+    for harness in opencode claude-code codex pi cursor; do
       rm -rf "$ROOT/Global/$harness"
       cp -a "$STAGING/$harness" "$ROOT/Global/$harness"
     done
