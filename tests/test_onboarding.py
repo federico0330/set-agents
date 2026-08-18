@@ -71,7 +71,7 @@ class ScopedInstallDriftTests(unittest.TestCase):
             bin_dir = tmp / "bin"
             bin_dir.mkdir()
             python3_shim = bin_dir / "python3"
-            python3_shim.write_text(f"#!/bin/sh\nexec {sys.executable} \"$@\"\n")
+            python3_shim.write_text(f"#!/bin/sh\nexec '{sys.executable}' \"$@\"\n")
             python3_shim.chmod(0o755)
             drift = subprocess.run(
                 ["bash", "ai/scripts/check-drift.sh"],
@@ -80,7 +80,9 @@ class ScopedInstallDriftTests(unittest.TestCase):
                     "HOME": str(home), "DRIFT_HOME": str(home)},
                 capture_output=True, text=True,
             )
-            self.assertEqual(drift.returncode, 0, drift.stdout + drift.stderr)
+            self.assertEqual(drift.returncode, 0, 
+                             f"DRIFT_HOME={home}\nstdout:\n{drift.stdout}\nstderr:\n{drift.stderr}\n"
+                             f"scope={scope_path.read_text() if scope_path.exists() else 'MISSING'}")
             self.assertIn("DRIFT_OK", drift.stdout)
 
     def test_full_install_records_full_scope(self):
