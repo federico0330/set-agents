@@ -40,10 +40,15 @@ _SYS_MODULES_ABSENT = object()
 
 
 def run(*args, env=None, check=True):
+    # PYTHONUTF8=1 ensures subprocess calls (feature-state.py, build.sh, etc.) use
+    # UTF-8 on Windows. Without it, Windows subprocess inherits cp1252 and writes
+    # STATUS.md / other outputs with non-UTF-8 bytes that subsequent read_text(encoding="utf-8")
+    # then fails on.  On Linux/macOS this is a no-op (they default to UTF-8 already).
+    utf8_env = {"PYTHONUTF8": "1"}
     return subprocess.run(
         args,
         cwd=ROOT,
-        env={**os.environ, **(env or {})},
+        env={**os.environ, **utf8_env, **(env or {})},
         text=True,
         capture_output=True,
         check=check,

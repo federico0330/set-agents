@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / "ai/scripts"))
 DECISION_ID_RE = re.compile(r"^dec1_[0-9a-f]{32}$")
 
 
+@unittest.skipIf(os.name != "posix", "routing store requires POSIX file locking (WAL mode)")
 class RoutingDecisionsLogTests(unittest.TestCase):
     def _probe_stubs(self, td):
         bins = Path(td) / "bin"; bins.mkdir(); log = Path(td) / "probes.log"

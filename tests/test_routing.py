@@ -6530,6 +6530,7 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(providers, {"openai-codex", "anthropic"})
 
 
+@unittest.skipIf(os.name != "posix", "routing store requires POSIX file locking (WAL mode)")
 class ClaudeCodeSpawnTests(unittest.TestCase):
     """AC-02 (015-anthropic-dispatch-parity): the new, SEPARATE Claude-Code-lane CLI
     subprocess spawn module -- `ai/scripts/claude_code_spawn.py`, never a call into
@@ -7289,6 +7290,7 @@ class ClaudeCodeSpawnTests(unittest.TestCase):
         self.assertIn("cannot both read stdin", err.getvalue())
 
 
+@unittest.skipIf(os.name != "posix", "routing store requires POSIX file locking (WAL mode)")
 class UsageWiringRealDispatchTests(unittest.TestCase):
     """023-senales-de-consumo PKG-B2 (AC-04a): `claude_code_spawn.dispatch_writer` /
     `opencode_spawn.dispatch_writer` already attach `--usage` on every writer dispatch, in
