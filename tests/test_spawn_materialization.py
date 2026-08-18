@@ -111,6 +111,7 @@ class CodexArgvTests(unittest.TestCase):
         self.assertEqual(cx._sandbox_mode("gate-runner", _ROSTER), "read-only")
 
 
+@unittest.skipIf(os.name != "posix", "vault degradation test requires POSIX subprocess behavior")
 class VaultDegradationParityTests(unittest.TestCase):
     def setUp(self):
         cx._vault_block_cache.clear()

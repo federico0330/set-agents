@@ -49,6 +49,7 @@ def _facts(role, runtime, **changes):
     return data
 
 
+@unittest.skipIf(os.name != "posix", "routing store requires POSIX file locking (WAL mode)")
 class ModelRequestBarrierTests(unittest.TestCase):
     """AC-05: one test per named barrier -- the requested model is denied, the denial
     names the barrier, and a genuinely eligible alternative still wins. Nothing here
@@ -321,6 +322,7 @@ class ModelRequestDescriptorValidationTests(unittest.TestCase):
                 set_agents_app._validate_model_request(bad)
 
 
+@unittest.skipIf(os.name != "posix", "routing store requires POSIX file locking (WAL mode)")
 class ModelRequestCliTests(unittest.TestCase):
     """AC-04 (closed key set, end to end via the real CLI) / AC-06 (the marker reaches
     the JSON envelope) / AC-07 (ephemeral: nothing written, nothing leaks into the next

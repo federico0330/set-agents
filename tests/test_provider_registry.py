@@ -460,6 +460,7 @@ class ProviderCliSubprocessTests(unittest.TestCase):
 # --------------------------------------------------------------- install.py (AC-13/14/15)
 
 
+@unittest.skipIf(os.name != "posix", "./build.sh requires bash; not available on Windows")
 class InstallProviderRenderTests(unittest.TestCase):
     def test_global_shared_opencode_json_no_longer_hardcodes_a_provider_block(self):
         """AC-13's own premise: the render must come from the registry because the
