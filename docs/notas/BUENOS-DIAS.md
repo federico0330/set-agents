@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-17T12:14:04` · generado 2026-08-18T15:14:04+00:00_
+_Ventana: desde `2026-08-17T12:34:35` · generado 2026-08-18T15:34:35+00:00_
 
 ## Necesita tu decisión
 
@@ -23,12 +23,15 @@ _Ventana: desde `2026-08-17T12:14:04` · generado 2026-08-18T15:14:04+00:00_
 ## Qué se está haciendo
 
 - **032-cursor-como-runtime** — fase `PACKAGE_GATES`
+- **033-menos-espera-menos-cuota** — fase `PACKAGE_PLANNING`
 
 ## Qué falta
 
 - **002-adaptive-pi-orchestration** 5 hallazgos abiertos
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
+- **033-menos-espera-menos-cuota** → toca planificar el próximo paquete
+- **033-menos-espera-menos-cuota** 5 tareas pendientes en PKG-6
 
 ## Qué cambió en el software
 

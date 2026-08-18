@@ -32,6 +32,7 @@
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
+- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `PACKAGE_PLANNING` · paquetes 0/6
 
 ## Qué falta
 
@@ -42,6 +43,8 @@
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
+- **033-menos-espera-menos-cuota** → toca planificar el próximo paquete
+- **033-menos-espera-menos-cuota** 5 tareas pendientes en PKG-6
 
 ## Quick-fixes recientes
 
@@ -68,13 +71,14 @@
 |---|---|---|
 | 031-registro-correctivo | 10/10 | n/a, notas |
 | 032-cursor-como-runtime | 10/10 | n/a, request |
+| 033-menos-espera-menos-cuota | 10/10 | n/a, request |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T15:14:03+00:00_
+_Actualizado: 2026-08-18T15:33:49+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias
