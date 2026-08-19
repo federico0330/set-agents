@@ -12,7 +12,9 @@ the harness dispatched the run at all -- a session started by hand shows up here
                rollout jsonl for the cached/reasoning breakdown)
 
 Section 2 -- HARNESS DISPATCH REGISTRY (this harness's own record of what it
-dispatched). Two sources, merged into this section, never invented via --route-decide:
+dispatched). Two sources, presented side by side when both have rows — never
+folded into one session TOTAL (a dual-source host would otherwise double-count
+the same work). Never invented via --route-decide:
 - ~/.local/state/set-agentes/routing-v2/routing.db `dispatches` (023 PKG-B1/B2): every
   run the ROUTER ITSELF dispatched through set_agents_spawn.py/claude_code_spawn.py/
   opencode_spawn.py. Empty on Cursor: native subagents never go through those CLIs.
@@ -694,6 +696,13 @@ _SECTION_2_SOURCE = (
     "routing.db `dispatches` plus ai/state/features/*.json spawns[] / history record-spawn "
     "(this harness's own record of what it dispatched, every runtime including Cursor)"
 )
+_SECTION_2_PI_SOURCE = (
+    "routing.db `dispatches` (router-dispatched runs; empty on Cursor native subagents)"
+)
+_SECTION_2_SPAWN_SOURCE = (
+    "ai/state/features/*.json spawns[] / history record-spawn "
+    "(this harness's own record, every runtime including Cursor)"
+)
 _NEVER_SUM_DISCLAIMER = (
     "These two sections measure OVERLAPPING spend from different vantage points -- a run this "
     "harness dispatches through the claude-code or opencode lane is counted in BOTH sections "
@@ -716,12 +725,21 @@ def main():
     collect_claude(cli_native, home, args.project, since_ms)
     collect_codex(cli_native, home, args.project, since_ms, args.deep)
 
-    harness_registry = defaultdict(new_bucket)
-    collect_pi(harness_registry, home, args.project, since_ms)
-    collect_feature_spawns(harness_registry, args.project, since_ms)
+    pi_registry = defaultdict(new_bucket)
+    collect_pi(pi_registry, home, args.project, since_ms)
+    spawn_registry = defaultdict(new_bucket)
+    collect_feature_spawns(spawn_registry, args.project, since_ms)
 
     render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
-    render(harness_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
+    # Dual-source hosts record the same work in both ledgers. Each ledger keeps
+    # its own TOTAL so Section 2 sessions never become pi+spawns (AC-6.5).
+    if pi_registry and spawn_registry:
+        render(pi_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_PI_SOURCE)
+        render(spawn_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SPAWN_SOURCE)
+    elif spawn_registry:
+        render(spawn_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
+    else:
+        render(pi_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
     print(_NEVER_SUM_DISCLAIMER)
     print()
 

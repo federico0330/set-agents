@@ -12638,6 +12638,18 @@ class HarnessTests(unittest.TestCase):
             )
             self.assertEqual(ok.returncode, 0)
 
+    def test_start_review_panel_rejects_wrong_single_role_on_small_low(self):
+        # AC-6.3 / PKG6-F02: missing required_reviewers is always an error, even small+low.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            wrong = self.run_state(
+                state, "start-review-panel", "PKG-01",
+                "--role", "security-auditor",
+                check=False,
+            )
+            self.assertEqual(wrong.returncode, 2)
+            self.assertIn("package-reviewer", wrong.stdout)
+
     def test_record_spawn_warns_at_eighty_percent_of_the_mode_ceiling(self):
         # AC-6.4: warn at 80% BEFORE the hard cap. validate_state still rejects overflow.
         with tempfile.TemporaryDirectory() as td:
@@ -12663,6 +12675,36 @@ class HarnessTests(unittest.TestCase):
             data = json.loads(state.read_text())
             self.assertTrue(data["history"][-1]["metadata"].get("spawn_budget_warn"))
             self.assertNotEqual(data["phase"], "BLOCKED")
+
+    def test_spawn_budget_warn_uses_current_package_not_feature_sum(self):
+        # AC-6.4 / PKG6-F01: multi-package sum >= ceiling must not silence the current cell.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state = root / "ai/state/features/feat.json"
+            state.parent.mkdir(parents=True)
+            init_state(state, "--ac", "AC-1", "--max-spawns-per-package", "5")
+            self.run_state(
+                state, "create-package", "PKG-01", "First",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            for index in range(3):
+                self.run_state(state, "record-spawn", "PKG-01", "implementer",
+                               "--purpose", f"a{index}")
+            self.run_state(
+                state, "create-package", "PKG-02", "Second",
+                "--ac", "AC-1", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            for index in range(3):
+                self.run_state(state, "record-spawn", "PKG-02", "implementer",
+                               "--purpose", f"b{index}")
+            warned = self.run_state(state, "record-spawn", "PKG-02", "implementer",
+                                    "--purpose", "b3")
+            self.assertIn("SPAWN_BUDGET_WARN", warned.stderr)
+            status = (root / "ai/state/STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("4/5 WARN 80%", status)
+            self.assertNotIn("7/5", status)
 
     def test_cost_report_section_two_ingests_feature_state_spawns(self):
         # AC-6.5: Cursor never writes routing.db; Section 2 must still count record-spawn.
@@ -12692,6 +12734,58 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("feature-state", result.stdout)
         self.assertIn("implementer", result.stdout)
         self.assertNotIn("No sessions matched.", result.stdout.split("Section 2", 1)[1].split("Section 3", 1)[0])
+
+    def test_cost_report_does_not_double_count_pi_and_feature_state(self):
+        # AC-6.5 / PKG6-F03: pi + feature-state for the same work must not TOTAL sessions=2.
+        app = self._import("set_agents_app")
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            project = Path(td) / "proj"
+            project.mkdir(parents=True)
+            key = app.project_key_for(project)
+            routing_root = home / ".local/state/set-agentes/routing-v2"
+            routing_root.mkdir(parents=True)
+            conn = sqlite3.connect(routing_root / "routing.db")
+            conn.execute(
+                "CREATE TABLE dispatches (project_key TEXT, actual_model TEXT, role TEXT, usage_status TEXT,"
+                " usage_input INT, usage_output INT, usage_cache_read INT, usage_cache_write INT,"
+                " usage_reasoning INT, updated_at INT)"
+            )
+            conn.execute(
+                "INSERT INTO dispatches VALUES (?, 'cursor/inherit', 'implementer', 'ok',"
+                " 10, 2, 0, 0, 0, 2000000000000)", (key,),
+            )
+            conn.commit()
+            conn.close()
+            features = project / "ai/state/features"
+            features.mkdir(parents=True)
+            (features / "feat.json").write_text(json.dumps({
+                "feature_id": "feat",
+                "packages": [{
+                    "package_id": "PKG-1",
+                    "spawns": [{
+                        "spawn_id": "SPAWN-001",
+                        "role": "implementer",
+                        "model": "inherit",
+                        "provider": "cursor",
+                        "at": "2026-08-18T23:17:52+00:00",
+                    }],
+                }],
+                "history": [],
+            }))
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--project", str(project), "--since", "2026-08-10")
+        section2 = result.stdout.split("Section 2", 1)[1].split("Section 3", 1)[0]
+        self.assertIn("feature-state", section2)
+        totals = []
+        for line in section2.splitlines():
+            if "this section only)" not in line:
+                continue
+            after = line.split("this section only)", 1)[1].split()
+            self.assertTrue(after, line)
+            totals.append(after[0])
+        self.assertTrue(totals, section2)
+        self.assertNotIn("2", totals)
 
     def test_shrinking_the_panel_cannot_let_implementer_self_approve_or_patch(self):
         # AC-6.6: pins NON_ACCEPTING_ACTORS / package_accept_ready. Do not weaken.

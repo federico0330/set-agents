@@ -521,7 +521,7 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
                 + ", ".join(writers)
             )
         missing = [role for role in required if role not in roles]
-        if len(required) > 1 and missing:
+        if missing:
             raise StateError(
                 "start-review-panel requires "
                 + ", ".join(required)

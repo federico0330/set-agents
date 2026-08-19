@@ -193,7 +193,7 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
             n = len(pending)
             noun = "tarea" if n == 1 else "tareas"
             bits.append(f"{n} {noun} pendientes en {package.get('package_id')}")
-    used, ceiling = spawn_budget_counts(data)
+    used, ceiling = spawn_budget_counts(data, package)
     if spawn_budget_warns(used, ceiling):
         bits.append(f"WARN spawns {spawn_budget_label(used, ceiling)}")
     return bits

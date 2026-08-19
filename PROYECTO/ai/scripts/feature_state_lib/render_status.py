@@ -232,7 +232,7 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
         "phase": data.get("phase", "?"),
         "package": f"{current.get('package_id')} ({current.get('status')})" if current else "-",
         "accepted": f"{sum(1 for p in packages if p.get('status') == 'accepted')}/{len(packages)}",
-        "spawns": spawn_budget_label(*spawn_budget_counts(data)),
+        "spawns": spawn_budget_label(*spawn_budget_counts(data, current)),
         "reviews": f"{cycles}/{budgets.get('max_deep_review_cycles', '?')}",
         "open_findings": open_findings,
         # Raw here would put agent-authored newlines and pipes into a markdown TABLE in
