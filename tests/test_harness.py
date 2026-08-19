@@ -10568,7 +10568,7 @@ class HarnessTests(unittest.TestCase):
         # bumping WINDOWS_BOOTSTRAP_SKIP_CEILING must fail the job.
         text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("windows-bootstrap:", text)
-        self.assertRegex(text, r"WINDOWS_BOOTSTRAP_SKIP_CEILING:\s*[\"']?660")
+        self.assertRegex(text, r"WINDOWS_BOOTSTRAP_SKIP_CEILING:\s*[\"']?669")
         self.assertIn("WINDOWS_BOOTSTRAP_SKIPS=", text)
         self.assertIn("exceeds ceiling", text)
 
