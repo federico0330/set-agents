@@ -63,11 +63,11 @@ jobs:
           # code now declares encoding="utf-8" at every text read and write, so this is
           # a second line of defence rather than the mechanism.
           PYTHONUTF8: "1"
-          # AC-4.3: 654 skipped of 1276 measured 2026-08-18 (spec), plus the tests that
-          # now skip via require_posix_toolchain instead of failing (four AC-4.1 bash
-          # sites, stdin-from-dev-null, cursor-tree drift check). A commit that adds
-          # skips must bump this number in the same change.
-          WINDOWS_BOOTSTRAP_SKIP_CEILING: "660"
+          # AC-4.3: 669 skipped of 1326 measured 2026-08-19 on windows-latest
+          # (run 32208044413: OK skipped=669, suite exit 0). The 660 ceiling was the
+          # 2026-08-18 654 skips plus PKG-4 posix-toolchain skips; PKG-5..6 added
+          # more declared skips. A commit that adds skips must bump this number.
+          WINDOWS_BOOTSTRAP_SKIP_CEILING: "669"
         run: |
           python -X utf8 -m unittest discover -s tests -v *> windows-unittest.log
           $code = $LASTEXITCODE
