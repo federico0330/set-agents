@@ -14,3 +14,4 @@
 | [005](005-portable-harness/spec.md) | Portable harness, mandatory vault, TUI selector | Draft | 2026-07-27 |
 | [014](014-model-preference-policy/spec.md) | Model preference policy (credential-aware role-class bias) | Draft | 2026-07-31 |
 | [015](015-anthropic-dispatch-parity/spec.md) | Anthropic dispatch parity v3.0.0 (cross-lane redirect to Claude Code — OpenCode-lane Anthropic auth needs a metered API key, never OAuth, so no OpenCode-lane Anthropic variants; routing-service redirect + Claude-Code CLI spawn with a live-verified CLI-level tool ceiling + review-independence fix, time-boxed ~12 days + `go-zen`/`.claude`-axis collision fixes) | Draft (round-2 correction pass, pending re-challenge) | 2026-07-31 |
+| [034](034-cuota-organica-y-writer-barato/spec.md) | Cuota orgánica y escritor barato (quick-fix 1–3 enforceable, writer barato + un salvage, techo frontier, pins Cursor; supersede parcial de 032 AC-06) | Approved | 2026-08-19 |

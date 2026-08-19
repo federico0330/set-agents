@@ -39,6 +39,29 @@ def cmd_record_gate(args: argparse.Namespace) -> int:
             # lineage admits exactly one correction"), so this bypasses the generic
             # gate_failures 3-strikes accumulator entirely and blocks on the first breach.
             return block_with_reason(data, args.actor, args.package_id, "repair exceeded its frozen line ceiling")
+        if not args.global_gate:
+            # ADR-0060/0062 (034 PKG-B): consecutive cheap misses are a FEATURE counter,
+            # latched once per package. Salvage-red must not add a second strike.
+            # Green-on-first resets only when the cheap writer closed the PACKAGE
+            # (all required gates pass, salvage is None, never struck) — see
+            # reset_consecutive_if_package_green_on_first at PACKAGE_GATES completion.
+            # This is NOT ADR-0011 D2 (quota relaunch).
+            package = package_by_id(data, args.package_id)
+            promo = model.writer_promotion(data)
+            if args.status == "fail" and package.get("salvage"):
+                return block_with_reason(
+                    data, args.actor, args.package_id,
+                    "HUMAN_DECISION_REQUIRED: salvage already used and the gate is still red",
+                )
+            if args.status == "fail" and not package.get("cheap_strike_recorded"):
+                package["cheap_strike_recorded"] = True
+                promo["cheap_consecutive_failures"] = int(promo.get("cheap_consecutive_failures") or 0) + 1
+                if promo["cheap_consecutive_failures"] >= 2:
+                    model.promote_next_rung(promo)
+            # F-B01: do NOT reset on a named-gate pass. Green-on-first is a
+            # PACKAGE close (PACKAGE_GATES → PACKAGE_REVIEW), not the first
+            # passing gate of a still-open package. Salvage-red still does
+            # not increment (branch above returns before this).
         if not args.global_gate and data["phase"] == "PACKAGE_GATES" and args.status == "fail":
             package = package_by_id(data, args.package_id)
             attempts = package.setdefault("attempts", {})

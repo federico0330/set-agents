@@ -1,7 +1,7 @@
 ---
 name: image-describer
 description: "Image describer \u2014 exact, literal visual transcription"
-model: inherit
+model: composer-2.5
 readonly: true
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: project-bootstrapper
 description: "Project bootstrapper \u2014 conservative project discovery and setup"
-model: inherit
+model: claude-opus-5
 readonly: false
 ---
 

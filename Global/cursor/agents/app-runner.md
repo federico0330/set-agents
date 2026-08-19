@@ -1,7 +1,7 @@
 ---
 name: app-runner
 description: "App runner \u2014 launch, health-check, and report the running application"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

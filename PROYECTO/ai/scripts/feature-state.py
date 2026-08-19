@@ -37,7 +37,7 @@ from feature_state_lib.model import (
     PHASES, LEGAL_TRANSITIONS, TERMINAL, MUTATING_COMMANDS, NON_ACCEPTING_ACTORS, REFUTING_ACTORS,
     DEFAULT_MAX_VERIFICATIONS, MODE_BUDGETS, TERMINAL_FINDING_STATUSES,
     is_p001_command, persist_review_requirements, spawn_budget_counts, spawn_budget_warns,
-    spawn_budget_label,
+    spawn_budget_label, is_frontier_spawn, frontier_budget_counts, frontier_budget_label,
 )
 from feature_state_lib.transitions import check_transition, next_transition
 from feature_state_lib.render_status import status_root, summarize_feature, render_status
@@ -422,6 +422,44 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         if attempts.get("spawns", 0) >= budget:
             return block_with_reason(data, args.actor, args.package_id, "spawn budget exhausted",
                                      counter={"scope": "attempts", "key": "spawns"})
+        # ADR-0062 / F-B02: --salvage without a non-empty --model is rejected
+        # BEFORE minting salvage or spending the spawn slot. Do not pin
+        # repair-agent heavy as a fallback (AC-B.4 / AC-D.1).
+        if getattr(args, "salvage", False):
+            salvage_model = (getattr(args, "model", None) or "").strip()
+            if not salvage_model:
+                print("SALVAGE_MODEL_REQUIRED", file=sys.stderr)
+                raise StateError("--salvage requires a non-empty --model")
+        # ADR-0062: second --salvage must not mint a spawn or spend budget.
+        if getattr(args, "salvage", False) and package.get("salvage"):
+            print("SALVAGE_ALREADY_USED", file=sys.stderr)
+            return block_with_reason(
+                data, args.actor, args.package_id,
+                "HUMAN_DECISION_REQUIRED: SALVAGE_ALREADY_USED",
+            )
+        # ADR-0061 (034 PKG-C): techo frontier BEFORE accepting salvage or a
+        # non-cheap spawn. Caps are constants, never JSON. Cheap /
+        # local-gate-runner / absent --model do not increment (additive).
+        # P001 --command on a heavy role still counts (SEC-001).
+        spawn_model = getattr(args, "model", None)
+        frontier = is_frontier_spawn(spawn_model, args.role, commands)
+        if frontier:
+            pkg_used, pkg_cap = frontier_budget_counts(data, package)
+            feat_used, feat_cap = frontier_budget_counts(data, None)
+            if pkg_used >= pkg_cap:
+                print("FRONTIER_CAP_EXHAUSTED", file=sys.stderr)
+                return block_with_reason(
+                    data, args.actor, args.package_id,
+                    "HUMAN_DECISION_REQUIRED: FRONTIER_CAP_EXHAUSTED",
+                    counter={"scope": "frontier", "key": "used", "grain": "package"},
+                )
+            if feat_used >= feat_cap:
+                print("FRONTIER_CAP_EXHAUSTED", file=sys.stderr)
+                return block_with_reason(
+                    data, args.actor, args.package_id,
+                    "HUMAN_DECISION_REQUIRED: FRONTIER_CAP_EXHAUSTED",
+                    counter={"scope": "frontier", "key": "used", "grain": "feature"},
+                )
         attempts["spawns"] = attempts.get("spawns", 0) + 1
         # AC-01: the id is always derived from the counter, never from
         # len(package["spawns"]) -- a package that already had spawns recorded before
@@ -466,6 +504,21 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         if commands:
             entry["commands"] = commands
             metadata["commands"] = commands
+        # ADR-0062 (034 PKG-B): --salvage is a gate-red escalation to a heavy model,
+        # one per package. It is NOT ADR-0011 D2 (quota/plan exhaustion relaunch —
+        # that path never sets this flag and never reads package.salvage).
+        if getattr(args, "salvage", False):
+            package["salvage"] = {
+                "spawn_id": spawn_id,
+                "role": args.role,
+                "model": getattr(args, "model", None) or "",
+                "at": entry["at"],
+            }
+            metadata["salvage"] = True
+        if frontier:
+            package["frontier_used"] = int(package.get("frontier_used") or 0) + 1
+            data["frontier_used"] = int(data.get("frontier_used") or 0) + 1
+            metadata["frontier_budget"] = frontier_budget_label(data, package)
         spawns.append(entry)
         record_event(
             data,
@@ -875,7 +928,11 @@ def build_parser() -> argparse.ArgumentParser:
     # A feature that reaches init already carries a risk signal (quick-fixes
     # close via log-quickfix, no state file), so scoped budgets are the floor;
     # full feature/SDD budgets stay opt-in via explicit --mode feature.
+    # ADR-0064: --mode default stays scoped so a bare `init` dies
+    # RISK_SIGNAL_REQUIRED unless --risk-signal is named. Do not change the
+    # default to quick-fix (that would create a state file; AC-A.6).
     init.add_argument("--mode", choices=sorted(MODE_BUDGETS), default="scoped")
+    init.add_argument("--risk-signal", help="closed-list token required for scoped/feature")
     init.set_defaults(func=cmd_init)
 
     for name, func in (("status", cmd_status), ("next", cmd_next), ("resume", cmd_resume), ("validate", cmd_validate)):
@@ -983,6 +1040,8 @@ def build_parser() -> argparse.ArgumentParser:
     spawn.add_argument("--effort")
     spawn.add_argument("--route-id", help="run_id (writer/verified-review) o decision_id (resto) del --route-decide")
     spawn.add_argument("--command", action="append", help="gate command; all-P001 gate-runner spawns are rejected")
+    spawn.add_argument("--salvage", action="store_true",
+                       help="ADR-0062: one heavy-model salvage per package after cheap gate red")
     spawn.set_defaults(func=cmd_record_spawn)
 
     review = sub.add_parser("record-review")

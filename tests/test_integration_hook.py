@@ -122,7 +122,7 @@ def _drive_to_receipt(repo, base_sha, candidate_sha, package_id="PKG-01", featur
     state = repo / "state.json"
     axes_log = _axes_log(repo, feature_id)
     _fs("init", feature_id, str(spec), digest, "--state-file", str(state), "--approved-by", "test",
-        "--axes-log", str(axes_log), cwd=repo)
+        "--axes-log", str(axes_log), "--risk-signal", "user-asked-full-pipeline", cwd=repo)
     _fs("create-package", package_id, "objective", "--state-file", str(state),
         "--complexity", "small", "--ac", "AC-01", "--task", "T1", "--actor", "test", cwd=repo)
     pack = Path(state).parent / "context" / f"{package_id}.md"
@@ -188,7 +188,7 @@ class IntegrationActionEndToEndTests(unittest.TestCase):
             state = repo / "state.json"
             axes_log = _axes_log(repo, "feat")
             _fs("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test",
-                "--axes-log", str(axes_log), cwd=repo)
+                "--axes-log", str(axes_log), "--risk-signal", "user-asked-full-pipeline", cwd=repo)
             _fs("create-package", "PKG-01", "objective", "--state-file", str(state),
                 "--complexity", "small", "--ac", "AC-01", "--task", "T1", "--actor", "test", cwd=repo)
             # Never driven past PACKAGE_PLANNING -- no receipt, no candidate_identity.

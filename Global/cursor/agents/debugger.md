@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: "Debugger \u2014 root-cause a failing gate and apply the minimal fix"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

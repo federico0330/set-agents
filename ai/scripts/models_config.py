@@ -36,7 +36,7 @@ CAPABILITIES = {"coord-ro", "review-ro", "docs-rw", "factory-rw", "code-rw", "ga
 READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
-AREA_FIELDS = ("claude", "codex", "codex_effort", "opencode")
+AREA_FIELDS = ("claude", "codex", "codex_effort", "opencode", "cursor")
 # The one role-override field that is NOT an area field: a per-role OpenCode
 # tier table consumed only by load_role_tiers, never by resolve_role's base merge.
 # Areas never declare it — only [roles.<role>] may.
@@ -175,7 +175,7 @@ def load_config(models_path=None):
     # header entirely is still a schema error, same as before).
     if not isinstance(config.get("subscriptions"), dict):
         die("models.toml: missing [subscriptions] (an empty table is valid; the key must exist)")
-    for key in ("claude", "codex", "codex_effort"):
+    for key in ("claude", "codex", "codex_effort", "cursor"):
         values = config["catalog"].get(key)
         if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
             die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
@@ -565,6 +565,16 @@ def family(field, value, families):
         return _OPENCODE_FAMILY_SUFFIX.sub("", value)
     if field == "codex_model":
         return value.removesuffix("-mini")
+    if field == "cursor_model":
+        # Cursor slugs have no OpenCode suffix. [families] already applied above;
+        # otherwise the raw measured slug is the family (ADR-0063). Distinct
+        # ids (composer-2.5 vs gpt-5.6-sol) are distinct families.
+        # `inherit` is the session parent (https://cursor.com/docs/subagents), not
+        # a measured family. This helper has no writer pin to collapse against,
+        # and inherit stays a legal catalog slug for coord. Mixed inherit on
+        # review-ro / duty audit|judge is refused at generate.validate_cursor_target
+        # and load_roles (034 SEC-001) — do not treat the raw slug as independence.
+        return value
     return value
 
 
@@ -599,6 +609,7 @@ def resolve_role(row, config, exhausted_providers=()):
         "codex_model": override.get("codex", area.get("codex")),
         "codex_effort": override.get("codex_effort", area.get("codex_effort")),
         "opencode_model": opencode_model,
+        "cursor_model": override.get("cursor", area.get("cursor")),
     }
     for key, value in resolved.items():
         if not value:
@@ -628,6 +639,17 @@ def load_roles(roles_path=None, models_path=None, exhausted_providers=()):
             die(f"{row['role']}: codex model {row['codex_model']} not in [catalog].codex")
         if row["codex_effort"] not in catalog["codex_effort"]:
             die(f"{row['role']}: codex effort {row['codex_effort']} not in [catalog].codex_effort")
+        if row["cursor_model"] not in catalog["cursor"]:
+            die(f"{row['role']}: cursor model {row['cursor_model']} not in [catalog].cursor")
+        if (
+            row["cursor_model"] == "inherit"
+            and row["capability"] == "review-ro"
+            and row["duty"] in REVIEW_DUTIES
+        ):
+            die(
+                f"cursor: inherit on reviewer {row['role']} is forbidden "
+                "(Cursor inherit is the parent model; mixed inherit shares the writer)"
+            )
         if not OPENCODE_MODEL_RE.fullmatch(row["opencode_model"]):
             die(f"{row['role']}: invalid OpenCode model id")
         subscription = subscription_of(row["opencode_model"], config)
@@ -656,7 +678,7 @@ def load_roles(roles_path=None, models_path=None, exhausted_providers=()):
 
     implementers = [r for r in roles if r["duty"] in IMPLEMENT_DUTIES]
     reviewers = [r for r in roles if r["duty"] in REVIEW_DUTIES]
-    for field in ("opencode_model", "claude_model", "codex_model"):
+    for field in ("opencode_model", "claude_model", "codex_model", "cursor_model"):
         implementation_families = {family(field, r[field], config["families"]) for r in implementers}
         for reviewer in reviewers:
             if family(field, reviewer[field], config["families"]) in implementation_families:
@@ -758,7 +780,7 @@ def emit(config):
         lines.append(f"{key} = {'true' if config['subscriptions'][key] else 'false'}")
     lines.append("")
     lines.append("[catalog]")
-    for key in ("claude", "codex", "codex_effort"):
+    for key in ("claude", "codex", "codex_effort", "cursor"):
         values = ", ".join(_value(item) for item in sorted(config["catalog"][key]))
         lines.append(f"{key} = [{values}]")
     # 012 AC-04: optional, so only emitted when present — round-trips without inventing an
@@ -818,7 +840,7 @@ def emit(config):
         area = config["areas"][duty]
         lines.append("")
         lines.append(f"[areas.{duty}]")
-        for field in ("claude", "codex", "codex_effort"):
+        for field in ("claude", "codex", "codex_effort", "cursor"):
             if field in area:
                 lines.append(f"{field} = {_value(area[field])}")
         if "opencode" in area:
@@ -827,7 +849,7 @@ def emit(config):
         override = config["roles"][role]
         lines.append("")
         lines.append(f"[roles.{role}]")
-        for field in ("claude", "codex", "codex_effort"):
+        for field in ("claude", "codex", "codex_effort", "cursor"):
             if field in override:
                 lines.append(f"{field} = {_value(override[field])}")
         if "opencode" in override:

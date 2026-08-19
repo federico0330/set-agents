@@ -1,7 +1,7 @@
 ---
 name: finding-verifier
 description: "Finding-Verifier \u2014 adversarial refutation of review findings before repair"
-model: inherit
+model: gpt-5.6-sol
 readonly: true
 ---
 

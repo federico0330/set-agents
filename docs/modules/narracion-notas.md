@@ -15,6 +15,8 @@ Deriva STATUS.md, bitácora y docs/notas/ (Obsidian-ready) del estado en cada mu
 
 ## Últimos cambios estructurales
 
+- 2026-08-19 034-cuota-organica-y-writer-barato/PKG-C — STATUS muestra frontier_used/cap. cost-report seccion 2 muestra percent green-on-first-attempt derivado; salvage-verde no es first-attempt; no se suma con seccion 1.
+- 2026-08-19 033-menos-espera-menos-cuota/PKG-6 — STATUS.md y las notas muestran spawns usados/techo del paquete corriente y WARN 80% antes del tope duro.
 - 2026-08-18 028-narracion-que-ensena/N2-doctrina-que-explica — AC-18: orchestrator.md documenta cuándo correr digest; test actualizado para verificar contenido no nombre
 - 2026-08-18 028-narracion-que-ensena/N3b-los-campos-donde-se-leen — límite de render elevado a 400; campos learned/next/why/alternative visibles en bitácora y digest
 - 2026-08-18 028-narracion-que-ensena/N1-campos-que-obligan — guarda de punteros insensible a caja (lower_ident); densidad real excluye muletillas; --result started con validación
@@ -23,7 +25,6 @@ Deriva STATUS.md, bitácora y docs/notas/ (Obsidian-ready) del estado en cada mu
 - 2026-08-14 024-listo-para-terceros/C1-estado-fuera-del-producto — El estado deja de viajar en el clon: historial a docs/historia, ai/state gitignoreado y sembrado
 - 2026-08-12 020-honest-dashboard/P2-anclas-verificables — Nuevo motor check_anchors.py y comando feature-state.py check-anchors: extrae las referencias file:line de docs/modules/, resuelve el basename SOLO dentro de los paths que el modulo declara en module…
 - 2026-08-12 020-honest-dashboard/P1-digest-no-esconde — Un unico predicado compartido en model.py (feature_is_live, open_blocker, blocked_days, stale_days, feature_is_stale, STALE_THRESHOLD_DAYS) reemplazo las dos copias mal escritas que tenian cmd_digest…
-- 2026-08-11 019-harness-evolution/P3-cognitive-module-docs — Nuevo feature_state_lib/render_modules.py, mismo contrato never-raises/atómico que render_notes.py; reutiliza merge_note/write_note/_short en vez de reimplementarlos; enganchado a mutate() y a sync-n…
 
 _Debajo de esta línea la prosa es mantenida a mano — contrastala con la fecha del último cambio estructural._
 <!-- /notas:auto -->

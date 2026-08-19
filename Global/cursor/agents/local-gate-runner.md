@@ -1,7 +1,7 @@
 ---
 name: local-gate-runner
 description: "Local gate runner \u2014 P001 deterministic commands only"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

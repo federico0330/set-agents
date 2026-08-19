@@ -13,6 +13,7 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 
 ## Últimos cambios estructurales
 
+- 2026-08-19 034-cuota-organica-y-writer-barato/PKG-B — El default de los escritores code-rw es el modelo gratis del catalogo que cumple tools; hay un solo salvage pesado por paquete y el contador de misses baratos es por paquete cerrado, no por gate suel…
 - 2026-08-15 027-controles-que-miran/P3-gates-que-preguntan-antes — El gate de credenciales de pi pasa a correr ANTES del subproceso pinneado de --list-models, y _decide_status suma MODEL_PINNED y los dos MODEL_REQUEST_ nombrados a su lista de marcadores informativos.
 - 2026-08-15 027-controles-que-miran/P3-gates-que-preguntan-antes — El gate de credenciales de pi pasa a correr ANTES del subproceso pinneado de --list-models, y _decide_status suma MODEL_PINNED y los dos MODEL_REQUEST_ nombrados a su lista de marcadores informativos.
 - 2026-08-14 024-listo-para-terceros/C3-primer-arranque-honesto — El primer arranque termina, dice que hacer cuando no hay credenciales, y avisa antes de pisar un global
@@ -22,7 +23,6 @@ Decide y autoriza qué runtime/provider/modelo ejecuta un spawn, persiste el res
 - 2026-08-13 023-senales-de-consumo/B1-registro-que-no-miente — La doctrina exige --usage al cerrar un run y hay un normalizador unico con la muestra real del cable por runtime
 - 2026-08-13 026-orquestador-elige-modelo/P2-modelo-por-instancia — El descriptor de ruteo acepta model_request: preferencia de modelo por instancia, efimera
 - 2026-08-13 026-orquestador-elige-modelo/P1-latencia-por-modelo-no-por-sufijo — El coordinador deja de estar obligado al sufijo -fast y pasa a un modelo no-GPT de suscripcion
-- 2026-08-13 022-disponibilidad-real/P3-liveness-real — Firma de credencial por runtime en la clave de cache y una sola cache en la raiz del store
 
 _Debajo de esta línea la prosa es mantenida a mano — contrastala con la fecha del último cambio estructural._
 <!-- /notas:auto -->

@@ -1,7 +1,7 @@
 ---
 name: runtime-verifier
 description: "Runtime-verifier \u2014 read-only end-to-end proof that the running app actually behaves"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

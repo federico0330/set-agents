@@ -17,6 +17,13 @@ schema = 2
 claude = ["fable", "haiku", "opus", "sonnet"]
 codex = ["gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]
 codex_effort = ["high", "low", "medium", "xhigh"]
+# 034 / ADR-0063: measured Cursor frontmatter slugs (V-D01, 2026-08-19).
+# Sources: https://cursor.com/docs/subagents (composer-2, composer-2.5,
+# composer-2.5[fast=false], gpt-5.6-sol, claude-opus-5, claude-opus-5[effort=high],
+# inherit) and https://cursor.com/docs/models-and-pricing (Cursor Models pool:
+# Grok 4.6 / Grok 4.5 / Composer 2.5; Other Models GPT-5.6 Luna through Sol,
+# Claude Opus 5). Pin outside this list → die. Not a routing lane.
+cursor = ["claude-opus-5", "claude-opus-5[effort=high]", "composer-2", "composer-2.5", "composer-2.5[fast=false]", "gpt-5.6-luna", "gpt-5.6-sol", "grok-4.5", "grok-4.6", "inherit"]
 # ADR-0042 (022 PKG-2, AC-04): tri-state declared ceiling for the two OpenCode-lane
 # providers (routing_core/catalog.py's `resolve_ceiling`, consumed by `_probe_pairs`,
 # `_read_probe_cache`, and `build_snapshot` alike) — bare model ids (no provider prefix,
@@ -93,30 +100,45 @@ codex_effort = "high"
 # openai-codex. `openai/gpt-5.5` ya esta curado en [catalog].opencode_zen y en [areas.audit] /
 # [areas.judge], y no colisiona con ningun [roles.<role>.tiers.*] (todos son luna/sol/terra).
 opencode = "openai/gpt-5.5"
+cursor = "composer-2.5"
 
 [areas.analysis]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
 opencode = "openai/gpt-5.4-fast"
+cursor = "composer-2.5"
 
 [areas.docs]
 claude = "sonnet"
 codex = "gpt-5.6-sol"
 codex_effort = "high"
 opencode = "openai/gpt-5.4-fast"
+# AC-D.2: product-analyst / architect MAY pin frontier. claude-opus-5 is a
+# distinct family from the cheap writer (composer-2.5).
+cursor = "claude-opus-5"
 
 [areas.implement]
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
-opencode = "openai/gpt-5.6-fast"
+# ADR-0060 (034 PKG-B): BASE cheap/free cell for every code-rw role. billing_rank==0
+# plus writer tools floor; prefer -free among rank 0. NEVER put this opencode/*
+# id into [roles.*.tiers.*] — generate.py:_opencode_projected_route only projects
+# openai/<M> and the variant-coherence gate dies. Feature-new default is this BASE,
+# never writer_tier=fast / implementer@fast (luna/sol/terra stay the @tier ladder).
+opencode = "opencode/deepseek-v4-flash-free"
+# Cursor counterpart of the cheap BASE writer (V-D01: Composer 2.5 is in the
+# Cursor Models pool at $0.5). repair-agent inherits this; salvage/promote are
+# Task-tool model overrides, never a heavy frontmatter pin.
+cursor = "composer-2.5"
 
 [areas.gate]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
 opencode = "openai/gpt-5.4-mini"
+cursor = "composer-2.5"
 
 [areas.audit]
 # 015-anthropic-dispatch-parity AC-06(b) (round 3, decision 1): was "opus" -- collided with the
@@ -135,6 +157,9 @@ codex_effort = "xhigh"
 # writer. Realigned to "openai/gpt-5.5", matching this area's own zen/openai-only lanes, which collides with
 # no [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree.
 opencode = "openai/gpt-5.5"
+# DEC-ROLES-FRONTIER: spec-challenger, package-reviewer (audit). Distinct
+# family from implementer's composer-2.5 (V-D02: family() returns the raw slug).
+cursor = "gpt-5.6-sol"
 
 [areas.judge]
 # 015 AC-06(b): same fix, same reason as [areas.audit].claude above.
@@ -150,18 +175,23 @@ codex_effort = "xhigh"
 # [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value
 # is one of luna/sol/terra, never "gpt-5.5"). See docs/adr/0019-anthropic-dispatch-parity.md D8.
 opencode = "openai/gpt-5.5"
+# DEC-ROLES-FRONTIER: adversarial-judge. Same family as audit, distinct from
+# implementer's composer-2.5.
+cursor = "gpt-5.6-sol"
 
 [areas.release]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
 opencode = "openai/gpt-5.4-mini"
+cursor = "composer-2.5"
 
 [areas.memory]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
 opencode = "openai/gpt-5.4-mini"
+cursor = "composer-2.5"
 
 [areas.ops]
 claude = "haiku"
@@ -180,6 +210,7 @@ codex_effort = "low"
 # [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value is
 # one of luna/sol/terra, never "gpt-5.4-mini").
 opencode = "openai/gpt-5.4-mini"
+cursor = "composer-2.5"
 
 [roles.agent-factory]
 claude = "opus"
@@ -234,9 +265,6 @@ opencode = "openai/gpt-5.6-sol"
 [roles.finding-verifier.tiers.frontier]
 opencode = "openai/gpt-5.6-terra"
 
-[roles.frontend-engineer]
-opencode = "openai/gpt-5.3-codex-spark"
-
 [roles.implementer.tiers.fast]
 opencode = "openai/gpt-5.6-luna"
 
@@ -270,7 +298,6 @@ codex_effort = "medium"
 
 [roles.refactor-specialist]
 codex = "gpt-5.6-luna"
-opencode = "openai/gpt-5.3-codex-spark"
 
 [roles.runtime-verifier]
 claude = "sonnet"

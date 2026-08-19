@@ -155,7 +155,8 @@ class StrictTddCliTests(unittest.TestCase):
         ]
         axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
         _run("init", feature_id, str(spec), digest, "--state-file", str(state),
-             "--approved-by", "test", "--axes-log", str(axes_log))
+             "--approved-by", "test", "--axes-log", str(axes_log),
+             "--risk-signal", "user-asked-full-pipeline")
 
     def test_create_package_strict_tdd_defaults_false(self):
         with tempfile.TemporaryDirectory() as td:
@@ -299,7 +300,8 @@ class FreezeCandidateAndReceiptCliTests(unittest.TestCase):
         ]
         axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
         _run("init", feature_id, str(spec), digest, "--state-file", str(state),
-             "--approved-by", "test", "--axes-log", str(axes_log))
+             "--approved-by", "test", "--axes-log", str(axes_log),
+             "--risk-signal", "user-asked-full-pipeline")
 
     def _drive_to_gates(self, state, repo, package_id="PKG-01"):
         self._init(state)

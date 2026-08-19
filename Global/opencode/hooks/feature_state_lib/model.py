@@ -126,6 +126,29 @@ MODE_BUDGETS = {
     "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3},
     "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3},
 }
+# ADR-0061 (034 PKG-C): heavy-model cupo, DISTINCT from MODE_BUDGETS spawn volume.
+# Caps live only here — never duplicated onto the feature JSON (drift). Status
+# renders used/cap by reading these constants. Cheap BASE pin is PKG-B's
+# [areas.implement].opencode; classification compares --model against that cell.
+FRONTIER_CAP_PER_PACKAGE = 4
+FRONTIER_CAP_PER_FEATURE = 16
+CHEAP_IMPLEMENT_MODEL = "opencode/deepseek-v4-flash-free"
+# ADR-0064: closed list. `init --mode scoped|feature` requires one of these via
+# `--risk-signal`. Unknown token → RISK_SIGNAL_INVALID. Additive on the state
+# JSON (`data.get("risk_signal")`); no backfill of existing files.
+RISK_SIGNAL_TOKENS = frozenset({
+    "money-billing",
+    "data-migration",
+    "auth-pii",
+    "public-contract",
+    "multi-module",
+    "user-asked-full-pipeline",
+})
+MODES_REQUIRING_RISK_SIGNAL = frozenset({"scoped", "feature"})
+# ADR-0060 (034 PKG-B): cheap BASE is "base", never MODEL_TIERS[0] == "fast"
+# (that name is implementer@fast, OpenCode-only). Promotion climbs this ladder.
+WRITER_RUNGS = ("base", "balanced", "frontier")
+DEFAULT_WRITER_RUNG = "base"
 # --no-render: high-frequency intra-phase writes (record-spawn, log-narrative)
 # defer STATUS/bitacora/notes regeneration; sync-notes consolidates later.
 RENDER_SKIP = False
@@ -239,6 +262,45 @@ def parse_bool(raw: str | None, default: bool | None = None) -> bool | None:
     raise StateError(f"invalid boolean: {raw}")
 
 
+def valid_risk_signal(token: str | None) -> bool:
+    """ADR-0064: the only predicate `init` uses for --risk-signal."""
+    return bool(token) and token in RISK_SIGNAL_TOKENS
+
+
+def writer_promotion(data: dict[str, Any]) -> dict[str, Any]:
+    """ADR-0060/0062: feature-level consecutive-cheap-fail + next_rung. Additive
+    `.setdefault` so files that predate 034 stay valid. `next_rung` is never
+    `"fast"` — that is implementer@fast, not the cheap BASE cell."""
+    promo = data.setdefault("writer_promotion", {
+        "cheap_consecutive_failures": 0,
+        "next_rung": DEFAULT_WRITER_RUNG,
+    })
+    if not isinstance(promo, dict):
+        promo = {"cheap_consecutive_failures": 0, "next_rung": DEFAULT_WRITER_RUNG}
+        data["writer_promotion"] = promo
+    promo.setdefault("cheap_consecutive_failures", 0)
+    rung = promo.get("next_rung") or DEFAULT_WRITER_RUNG
+    if rung not in WRITER_RUNGS:
+        rung = DEFAULT_WRITER_RUNG
+    promo["next_rung"] = rung
+    return promo
+
+
+def resolve_next_writer_rung(data: dict[str, Any]) -> str:
+    """create-package copies this onto package.writer_rung. Absent / "fast" → base."""
+    return writer_promotion(data)["next_rung"]
+
+
+def promote_next_rung(promo: dict[str, Any]) -> str:
+    """One step up the 034 ladder after 2 consecutive cheap misses. Caps at frontier."""
+    current = promo.get("next_rung") or DEFAULT_WRITER_RUNG
+    if current not in WRITER_RUNGS:
+        current = DEFAULT_WRITER_RUNG
+    idx = WRITER_RUNGS.index(current)
+    promo["next_rung"] = WRITER_RUNGS[min(idx + 1, len(WRITER_RUNGS) - 1)]
+    return promo["next_rung"]
+
+
 def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any]:
     stamp = now()
     return {
@@ -271,6 +333,16 @@ def base_state(feature_id: str, spec_path: str, spec_hash: str) -> dict[str, Any
         "history": [],
         "final_state": None,
         "updated_at": stamp,
+        # ADR-0060 / ADR-0062 (034 PKG-B): additive .get() — old feature files
+        # without this key read as consecutive=0 / next_rung=base. Never "fast":
+        # that name is implementer@fast (MODEL_TIERS[0]), not the cheap BASE cell.
+        "writer_promotion": {
+            "cheap_consecutive_failures": 0,
+            "next_rung": DEFAULT_WRITER_RUNG,
+        },
+        # ADR-0061 (034 PKG-C): additive .get() default 0. Cap is the constant
+        # FRONTIER_CAP_PER_FEATURE, never stored beside this integer.
+        "frontier_used": 0,
     }
 
 
@@ -344,6 +416,16 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         # `record-module-impact --module-impact-waived --reason`. Mutually exclusive in practice with
         # a non-empty module_impacts (a package either documents its impact or declares why not).
         "module_impact_waiver": None,
+        # ADR-0062 (034 PKG-B): additive .get() — absent salvage is None (no
+        # salvage). writer_rung defaults to BASE, never "fast". cheap_strike_recorded
+        # latches the +1 consecutive so cheap-red + salvage-red in one package
+        # cannot count as two.
+        "salvage": None,
+        "writer_rung": DEFAULT_WRITER_RUNG,
+        "cheap_strike_recorded": False,
+        # ADR-0061 (034 PKG-C): additive .get() default 0. Cap is the constant
+        # FRONTIER_CAP_PER_PACKAGE, never stored on the package.
+        "frontier_used": 0,
     }
 
 
@@ -587,6 +669,61 @@ def spawn_budget_label(used: int, ceiling: int) -> str:
     return label
 
 
+def is_cheap_default_model(model: str | None) -> bool:
+    """True iff `model` is PKG-B's cheap BASE cell (ADR-0060), full slug or id."""
+    if not model:
+        return False
+    text = str(model).strip()
+    if not text:
+        return False
+    cheap_id = CHEAP_IMPLEMENT_MODEL.split("/", 1)[-1]
+    return text == CHEAP_IMPLEMENT_MODEL or text == cheap_id
+
+
+def is_frontier_spawn(model: str | None, role: str | None,
+                      commands: list[str] | None = None) -> bool:
+    """ADR-0061: a spawn counts as frontier when ALL of: --model present, model
+    is not the cheap default, role is not local-gate-runner.
+    Heavy --model + P001 --command on implementer/repair-agent/package-reviewer
+    still counts (SEC-001). Honest P001 exemption is the local-gate-runner role
+    (033 AC-6.2). `commands` stays in the signature for additive callers.
+    Absent --model does not increment (additive for old callers)."""
+    if not (model or "").strip():
+        return False
+    if (role or "") == "local-gate-runner":
+        return False
+    if is_cheap_default_model(model):
+        return False
+    return True
+
+
+def frontier_used(data: dict[str, Any], package: dict[str, Any] | None = None) -> int:
+    """Additive .get() default 0 — files that predate 034 PKG-C stay valid."""
+    if package is not None:
+        return int(package.get("frontier_used") or 0)
+    return int(data.get("frontier_used") or 0)
+
+
+def frontier_budget_counts(data: dict[str, Any],
+                           package: dict[str, Any] | None = None) -> tuple[int, int]:
+    """used/cap. Cap is the constant, never a JSON field."""
+    if package is not None:
+        return frontier_used(data, package), FRONTIER_CAP_PER_PACKAGE
+    return frontier_used(data), FRONTIER_CAP_PER_FEATURE
+
+
+def frontier_budget_label(data: dict[str, Any],
+                          package: dict[str, Any] | None = None) -> str:
+    pkg_used, pkg_cap = frontier_budget_counts(data, package) if package is not None else (
+        frontier_used(data, None), FRONTIER_CAP_PER_PACKAGE
+    )
+    if package is not None:
+        feat_used, feat_cap = frontier_budget_counts(data, None)
+        return f"{pkg_used}/{pkg_cap} pkg · {feat_used}/{feat_cap} feat"
+    feat_used, feat_cap = frontier_budget_counts(data, None)
+    return f"{feat_used}/{feat_cap}"
+
+
 def package_by_id(data: dict[str, Any], package_id: str | None = None) -> dict[str, Any]:
     pid = package_id or data.get("current_package_id")
     if not pid:
@@ -626,6 +763,20 @@ def required_gates(package: dict[str, Any]) -> list[dict[str, Any]]:
 
 def failing_required_gates(package: dict[str, Any]) -> list[str]:
     return [gate.get("name", "<unnamed>") for gate in required_gates(package) if gate.get("status") != "pass"]
+
+
+def reset_consecutive_if_package_green_on_first(data: dict[str, Any], package: dict[str, Any]) -> None:
+    """AC-B.6: reset the feature consecutive counter only when the cheap writer
+    closed the PACKAGE green-on-first-attempt — every recorded required gate
+    passed, salvage is None, this package never struck. A single named-gate
+    pass on a still-open package is not enough (F-B01)."""
+    if package.get("salvage") is not None:
+        return
+    if package.get("cheap_strike_recorded"):
+        return
+    if not required_gates(package) or failing_required_gates(package):
+        return
+    writer_promotion(data)["cheap_consecutive_failures"] = 0
 
 
 def tasks_complete(package: dict[str, Any]) -> bool:

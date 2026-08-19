@@ -1,7 +1,7 @@
 ---
 description: "Integrator \u2014 integrate accepted packages and run global consistency checks"
 mode: subagent
-model: openai/gpt-5.6-fast
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 steps: 20
 hidden: true

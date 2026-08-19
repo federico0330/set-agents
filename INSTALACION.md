@@ -60,6 +60,7 @@ Esc/Ctrl-C volver) con estas opciones, en orden:
 - Actualizar
 - Modelos (panel compacto; fijar por área/rol; suscripciones tri-estado; descubiertos)
 - Herramientas (CLIs)
+- Proponer herramienta nueva
 - MCPs
 - Plugins Claude Code
 - Vault Obsidian
@@ -74,8 +75,9 @@ Esc/Ctrl-C volver) con estas opciones, en orden:
   Reglas y slash commands NO tienen ubicación global en Cursor, así que entran por proyecto:
   `python3 ai/scripts/bootstrap_project.py <proyecto>` escribe `.cursor/rules/00-harness.mdc`
   (`alwaysApply: true`, la doctrina del harness en cada sesión) y `.cursor/commands/*.md`.
-  Ningún rol fija modelo: todos heredan el que elijas en Cursor. No se instalan hooks de evento,
-  así que la política de comandos del harness no corre ahí.
+  Cada rol pinnea `model:` desde `models.toml` (escritor barato, juez en otra familia;
+  `inherit` en un reviewer está prohibido). No se instalan hooks de evento, así que la
+  política de comandos del harness no corre ahí.
 - **MCPs**: agrega servers (supabase, context7, playwright) a los harnesses que detecte
   instalados: opencode, claude, codex, y también cursor y gemini CLI si están. En opencode se
   agregan apagados (política del repo) y se togglean desde el menú.

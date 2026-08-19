@@ -64,7 +64,8 @@ class RepairCeilingCliTests(unittest.TestCase):
         ]
         axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
         _run("init", feature_id, str(spec), digest, "--state-file", str(state),
-             "--approved-by", "test", "--axes-log", str(axes_log))
+             "--approved-by", "test", "--axes-log", str(axes_log),
+             "--risk-signal", "user-asked-full-pipeline")
 
     def _drive_to_review_required(self, state, repo, base_sha, candidate_sha,
                                   complexity="small", package_id="PKG-01"):

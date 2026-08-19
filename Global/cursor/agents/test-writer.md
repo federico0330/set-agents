@@ -1,7 +1,7 @@
 ---
 name: test-writer
 description: "Test-Writer \u2014 end-stage regression tests after package convergence"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

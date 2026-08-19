@@ -1,7 +1,7 @@
 ---
 name: package-planner
 description: "Package-Planner \u2014 coherent package decomposition after spec approval"
-model: inherit
+model: claude-opus-5
 readonly: false
 ---
 

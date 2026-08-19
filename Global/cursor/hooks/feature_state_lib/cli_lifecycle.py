@@ -151,10 +151,20 @@ def cmd_init(args: argparse.Namespace) -> int:
     path = Path(args.state_file) if args.state_file else state_path(args.feature_id)
     if path.exists() and not args.force:
         raise StateError(f"state exists: {path}")
+    token = getattr(args, "risk_signal", None) or None
+    if args.mode in model.MODES_REQUIRING_RISK_SIGNAL:
+        if not token:
+            raise StateError("RISK_SIGNAL_REQUIRED")
+        if not model.valid_risk_signal(token):
+            raise StateError("RISK_SIGNAL_INVALID")
+    elif token and not model.valid_risk_signal(token):
+        raise StateError("RISK_SIGNAL_INVALID")
     verify_spec_hash(args.spec_path, args.spec_hash)
     data = base_state(args.feature_id, args.spec_path, args.spec_hash)
     data["acceptance_criteria"] = args.ac or []
     data["mode"] = args.mode
+    if token:
+        data["risk_signal"] = token
     data["budgets"].update(MODE_BUDGETS[args.mode])
     axes_path = axes.axes_log_path(path, getattr(args, "axes_log", None))
     axes_rows = axes.read_axes_log(axes_path)
@@ -266,6 +276,11 @@ def cmd_transition(args: argparse.Namespace) -> int:
             package = package_by_id(data, args.package_id)
             if args.to_phase not in {"INTEGRATION", "DONE"}:
                 package["status"] = args.to_phase.lower()
+            # F-B01 / AC-B.6: PACKAGE_GATES completion is when the cheap writer
+            # closed the package. Reset consecutive only if that close was
+            # green-on-first (all required gates pass, salvage None, never struck).
+            if from_phase == "PACKAGE_GATES" and args.to_phase == "PACKAGE_REVIEW":
+                model.reset_consecutive_if_package_green_on_first(data, package)
         if args.to_phase == "PACKAGE_REPAIR":
             # A manual transition (e.g. orchestrator override) is a sixth entry point
             # into PACKAGE_REPAIR that does not know WHY the package is here -- unlike
@@ -307,6 +322,8 @@ def cmd_create_package(args: argparse.Namespace) -> int:
         if any(package.get("package_id") == args.package_id for package in data.get("packages", [])):
             return False
         package = compact_package(args.package_id, args.objective)
+        # ADR-0060: copy the feature's next_rung onto this package. Absent / "fast" → base.
+        package["writer_rung"] = model.resolve_next_writer_rung(data)
         package["acceptance_criteria"] = args.ac or []
         package["dependencies"] = args.depends_on or []
         package["owned_paths"] = args.owned_path or []
@@ -447,13 +464,16 @@ def block_with_reason(data: dict[str, Any], actor: str, package_id: str | None, 
     produced this block -- structured, never inferred from `reason`'s prose (that string is
     free text on several call sites, e.g. `args.evidence or "package testing blocked"`, and
     matching against it would repeat the exact SEC-001 mistake `coord_policy.py` documents
-    as expensive). `cmd_reopen` reads this key back to reset ONLY that one counter. Two
-    shapes, both closed vocabularies:
+    as expensive). `cmd_reopen` reads this key back to reset ONLY that one counter. Three
+    shapes, all closed vocabularies (ADR-0061 added `frontier`):
       - `{"scope": "attempts", "key": <name>}` for a `package["attempts"][<name>]` counter
         (spawns, deep_review_cycles, gate_failures, verifications, verification_waivers).
       - `{"scope": "finding", "key": "repair_attempts", "finding_id": <id>}` for the
         per-finding `repair_attempts` counter `record-repair` enforces -- it lives on the
         finding, not on `package["attempts"]`, so it needs its own finding_id to locate.
+      - `{"scope": "frontier", "key": "used", "grain": "package"|"feature"}` for
+        `frontier_used`, which does NOT live under `attempts` (ADR-0061: mixing it there
+        would collapse the two budgets this package exists to keep apart).
     Omitted (the default) for every block that is not a budget exhaustion -- a manual
     `cmd_block`, or a verdict/testing/runtime-QA refusal the caller phrases in free text.
     `cmd_reopen` then resets nothing for that blocker, which is also what happens for every
@@ -483,7 +503,25 @@ def _reset_blocker_counter(data: dict[str, Any], blocker: dict[str, Any]) -> Non
     scope = counter.get("scope")
     key = counter.get("key")
     package_id = blocker.get("package_id")
-    if scope not in {"attempts", "finding"} or not key or not package_id:
+    if not key:
+        return
+    # ADR-0061: third closed shape. frontier_used is NOT under attempts.
+    if scope == "frontier":
+        if key != "used":
+            return
+        grain = counter.get("grain")
+        if grain == "feature":
+            data["frontier_used"] = 0
+            return
+        if grain != "package" or not package_id:
+            return
+        try:
+            package = package_by_id(data, package_id)
+        except StateError:
+            return
+        package["frontier_used"] = 0
+        return
+    if scope not in {"attempts", "finding"} or not package_id:
         return
     try:
         package = package_by_id(data, package_id)

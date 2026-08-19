@@ -1,7 +1,7 @@
 ---
 name: refactor-specialist
 description: "Refactor-Specialist \u2014 behavior-preserving refactors under a test net"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

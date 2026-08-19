@@ -1,7 +1,7 @@
 ---
 name: repair-agent
 description: "Repair-Agent \u2014 consolidated repair of package findings"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

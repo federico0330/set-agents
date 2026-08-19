@@ -1,7 +1,7 @@
 ---
 name: memory-scribe
 description: "Memory scribe \u2014 local-first durable verified learning"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

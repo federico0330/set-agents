@@ -67,6 +67,11 @@ FIELDS = ("input", "output", "cache_read", "cache_write", "reasoning")
 # Duplicated, not imported (AC-16, see `_pi_project_key`'s docstring for why this module
 # never imports repo-local code) -- pinned against the real constant by a test instead.
 _DAY_MS = 86400000
+# ADR-0060 / ADR-0061 (034 PKG-C): duplicated, not imported (AC-16). Tests pin
+# these against feature_state_lib.model so the reporter cannot drift from the
+# state machine. Caps are NEVER persisted on the feature JSON.
+_CHEAP_IMPLEMENT_MODEL = "opencode/deepseek-v4-flash-free"
+_FRONTIER_CAP_PER_FEATURE = 16
 
 
 def parse_args():
@@ -481,6 +486,140 @@ def collect_feature_spawns(report, project, since_ms):
             })
 
 
+def _is_cheap_implement_model(model):
+    """PKG-B cheap BASE cell. Full slug or trailing id. Duplicated (AC-16)."""
+    if not model:
+        return False
+    text = str(model).strip()
+    cheap_id = _CHEAP_IMPLEMENT_MODEL.split("/", 1)[-1]
+    return text == _CHEAP_IMPLEMENT_MODEL or text == cheap_id
+
+
+def _package_reached_gate(package):
+    gates = [g for g in (package.get("gates") or []) if isinstance(g, dict)]
+    return any(g.get("status") in {"pass", "fail", "blocked"} for g in gates)
+
+
+def _required_gates_all_pass(package):
+    required = [
+        g for g in (package.get("gates") or [])
+        if isinstance(g, dict) and g.get("required", True)
+    ]
+    return bool(required) and all(g.get("status") == "pass" for g in required)
+
+
+def _package_has_implementer_cheap(package, since_ms):
+    """True iff this package recorded an implementer spawn on the cheap default.
+
+    History fallback matches `_iter_recorded_spawns`: only when spawns[] is empty.
+    A spawn before --since is ignored (the package stays outside the universe).
+    """
+    spawns = [item for item in (package.get("spawns") or []) if isinstance(item, dict)]
+    if not spawns:
+        return False
+    for item in spawns:
+        if item.get("role") != "implementer":
+            continue
+        if not _is_cheap_implement_model(item.get("model")):
+            continue
+        stamp_ms = _iso_to_ms(item.get("at"))
+        if since_ms and stamp_ms is not None and stamp_ms < since_ms:
+            continue
+        return True
+    return False
+
+
+def green_on_first_attempt_outcome(package, since_ms=None):
+    """AC-C.6 derived metric. Returns True/False for universe members, None if outside.
+
+    Numerador: required gates all pass AND salvage is None.
+    Denominador: implementer-cheap that reached a package gate (incl. salvage / red).
+    Salvage-green is NOT first-attempt — it stays in the denominator only.
+    Package without that spawn or without a gate → None (not 0%, not 100%).
+    """
+    if not _package_has_implementer_cheap(package, since_ms):
+        return None
+    if not _package_reached_gate(package):
+        return None
+    if package.get("salvage") is not None:
+        return False
+    return _required_gates_all_pass(package)
+
+
+def collect_organic_quota(project, since_ms):
+    """Per-feature % green-on-first-attempt + frontier_used/cap. Derived, not persisted."""
+    rows = []
+    if not project:
+        return rows
+    features_dir = Path(project) / "ai" / "state" / "features"
+    if not features_dir.is_dir():
+        return rows
+    for path in sorted(features_dir.glob("*.json")):
+        if path.name.startswith("_"):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        feature_id = data.get("feature_id") or path.stem
+        numerator = 0
+        denominator = 0
+        for package in data.get("packages") or []:
+            if not isinstance(package, dict):
+                continue
+            outcome = green_on_first_attempt_outcome(package, since_ms)
+            if outcome is None:
+                continue
+            denominator += 1
+            if outcome:
+                numerator += 1
+        rows.append({
+            "feature_id": feature_id,
+            "numerator": numerator,
+            "denominator": denominator,
+            "frontier_used": int(data.get("frontier_used") or 0),
+            "frontier_cap": _FRONTIER_CAP_PER_FEATURE,
+        })
+    return rows
+
+
+def render_organic_quota(rows, md):
+    """Section 2 companion: % green-on-first-attempt + frontier. Never a S1+S2 total."""
+    heading = (
+        "Section 2 -- % green-on-first-attempt (implementer-cheap that reached a "
+        "package gate; derived, not persisted) + frontier_used/cap"
+    )
+    if md:
+        print(f"## {heading}")
+    else:
+        print(heading)
+        print("=" * len(heading))
+    if not rows:
+        print("No feature state matched.")
+        print()
+        return
+    total_num = 0
+    total_den = 0
+    for row in rows:
+        total_num += row["numerator"]
+        total_den += row["denominator"]
+        frontier = f"{row['frontier_used']}/{row['frontier_cap']}"
+        if row["denominator"] == 0:
+            pct = "n/a (fuera del denominador)"
+        else:
+            pct = f"{row['numerator']}/{row['denominator']} ({100 * row['numerator'] / row['denominator']:.0f}%)"
+        line = f"{row['feature_id']}: {pct}  frontier {frontier}"
+        print(line)
+    if total_den == 0:
+        total_pct = "n/a (fuera del denominador)"
+    else:
+        total_pct = f"{total_num}/{total_den} ({100 * total_num / total_den:.0f}%)"
+    print(f"TOTAL (this filter, Section 2 only): {total_pct}")
+    print()
+
+
 # ---------------------------------------------------------------------------------------
 # 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) -- ESTIMATED remaining quota,
 # read from `usage_rollups` (schema 9, PKG-B3). Tokens only, same "what matters is quota"
@@ -740,6 +879,8 @@ def main():
         render(spawn_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
     else:
         render(pi_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
+    organic = collect_organic_quota(args.project, since_ms)
+    render_organic_quota(organic, args.md)
     print(_NEVER_SUM_DISCLAIMER)
     print()
 

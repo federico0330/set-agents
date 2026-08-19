@@ -15,7 +15,7 @@ Probe not touched: `tests/__init__.py:420-428` (verified after the diff).
 | AC-4.2.8 | Reads tracked archive `docs/historia/estado-2026-08/decisions-log.jsonl` with `encoding="utf-8"` (`tests/test_harness.py:6188-6199`). | `test_adr_0017_and_0007_amendment_and_superseding_decision_recorded` OK. `git ls-files` lists the archive; live `ai/state/decisions-log.jsonl` is gitignored (ADR-0047). |
 | AC-4.3 | `.github/workflows/ci.yml:70-85` prints `WINDOWS_BOOTSTRAP_SKIPS` and fails if `skips > 660`. Parser `tests/test_harness.py:74-81`. Pins `:10452`, `:10461`. | Both new tests OK. Bites below. Ceiling = 654 (spec, 2026-08-18) + 4 AC-4.1 sites + case 6 + cursor-tree drift now gated by `run()`. |
 | AC-4.4 | Stream handshake, no extra sleep (`tests/test_provider_registry.py:297-330`). `tui.py` not edited. | Focused unittest OK in 1.395s with the cheap bundle. |
-| AC-4.5 | Not this spawn. Ceiling is ready; orchestrator cites the CI SHA at package close. | — |
+| AC-4.5 | Ceiling `"669"` in `.github/workflows/ci.yml`; pin `tests/test_harness.py` `test_windows_bootstrap_job_pins_a_skip_ceiling` matches `669`. | SHA `8fd15fe72af2a97cbc9924af6cbc509d76cf2fdc`, run https://github.com/federico0330/set-agents/actions/runs/32208953619 conclusion `success`. Jobs: verify-linux `95937605524`, verify-macos `95937605592`, windows-bootstrap `95937605514` — all `success` in that run (`gh run view 32208953619 --json conclusion,headSha,jobs`). |
 
 `./build.sh --check` → `BUILD_CHECK_PASS` + `GLOBAL_TREE_SYNC_OK profile=go-zen harnesses=5`. `git diff --check` clean. Probe `tests/__init__.py:420-428` unchanged.
 

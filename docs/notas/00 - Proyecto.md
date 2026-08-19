@@ -32,7 +32,8 @@
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
-- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `PACKAGE_GATES` · paquetes 2/6
+- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `INTEGRATION` · paquetes 6/6
+- [[features/034-cuota-organica-y-writer-barato|034-cuota-organica-y-writer-barato]] — fase `DONE` · paquetes 4/4 · **DONE**
 
 ## Qué falta
 
@@ -43,7 +44,7 @@
 - **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
 - **011-quota-failover** 5 tareas pendientes en P1-quota-failover
 - **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
-- **033-menos-espera-menos-cuota** → falta registrar la referencia del diff integrado; el paquete todavía no está integrado localmente
+- **033-menos-espera-menos-cuota** → faltan correr los gates globales finales
 
 ## Quick-fixes recientes
 
@@ -55,14 +56,14 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-18 033-pkg5-digest-no-ensucia-owned-paths|Digest no ensucia el diff de un paquete con bitacoras ajenas]]
-- [[decisiones/2026-08-18 033-pkg5-verify-reporter-modulo-python|El presenter del gate vive en un modulo Python testeable, no en el shell]]
-- [[decisiones/2026-08-18 033-pkg4-commit-antes-del-freeze|PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git]]
-- [[decisiones/2026-08-18 033-review-mismo-modelo-contexto-limpio|Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada]]
-- [[decisiones/2026-08-18 orden-paquetes-033-ci-gate-consola-lane|Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final]]
-- [[decisiones/2026-08-18 por-que-el-harness-agota-cuotas-convierte-un-prompt-humano-en-n-prompts-de-proveedor|Por que el harness agota cuotas: convierte un prompt humano en N prompts de proveedor]]
-- [[decisiones/2026-08-18 en-cursor-no-se-instalan-hooks-de-evento-en-esta-version|En Cursor no se instalan hooks de evento en esta version]]
-- [[decisiones/2026-08-18 cursor-entra-como-runtime-anfitrion-nunca-como-lane-de-ruteo|Cursor entra como runtime anfitrion, nunca como lane de ruteo]]
+- [[decisiones/2026-08-19 034-consola-no-copia-gentle-tui|No copiar la TUI de Gentle; SET ya cubre install/update/sync]]
+- [[decisiones/2026-08-19 034-memory-scribe-sin-record-spawn|memory-scribe al cierre sin gastar el techo 12]]
+- [[decisiones/2026-08-19 034-skip-test-writer-bites-already-landed|No spawn test-writer: cada AC ya tiene mordida]]
+- [[decisiones/2026-08-19 034-pkg-d-owned-path-exceptions|Excepciones PKG-D: arboles emitidos y suciedad A/B/C]]
+- [[decisiones/2026-08-19 034-pkg-c-owned-path-exceptions|Excepciones PKG-C: suciedad de A/B, espejos y docs]]
+- [[decisiones/2026-08-19 034-pkg-b-triage-skill-preexisting|PKG-B waiver del skill de triage que ya cambio el lote anterior]]
+- [[decisiones/2026-08-19 034-pkg-b-owned-path-exceptions|Excepciones de ownership PKG-B: lifecycle, espejos y docs vivos]]
+- [[decisiones/2026-08-19 034-pkg-a-owned-path-exceptions|Excepciones de ownership PKG-A: docs vivos, spec 034 y suciedad 033]]
 
 ## Convenciones
 
@@ -71,13 +72,14 @@
 | 031-registro-correctivo | 10/10 | n/a, notas |
 | 032-cursor-como-runtime | 10/10 | n/a, request |
 | 033-menos-espera-menos-cuota | 10/10 | n/a, request |
+| 034-cuota-organica-y-writer-barato | 10/10 | adr, n/a, notas |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-18T20:06:44+00:00_
+_Actualizado: 2026-08-19T18:29:58+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

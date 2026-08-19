@@ -1,6 +1,9 @@
 # ADR-0020 — Direct-read vs. delegated-explore threshold: a file-count rule for the orchestrator's own reading, not a new delegation mechanism
 
-- Estado: Accepted (2026-08-03). Adopted after studying `gentle-ai`'s (Gentleman Programming) RDD/SDD
+- Estado: Accepted (2026-08-03). **Amended in part by ADR-0064** (Accepted 2026-08-19): write-side
+  mode selection is an `init --risk-signal` CLI gate; the number 3 as a
+  cross-referenced constant does not change; the read-side table is untouched.
+  Adopted after studying `gentle-ai`'s (Gentleman Programming) RDD/SDD
   orchestrator delegation-rules table, contrasted against SET-AGENTES's existing mode-selection doctrine.
   First of five ADRs (0020-0024) tracking the RDD-inspired integration; the other four (integration receipt,
   evidence-based risk escalation, bounded repair ceiling, strict-TDD opt-in) are separate, larger packages not

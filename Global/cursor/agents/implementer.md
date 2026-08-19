@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: "Implementer \u2014 bounded package work with local validation, no self-approval"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

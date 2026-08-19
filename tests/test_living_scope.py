@@ -44,7 +44,8 @@ def _init_feature(tmp: Path, fid="020-scope"):
     (tmp / "ai/state/features").mkdir(parents=True, exist_ok=True)
     axes_log = _axes_log(tmp, fid)
     _run(tmp, "init", fid, str(spec.relative_to(tmp)), digest,
-         "--approved-by", "tester", "--ac", "AC-01", "--axes-log", str(axes_log), check=True)
+         "--approved-by", "tester", "--ac", "AC-01", "--axes-log", str(axes_log),
+         "--risk-signal", "user-asked-full-pipeline", check=True)
     return fid, spec
 
 

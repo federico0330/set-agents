@@ -331,6 +331,15 @@ def init_state(state, *extra, feature_id="feat", body="# contract\n", check=True
                      "realtime", "mobile", "auth", "cost", "legal")
     ]
     axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+    extra = list(extra)
+    if "--risk-signal" not in extra:
+        mode = None
+        for index, token in enumerate(extra):
+            if token == "--mode" and index + 1 < len(extra):
+                mode = extra[index + 1]
+                break
+        if mode not in {"quick-fix", "incident"}:
+            extra.extend(["--risk-signal", "user-asked-full-pipeline"])
     return run("python3", str(FEATURE_STATE), "init", feature_id, str(spec),
                spec_digest(state, feature_id),
                "--state-file", str(state), "--approved-by", "test",
@@ -736,17 +745,36 @@ class HarnessTests(unittest.TestCase):
             row["role"]: row
             for row in mc.load_roles(ROOT / "roles.tsv", ROOT / "models.toml")
         }
-        # Hot path latency policy, ADR-0044: measured, `-fast` is a naming convention that only
-        # exists on opencode's `openai` provider (`gpt-5.6-{luna,sol,terra}-fast`) -- neither
-        # opencode-go (18 ids) nor opencode-zen (61 ids) ships a single `-fast` variant. So this
-        # assertion never meant "low latency"; it meant "must be OpenAI". `orchestrator` is
-        # dropped from this loop on purpose: it is a single long-lived coordinator instance, not
-        # a high-volume dispatch, so sub-second `-fast` latency is not its selection criterion --
-        # [areas.coord].opencode is free to be a non-GPT model (see models.toml). `implementer`
-        # and `product-analyst` stay: they are the two high-volume hot-path roles that still want
-        # the low-latency variant, and this loop must keep failing if either loses it.
-        for role in ("implementer", "product-analyst"):
-            self.assertTrue(rows[role]["opencode_model"].endswith("-fast"), role)
+        # 034 / ADR-0060 amends the ADR-0044 hot-path reason. 0044 measured that `-fast`
+        # only exists on opencode's `openai` provider, so the old loop
+        # (`implementer`, `product-analyst`) never meant "low latency": it meant "must
+        # be OpenAI". 0044 dropped `orchestrator` from that loop (coordinator is one
+        # long-lived instance). 034 drops `product-analyst` the same way: it is
+        # docs-rw / class `decision` (ADR-0018, roles.tsv), not a code-rw writer, and
+        # no test may force it to `-fast` or `-free` (AC-B.3). The volume that 034
+        # actually spends is the writer: every `code-rw` BASE cell is the cheapest
+        # living catalog id that still has the writer tools floor, `billing_rank==0`
+        # (prefer `-free` among rank 0). `implementer@fast` / writer_tier=fast is the
+        # OpenCode-only @tier ladder, never the feature-new default.
+        from routing_core.catalog import billing_rank as _billing_rank
+
+        def opencode_cell_rank(model_id):
+            prefix, _, name = model_id.partition("/")
+            provider = {
+                "opencode": "opencode-zen",
+                "opencode-go": "opencode-go",
+                "openai": "opencode-zen",  # OpenCode openai/* is zen-metered, not openai-codex
+            }.get(prefix, prefix)
+            return _billing_rank(provider, name)
+
+        for role in ("implementer", "debugger"):
+            model_id = rows[role]["opencode_model"]
+            self.assertFalse(model_id.endswith("-fast"), role)
+            self.assertEqual(opencode_cell_rank(model_id), 0, role)
+        self.assertEqual(
+            rows["repair-agent"]["opencode_model"],
+            rows["implementer"]["opencode_model"],
+        )
         # Reviewers stay on the deep-reasoning family, distinct from the implementer's.
         # 015-anthropic-dispatch-parity AC-06(a): [areas.audit].opencode."go-zen" moved off
         # "openai/gpt-5.6-sol" (a same-provider-and-same-model collision with
@@ -764,6 +792,621 @@ class HarnessTests(unittest.TestCase):
                 mc.family("opencode_model", rows[role]["opencode_model"], {}),
                 mc.family("opencode_model", rows["implementer"]["opencode_model"], {}),
             )
+
+    def test_product_analyst_is_not_forced_to_fast_or_free(self):
+        # AC-B.3 / AC-B.7: product-analyst left the -fast loop the same way 0044
+        # dropped orchestrator. No remaining assert in this module may require it
+        # to end with -fast or -free.
+        source = Path(__file__).read_text(encoding="utf-8")
+        self.assertNotRegex(
+            source,
+            r'for role in \("implementer", "product-analyst"\)',
+        )
+        self.assertNotRegex(
+            source,
+            r'product-analyst.*endswith\("-fast"\)',
+        )
+
+    def test_new_feature_does_not_dispatch_implementer_at_fast(self):
+        # AC-B.1 / AC-B.6: feature-new default is BASE, never writer_tier=fast.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--ac", "AC-1", "--no-render")
+            data = json.loads(state.read_text())
+            promo = data.get("writer_promotion") or {}
+            self.assertEqual(promo.get("next_rung"), "base")
+            self.assertNotEqual(promo.get("next_rung"), "fast")
+            self.assertEqual(promo.get("cheap_consecutive_failures"), 0)
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "small", "--no-render",
+            )
+            data = json.loads(state.read_text())
+            package = data["packages"][0]
+            self.assertEqual(package.get("writer_rung"), "base")
+            self.assertNotEqual(package.get("selected_role"), "implementer@fast")
+            model = package.get("selected_model") or ""
+            self.assertFalse(str(model).endswith("@fast"))
+            self.assertFalse(str(model).endswith("implementer@fast"))
+
+    def _package_at_gates(self, td, package_id="PKG-01"):
+        state = Path(td) / "feature.json"
+        init_state(state, "--ac", "AC-1", "--no-render")
+        self.run_state(
+            state, "create-package", package_id, "Slice",
+            "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+            "--owned-path", "src/**", "--complexity", "small", "--no-render",
+        )
+        write_context_pack(state, package_id=package_id)
+        self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION",
+                       "--package-id", package_id, "--no-render")
+        for task_id in ("T-001", "T-002"):
+            self.run_state(state, "complete-task", package_id, task_id,
+                           "--actor", "implementer", "--validation", "focused-test",
+                           "--no-render")
+        self.run_state(state, "transition", "PACKAGE_GATES",
+                       "--package-id", package_id, "--no-render")
+        return state
+
+    def _next_package_at_gates(self, state, package_id):
+        data = json.loads(state.read_text())
+        data["phase"] = "PACKAGE_PLANNING"
+        data["final_state"] = None
+        state.write_text(json.dumps(data, indent=2) + "\n")
+        self.run_state(
+            state, "create-package", package_id, f"Slice {package_id}",
+            "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+            "--owned-path", "src/**", "--complexity", "small", "--no-render",
+        )
+        write_context_pack(state, package_id=package_id)
+        self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION",
+                       "--package-id", package_id, "--no-render")
+        for task_id in ("T-001", "T-002"):
+            self.run_state(state, "complete-task", package_id, task_id,
+                           "--actor", "implementer", "--validation", "focused-test",
+                           "--no-render")
+        self.run_state(state, "transition", "PACKAGE_GATES",
+                       "--package-id", package_id, "--no-render")
+        return state
+
+    def test_cheap_red_plus_salvage_red_counts_one_consecutive(self):
+        # AC-B.6: cheap-red + salvage-red in the SAME package = 1 consecutive, not 2.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td)
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-01", "--evidence", "cheap miss",
+                           "--no-render")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 1)
+            self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--model", "openai/gpt-5.6-terra",
+                "--purpose", "salvage", "--no-render",
+            )
+            data = json.loads(state.read_text())
+            salvage = data["packages"][0]["salvage"]
+            self.assertEqual(salvage["role"], "repair-agent")
+            self.assertEqual(salvage["model"], "openai/gpt-5.6-terra")
+            self.assertTrue(salvage["spawn_id"])
+            blocked = self.run_state(
+                state, "record-gate", "package verify", "fail",
+                "--package-id", "PKG-01", "--evidence", "salvage miss",
+                "--no-render", check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(blocked.returncode, 0)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("HUMAN_DECISION_REQUIRED", json.dumps(data["blockers"]))
+        self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 1)
+
+    def test_second_salvage_is_rejected(self):
+        # AC-B.4 / AC-B.5: second --salvage → SALVAGE_ALREADY_USED + block.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td)
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-01", "--evidence", "cheap miss",
+                           "--no-render")
+            self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--model", "openai/gpt-5.6-terra", "--no-render",
+            )
+            rejected = self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--model", "openai/gpt-5.6-terra", "--no-render",
+                check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(rejected.returncode, 0)
+        self.assertIn("SALVAGE_ALREADY_USED", rejected.stderr)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertEqual(sum(1 for s in data["packages"][0]["spawns"] if s.get("role") == "repair-agent"), 1)
+
+    def test_two_cheap_misses_promote_next_package_off_fast(self):
+        # AC-B.6: two consecutive packages whose cheap writer was not green-on-first
+        # → next package writer_rung is heavier than base, never "fast".
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--ac", "AC-1", "--no-render")
+            for index, pid in enumerate(("PKG-01", "PKG-02"), start=1):
+                if index > 1:
+                    data = json.loads(state.read_text())
+                    data["phase"] = "PACKAGE_PLANNING"
+                    data["final_state"] = None
+                    state.write_text(json.dumps(data, indent=2) + "\n")
+                self.run_state(
+                    state, "create-package", pid, f"Slice {pid}",
+                    "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                    "--owned-path", "src/**", "--complexity", "small", "--no-render",
+                )
+                write_context_pack(state, package_id=pid)
+                self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION",
+                               "--package-id", pid, "--no-render")
+                for task_id in ("T-001", "T-002"):
+                    self.run_state(state, "complete-task", pid, task_id,
+                                   "--actor", "implementer", "--validation", "focused-test",
+                                   "--no-render")
+                self.run_state(state, "transition", "PACKAGE_GATES",
+                               "--package-id", pid, "--no-render")
+                self.run_state(state, "record-gate", "package verify", "fail",
+                               "--package-id", pid, "--evidence", "cheap miss",
+                               "--no-render")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 2)
+            self.assertEqual(data["writer_promotion"]["next_rung"], "balanced")
+            data["phase"] = "PACKAGE_PLANNING"
+            data["final_state"] = None
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            self.run_state(
+                state, "create-package", "PKG-03", "Promoted slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "small", "--no-render",
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(data["packages"][-1]["writer_rung"], "balanced")
+        self.assertNotEqual(data["packages"][-1]["writer_rung"], "fast")
+
+    def test_partial_gate_pass_does_not_reset_consecutive(self):
+        # F-B01 / AC-B.6: PKG-01 fail; PKG-02 pass-then-fail across two named
+        # gates. The first passing named gate of the still-open package must
+        # NOT reset the feature counter. Consecutive ends at 2 and the next
+        # package is writer_rung=balanced.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td, "PKG-01")
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-01", "--evidence", "cheap miss",
+                           "--no-render")
+            self._next_package_at_gates(state, "PKG-02")
+            self.run_state(state, "record-gate", "package verify", "pass",
+                           "--package-id", "PKG-02", "--evidence", "first named gate",
+                           "--no-render")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 1)
+            self.run_state(state, "record-gate", "package lint", "fail",
+                           "--package-id", "PKG-02", "--evidence", "second named gate",
+                           "--no-render")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 2)
+            self.assertEqual(data["writer_promotion"]["next_rung"], "balanced")
+            self._next_package_at_gates(state, "PKG-03")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["packages"][-1]["writer_rung"], "balanced")
+
+    def test_package_green_on_first_resets_consecutive(self):
+        # F-B01 / AC-B.6: PKG-01 fail; PKG-02 all required gates pass with
+        # salvage None (PACKAGE_GATES completion) → consecutive==0.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td, "PKG-01")
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-01", "--evidence", "cheap miss",
+                           "--no-render")
+            self._next_package_at_gates(state, "PKG-02")
+            self.run_state(state, "record-gate", "package verify", "pass",
+                           "--package-id", "PKG-02", "--evidence", "ok",
+                           "--no-render")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 1)
+            self.assertIsNone(data["packages"][-1].get("salvage"))
+            self.run_state(state, "update-package", "PKG-02",
+                           "--integrated", "true", "--diff-ref", "HEAD..work",
+                           "--no-render")
+            self.run_state(state, "transition", "PACKAGE_REVIEW",
+                           "--package-id", "PKG-02", "--no-render")
+            data = json.loads(state.read_text())
+        self.assertEqual(data["writer_promotion"]["cheap_consecutive_failures"], 0)
+        self.assertEqual(data["phase"], "PACKAGE_REVIEW")
+
+    def test_salvage_without_model_does_not_mint_salvage(self):
+        # F-B02 / AC-B.4: --salvage without a non-empty --model is rejected
+        # BEFORE minting salvage or spending the spawn slot.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td)
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-01", "--evidence", "cheap miss",
+                           "--no-render")
+            before = json.loads(state.read_text())
+            rejected = self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--no-render",
+                check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("SALVAGE_MODEL_REQUIRED", rejected.stderr)
+        self.assertIsNone(data["packages"][0].get("salvage"))
+        self.assertEqual(
+            data["packages"][0]["attempts"].get("spawns", 0),
+            before["packages"][0]["attempts"].get("spawns", 0),
+        )
+        self.assertEqual(len(data["packages"][0].get("spawns") or []),
+                         len(before["packages"][0].get("spawns") or []))
+
+    CHEAP_IMPLEMENT = "opencode/deepseek-v4-flash-free"
+    HEAVY_MODEL = "openai/gpt-5.6-terra"
+
+    def _package_ready_for_spawn(self, td, package_id="PKG-01"):
+        state = Path(td) / "feature.json"
+        init_state(state, "--ac", "AC-1", "--no-render")
+        self.run_state(
+            state, "create-package", package_id, "Slice",
+            "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+            "--owned-path", "src/**", "--complexity", "small", "--no-render",
+        )
+        return state
+
+    def test_mode_budgets_scoped_max_spawns_stays_eight(self):
+        # AC-C.1 / AC-X.2: MODE_BUDGETS.scoped.max_spawns_per_package == 8 byte-equal.
+        # Frontier caps are constants OUTSIDE that dict and are not JSON fields.
+        sys.path.insert(0, str(ROOT / "ai/scripts"))
+        from feature_state_lib.model import (
+            MODE_BUDGETS, FRONTIER_CAP_PER_PACKAGE, FRONTIER_CAP_PER_FEATURE,
+            CHEAP_IMPLEMENT_MODEL,
+        )
+        self.assertEqual(MODE_BUDGETS["scoped"]["max_spawns_per_package"], 8)
+        self.assertEqual(FRONTIER_CAP_PER_PACKAGE, 4)
+        self.assertEqual(FRONTIER_CAP_PER_FEATURE, 16)
+        self.assertEqual(CHEAP_IMPLEMENT_MODEL, self.CHEAP_IMPLEMENT)
+        source = (ROOT / "ai/scripts/feature_state_lib/model.py").read_text(encoding="utf-8")
+        scoped_row = (
+            '    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, '
+            '"max_gate_failures_per_package": 3, "max_verifications_per_package": 6},\n'
+        )
+        self.assertIn(scoped_row, source)
+        start = source.index("MODE_BUDGETS = {")
+        end = source.index("FRONTIER_CAP_PER_PACKAGE")
+        self.assertNotIn("FRONTIER_CAP", source[start:end])
+
+    def test_cheap_spawn_does_not_increment_frontier(self):
+        # AC-C.2: implementer on the PKG-B cheap default is not frontier.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_ready_for_spawn(td)
+            self.run_state(
+                state, "record-spawn", "PKG-01", "implementer",
+                "--model", self.CHEAP_IMPLEMENT, "--purpose", "cheap writer",
+                "--no-render",
+            )
+            absent = self.run_state(
+                state, "record-spawn", "PKG-01", "implementer",
+                "--purpose", "legacy caller without --model", "--no-render",
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(absent.returncode, 0)
+        self.assertEqual(data.get("frontier_used", 0), 0)
+        self.assertEqual(data["packages"][0].get("frontier_used", 0), 0)
+        self.assertEqual(data["packages"][0]["attempts"]["spawns"], 2)
+        self.assertNotIn("frontier_cap", json.dumps(data))
+        self.assertNotIn("frontier_used", data["packages"][0].get("attempts") or {})
+
+    def test_salvage_and_heavy_reviewer_increment_frontier_p001_does_not(self):
+        # AC-C.2: salvage + judge on a heavy model count; local-gate-runner / P001 do not.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td)
+            self.run_state(
+                state, "record-spawn", "PKG-01", "package-reviewer",
+                "--model", self.HEAVY_MODEL, "--purpose", "heavy judge",
+                "--no-render",
+            )
+            self.run_state(
+                state, "record-gate", "package verify", "fail",
+                "--package-id", "PKG-01", "--evidence", "cheap miss",
+                "--no-render",
+            )
+            self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--model", self.HEAVY_MODEL, "--no-render",
+            )
+            self.run_state(
+                state, "record-spawn", "PKG-01", "local-gate-runner",
+                "--model", self.HEAVY_MODEL, "--command", "git diff --check",
+                "--purpose", "P001", "--no-render",
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(data["packages"][0]["frontier_used"], 2)
+        self.assertEqual(data["frontier_used"], 2)
+        self.assertIsNotNone(data["packages"][0].get("salvage"))
+        roles = [s["role"] for s in data["packages"][0]["spawns"]]
+        self.assertIn("local-gate-runner", roles)
+        self.assertEqual(data["budgets"]["max_spawns_per_package"], 8)
+
+    def test_fifth_frontier_of_a_package_is_rejected(self):
+        # AC-C.3: 5th frontier dies with FRONTIER_CAP_EXHAUSTED; max_spawns stays 8.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state = root / "ai/state/features/feat.json"
+            state.parent.mkdir(parents=True)
+            init_state(state, "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            for index in range(4):
+                self.run_state(
+                    state, "record-spawn", "PKG-01", "package-reviewer",
+                    "--model", self.HEAVY_MODEL, "--purpose", f"j{index}",
+                )
+            blocked = self.run_state(
+                state, "record-spawn", "PKG-01", "adversarial-judge",
+                "--model", self.HEAVY_MODEL, "--purpose", "fifth",
+                check=False,
+            )
+            data = json.loads(state.read_text())
+            status = (root / "ai/state/STATUS.md").read_text(encoding="utf-8")
+        self.assertEqual(blocked.returncode, 0)
+        self.assertIn("FRONTIER_CAP_EXHAUSTED", blocked.stderr)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("HUMAN_DECISION_REQUIRED", json.dumps(data["blockers"]))
+        self.assertEqual(
+            data["blockers"][-1]["counter"],
+            {"scope": "frontier", "key": "used", "grain": "package"},
+        )
+        self.assertEqual(data["packages"][0]["frontier_used"], 4)
+        self.assertEqual(data["frontier_used"], 4)
+        self.assertEqual(len(data["packages"][0]["spawns"]), 4)
+        self.assertEqual(data["packages"][0]["attempts"]["spawns"], 4)
+        self.assertEqual(data["budgets"]["max_spawns_per_package"], 8)
+        self.assertEqual(data["packages"][0].get("attempts", {}).get("frontier_used", "absent"), "absent")
+        self.assertIn("4/4 pkg", status)
+        self.assertIn("4/16 feat", status)
+        self.assertIn("| Frontier |", status)
+
+    def test_fifth_heavy_implementer_with_p001_command_is_rejected(self):
+        # SEC-001: heavy --model + P001 --command on implementer is still frontier.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_ready_for_spawn(td)
+            for index in range(4):
+                self.run_state(
+                    state, "record-spawn", "PKG-01", "implementer",
+                    "--model", self.HEAVY_MODEL,
+                    "--command", "git diff --check",
+                    "--purpose", f"heavy+p001-{index}",
+                    "--no-render",
+                )
+            blocked = self.run_state(
+                state, "record-spawn", "PKG-01", "implementer",
+                "--model", self.HEAVY_MODEL,
+                "--command", "git diff --check",
+                "--purpose", "fifth heavy+p001",
+                "--no-render",
+                check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(blocked.returncode, 0)
+        self.assertIn("FRONTIER_CAP_EXHAUSTED", blocked.stderr)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIn("HUMAN_DECISION_REQUIRED", json.dumps(data["blockers"]))
+        self.assertEqual(data["packages"][0]["frontier_used"], 4)
+        self.assertEqual(len(data["packages"][0]["spawns"]), 4)
+
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td)
+            for index in range(4):
+                self.run_state(
+                    state, "record-spawn", "PKG-01", "package-reviewer",
+                    "--model", self.HEAVY_MODEL,
+                    "--command", "git diff --check",
+                    "--purpose", f"j{index}",
+                    "--no-render",
+                )
+            salvage = self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--model", self.HEAVY_MODEL,
+                "--command", "git diff --check",
+                "--no-render",
+                check=False,
+            )
+            after = json.loads(state.read_text())
+        self.assertEqual(salvage.returncode, 0)
+        self.assertIn("FRONTIER_CAP_EXHAUSTED", salvage.stderr)
+        self.assertEqual(after["phase"], "BLOCKED")
+        self.assertIsNone(after["packages"][0].get("salvage"))
+        self.assertEqual(after["packages"][0]["frontier_used"], 4)
+
+    def test_frontier_cap_beats_salvage_and_promotion(self):
+        # AC-C.4: cupo lleno + salvage/promote → HUMAN_DECISION_REQUIRED.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td)
+            for index in range(4):
+                self.run_state(
+                    state, "record-spawn", "PKG-01", "package-reviewer",
+                    "--model", self.HEAVY_MODEL, "--purpose", f"j{index}",
+                    "--no-render",
+                )
+            salvage = self.run_state(
+                state, "record-spawn", "PKG-01", "repair-agent",
+                "--salvage", "--model", self.HEAVY_MODEL, "--no-render",
+                check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(salvage.returncode, 0)
+        self.assertIn("FRONTIER_CAP_EXHAUSTED", salvage.stderr)
+        self.assertEqual(data["phase"], "BLOCKED")
+        self.assertIsNone(data["packages"][0].get("salvage"))
+        self.assertEqual(data["packages"][0]["frontier_used"], 4)
+
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_at_gates(td, "PKG-01")
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-01", "--evidence", "cheap miss",
+                           "--no-render")
+            self._next_package_at_gates(state, "PKG-02")
+            self.run_state(state, "record-gate", "package verify", "fail",
+                           "--package-id", "PKG-02", "--evidence", "cheap miss",
+                           "--no-render")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["writer_promotion"]["next_rung"], "balanced")
+            data["phase"] = "PACKAGE_PLANNING"
+            data["final_state"] = None
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            self.run_state(
+                state, "create-package", "PKG-03", "Promoted",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "small", "--no-render",
+            )
+            data = json.loads(state.read_text())
+            self.assertEqual(data["packages"][-1]["writer_rung"], "balanced")
+            data["packages"][-1]["frontier_used"] = 4
+            data["frontier_used"] = 4
+            data["phase"] = "PACKAGE_IMPLEMENTATION"
+            data["final_state"] = None
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            promoted = self.run_state(
+                state, "record-spawn", "PKG-03", "implementer",
+                "--model", "openai/gpt-5.6-sol", "--purpose", "promoted writer",
+                "--no-render", check=False,
+            )
+            after = json.loads(state.read_text())
+        self.assertEqual(promoted.returncode, 0)
+        self.assertIn("FRONTIER_CAP_EXHAUSTED", promoted.stderr)
+        self.assertEqual(after["phase"], "BLOCKED")
+        self.assertEqual(after["packages"][-1]["frontier_used"], 4)
+        self.assertFalse(any(
+            s.get("purpose") == "promoted writer" for s in after["packages"][-1].get("spawns") or []
+        ))
+
+    def test_reopen_resets_only_the_frontier_counter_named_on_the_blocker(self):
+        # ADR-0061 / ADR-0039: grain=package resets package.frontier_used, not attempts.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._package_ready_for_spawn(td)
+            for index in range(4):
+                self.run_state(
+                    state, "record-spawn", "PKG-01", "package-reviewer",
+                    "--model", self.HEAVY_MODEL, "--purpose", f"j{index}",
+                    "--no-render",
+                )
+            self.run_state(
+                state, "record-spawn", "PKG-01", "adversarial-judge",
+                "--model", self.HEAVY_MODEL, "--no-render", check=False,
+            )
+            blocked = json.loads(state.read_text())
+            blocked["packages"][0]["attempts"]["spawns"] = 4
+            blocked["packages"][0]["attempts"]["gate_failures"] = 2
+            state.write_text(json.dumps(blocked, indent=2) + "\n")
+            self.run_state(
+                state, "reopen",
+                "--reason", "frontier cap exhausted; directed reset of that counter only",
+                "--authorized-by", "human:test", "--no-render",
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(data["phase"], "PACKAGE_PLANNING")
+        self.assertEqual(data["packages"][0]["frontier_used"], 0)
+        self.assertEqual(data["frontier_used"], 4)
+        self.assertEqual(data["packages"][0]["attempts"]["spawns"], 4)
+        self.assertEqual(data["packages"][0]["attempts"]["gate_failures"], 2)
+
+    def test_cost_report_never_sum_s1_s2_lines_stay_intact(self):
+        # AC-C.5 / 023 AC-04: cost-report.py:26-30 must not be rewritten.
+        lines = COST_REPORT.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(
+            lines[25],
+            "WHY THESE NEVER SUM (AC-04): a run the harness dispatches through the claude-code or",
+        )
+        self.assertEqual(
+            lines[26],
+            "opencode lane is the SAME spend Section 1 already counts from that CLI's own transcript/",
+        )
+        self.assertEqual(
+            lines[27],
+            "session store -- Section 2 counts it a SECOND time, from the router's own vantage point.",
+        )
+        self.assertEqual(
+            lines[28],
+            "Adding the two sections' totals into one grand total would double-count that spend. Each",
+        )
+        self.assertEqual(
+            lines[29],
+            "section prints only its OWN total; this report never prints one total across sections",
+        )
+
+    def test_salvage_green_is_not_green_on_first_attempt(self):
+        # AC-C.6 bite: counting salvage-green as first-attempt must go RED.
+        spec = importlib.util.spec_from_file_location("cost_report_c6", COST_REPORT)
+        cost_report = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cost_report)
+        sys.path.insert(0, str(ROOT / "ai/scripts"))
+        from feature_state_lib.model import CHEAP_IMPLEMENT_MODEL, FRONTIER_CAP_PER_FEATURE
+        self.assertEqual(cost_report._CHEAP_IMPLEMENT_MODEL, CHEAP_IMPLEMENT_MODEL)
+        self.assertEqual(cost_report._FRONTIER_CAP_PER_FEATURE, FRONTIER_CAP_PER_FEATURE)
+
+        cheap_spawn = {
+            "spawn_id": "SPAWN-001", "role": "implementer",
+            "model": self.CHEAP_IMPLEMENT, "at": "2026-08-18T12:00:00+00:00",
+        }
+        green_first = {
+            "package_id": "PKG-A",
+            "spawns": [cheap_spawn],
+            "salvage": None,
+            "gates": [{"name": "package verify", "status": "pass", "required": True}],
+        }
+        salvage_green = {
+            "package_id": "PKG-B",
+            "spawns": [cheap_spawn, {
+                "spawn_id": "SPAWN-002", "role": "repair-agent",
+                "model": self.HEAVY_MODEL, "at": "2026-08-18T13:00:00+00:00",
+            }],
+            "salvage": {"spawn_id": "SPAWN-002", "role": "repair-agent",
+                        "model": self.HEAVY_MODEL, "at": "2026-08-18T13:00:00+00:00"},
+            "gates": [{"name": "package verify", "status": "pass", "required": True}],
+        }
+        no_cheap = {
+            "package_id": "PKG-C",
+            "spawns": [{"spawn_id": "SPAWN-001", "role": "package-reviewer",
+                        "model": self.HEAVY_MODEL, "at": "2026-08-18T12:00:00+00:00"}],
+            "salvage": None,
+            "gates": [{"name": "package verify", "status": "pass", "required": True}],
+        }
+        no_gate = {
+            "package_id": "PKG-D",
+            "spawns": [cheap_spawn],
+            "salvage": None,
+            "gates": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td) / "proj"
+            features = project / "ai/state/features"
+            features.mkdir(parents=True)
+            (features / "034-metric.json").write_text(json.dumps({
+                "feature_id": "034-metric",
+                "frontier_used": 3,
+                "packages": [green_first, salvage_green, no_cheap, no_gate],
+            }))
+            home = Path(td) / "home"
+            home.mkdir()
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--project", str(project), "--since", "2026-08-10")
+            rows = cost_report.collect_organic_quota(str(project), None)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["numerator"], 1)
+        self.assertEqual(rows[0]["denominator"], 2)
+        # Bite: the forbidden formula (green gate regardless of salvage) would
+        # count PKG-B and report 2/2. This assertion goes RED if that happens.
+        self.assertNotEqual(rows[0]["numerator"], 2)
+        self.assertIn("1/2 (50%)", result.stdout)
+        self.assertIn("frontier 3/16", result.stdout)
+        self.assertIn("Section 2", result.stdout)
+        self.assertIn("Do not add the two sections", result.stdout)
+        self.assertNotIn("0%", result.stdout.split("Section 2", 1)[1].split("TOTAL", 1)[0])
+        self.assertNotIn("100%", result.stdout.split("% green-on-first-attempt", 1)[1])
 
     def test_models_config_rejects_incomplete_area(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1049,8 +1692,11 @@ class HarnessTests(unittest.TestCase):
 
     def test_setup_models_check_rejects_opencode_separation_violation(self):
         with tempfile.TemporaryDirectory() as td:
+            # 034 PKG-B moved [areas.implement].opencode off openai/*-fast onto
+            # the cheap BASE cell. The bite is still "judge shares the writer
+            # family"; the collision target has to be that cell, not the old -fast id.
             result, models = self._setup_models(
-                td, "--set", "judge.opencode=openai/gpt-5.6-fast",
+                td, "--set", "judge.opencode=opencode/deepseek-v4-flash-free",
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("separation violation", result.stderr)
@@ -4977,6 +5623,178 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("second fix", status)
             self.assertIn("sin features registradas", status)
 
+    def test_init_scoped_without_risk_signal_rejects_a_small_copy_change(self):
+        # AC-A.2 bite (ADR-0064): blast radius 1–3 (copy), no closed-list signal.
+        # `init --mode scoped` without `--risk-signal` MUST fail RISK_SIGNAL_REQUIRED
+        # and leave no valid state. The test is RED if that init is accepted.
+        # AC-A.6: absence of init is the happy path; `init --mode quick-fix` must
+        # not paint this assertion red.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            copy_file = root / "banner-copy.txt"
+            copy_file.write_text("typo\n")
+            state = root / "ai/state/features/copy-fix.json"
+            spec = root / "copy-fix-spec.md"
+            spec.write_text("# copy tweak\n")
+            digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+            axes_log = root / "ai/state/axes-log.jsonl"
+            axes_log.parent.mkdir(parents=True, exist_ok=True)
+            axes_rows = [
+                {"at": "2026-08-15T00:00:00Z", "feature_id": "copy-fix", "axis": axis,
+                 "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+                for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                             "realtime", "mobile", "auth", "cost", "legal")
+            ]
+            axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+            common = ["--state-file", str(state), "--approved-by", "test",
+                      "--axes-log", str(axes_log), "--no-render"]
+
+            refused = run("python3", str(FEATURE_STATE), "init", "copy-fix", str(spec), digest,
+                          *common, "--mode", "scoped", check=False)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("RISK_SIGNAL_REQUIRED", refused.stdout + refused.stderr)
+            self.assertFalse(state.exists())
+
+            # Happy path: no init at all — log-quickfix is the close, not a feature JSON.
+            log = root / "ai/state/quickfix-log.jsonl"
+            run("python3", str(FEATURE_STATE), "log-quickfix",
+                "--summary", "fix banner typo", "--result", "done",
+                "--file", str(copy_file), "--gate", "git diff --check",
+                "--log-file", str(log))
+            self.assertTrue(log.exists())
+            self.assertFalse(state.exists())
+
+            # init --mode quick-fix must not paint AC-A.2 red.
+            qf_state = root / "ai/state/features/copy-qf.json"
+            ok = run("python3", str(FEATURE_STATE), "init", "copy-fix", str(spec), digest,
+                     "--state-file", str(qf_state), "--approved-by", "test",
+                     "--axes-log", str(axes_log), "--mode", "quick-fix", "--no-render")
+            self.assertEqual(ok.returncode, 0)
+            self.assertEqual(json.loads(qf_state.read_text())["mode"], "quick-fix")
+
+    def test_init_feature_without_risk_signal_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            spec = Path(td) / "feat-spec.md"
+            spec.write_text("# contract\n")
+            digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+            axes_log = Path(td) / "axes-log.jsonl"
+            axes_rows = [
+                {"at": "2026-08-15T00:00:00Z", "feature_id": "feat", "axis": axis,
+                 "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+                for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                             "realtime", "mobile", "auth", "cost", "legal")
+            ]
+            axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+            refused = run("python3", str(FEATURE_STATE), "init", "feat", str(spec), digest,
+                          "--state-file", str(state), "--approved-by", "test",
+                          "--axes-log", str(axes_log), "--mode", "feature",
+                          "--no-render", check=False)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("RISK_SIGNAL_REQUIRED", refused.stdout + refused.stderr)
+            self.assertFalse(state.exists())
+
+    def test_init_unknown_risk_signal_is_invalid(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            result = init_state(state, "--mode", "scoped", "--ac", "AC-1",
+                                "--risk-signal", "feels-big", check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("RISK_SIGNAL_INVALID", result.stdout + result.stderr)
+            self.assertFalse(state.exists())
+
+    def test_init_scoped_with_named_signal_persists_it(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--mode", "scoped", "--ac", "AC-1",
+                       "--risk-signal", "user-asked-full-pipeline")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["mode"], "scoped")
+            self.assertEqual(data["risk_signal"], "user-asked-full-pipeline")
+
+    def test_init_incident_does_not_require_risk_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--mode", "incident", "--ac", "AC-1")
+            data = json.loads(state.read_text())
+            self.assertEqual(data["mode"], "incident")
+            self.assertIsNone(data.get("risk_signal"))
+
+    def test_init_mode_default_stays_scoped_so_bare_init_fails(self):
+        # AC-A.6: do not change --mode default to quick-fix. A naked init is scoped
+        # and therefore RISK_SIGNAL_REQUIRED.
+        source = FEATURE_STATE.read_text()
+        self.assertIn('default="scoped"', source)
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            spec = Path(td) / "feat-spec.md"
+            spec.write_text("# contract\n")
+            digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+            axes_log = Path(td) / "axes-log.jsonl"
+            axes_rows = [
+                {"at": "2026-08-15T00:00:00Z", "feature_id": "feat", "axis": axis,
+                 "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+                for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                             "realtime", "mobile", "auth", "cost", "legal")
+            ]
+            axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+            bare = run("python3", str(FEATURE_STATE), "init", "feat", str(spec), digest,
+                       "--state-file", str(state), "--approved-by", "test",
+                       "--axes-log", str(axes_log), "--no-render", check=False)
+            self.assertNotEqual(bare.returncode, 0)
+            self.assertIn("RISK_SIGNAL_REQUIRED", bare.stdout + bare.stderr)
+            self.assertFalse(state.exists())
+
+    def test_log_quickfix_cli_flags_remain_mandatory(self):
+        # AC-A.4: the verb is not optional and the flags at feature-state.py:1194-1201
+        # stay required/present. This does not replace test_log_quickfix_appends_and_renders.
+        source = FEATURE_STATE.read_text()
+        self.assertIn('quickfix.add_argument("--summary", required=True)', source)
+        self.assertIn('quickfix.add_argument("--result", required=True', source)
+        self.assertIn('quickfix.add_argument("--file", action="append")', source)
+        self.assertIn('quickfix.add_argument("--gate")', source)
+        missing = run("python3", str(FEATURE_STATE), "log-quickfix", check=False)
+        self.assertNotEqual(missing.returncode, 0)
+
+    def test_quickfix_blocked_does_not_require_context_pack_or_salvage(self):
+        # AC-A.5: quick-fix is not a package, so 033 AC-6.1 context pack does not apply.
+        # Gate red → retry or escalate with a named signal; salvage does not apply.
+        with tempfile.TemporaryDirectory() as td:
+            log = Path(td) / "ai/state/quickfix-log.jsonl"
+            run("python3", str(FEATURE_STATE), "log-quickfix",
+                "--summary", "copy tweak; gate red", "--result", "blocked",
+                "--file", "banner-copy.txt", "--gate", "verify.sh failed",
+                "--log-file", str(log))
+            entry = json.loads(log.read_text().splitlines()[0])
+            self.assertEqual(entry["result"], "blocked")
+            dumped = json.dumps(entry)
+            self.assertNotIn("salvage", dumped)
+            self.assertNotIn("context_pack", dumped)
+            features = Path(td) / "ai/state/features"
+            feature_jsons = [
+                p.name for p in features.glob("*.json")
+                if p.name != "_anchor.json"
+            ] if features.exists() else []
+            self.assertEqual(feature_jsons, [])
+        skill = (ROOT / "Global/_canonical/skills/request-triage/SKILL.md").read_text()
+        orch = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
+        self.assertIn("salvage does not apply", skill)
+        self.assertIn("salvage does not apply", orch)
+
+    def test_organic_routing_doctrine_unifies_default_and_risk_signal(self):
+        # AC-A.1: three surfaces say the same thing. The budget table must not
+        # call scoped "default" for the 1–3-file case. ADR-0020's number 3 stays.
+        skill = (ROOT / "Global/_canonical/skills/request-triage/SKILL.md").read_text()
+        orch = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
+        self.assertIsNone(re.search(r"`scoped`\s*\(default\)", skill))
+        self.assertIn("RISK_SIGNAL_REQUIRED", skill)
+        self.assertIn("RISK_SIGNAL_REQUIRED", orch)
+        self.assertIn("user-asked-full-pipeline", skill)
+        self.assertIn("money-billing", skill)
+        self.assertIn("ADR-0020", orch)
+        self.assertIn("1-3 files", orch)
+        self.assertIn("1-3 files", skill)
+
     def test_log_narrative_appends_and_renders(self):
         with tempfile.TemporaryDirectory() as td:
             log = Path(td) / "ai/state/narrative-log.jsonl"
@@ -5422,7 +6240,10 @@ class HarnessTests(unittest.TestCase):
     def test_invalid_separation_graph_is_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             def judge_on_implementer_model(config):
-                config["areas"]["judge"]["opencode"] = "openai/gpt-5.6-fast"
+                # 034 PKG-B: implementer OpenCode BASE is
+                # opencode/deepseek-v4-flash-free. openai/gpt-5.6-fast no longer
+                # shares a family with implementation, so it is not a bite.
+                config["areas"]["judge"]["opencode"] = "opencode/deepseek-v4-flash-free"
             models = self._repo_models_variant(td, judge_on_implementer_model)
             result = run("python3", "ai/scripts/generate.py", "--output", str(Path(td) / "out"), "--models", str(models), check=False)
         self.assertEqual(result.returncode, 2)
@@ -6709,7 +7530,8 @@ class HarnessTests(unittest.TestCase):
                              "realtime", "mobile", "auth", "cost", "legal")
             ]
             axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
-            common = ["--state-file", str(state), "--ac", "AC-1", "--no-render", "--axes-log", str(axes_log)]
+            common = ["--state-file", str(state), "--ac", "AC-1", "--no-render", "--axes-log", str(axes_log),
+                      "--risk-signal", "user-asked-full-pipeline"]
 
             wrong = run("python3", str(FEATURE_STATE), "init", "feat", str(spec), "deadbeef",
                         *common, "--approved-by", "federico", check=False)
@@ -13989,12 +14811,11 @@ class TuiTests(unittest.TestCase):
 
 
 class CursorRuntimeTargetTests(unittest.TestCase):
-    """032/C1-C2: Cursor as a host runtime of the harness.
+    """032/C1-C2 + 034/ADR-0063: Cursor as a host runtime of the harness.
 
-    Cursor is the runtime Federico is left with once the other three subscriptions are
-    exhausted, so "the roles are installed" is not enough on its own -- what must hold is
-    that the target never acquires a model of its own (the failure that emptied those
-    quotas) and never loses the doctrine that governs the roles.
+    Cursor stays out of RUNTIMES. Each role pins a `model:` from models.toml
+    `cursor=`. 032 AC-06 (inherit-universal) is superseded; roster, readonly,
+    and no-hooks.json remain.
     """
 
     @classmethod
@@ -14007,6 +14828,15 @@ class CursorRuntimeTargetTests(unittest.TestCase):
         rows = (ROOT / "roles.tsv").read_text(encoding="utf-8").splitlines()
         return {line.split("\t")[0] for line in rows[1:] if line.strip()}
 
+    def _cursor_pins(self):
+        pins = {}
+        for path in sorted((self.out / "cursor/agents").glob("*.md")):
+            head = path.read_text(encoding="utf-8").split("\n---\n", 1)[0]
+            model_lines = [line for line in head.splitlines() if line.startswith("model:")]
+            self.assertEqual(len(model_lines), 1, path.name)
+            pins[path.stem] = model_lines[0].split(":", 1)[1].strip()
+        return pins
+
     def test_every_roster_role_reaches_the_cursor_target(self):
         # AC-01: same role set as the roster -- a role the harness declares but Cursor
         # cannot delegate to is a silently missing separation of duties, not a cosmetic gap.
@@ -14014,12 +14844,84 @@ class CursorRuntimeTargetTests(unittest.TestCase):
         self.assertEqual(actual, self._roster_roles())
 
     def test_no_cursor_agent_pins_a_model(self):
-        # AC-06: `model: inherit` on every role. A concrete id here would make the harness
-        # spend a subscription the user never chose in Cursor's own model picker.
-        for path in sorted((self.out / "cursor/agents").glob("*.md")):
-            head = path.read_text(encoding="utf-8").split("\n---\n", 1)[0]
-            model_lines = [line for line in head.splitlines() if line.startswith("model:")]
-            self.assertEqual(model_lines, ["model: inherit"], path.name)
+        # 034 / ADR-0063 supersedes 032 AC-06 and the inherit clause of 032 AC-01.
+        # REWRITTEN, not deleted: pin present, roster complete (sibling test),
+        # readonly intact (sibling test), NOT all inherit, independence or
+        # explicit degradation. Universal inherit is RED. Missing pin is die
+        # (validate_cursor_target). repair-agent heavy is RED.
+        mc = HarnessTests._import("models_config")
+
+        self.assertNotIn("cursor", mc.RUNTIMES)
+        self.assertIn("cursor", mc.AREA_FIELDS)
+        pins = self._cursor_pins()
+        self.assertTrue(pins)
+        self.assertTrue(all(pins.values()), "every Cursor agent must declare a model: pin")
+        self.assertFalse(
+            all(pin == "inherit" for pin in pins.values()),
+            "universal inherit is superseded; pin per role",
+        )
+        cheap = pins["implementer"]
+        self.assertEqual(pins["repair-agent"], cheap, "repair-agent must stay on the cheap code-rw pin")
+        self.assertEqual(cheap, "composer-2.5")
+        self.assertNotEqual(
+            mc.family("cursor_model", pins["package-reviewer"], {}),
+            mc.family("cursor_model", cheap, {}),
+        )
+        self.assertNotEqual(
+            mc.family("cursor_model", pins["adversarial-judge"], {}),
+            mc.family("cursor_model", cheap, {}),
+        )
+        # AC-D.2: product-analyst / architect MAY pin frontier; not forced to cheap.
+        self.assertEqual(pins["product-analyst"], "claude-opus-5")
+        self.assertEqual(pins["architect"], "claude-opus-5")
+        doctrine = (self.out / "cursor/AGENTS.md").read_text(encoding="utf-8")
+        self.assertNotIn("No model is pinned", doctrine)
+        self.assertNotIn("every role inherits", doctrine)
+        override = (self.out / "cursor/agents/orchestrator.md").read_text(encoding="utf-8")
+        self.assertNotIn("every role inherits", override)
+        self.assertIn("record-subreview --evidence", override)
+
+    def test_mixed_inherit_on_audit_reviewer_is_forbidden_at_generate(self):
+        # 034 SEC-001: family() returns the raw slug `inherit`, so a mixed pin
+        # ([areas.audit].cursor=inherit while implementer stays composer-2.5)
+        # used to look like independence. Cursor inherit is the parent model
+        # (https://cursor.com/docs/subagents) — the reviewer would share the
+        # writer. Universal inherit still dies; this bite is mixed inherit.
+        # Does not delete test_no_cursor_agent_pins_a_model.
+        with tempfile.TemporaryDirectory(prefix="set-agentes-cursor-mixed-inherit-") as td:
+            td_path = Path(td)
+            models = td_path / "models.toml"
+            shutil.copy2(ROOT / "models.toml", models)
+            text = models.read_text(encoding="utf-8")
+            # Header must be a real table (`\n[areas.audit]\n`): the shipped file
+            # mentions `[areas.audit]` in comments above the section.
+            before, audit_hdr, rest = text.partition("\n[areas.audit]\n")
+            self.assertEqual(audit_hdr, "\n[areas.audit]\n")
+            audit_block, judge_hdr, after = rest.partition("\n[areas.judge]\n")
+            self.assertEqual(judge_hdr, "\n[areas.judge]\n")
+            self.assertIn('cursor = "gpt-5.6-sol"', audit_block)
+            self.assertIn('cursor = "composer-2.5"', before)
+            audit_block = audit_block.replace('cursor = "gpt-5.6-sol"', 'cursor = "inherit"', 1)
+            models.write_text(before + audit_hdr + audit_block + judge_hdr + after, encoding="utf-8")
+
+            mixed = run(
+                "python3", "ai/scripts/generate.py",
+                "--models", str(models),
+                "--output", str(td_path / "out-mixed"),
+                check=False,
+            )
+            self.assertNotEqual(mixed.returncode, 0, mixed.stdout + mixed.stderr)
+            err = mixed.stderr + mixed.stdout
+            self.assertIn("inherit", err)
+            self.assertIn("reviewer", err)
+            self.assertIn("forbidden", err)
+
+            shipped = run(
+                "python3", "ai/scripts/generate.py",
+                "--output", str(td_path / "out-shipped"),
+                check=False,
+            )
+            self.assertEqual(shipped.returncode, 0, shipped.stderr)
 
     def test_readonly_reuses_the_codex_sandbox_predicate_rather_than_a_second_one(self):
         # AC-01: `readonly: true` must agree with Codex's already-audited `sandbox_mode`

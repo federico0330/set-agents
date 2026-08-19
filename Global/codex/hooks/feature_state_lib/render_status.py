@@ -14,7 +14,7 @@ from typing import Any
 from feature_state_lib import model
 from feature_state_lib.model import (
     StateError, now, load_state, package_by_id, TERMINAL_FINDING_STATUSES,
-    spawn_budget_counts, spawn_budget_label,
+    spawn_budget_counts, spawn_budget_label, frontier_budget_label,
 )
 from feature_state_lib.transitions import next_transition
 from feature_state_lib.render_bitacora import read_jsonl, collect_narrative, format_narrative
@@ -233,6 +233,7 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
         "package": f"{current.get('package_id')} ({current.get('status')})" if current else "-",
         "accepted": f"{sum(1 for p in packages if p.get('status') == 'accepted')}/{len(packages)}",
         "spawns": spawn_budget_label(*spawn_budget_counts(data, current)),
+        "frontier": frontier_budget_label(data, current),
         "reviews": f"{cycles}/{budgets.get('max_deep_review_cycles', '?')}",
         "open_findings": open_findings,
         # Raw here would put agent-authored newlines and pipes into a markdown TABLE in
@@ -266,7 +267,8 @@ def render_status(state_file: Path) -> None:
                 rows.append(summarize_feature(load_state(path)))
             except Exception:  # legacy/malformed schemas degrade to a row, never a crash
                 rows.append({"feature_id": path.stem, "mode": "?", "phase": "INVALID_STATE",
-                             "package": "-", "accepted": "-", "spawns": "-", "reviews": "-",
+                             "package": "-", "accepted": "-", "spawns": "-", "frontier": "-",
+                             "reviews": "-",
                              "open_findings": "-", "blocker": "state file failed to parse",
                              "next": "-", "last_event": "-"})
         lines = [
@@ -278,17 +280,17 @@ def render_status(state_file: Path) -> None:
             "",
             "## Features",
             "",
-            "| Feature | Modo | Fase | Paquete | Aceptados | Spawns | Reviews | Findings abiertos | Blocker | Próximo paso | Último evento |",
-            "|---|---|---|---|---|---|---|---|---|---|---|",
+            "| Feature | Modo | Fase | Paquete | Aceptados | Spawns | Frontier | Reviews | Findings abiertos | Blocker | Próximo paso | Último evento |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         if rows:
             for row in rows:
                 lines.append(
-                    "| {feature_id} | {mode} | {phase} | {package} | {accepted} | {spawns} | {reviews} "
+                    "| {feature_id} | {mode} | {phase} | {package} | {accepted} | {spawns} | {frontier} | {reviews} "
                     "| {open_findings} | {blocker} | {next} | {last_event} |".format(**row)
                 )
         else:
-            lines.append("| _sin features registradas_ | | | | | | | | | | |")
+            lines.append("| _sin features registradas_ | | | | | | | | | | | |")
         lines += ["", "## Quick-fixes recientes", ""]
         entries = read_jsonl(out_dir / "quickfix-log.jsonl")
         if entries:

@@ -1,7 +1,7 @@
 ---
 name: github-release-manager
 description: "GitHub release manager \u2014 gated local preparation and two human cuts"
-model: inherit
+model: composer-2.5
 readonly: true
 ---
 

@@ -9,10 +9,14 @@ user-level rules file — verified 2026-08-18 against <https://cursor.com/docs/c
   (`/implementer ...`, or "use the package-reviewer subagent"). Read-only roles carry `readonly: true`, which
   is Cursor's own enforcement of the separation of duties below — not a promise in prose.
 - **Skills are native and global** (`~/.cursor/skills/<name>/SKILL.md`).
-- **No model is pinned.** Every role declares `model: inherit`: it runs on whatever model you selected in
-  Cursor. The harness deliberately routes nothing here, so no role can spend a quota you did not choose.
-  The consequence is that writer and reviewer share a model; independence rests on the subagent's clean
-  context, and that degradation must be recorded in the review evidence (see Turn continuity).
+- **Each role pins a model** from `models.toml` (`cursor=` dimension, ADR-0063). `code-rw`
+  roles — including `repair-agent` — pin the cheap Cursor counterpart of the OpenCode BASE
+  writer; judges pin another family. Independence is that pin plus a clean context. If two
+  families are not available in the measured catalog, pin a distinct model id and record the
+  degradation in the review evidence (`record-subreview --evidence` /
+  `finalize-review-panel --evidence`). Salvage and writer promotion are invocation overrides
+  (Task tool `model` parameter), never a heavy `repair-agent` frontmatter pin. Cursor is not
+  a routing lane: never `--route-decide`.
 - **No event hooks are installed.** `hooks.json` is not part of this target, so the harness command policy
   (`coord_policy.py`) does NOT run in Cursor. The surface that governs shell and edits here is Cursor's own
   permission model. Do not claim a guard is enforcing something it is not.

@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_GATES` · modo: scoped · revisión 105
+- fase: `INTEGRATION` · modo: scoped · revisión 244
 - spec: `docs/specs/033-menos-espera-menos-cuota/spec.md` (hash `18dcffafa809`)
 
 ## Criterios de aceptación
@@ -48,12 +48,12 @@
 
 ## Paquetes
 
-- [[features/033-menos-espera-menos-cuota/PKG-1|PKG-1]] — planned · Una sola dimension opencode: colapsar go-zen/zen/openai-only en un solo valor por area
-- [[features/033-menos-espera-menos-cuota/PKG-2|PKG-2]] — package_gates · El menu Modelos no congela: probe asincronico, cache con TTL y degradacion con nombre
-- [[features/033-menos-espera-menos-cuota/PKG-3|PKG-3]] — planned · Elegir modelo sin scrollear: agrupado por proveedor, contador, valor actual marcado, sin …
+- [[features/033-menos-espera-menos-cuota/PKG-1|PKG-1]] — accepted · Una sola dimension opencode: colapsar go-zen/zen/openai-only en un solo valor por area
+- [[features/033-menos-espera-menos-cuota/PKG-2|PKG-2]] — accepted · El menu Modelos no congela: probe asincronico, cache con TTL y degradacion con nombre
+- [[features/033-menos-espera-menos-cuota/PKG-3|PKG-3]] — accepted · Elegir modelo sin scrollear: agrupado por proveedor, contador, valor actual marcado, sin …
 - [[features/033-menos-espera-menos-cuota/PKG-4|PKG-4]] — accepted · Windows sin mentiras: cerrar las 8 fallas residuales y el flaky de macOS, con techo de sk…
 - [[features/033-menos-espera-menos-cuota/PKG-5|PKG-5]] — accepted · El gate se ve: progreso en vivo, falla temprana, resumen final y los 10 tests mas lentos
-- [[features/033-menos-espera-menos-cuota/PKG-6|PKG-6]] — planned · Cuotas que alcanzan: context pack obligatorio, gates sin modelo, panel por riesgo y presu…
+- [[features/033-menos-espera-menos-cuota/PKG-6|PKG-6]] — accepted · Cuotas que alcanzan: context pack obligatorio, gates sin modelo, panel por riesgo y presu…
 
 ## Approach y decisiones
 
@@ -63,17 +63,21 @@
 - ruteo PKG-4: cursor-host native subagent; no route-decide
 - ruteo PKG-5: cursor-host native subagent; no route-decide
 - ruteo PKG-6: cursor-host native subagent; no route-decide
-- [2026-08-18] gate-runner: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara. Gate failures 1/3 ya gastado.
-- [2026-08-18] package-reviewer: package-reviewer Cursor inherit readonly. Diff 779671b. same-model inherit / clean-context only. No parchea.
-- [2026-08-18] security-auditor: security-auditor Cursor inherit readonly. same-model inherit / clean-context only. Superficie: verify.sh y verify_reporter.py. No parchea.
-- [2026-08-18] orchestrator: El presenter del gate vive en un modulo Python que verify.sh invoca. La ETA sale del ritmo medido. La suite completa paso: mil doscientos noventa y ocho tests en veinticuatro minu…
-- [2026-08-18] implementer: implementer Cursor inherit. Context pack PKG-2.md. owned setup_models.py models_config.py mas excepciones de tests. No reescribir tui.with_progress. No sacar lanes (PKG-1).
-- [2026-08-18] gate-runner: gate-runner Cursor inherit readonly. heartbeat-run verify.sh. No repara.
+- [2026-08-19] finding-verifier: finding-verifier Cursor inherit. Clean context. In doubt uphold. Same model as writer and reviewer.
+- [2026-08-19] finding-verifier: Verification recorded: three upheld. Spawn counter at the scoped ceiling. Next repair plus delta would need two more spawns. Stopped before record-spawn would block the whole feat…
+- [2026-08-19] repair-agent: repair-agent Cursor inherit. Three upheld findings. Ceiling 200 lines. No record-spawn: ninth would BLOCK. Bite with cp. Do not edit Global by hand; build.sh regenerates.
+- [2026-08-19] orchestrator: PKG-6 accepted. VERIFY_PASS 1336. Repair 3900d4b+de8a476. Ceiling 199/200. Same-model inherit recorded on the panel. Next is integration before/after measurements.
+- [2026-08-19] integrator: INTEGRATION. Six packages accepted. Remedir baseline. Do not push. AC-4.5 stays residual without three-job SHA. No --route-decide.
+- [2026-08-19] integrator: INTEGRATION evidence d1a5441. VERIFY_PASS 1336/13m08s vs 1286/1237s. Section 2=144. First paint tests 0.031s. AC-4.5 residual: 12 local commits not pushed. Feature stays INTEGRATI…
 - decisión: [[decisiones/2026-08-18 orden-paquetes-033-ci-gate-consola-lane|Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final]]
 - decisión: [[decisiones/2026-08-18 033-review-mismo-modelo-contexto-limpio|Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada]]
 - decisión: [[decisiones/2026-08-18 033-pkg4-commit-antes-del-freeze|PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git]]
 - decisión: [[decisiones/2026-08-18 033-pkg5-verify-reporter-modulo-python|El presenter del gate vive en un modulo Python testeable, no en el shell]]
 - decisión: [[decisiones/2026-08-18 033-pkg5-digest-no-ensucia-owned-paths|Digest no ensucia el diff de un paquete con bitacoras ajenas]]
+- decisión: [[decisiones/2026-08-18 033-pkg2-autoprobe-despues-del-primer-frame|El vivo llega solo despues del primer frame; el test de labels se aisla]]
+- decisión: [[decisiones/2026-08-19 033-pkg6-techo-scoped-deja-repair-fuera|033-pkg6-techo-scoped-deja-repair-fuera]]
+- decisión: [[decisiones/2026-08-19 033-pkg6-dos-despachos-extra-autorizados|033-pkg6-dos-despachos-extra-autorizados]]
+- decisión: [[decisiones/2026-08-19 033-push-main-para-ac-4-5|033-push-main-para-ac-4-5]]
 
 ## Convenciones
 
@@ -92,15 +96,15 @@
 
 ## Qué falta
 
-- → falta registrar la referencia del diff integrado; el paquete todavía no está integrado localmente
+- → faltan correr los gates globales finales
 
 ## Presupuestos
 
-- spawns: 13 (máx 8/paquete) · deep review máx 2 ciclos
+- spawns: 35 (máx 8/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/033-menos-espera-menos-cuota/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/033-menos-espera-menos-cuota/bitacora.md`
 
-_Actualizado: 2026-08-18T20:06:44+00:00_
+_Actualizado: 2026-08-19T02:09:59+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

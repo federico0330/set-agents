@@ -1,6 +1,8 @@
 # ADR-0039 — `reopen` resetea el contador que lo bloqueó, estructurado en el blocker, nunca inferido
 
-- Estado: Accepted (2026-08-11). Feature 019-harness-evolution, defecto del motor de estado encontrado
+- Estado: Accepted (2026-08-11). **Amended in part by ADR-0061** (Accepted 2026-08-19): `block_with_reason.counter.scope`
+  gana el valor cerrado `frontier`; los shapes `attempts` y `finding` no cambian.
+  Feature 019-harness-evolution, defecto del motor de estado encontrado
   dogfooding contra `P5-tools-discovery` — autorizado por Federico como arreglo al harness (opción A),
   registrado en `ai/state/decisions-log.jsonl`, slugs `reopen-no-resetea-el-contador-de-verificacion` y
   `reopen-resetea-contadores-opcion-A-autorizada`. No es un AC de 019: es la herramienta que quedó

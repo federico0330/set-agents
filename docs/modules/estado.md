@@ -13,6 +13,10 @@ Máquina de estados de paquetes/features: fases legales, gates, reviews, finding
 
 ## Últimos cambios estructurales
 
+- 2026-08-19 034-cuota-organica-y-writer-barato/PKG-C — Hay un cupo de modelos pesados (4 por paquete, 16 por feature) distinto del tope de despachos. Un comando P001 no disfraza un rol pesado. reopen puede resetear solo ese contador.
+- 2026-08-19 034-cuota-organica-y-writer-barato/PKG-B — record-spawn --salvage exige --model no vacio; record-gate ya no resetea el consecutivo en un PASS parcial; el reset ocurre al pasar de gates a review si el paquete cerro green-on-first.
+- 2026-08-19 034-cuota-organica-y-writer-barato/PKG-A — init scoped y feature exigen un token de riesgo nombrado antes de escribir state; sin token el comando muere y no deja JSON.
+- 2026-08-19 033-menos-espera-menos-cuota/PKG-6 — PACKAGE_IMPLEMENTATION exige context pack. gate-runner all-P001 se rechaza a favor de local-gate-runner. El panel sale de complexity/risk. Status avisa al 80% del techo DEL PAQUETE actual.
 - 2026-08-18 010-spawn-provenance/P1-spawn-provenance — spawn provenance node en el grafo de estado: cada spawn queda trazable al paquete que lo originó, con su decision_id de routing
 - 2026-08-18 006-execution-graph/P3-graph-view — ai/scripts/check-feature-state.py: nuevo script que genera el grafo de ejecución de features y paquetes
 - 2026-08-18 031-registro-correctivo/P1-verbos-correctivos — dos nuevos verbos: cmd_reopen extendido con --from-done, cmd_amend_package nuevo; MUTATING_COMMANDS actualizado

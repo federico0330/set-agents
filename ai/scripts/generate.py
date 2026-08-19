@@ -132,11 +132,16 @@ and they override every `--route-decide` instruction above while you are hosted 
    in. That is the exact failure this target exists to prevent.
 2. **Delegate through Cursor's own subagents**: `/implementer <task>`, `/package-reviewer <task>`,
    or "use the <role> subagent to ...". Every roster role is installed as one
-   (`~/.cursor/agents/<role>.md`); the read-only ones carry `readonly: true`, and each starts with
-   a clean context — which is what reviewer independence rests on here, because every role inherits
-   the single model you picked in Cursor. Record that degradation in the review evidence
-   (`record-subreview --evidence` / `finalize-review-panel --evidence`): a shared model keeps
-   correlated blind spots that a clean context does not remove.
+   (`~/.cursor/agents/<role>.md`); the read-only ones carry `readonly: true`. Each role's
+   frontmatter pins a `model:` from `models.toml` (`cursor=` dimension, ADR-0063). `code-rw`
+   roles — including `repair-agent` — pin the cheap Cursor counterpart of the OpenCode BASE
+   writer; judges pin another family. Independence is that pin plus a clean context. If the
+   measured Cursor catalog cannot tell two families apart, pin a distinct model id and record
+   the degradation in review evidence (`record-subreview --evidence` /
+   `finalize-review-panel --evidence`): a shared family keeps correlated blind spots that a
+   clean context does not remove. Salvage and writer promotion in Cursor are invocation
+   overrides (Task tool `model` parameter), never a heavy `repair-agent` frontmatter pin and
+   never an OpenCode-only `@tier` variant.
 
 Everything else in this doctrine — the phase machine, the gates, the file-first state, the
 narration, the question policy — is unchanged and still binds.
@@ -562,16 +567,17 @@ def generate(out, roles_path=None, models_path=None, routes_path=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(pi, encoding="utf-8")
 
-        # 032/C1 (AC-01, AC-06): Cursor subagents. Frontmatter fields verified 2026-08-18
-        # against https://cursor.com/docs/subagents -- name/description/model/readonly/
-        # is_background, and NOTHING else. `model: inherit` is the whole point: Cursor is a
-        # host runtime, not a routing lane, so no models.toml value reaches it and no role
-        # can spend a quota the user did not pick in the UI. `readonly` reuses the SAME
-        # predicate Codex's `sandbox_mode` already uses above -- one audited definition of
+        # 034 / ADR-0063 (supersedes 032 AC-06 and the inherit clause of 032 AC-01):
+        # Cursor subagents. Frontmatter fields verified 2026-08-18 against
+        # https://cursor.com/docs/subagents -- name/description/model/readonly/
+        # is_background, and NOTHING else. `model:` is the per-role pin from
+        # models.toml `cursor=` (merge ADR-0003). Cursor stays out of RUNTIMES;
+        # this is a pin, not a routing lane. `readonly` reuses the SAME predicate
+        # Codex's `sandbox_mode` already uses above -- one audited definition of
         # "this role must not write", not a second one that could drift from it.
         cursor = "\n".join([
             "---", f"name: {row['role']}", f"description: {json.dumps(desc)}",
-            "model: inherit", f"readonly: {'true' if sandbox == 'read-only' else 'false'}",
+            f"model: {row['cursor_model']}", f"readonly: {'true' if sandbox == 'read-only' else 'false'}",
             "---", "", body + (CURSOR_DELEGATION_OVERRIDE if row["capability"] == "coord-ro" else ""),
         ])
         path = out / "cursor/agents" / f"{row['role']}.md"
@@ -661,7 +667,7 @@ def generate(out, roles_path=None, models_path=None, routes_path=None):
         shutil.copytree(ROOT / "ai/scripts/feature_state_lib", hooks / "feature_state_lib",
                         dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__"))
     write_indexes(out)
-    validate(out, roles, role_tiers, routes_path)
+    validate(out, roles, role_tiers, routes_path, models_path)
 
 
 def _opencode_projected_route(model):
@@ -732,22 +738,82 @@ def validate_pi_target(roles):
             die(f"pi target: {row['role']}: missing canonical prompt")
 
 
-def validate_cursor_target(out):
-    """032/C1 (AC-01, AC-06): Cursor is a host runtime, never a routing lane.
+def validate_cursor_target(out, roles, models_path=None):
+    """034 / ADR-0063: per-role Cursor pins. 032 AC-06 superseded (not deleted).
 
-    The one thing that must never regress here is the model line: the moment a concrete
-    model id lands in a Cursor agent, the harness starts spending a subscription the user
-    never chose in the UI -- which is the exact failure that motivated this target.
+    Cursor remains a host runtime, never a routing lane (RUNTIMES unchanged;
+    --route-decide still forbidden at generate.py:125-132). Pins come from
+    models.toml `cursor=`. Universal inherit is a regression. A missing pin
+    dies. repair-agent stays on the cheap code-rw pin, never a heavy
+    salvage/frontier pin. 032 AC-01 remainder (roster, readonly) and AC-07
+    (no hooks.json) stay.
     """
     rule = out / "cursor/rules/00-harness.mdc"
     if not rule.exists() or not rule.read_text(encoding="utf-8").startswith("---\nalwaysApply: true\n---\n"):
         die("cursor: rules/00-harness.mdc must declare alwaysApply: true")
-    for path in (out / "cursor/agents").glob("*.md"):
+    doctrine = (out / "cursor/AGENTS.md").read_text(encoding="utf-8")
+    if "No model is pinned" in doctrine or "every role inherits" in doctrine:
+        die("cursor: doctrine still claims inherit-universal (034 AC-D.6)")
+    if (out / "cursor/hooks.json").is_file():
+        die("cursor: must not emit hooks.json (032 AC-07)")
+    variants = sorted((out / "cursor/agents").glob("*@*.md"))
+    if variants:
+        die(f"cursor: OpenCode @tier variants are OpenCode-ONLY, found {variants[0].name}")
+    by_role = {row["role"]: row for row in roles}
+    # 034 SEC-001: Cursor `inherit` is the parent model
+    # (https://cursor.com/docs/subagents), not a distinct family. family()
+    # returns the raw slug, so inherit looks distinct from composer-2.5 and
+    # mixed inherit on review-ro/audit/judge used to pass this validator while
+    # sharing the writer at runtime. Universal inherit (all pins inherit) still
+    # dies below. inherit stays a legal [catalog].cursor slug for coord.
+    for row in roles:
+        if (
+            row["cursor_model"] == "inherit"
+            and row["capability"] == "review-ro"
+            and row["duty"] in models_config.REVIEW_DUTIES
+        ):
+            die(
+                f"cursor: inherit on reviewer {row['role']} is forbidden "
+                "(Cursor inherit is the parent model; mixed inherit shares the writer)"
+            )
+    config = models_config.load_config(models_path)
+    families = config.get("families") or {}
+    pins = []
+    for path in sorted((out / "cursor/agents").glob("*.md")):
         text = path.read_text(encoding="utf-8")
-        if "\nmodel: inherit\n" not in text:
-            die(f"{path}: cursor agents must inherit the session model")
+        head, _, _rest = text.partition("\n---\n")
+        model_lines = [line for line in head.splitlines() if line.startswith("model:")]
+        if len(model_lines) != 1:
+            die(f"{path}: cursor agents must declare exactly one model: pin")
+        pin = model_lines[0].split(":", 1)[1].strip()
+        if not pin:
+            die(f"{path}: missing cursor model pin")
+        if path.stem not in by_role:
+            die(f"{path}: generated agent is not on the roster")
+        expected = by_role[path.stem]["cursor_model"]
+        if pin != expected:
+            die(f"{path}: model {pin!r} != resolved cursor_model {expected!r}")
+        if pin not in config["catalog"]["cursor"]:
+            die(f"{path}: cursor model {pin!r} not in [catalog].cursor")
+        pins.append(pin)
         if "\nreadonly: true\n" not in text and "\nreadonly: false\n" not in text:
             die(f"{path}: cursor agents must declare readonly explicitly")
+    if pins and all(pin == "inherit" for pin in pins):
+        die("cursor: universal inherit is superseded (034 AC-D.1); pin per role")
+    implementer_pin = by_role["implementer"]["cursor_model"]
+    repair_pin = by_role["repair-agent"]["cursor_model"]
+    if repair_pin != implementer_pin:
+        die("cursor: repair-agent must pin the cheap code-rw model, not a heavy salvage pin")
+    implementer_family = models_config.family("cursor_model", implementer_pin, families)
+    orchestrator = (out / "cursor/agents/orchestrator.md").read_text(encoding="utf-8")
+    for role in ("package-reviewer", "adversarial-judge"):
+        other_pin = by_role[role]["cursor_model"]
+        other_family = models_config.family("cursor_model", other_pin, families)
+        if other_family == implementer_family:
+            if other_pin == implementer_pin:
+                die(f"cursor: {role} shares implementer's pin while an alternative exists")
+            if "record-subreview --evidence" not in orchestrator:
+                die("cursor: same-family pins require noisy degradation (record-subreview --evidence)")
 
 
 def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=None):
@@ -786,7 +852,7 @@ def validate(out, roles=None, role_tiers=None, routes_path=None, models_path=Non
             die(f"orchestrator cannot delegate required tier variant: {name}")
     check_variant_catalog_coherence(role_tiers, routes_path)
     validate_pi_target(roles)
-    validate_cursor_target(out)
+    validate_cursor_target(out, roles, models_path)
 
 
 def main():

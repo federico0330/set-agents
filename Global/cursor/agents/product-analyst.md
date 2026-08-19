@@ -1,7 +1,7 @@
 ---
 name: product-analyst
 description: "Product-Analyst \u2014 turns intent into specs and acceptance criteria"
-model: inherit
+model: claude-opus-5
 readonly: false
 ---
 

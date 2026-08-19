@@ -1,8 +1,12 @@
 # ADR-0044 — La latencia es una propiedad del modelo elegido, no un requisito del sufijo del nombre
 
-- Estado: Accepted (2026-08-13). Feature 026-orquestador-elige-modelo, PKG-1
+- Estado: Accepted (2026-08-13). **Amended in part by ADR-0060** (Accepted 2026-08-19): el loop
+  hot-path que conservaba `-fast` para `implementer`/`product-analyst` pasa a
+  barato/free; `product-analyst` sale. Coord grok, límite lane `codex`, y P2
+  `model_request` siguen. Feature 026-orquestador-elige-modelo, PKG-1
   (`P1-latencia-por-modelo-no-por-sufijo`) y PKG-2 (`P2-modelo-por-instancia`, AC-04..AC-07,
-  sección "Extensión P2" más abajo). No supersede nada.
+  sección "Extensión P2" más abajo). El loop `-fast` de `implementer`/`product-analyst`
+  queda superseded in part by ADR-0060.
 
 ## Contexto
 

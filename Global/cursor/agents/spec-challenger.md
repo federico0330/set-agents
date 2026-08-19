@@ -1,7 +1,7 @@
 ---
 name: spec-challenger
 description: "Spec-Challenger \u2014 pre-approval read-only challenge of the Feature Contract"
-model: inherit
+model: gpt-5.6-sol
 readonly: true
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: adversarial-judge
 description: "Adversarial judge \u2014 mandatory final read-only gate"
-model: inherit
+model: gpt-5.6-sol
 readonly: true
 ---
 

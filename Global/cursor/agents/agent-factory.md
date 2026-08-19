@@ -1,7 +1,7 @@
 ---
 name: agent-factory
 description: "Agent factory \u2014 canonical role and capability authoring"
-model: inherit
+model: claude-opus-5
 readonly: false
 ---
 

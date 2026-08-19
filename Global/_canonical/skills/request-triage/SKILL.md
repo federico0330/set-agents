@@ -71,8 +71,10 @@ exceptions (scoped-feature / quick-fix / incident).
 
 ### 2. Scoped-feature — for bounded work that shows a concrete risk signal
 Triggers: a **well-bounded** change on established infrastructure where at least ONE concrete risk signal is
-present: money/billing, data migrations, auth/permissions/PII, a public contract or shared API, genuinely
-multi-module work, or the user explicitly asking for the full treatment ("hacelo con el pipeline completo").
+present: money/billing (`money-billing`), data migrations (`data-migration`), auth/permissions/PII
+(`auth-pii`), a public contract or shared API (`public-contract`), genuinely multi-module work
+(`multi-module`), or the user explicitly asking for the full treatment (`user-asked-full-pipeline`,
+"hacelo con el pipeline completo").
 The canonical case: "a login view + password recovery on Supabase". Without one of these signals, a bounded
 change is a quick-fix, not a scoped-feature — running spec + planner + panel + judge on an ordinary bugfix is
 the same waste as running the full panel after every task (that is what turned a login into a 4-5h grind).
@@ -95,7 +97,9 @@ day-to-day requests land here unless a concrete scoped/feature trigger is presen
 to touch a concrete risk signal (auth/money/PII/migration/public contract), then **escalate to scoped-feature
 or feature mode**, naming the signal. MANDATORY at close: record the minimal durable trace with
 `python3 ai/scripts/feature-state.py log-quickfix --summary "<what/why>" --result done --file <path> --gate "<gate evidence>"`
-— quick-fixes with no trace are how the development thread gets lost.
+— quick-fixes with no trace are how the development thread gets lost. Gate red in quick-fix (no package):
+retry locally or escalate to scoped/feature with a named `--risk-signal`; salvage does not apply, and the
+context pack required of packages (033 AC-6.1) does not apply either — a quick-fix never creates a package.
 
 ### 4. Incident / break-glass — production is broken NOW
 Triggers: production down or a user blocked with no in-app path, and speed matters more than ceremony (e.g. a
@@ -114,12 +118,16 @@ to quick-fix and record why with `log-decision` — escalation is not a one-way 
 ## Physical budgets per mode (enforced by the state CLI, not by prose)
 
 The mode you choose is not just a flow — it sets hard budgets in the feature state. Pass it to
-`feature-state.py init` via `--mode`:
+`feature-state.py init` via `--mode`. Operational default for a 1-3 file change with no risk signal is
+**quick-fix without `init`** (`implement → gate → log-quickfix`). `init --mode scoped` / `feature`
+without `--risk-signal TOKEN` dies `RISK_SIGNAL_REQUIRED` and leaves no valid state (unknown token →
+`RISK_SIGNAL_INVALID`). The CLI `--mode` default stays `scoped` on purpose: a bare `init` fails closed
+instead of silently opening ceremony. Do not treat `scoped` as the default lane for 1-3 files.
 
 | Mode | `--mode` | Spawns/package | Deep review cycles | Gate failures |
 |---|---|---|---|---|
 | Feature / SDD | `feature` (opt-in) | 12 | 2 | 3 |
-| Scoped-feature | `scoped` (default) | 8 | 2 | 3 |
+| Scoped-feature | `scoped` | 8 | 2 | 3 |
 | Quick-fix | `quick-fix` | 4 | 1 | 2 |
 | Incident | `incident` | 6 | 1 | 2 |
 

@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-18T15:34:35+00:00
+Actualizado: 2026-08-19T18:30:21+00:00
 
 [2026-08-14T05:11:39+00:00] C1-estado-fuera-del-producto · implementer · started · modelo anthropic/opus · effort medium
 Cliente: Que quien clone el proyecto no herede tu historial de trabajo, y que vos no pierdas el tuyo.

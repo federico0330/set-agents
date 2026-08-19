@@ -1,7 +1,7 @@
 ---
 name: ux-ui-designer
 description: "UX-UI-Designer \u2014 frontend design, design tokens, accessibility, error UX"
-model: inherit
+model: claude-opus-5
 readonly: false
 ---
 

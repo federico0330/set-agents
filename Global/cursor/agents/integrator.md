@@ -1,7 +1,7 @@
 ---
 name: integrator
 description: "Integrator \u2014 integrate accepted packages and run global consistency checks"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

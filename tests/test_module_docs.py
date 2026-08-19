@@ -68,7 +68,7 @@ def _init_ready_package(root: Path) -> Path:
     digest = hashlib.sha256(spec.read_bytes()).hexdigest()
     axes_log = _axes_log(root, "feat")
     _run("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test",
-         "--axes-log", str(axes_log), cwd=root)
+         "--axes-log", str(axes_log), "--risk-signal", "user-asked-full-pipeline", cwd=root)
     _run("create-package", "PKG-01", "objective", "--state-file", str(state),
          "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium",
          "--owned-path", "src/demo/**", "--actor", "test", cwd=root)
@@ -369,7 +369,7 @@ class ModuleImpactCliTests(unittest.TestCase):
             digest = hashlib.sha256(spec.read_bytes()).hexdigest()
             axes_log = _axes_log(root, "feat")
             _run("init", "feat", str(spec), digest, "--state-file", str(state), "--approved-by", "test",
-                 "--axes-log", str(axes_log), cwd=root)
+                 "--axes-log", str(axes_log), "--risk-signal", "user-asked-full-pipeline", cwd=root)
             _run("create-package", "PKG-01", "objective", "--state-file", str(state),
                  "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium",
                  "--owned-path", "src/demo/**", "--owned-path", "src/orphan/unmatched.py",

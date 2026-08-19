@@ -1,7 +1,7 @@
 ---
 description: "Refactor-Specialist \u2014 behavior-preserving refactors under a test net"
 mode: subagent
-model: openai/gpt-5.3-codex-spark
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 steps: 18
 permission:

@@ -1,7 +1,7 @@
 ---
 name: frontend-engineer
 description: "Frontend-engineer \u2014 build brand-grade, accessible UI that never looks generic"
-model: inherit
+model: composer-2.5
 readonly: false
 ---
 

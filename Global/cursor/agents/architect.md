@@ -1,7 +1,7 @@
 ---
 name: architect
 description: "Architect \u2014 design, ADRs, Clean/Hexagonal/SOLID before implementation"
-model: inherit
+model: claude-opus-5
 readonly: false
 ---
 

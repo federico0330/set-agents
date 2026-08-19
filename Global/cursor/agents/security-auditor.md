@@ -1,7 +1,7 @@
 ---
 name: security-auditor
 description: "Security-Auditor \u2014 offensive + defensive read-only security review"
-model: inherit
+model: gpt-5.6-sol
 readonly: true
 ---
 

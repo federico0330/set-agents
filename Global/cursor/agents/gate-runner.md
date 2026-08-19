@@ -1,7 +1,7 @@
 ---
 name: gate-runner
 description: "Gate runner \u2014 deterministic verification without repair"
-model: inherit
+model: composer-2.5
 readonly: true
 ---
 

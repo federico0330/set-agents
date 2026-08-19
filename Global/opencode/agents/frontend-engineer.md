@@ -1,7 +1,7 @@
 ---
 description: "Frontend-engineer \u2014 build brand-grade, accessible UI that never looks generic"
 mode: subagent
-model: openai/gpt-5.3-codex-spark
+model: opencode/deepseek-v4-flash-free
 temperature: 0.2
 steps: 30
 permission:

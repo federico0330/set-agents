@@ -1,7 +1,7 @@
 ---
 name: brainstormer
 description: "Brainstormer \u2014 divergent idea generation with explicit tradeoffs"
-model: inherit
+model: composer-2.5
 readonly: true
 ---
 

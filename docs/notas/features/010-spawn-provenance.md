@@ -46,7 +46,7 @@
 
 ## Qué falta
 
-- _nada pendiente_ ✅
+- WARN spawns 11/12 WARN 80%
 
 ## Presupuestos
 

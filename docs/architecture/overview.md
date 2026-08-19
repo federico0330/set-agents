@@ -1,6 +1,8 @@
 # Architecture overview
 
-This is the high-level map of the harness as of ADR-0036 (feature 019-harness-evolution). It describes the
+This is the high-level map of the harness as of ADR-0064 (feature 034-cuota-organica-y-writer-barato).
+The trusted-routing diagrams below still describe that subsystem as of ADR-0036; 034 adds mode-selection
+and writer-quota on top of it (next section) without changing the SQLite dispatch path. It describes the
 accepted architecture target, not evidence that implementation is complete; decision rationale lives in the
 [ADR index](../adr/README.md). **Per-module detail lives in [`docs/modules/`](../modules/modules.toml)
 (ADR-0036). Of that schema's eight sections, only three are machine-regenerated on every state mutation
@@ -93,6 +95,34 @@ authorized/open/non-partial/non-terminal; after `mark_dispatched`, external star
 never may. Reviewer/auditor/judge routing uses the actual provider/model/family/effort/runtime of a
 terminal-success `code-rw` dispatch, excludes its family, and prefers another authenticated provider.
 
+## Mode selection and writer quota (034)
+
+Ceremony and model weight are two different budgets. Neither lives in `routing.db`.
+`MODE_BUDGETS.scoped = 8` still counts spawns; a separate frontier cap (4/package, 16/feature)
+counts heavy models. Why: [ADR index](../adr/README.md) 0060–0064.
+
+```mermaid
+flowchart TD
+    Req["Pedido"] --> Triage{"1-3 archivos y sin señal de riesgo?"}
+    Triage -->|sí| QF["quick-fix: implementer barato → gate → log-quickfix"]
+    Triage -->|no, señal nombrada| Init["init scoped/feature --risk-signal TOKEN"]
+    Init --> Cheap["implementer barato"]
+    Cheap --> Gate{"gate"}
+    Gate -->|verde, sin salvage| First["cuenta green-on-first-attempt"]
+    Gate -->|rojo| Salvage{"¿cupo frontier libre y sin salvage previo?"}
+    Salvage -->|sí| Heavy["1 repair-agent pesado"]
+    Salvage -->|no| Human["HUMAN_DECISION_REQUIRED"]
+    Heavy --> Gate2{"gate"}
+    Gate2 -->|rojo| Human
+    Cheap -.-> Cursor["Cursor: pin por rol en models.toml, no inherit"]
+```
+
+A 1–3 file change cannot `init --mode scoped` without `--risk-signal` (the testable gate, not an LLM).
+`code-rw` defaults to `billing_rank == 0` plus the writer tools floor, not the `-fast` suffix.
+Cursor pins a model per role and stays out of `RUNTIMES`. One heavy salvage per package; the line-count
+repair ceiling (ADR-0023) still applies to post-panel diffs. Hitting the frontier cap beats salvage and
+auto-promotion.
+
 ## Use cases and delivery boundary
 
 - Explain a trusted hypothetical route without mutating the SQLite dispatch/event state (it may read, never
@@ -105,6 +135,10 @@ terminal-success `code-rw` dispatch, excludes its family, and prefers another au
 - Refuse persistent routing on unsafe paths, unsupported platforms, or unreliable/unknown network filesystems.
 - Enumerate only the approved legacy basenames/rotated-event regex, `lstat` without following, and warn
   present/unsafe without opening, reading, or mutating legacy state.
+- Classify a 1–3 file change without a named risk signal as quick-fix (no `init scoped`); persist
+  `scoped`/`feature` only with `--risk-signal` (ADR-0064).
+- Dispatch `code-rw` on the cheap/free default; one heavy salvage; stop at the frontier cap 4/16 (ADR-0060–0062).
+  Cursor pins per role from `models.toml`, never as a routing lane (ADR-0063).
 
 ## Adaptive dispatch CLI contract (004 P1-dispatch-core)
 

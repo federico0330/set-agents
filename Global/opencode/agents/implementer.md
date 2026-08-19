@@ -1,7 +1,7 @@
 ---
 description: "Implementer \u2014 bounded package work with local validation, no self-approval"
 mode: subagent
-model: openai/gpt-5.6-fast
+model: opencode/deepseek-v4-flash-free
 temperature: 0.1
 steps: 30
 permission:
