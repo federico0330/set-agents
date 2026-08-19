@@ -15,7 +15,7 @@ from feature_state_lib import model
 from feature_state_lib.model import (
     StateError, now, state_path, print_json, parse_json_object, parse_bool, base_state,
     compact_package, load_state, atomic_write, validate_state, fail_if_invalid,
-    package_by_id, task_by_id, MODE_BUDGETS, TERMINAL,
+    package_by_id, task_by_id, MODE_BUDGETS, TERMINAL, persist_review_requirements,
 )
 from feature_state_lib.transitions import check_transition, next_transition
 from feature_state_lib.render_status import render_status
@@ -314,6 +314,7 @@ def cmd_create_package(args: argparse.Namespace) -> int:
         package["shared_paths"] = args.shared_path or []
         package["risks"] = args.risk or []
         package["complexity"] = args.complexity
+        persist_review_requirements(package)
         package["selected_role"] = args.selected_role
         package["selected_model"] = args.selected_model
         package["routing_reason"] = args.routing_reason
@@ -356,6 +357,7 @@ def cmd_update_package(args: argparse.Namespace) -> int:
             package["diff_ref"] = args.diff_ref
         if args.complexity:
             package["complexity"] = args.complexity
+            persist_review_requirements(package)
         if args.selected_role:
             package["selected_role"] = args.selected_role
         if args.selected_model:

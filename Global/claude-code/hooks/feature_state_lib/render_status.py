@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from feature_state_lib import model
-from feature_state_lib.model import StateError, now, load_state, package_by_id, TERMINAL_FINDING_STATUSES
+from feature_state_lib.model import (
+    StateError, now, load_state, package_by_id, TERMINAL_FINDING_STATUSES,
+    spawn_budget_counts, spawn_budget_label,
+)
 from feature_state_lib.transitions import next_transition
 from feature_state_lib.render_bitacora import read_jsonl, collect_narrative, format_narrative
 
@@ -213,7 +216,6 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
         current = package_by_id(data)
     except StateError:
         pass
-    spawns = sum(p.get("attempts", {}).get("spawns", 0) for p in packages)
     cycles = current.get("attempts", {}).get("deep_review_cycles", 0) if current else 0
     open_findings = sum(
         1
@@ -230,7 +232,7 @@ def summarize_feature(data: dict[str, Any]) -> dict[str, Any]:
         "phase": data.get("phase", "?"),
         "package": f"{current.get('package_id')} ({current.get('status')})" if current else "-",
         "accepted": f"{sum(1 for p in packages if p.get('status') == 'accepted')}/{len(packages)}",
-        "spawns": f"{spawns}/{budgets.get('max_spawns_per_package', '?')}",
+        "spawns": spawn_budget_label(*spawn_budget_counts(data)),
         "reviews": f"{cycles}/{budgets.get('max_deep_review_cycles', '?')}",
         "open_findings": open_findings,
         # Raw here would put agent-authored newlines and pipes into a markdown TABLE in
