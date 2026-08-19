@@ -67,6 +67,8 @@ def collect_narrative(features_dir: Path, out_dir: Path) -> list[dict[str, Any]]
                 "model": meta.get("model", ""),
                 "provider": meta.get("provider", ""),
                 "effort": meta.get("effort", ""),
+                "spawn_budget": meta.get("spawn_budget", ""),
+                "spawn_budget_warn": meta.get("spawn_budget_warn", False),
             })
     # Timestamps have second resolution, so an opening and its closing block can
     # tie. Break the tie on result so a delegation never reads as having finished
@@ -112,6 +114,11 @@ def format_narrative(entry: dict[str, Any]) -> list[str]:
         parts.append("modelo " + _short(f"{provider}/{model}" if provider else model, 80))
     if entry.get("effort"):
         parts.append("effort " + _short(entry["effort"], 20))
+    if entry.get("spawn_budget"):
+        budget_bit = "spawns " + _short(entry["spawn_budget"], 40)
+        if entry.get("spawn_budget_warn"):
+            budget_bit += " WARN 80%"
+        parts.append(budget_bit)
     tail = " · ".join(parts)
     lines = [
         f"[{entry.get('at', '?')}] {tail}".rstrip(),

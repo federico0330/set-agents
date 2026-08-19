@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -87,6 +88,20 @@ MUTATING_COMMANDS = {
     "reopen-from-done",
 }
 NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist", "repair-agent"}
+# AC-6.3: panel size is a state-machine rule, not the orchestrator of the day's taste.
+# small+low closes with one reviewer; medium/high keeps the full panel. Risk defaults
+# to low when the planner left it null — do not make the human name it (PKG-6).
+DEFAULT_PACKAGE_RISK = "low"
+SINGLE_REVIEW_PANEL = ["package-reviewer"]
+FULL_REVIEW_PANEL = ["package-reviewer", "security-auditor"]
+# AC-6.4: warn while budget remains, not only after overflow. Integer used/ceiling
+# compared at 80%; the hard cap still lives in record-spawn / validate_state.
+SPAWN_BUDGET_WARN_RATIO = 0.8
+# AC-6.2: P001 argv shapes copied from claude_local_gate_guard.py:43-61. That hook
+# cannot be imported (it reads stdin at module import), so the allowlist is pinned
+# here and the test asserts both sources still describe the same commands.
+P001_SCRIPTS = {"ai/scripts/feature-state.py", "ai/scripts/check-owned-paths.py"}
+P001_RECORD_GATE_STATE = "ai/state/002-local-uat-identities-and-feature-state.json"
 # Refuting retires a blocking finding with no code change: it is an authorization verb,
 # not bookkeeping, so it needs its own actor gate.  Enforcing separation of duties one
 # step downstream of the verb that defeats the gate is not enforcement.  `upheld`
@@ -302,6 +317,11 @@ def compact_package(package_id: str, objective: str) -> dict[str, Any]:
         "runtime_surface": True,
         "status": "planned",
         "complexity": None,
+        # AC-6.3: low|medium|high. None means "planner left it null" — readers call
+        # resolve_package_risk, which defaults to DEFAULT_PACKAGE_RISK rather than
+        # asking the human. Distinct from `risks` (free-text notes from --risk).
+        "risk": None,
+        "required_reviewers": None,
         "selected_role": None,
         "selected_model": None,
         "routing_reason": None,
@@ -441,6 +461,130 @@ def fail_if_invalid(data: dict[str, Any]) -> None:
     errors = validate_state(data)
     if errors:
         raise StateError("; ".join(errors))
+
+
+def resolve_package_risk(package: dict[str, Any]) -> str:
+    """AC-6.3: a stored `risk` wins; else a whole-item token in `risks`; else low.
+
+    Defaulting in the machine is documented so the planner is not blocked on a
+    missing flag. A free-text risk note that is not exactly low/medium/high is
+    not a level.
+    """
+    stored = package.get("risk")
+    if stored in {"low", "medium", "high"}:
+        return stored
+    for item in package.get("risks") or []:
+        token = str(item).strip().lower()
+        if token in {"low", "medium", "high"}:
+            return token
+    return DEFAULT_PACKAGE_RISK
+
+
+def required_reviewers_for(complexity: str | None, risk: str | None) -> list[str]:
+    """small AND low → one reviewer; any medium/high axis → full panel.
+
+    Unset complexity fail-safes to medium (full panel) rather than shrinking
+    review. Unset risk is low (DEFAULT_PACKAGE_RISK).
+    """
+    complexity = complexity or "medium"
+    risk = risk or DEFAULT_PACKAGE_RISK
+    if complexity == "small" and risk == "low":
+        return list(SINGLE_REVIEW_PANEL)
+    return list(FULL_REVIEW_PANEL)
+
+
+def persist_review_requirements(package: dict[str, Any]) -> list[str]:
+    """Write resolved risk + required_reviewers onto the package and return them."""
+    package["risk"] = resolve_package_risk(package)
+    reviewers = required_reviewers_for(package.get("complexity"), package["risk"])
+    package["required_reviewers"] = reviewers
+    return reviewers
+
+
+def context_pack_path(data: dict[str, Any], package_id: str) -> Path:
+    spec = Path(((data.get("approved_spec") or {}).get("path")) or "")
+    return spec.parent / "context" / f"{package_id}.md"
+
+
+def context_pack_errors(data: dict[str, Any], package_id: str | None) -> list[str]:
+    """AC-6.1: PACKAGE_IMPLEMENTATION requires docs/specs/<feature>/context/<PKG>.md.
+
+    The recorded `context_pack` path, when set, must exist; otherwise the
+    canonical sibling of approved_spec.path must exist. Dry-run's sentinel hash
+    skips the disk check — that workflow never touches the delivery folder.
+    """
+    if (data.get("approved_spec") or {}).get("hash") == "dry-run":
+        return []
+    try:
+        package = package_by_id(data, package_id)
+    except StateError:
+        return ["context pack required: package_id is required"]
+    pid = package.get("package_id") or package_id or "?"
+    recorded = package.get("context_pack")
+    if recorded:
+        if Path(recorded).is_file():
+            return []
+        return [f"context pack not found: {recorded}"]
+    expected = context_pack_path(data, pid)
+    if expected.is_file():
+        return []
+    return [f"cannot enter PACKAGE_IMPLEMENTATION without {expected}"]
+
+
+def is_p001_command(command: str) -> bool:
+    """True iff `command` matches the P001 allowlist (claude_local_gate_guard.py:43-61)."""
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    if not argv:
+        return False
+    return (
+        (len(argv) == 4 and argv[:3] == ["python3", "-m", "py_compile"] and argv[3] in P001_SCRIPTS)
+        or (len(argv) == 3 and argv[0] == "python3" and argv[1] in P001_SCRIPTS and argv[2] == "--help")
+        or (
+            len(argv) == 7
+            and argv[:2] == ["python3", "ai/scripts/check-owned-paths.py"]
+            and argv[2::2] == ["--state-file", "--package-id", "--baseline"]
+        )
+        or argv == ["git", "diff", "--check"]
+        or (
+            len(argv) >= 5
+            and argv[:3] == ["python3", "ai/scripts/feature-state.py", "record-gate"]
+            and argv.count("--state-file") == 1
+            and argv[argv.index("--state-file") + 1:argv.index("--state-file") + 2] == [P001_RECORD_GATE_STATE]
+        )
+    )
+
+
+def spawn_budget_counts(data: dict[str, Any], package: dict[str, Any] | None = None) -> tuple[int, int]:
+    ceiling = (data.get("budgets") or {}).get("max_spawns_per_package", 12)
+    if not isinstance(ceiling, int) or ceiling < 0:
+        ceiling = 12
+    if package is not None:
+        used = (package.get("attempts") or {}).get("spawns", 0) or 0
+    else:
+        packages = data.get("packages", [])
+        if isinstance(packages, dict):
+            packages = packages.values()
+        used = 0
+        for item in packages or []:
+            if not isinstance(item, dict):
+                continue
+            used += (item.get("attempts") or {}).get("spawns", 0) or 0
+    return int(used), ceiling
+
+
+def spawn_budget_warns(used: int, ceiling: int) -> bool:
+    """True at or above 80% of the mode ceiling, while the hard cap still has room."""
+    return ceiling > 0 and used < ceiling and used / ceiling >= SPAWN_BUDGET_WARN_RATIO
+
+
+def spawn_budget_label(used: int, ceiling: int) -> str:
+    label = f"{used}/{ceiling}"
+    if spawn_budget_warns(used, ceiling):
+        label += " WARN 80%"
+    return label
 
 
 def package_by_id(data: dict[str, Any], package_id: str | None = None) -> dict[str, Any]:

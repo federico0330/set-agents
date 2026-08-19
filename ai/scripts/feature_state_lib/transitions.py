@@ -10,7 +10,7 @@ from typing import Any
 from feature_state_lib.model import (
     StateError, LEGAL_TRANSITIONS, TERMINAL, has_open_findings, package_by_id,
     package_accept_ready, package_review_ready, tasks_complete, done_ready,
-    module_impacts_ready,
+    module_impacts_ready, context_pack_errors,
 )
 
 
@@ -18,6 +18,10 @@ def check_transition(data: dict[str, Any], to_phase: str, package_id: str | None
     from_phase = data.get("phase")
     if to_phase not in LEGAL_TRANSITIONS.get(from_phase, set()):
         raise StateError(f"illegal transition: {from_phase} -> {to_phase}")
+    if to_phase == "PACKAGE_IMPLEMENTATION":
+        errors = context_pack_errors(data, package_id)
+        if errors:
+            raise StateError("cannot enter PACKAGE_IMPLEMENTATION: " + "; ".join(errors))
     if to_phase == "PACKAGE_REVIEW":
         errors = package_review_ready(package_by_id(data, package_id))
         if errors:

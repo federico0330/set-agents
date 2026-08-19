@@ -36,6 +36,8 @@ from feature_state_lib.model import (
     package_review_ready, package_accept_ready, done_ready,
     PHASES, LEGAL_TRANSITIONS, TERMINAL, MUTATING_COMMANDS, NON_ACCEPTING_ACTORS, REFUTING_ACTORS,
     DEFAULT_MAX_VERIFICATIONS, MODE_BUDGETS, TERMINAL_FINDING_STATUSES,
+    is_p001_command, persist_review_requirements, spawn_budget_counts, spawn_budget_warns,
+    spawn_budget_label,
 )
 from feature_state_lib.transitions import check_transition, next_transition
 from feature_state_lib.render_status import status_root, summarize_feature, render_status
@@ -396,6 +398,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
 
 def cmd_record_spawn(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
+    commands = [item for item in (getattr(args, "command", None) or []) if item]
 
     def update(data: dict[str, Any]) -> bool:
         if replayed(data, "record-spawn", args.event_id):
@@ -408,6 +411,11 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             return False
         if data["phase"] in TERMINAL:
             raise StateError(f"cannot record spawn from phase {data['phase']}")
+        if args.role == "gate-runner" and commands and all(is_p001_command(item) for item in commands):
+            raise StateError(
+                "gate-runner spawn rejected: all commands are on the P001 allowlist; "
+                "use local-gate-runner"
+            )
         package = package_by_id(data, args.package_id)
         attempts = package.setdefault("attempts", {})
         budget = data.get("budgets", {}).get("max_spawns_per_package", 12)
@@ -436,6 +444,10 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             "at": now(),
         }
         metadata = {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"], "spawn_id": spawn_id}
+        used, ceiling = spawn_budget_counts(data, package)
+        metadata["spawn_budget"] = f"{used}/{ceiling}"
+        if spawn_budget_warns(used, ceiling):
+            metadata["spawn_budget_warn"] = True
         # The two registers of the opening narration block. Optional so older
         # callers keep working, but the orchestrator doctrine requires them:
         # they are what render_bitacora turns into the durable story.
@@ -451,6 +463,9 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             if value:
                 entry[key] = value
                 metadata[key] = value
+        if commands:
+            entry["commands"] = commands
+            metadata["commands"] = commands
         spawns.append(entry)
         record_event(
             data,
@@ -465,6 +480,16 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         return True
 
     data, changed = mutate(path, args, "record-spawn", update)
+    try:
+        package = package_by_id(data, args.package_id)
+        used, ceiling = spawn_budget_counts(data, package)
+        if spawn_budget_warns(used, ceiling):
+            print(
+                f"SPAWN_BUDGET_WARN {spawn_budget_label(used, ceiling)}",
+                file=sys.stderr,
+            )
+    except StateError:
+        pass
     return output_state(data, changed, path)
 
 
@@ -488,6 +513,25 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
         errors = package_review_ready(package)
         if errors:
             raise StateError("cannot start review panel: " + "; ".join(errors))
+        required = persist_review_requirements(package)
+        writers = [role for role in roles if role in NON_ACCEPTING_ACTORS]
+        if writers:
+            raise StateError(
+                "review panel cannot include a writer that would patch or self-approve: "
+                + ", ".join(writers)
+            )
+        missing = [role for role in required if role not in roles]
+        if len(required) > 1 and missing:
+            raise StateError(
+                "start-review-panel requires "
+                + ", ".join(required)
+                + f" for complexity={package.get('complexity')} risk={package.get('risk')}"
+                + f"; missing {', '.join(missing)}"
+            )
+        if len(required) == 1 and len(roles) > 1:
+            raise StateError(
+                "small+low packages close with one reviewer; extra panel roles are rejected"
+            )
         attempts = package.setdefault("attempts", {})
         if attempts.get("deep_review_cycles", 0) >= data["budgets"]["max_deep_review_cycles"]:
             return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted",
@@ -938,6 +982,7 @@ def build_parser() -> argparse.ArgumentParser:
     spawn.add_argument("--provider")
     spawn.add_argument("--effort")
     spawn.add_argument("--route-id", help="run_id (writer/verified-review) o decision_id (resto) del --route-decide")
+    spawn.add_argument("--command", action="append", help="gate command; all-P001 gate-runner spawns are rejected")
     spawn.set_defaults(func=cmd_record_spawn)
 
     review = sub.add_parser("record-review")

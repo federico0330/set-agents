@@ -11,18 +11,15 @@ the harness dispatched the run at all -- a session started by hand shows up here
 - Codex:       ~/.codex/state_5.sqlite threads (per-thread aggregate; --deep parses the
                rollout jsonl for the cached/reasoning breakdown)
 
-Section 2 -- HARNESS DISPATCH REGISTRY (this harness's own `dispatches` table,
-~/.local/state/set-agentes/routing-v2/routing.db, 023-senales-de-consumo PKG-B1/B2): every
-run the ROUTER ITSELF dispatched and closed with usable usage, across EVERY runtime it can
-route to -- pi natively, plus any claude-code-lane/opencode-lane redirect PKG-B2 wired onto
-the store's flat vocabulary (`routing_core/usage.py`). Every row is still labeled "pi" for
-historical reasons this package does not fix (cosmetic, per the package's own context pack)
--- but this section's COVERAGE is every runtime the harness dispatches, not only the pi CLI.
-Bounded to spawns the harness itself dispatched through set_agents_spawn.py/
-claude_code_spawn.py/opencode_spawn.py -- a session started by hand is invisible here. The
-stored project_key is a one-way hash, not invertible to a directory: this section is
-attributed to a project only when --project is given (the key is recomputed locally and
-matched); otherwise it is reported unattributed rather than guessed.
+Section 2 -- HARNESS DISPATCH REGISTRY (this harness's own record of what it
+dispatched). Two sources, merged into this section, never invented via --route-decide:
+- ~/.local/state/set-agentes/routing-v2/routing.db `dispatches` (023 PKG-B1/B2): every
+  run the ROUTER ITSELF dispatched through set_agents_spawn.py/claude_code_spawn.py/
+  opencode_spawn.py. Empty on Cursor: native subagents never go through those CLIs.
+- ai/state/features/*.json `spawns[]` (and history `record-spawn` when a package has
+  no spawns[] yet): what this harness actually records on every runtime, including
+  Cursor. Token fields are absent there — sessions still count. Requires --project
+  so the features directory can be found.
 
 WHY THESE NEVER SUM (AC-04): a run the harness dispatches through the claude-code or
 opencode lane is the SAME spend Section 1 already counts from that CLI's own transcript/
@@ -74,12 +71,13 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
         epilog="Two sections, never summed (AC-04/AC-05): Section 1 is each CLI's own native "
-               "store; Section 2 is this harness's own dispatch registry (every runtime it "
-               "dispatched, labeled 'pi' per row for historical reasons -- see the module "
-               "docstring). Section 2 coverage: only spawns dispatched through "
-               "set_agents_spawn.py/claude_code_spawn.py/opencode_spawn.py; a session started "
-               "by hand is invisible there. Without --project it is reported unattributed "
-               "(project_key is a one-way hash, never guessed back to a path).",
+               "store; Section 2 is this harness's own dispatch registry (routing.db "
+               "dispatches PLUS ai/state/features/*.json spawns the harness recorded -- "
+               "see the module docstring). Section 2 coverage: router dispatches through "
+               "set_agents_spawn.py/claude_code_spawn.py/opencode_spawn.py, and feature-state "
+               "record-spawn rows under --project. Without --project, routing.db rows are "
+               "unattributed (project_key is a one-way hash, never guessed back to a path) "
+               "and feature-state spawns are skipped.",
     )
     parser.add_argument("--project", help="only sessions whose cwd is inside this directory "
                         "(also required to attribute Section 2 to a project)")
@@ -404,6 +402,83 @@ def collect_pi(report, home, project, since_ms):
         conn.close()
 
 
+def _iso_to_ms(stamp):
+    if not stamp:
+        return None
+    text = str(stamp).replace("Z", "+00:00")
+    try:
+        return int(dt.datetime.fromisoformat(text).timestamp() * 1000)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _iter_recorded_spawns(data):
+    """Prefer package.spawns[]; fall back to history record-spawn when spawns[] is empty.
+
+    A package that has both must not be counted twice — that was the Cursor blind
+    spot this collector exists to close, not a new double-count.
+    """
+    history = [
+        event for event in data.get("history") or []
+        if isinstance(event, dict) and event.get("event") == "record-spawn"
+    ]
+    for package in data.get("packages") or []:
+        if not isinstance(package, dict):
+            continue
+        spawns = [item for item in (package.get("spawns") or []) if isinstance(item, dict)]
+        if spawns:
+            for item in spawns:
+                yield item
+            continue
+        pid = package.get("package_id")
+        for event in history:
+            if event.get("package_id") == pid:
+                meta = event.get("metadata") or {}
+                yield {
+                    "role": meta.get("role"),
+                    "model": meta.get("model"),
+                    "provider": meta.get("provider"),
+                    "at": event.get("timestamp") or meta.get("at"),
+                }
+
+
+def collect_feature_spawns(report, project, since_ms):
+    """AC-6.5: ingest ai/state/features/*.json spawns the harness actually recorded.
+
+    Cursor subagents never hit routing.db; this is the ledger that does exist.
+    No --route-decide, no spawn CLI. Token fields stay zero — sessions still count.
+    """
+    if not project:
+        return
+    features_dir = Path(project) / "ai" / "state" / "features"
+    if not features_dir.is_dir():
+        return
+    directory = str(Path(project).resolve())
+    for path in sorted(features_dir.glob("*.json")):
+        if path.name.startswith("_"):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        feature_id = data.get("feature_id") or path.stem
+        for spawn in _iter_recorded_spawns(data):
+            stamp_ms = _iso_to_ms(spawn.get("at"))
+            if since_ms and stamp_ms is not None and stamp_ms < since_ms:
+                continue
+            model = spawn.get("model")
+            provider = spawn.get("provider")
+            if provider and model:
+                model = f"{provider}/{model}"
+            role = spawn.get("role") or feature_id
+            add(report, directory, "feature-state", model, role, {
+                "input": 0, "output": 0, "cache_read": 0, "cache_write": 0,
+                "reasoning": 0, "sessions": 1,
+            })
+
+
 # ---------------------------------------------------------------------------------------
 # 023-senales-de-consumo PKG-B4 (AC-08/AC-09/AC-10, ADR-0046) -- ESTIMATED remaining quota,
 # read from `usage_rollups` (schema 9, PKG-B3). Tokens only, same "what matters is quota"
@@ -615,7 +690,10 @@ def render(report, md, *, title, source):
 _SECTION_1_TITLE = "Section 1 -- CLI-native stores"
 _SECTION_1_SOURCE = "opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting)"
 _SECTION_2_TITLE = "Section 2 -- harness dispatch registry"
-_SECTION_2_SOURCE = "routing.db `dispatches` table (this harness's own record of what IT dispatched, every runtime)"
+_SECTION_2_SOURCE = (
+    "routing.db `dispatches` plus ai/state/features/*.json spawns[] / history record-spawn "
+    "(this harness's own record of what it dispatched, every runtime including Cursor)"
+)
 _NEVER_SUM_DISCLAIMER = (
     "These two sections measure OVERLAPPING spend from different vantage points -- a run this "
     "harness dispatches through the claude-code or opencode lane is counted in BOTH sections "
@@ -640,6 +718,7 @@ def main():
 
     harness_registry = defaultdict(new_bucket)
     collect_pi(harness_registry, home, args.project, since_ms)
+    collect_feature_spawns(harness_registry, args.project, since_ms)
 
     render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
     render(harness_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)

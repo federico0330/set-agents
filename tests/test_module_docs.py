@@ -72,6 +72,9 @@ def _init_ready_package(root: Path) -> Path:
     _run("create-package", "PKG-01", "objective", "--state-file", str(state),
          "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium",
          "--owned-path", "src/demo/**", "--actor", "test", cwd=root)
+    pack = spec.parent / "context" / "PKG-01.md"
+    pack.parent.mkdir(parents=True, exist_ok=True)
+    pack.write_text("# pack\n")
     _run("transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01",
          "--state-file", str(state), "--actor", "test", cwd=root)
     for tid in ("T1", "T2"):

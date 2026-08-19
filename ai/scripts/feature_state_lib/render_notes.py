@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from feature_state_lib.model import now, package_by_id, TERMINAL_FINDING_STATUSES
+from feature_state_lib.model import now, package_by_id, TERMINAL_FINDING_STATUSES, spawn_budget_counts, spawn_budget_warns, spawn_budget_label
 from feature_state_lib.render_status import status_root, describe_next_step
 
 
@@ -193,6 +193,9 @@ def _pending_bits(data: dict[str, Any]) -> list[str]:
             n = len(pending)
             noun = "tarea" if n == 1 else "tareas"
             bits.append(f"{n} {noun} pendientes en {package.get('package_id')}")
+    used, ceiling = spawn_budget_counts(data)
+    if spawn_budget_warns(used, ceiling):
+        bits.append(f"WARN spawns {spawn_budget_label(used, ceiling)}")
     return bits
 
 

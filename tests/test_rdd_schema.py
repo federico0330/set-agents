@@ -305,6 +305,9 @@ class FreezeCandidateAndReceiptCliTests(unittest.TestCase):
         self._init(state)
         _run("create-package", package_id, "objective", "--state-file", str(state),
              "--complexity", "small", "--ac", "AC-01", "--task", "T1", "--actor", "test", cwd=repo)
+        pack = Path(state).parent / "context" / f"{package_id}.md"
+        pack.parent.mkdir(parents=True, exist_ok=True)
+        pack.write_text("# pack\n")
         _run("transition", "PACKAGE_IMPLEMENTATION", "--package-id", package_id,
              "--state-file", str(state), "--actor", "test", cwd=repo)
         _run("start-task", package_id, "T1", "--state-file", str(state), "--actor", "test", cwd=repo)

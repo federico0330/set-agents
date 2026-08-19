@@ -346,6 +346,15 @@ def spec_digest(state, feature_id="feat"):
     return hashlib.sha256(spec_path(state, feature_id).read_bytes()).hexdigest()
 
 
+def write_context_pack(state, package_id="PKG-01", feature_id="feat"):
+    """AC-6.1 fixture: the canonical sibling of the approved spec must exist."""
+    pack = spec_path(state, feature_id).parent / "context" / f"{package_id}.md"
+    pack.parent.mkdir(parents=True, exist_ok=True)
+    if not pack.exists():
+        pack.write_text(f"# context pack {package_id}\n", encoding="utf-8")
+    return pack
+
+
 def write_graph_fixture(root, feature_id, data):
     """P3-graph-view (006/AC-29): a synthetic `<root>/ai/state/features/<fid>.json`, never
     a real in-flight feature's state file -- those change under a test's feet as other
@@ -419,11 +428,12 @@ class HarnessTests(unittest.TestCase):
             "--ac", "AC-1", "--ac", "AC-2",
             "--task", "T-001", "--task", "T-002", "--task", "T-003",
             "--owned-path", "src/**", "--owned-path", "tests/**",
-            "--complexity", "medium",
+            "--complexity", "small",
             "--selected-role", "implementer",
             "--selected-model", "openai/gpt-5.6-terra",
             "--routing-reason", "three related tasks across code and tests",
         )
+        write_context_pack(state)
         self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
         for task_id in ("T-001", "T-002", "T-003"):
             self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "focused-test")
@@ -3142,6 +3152,7 @@ class HarnessTests(unittest.TestCase):
             "--owned-path", "src/**", "--complexity", "small",
             "--selected-role", "implementer", "--selected-model", "openai/gpt-5.6-terra",
             "--routing-reason", "tareas chicas y relacionadas")
+        write_context_pack(state, feature_id="feat-x")
         return root, state
 
     def test_sync_notes_renders_hub_feature_and_package_notes(self):
@@ -7736,6 +7747,7 @@ class HarnessTests(unittest.TestCase):
             )
             self.run_state(state, "block", "manual pause", "--package-id", "PKG-01", "--actor", "orchestrator")
             self.run_state(state, "reopen", "--reason", "resolved", "--authorized-by", "user", "--package-id", "PKG-01")
+            write_context_pack(state)
             self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
             for task_id in ("T-001", "T-002"):
                 self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "focused-test")
@@ -7835,6 +7847,7 @@ class HarnessTests(unittest.TestCase):
     def test_review_panel_allows_many_subagents_as_one_cycle(self):
         with tempfile.TemporaryDirectory() as td:
             state = self.create_ready_package(td, review=False)
+            self.run_state(state, "update-package", "PKG-01", "--complexity", "medium")
             self.run_state(
                 state, "start-review-panel", "PKG-01",
                 "--role", "package-reviewer", "--role", "security-auditor", "--role", "db-auditor", "--role", "performance-auditor",
@@ -7884,7 +7897,7 @@ class HarnessTests(unittest.TestCase):
             self.run_state(state, "start-review-panel", "PKG-01", "--panel-id", "RP-01",
                            "--role", "package-reviewer")
             again = self.run_state(state, "start-review-panel", "PKG-01", "--panel-id", "RP-01",
-                                   "--role", "package-reviewer", "--role", "architect", check=False)
+                                   "--role", "package-reviewer", check=False)
             package = json.loads(state.read_text())["packages"][0]
         self.assertEqual(again.returncode, 2)
         self.assertIn("already exists", again.stdout)
@@ -9224,6 +9237,7 @@ class HarnessTests(unittest.TestCase):
                 "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
                 "--owned-path", "src/**", "--complexity", "medium",
             )
+            write_context_pack(state)
             self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
             self.run_state(state, "complete-task", "PKG-01", "T-001", "--actor", "implementer", "--validation", "unit")
             self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
@@ -9242,6 +9256,7 @@ class HarnessTests(unittest.TestCase):
                 "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
                 "--owned-path", "src/**", "--complexity", "medium",
             )
+            write_context_pack(state)
             self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
             self.run_state(state, "complete-task", "PKG-01", "T-001", "--actor", "implementer", "--validation", "unit")
             self.run_state(state, "complete-task", "PKG-01", "T-002", "--actor", "implementer", "--validation", "unit")
@@ -9265,6 +9280,7 @@ class HarnessTests(unittest.TestCase):
                 "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
                 "--owned-path", "src/**", "--complexity", "medium",
             )
+            write_context_pack(state)
             self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
             self.run_state(state, "complete-task", "PKG-01", "T-001", "--actor", "implementer", "--validation", "unit")
             self.run_state(state, "complete-task", "PKG-01", "T-002", "--actor", "implementer", "--validation", "unit")
@@ -9320,6 +9336,7 @@ class HarnessTests(unittest.TestCase):
                 "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
                 "--owned-path", "src/**", "--complexity", "medium", *extra_create_args,
             )
+            write_context_pack(state)
             self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
             for task_id in ("T-001", "T-002"):
                 self.run_state(state, "complete-task", "PKG-01", task_id, "--actor", "implementer", "--validation", "unit")
@@ -10222,6 +10239,7 @@ class HarnessTests(unittest.TestCase):
                 "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
                 "--owned-path", "src/**", "--complexity", "medium",
             )
+            write_context_pack(state)
             self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
             resume = self.run_state(state, "resume")
             invalid = self.run_state(state, "transition", "PACKAGE_ACCEPTED", "--package-id", "PKG-01", check=False)
@@ -10238,6 +10256,7 @@ class HarnessTests(unittest.TestCase):
                 "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
                 "--owned-path", "src/**", "--complexity", "medium",
             )
+            write_context_pack(state)
             result = self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01", "--expect-revision", "0", check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn("stale revision", result.stdout)
@@ -11541,6 +11560,7 @@ class HarnessTests(unittest.TestCase):
             init_state(state)
             run("python3", str(FEATURE_STATE), "create-package", "PKG-01", "obj", "--state-file", str(state),
                 "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium")
+            write_context_pack(state)
             run("python3", str(FEATURE_STATE), "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01",
                 "--state-file", str(state))
             for task in ("T1", "T2"):
@@ -11592,6 +11612,7 @@ class HarnessTests(unittest.TestCase):
             init_state(state)
             run("python3", str(FEATURE_STATE), "create-package", "PKG-01", "obj", "--state-file", str(state),
                 "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium")
+            write_context_pack(state)
             run("python3", str(FEATURE_STATE), "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01",
                 "--state-file", str(state))
             for task in ("T1", "T2"):
@@ -12146,6 +12167,7 @@ class HarnessTests(unittest.TestCase):
             init_state(state)
             run("python3", str(FEATURE_STATE), "create-package", "PKG-01", "obj", "--state-file", str(state),
                 "--ac", "AC-1", "--task", "T1", "--task", "T2", "--complexity", "medium")
+            write_context_pack(state)
             run("python3", str(FEATURE_STATE), "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01",
                 "--state-file", str(state))
             for task in ("T1", "T2"):
@@ -12521,6 +12543,184 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("heartbeat-run.py", text, rel)
             self.assertIn("stall", text, rel)
             self.assertIsNone(re.compile(r"\| *tail\b").search(text), rel)
+
+    # ------------------------------------------------- 033-menos-espera-menos-cuota / PKG-6
+
+    def test_package_implementation_requires_a_context_pack_file(self):
+        # AC-6.1: same class of guard as the other check_transition preconditions.
+        # The implementer prompt "if it exists" is not enough.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            missing = self.run_state(
+                state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01",
+                check=False,
+            )
+            self.assertEqual(missing.returncode, 2)
+            self.assertIn("cannot enter PACKAGE_IMPLEMENTATION", missing.stdout)
+            self.assertIn("context", missing.stdout)
+            write_context_pack(state)
+            ok = self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+            self.assertEqual(ok.returncode, 0)
+            self.assertEqual(json.loads(state.read_text())["phase"], "PACKAGE_IMPLEMENTATION")
+
+    def test_record_spawn_rejects_p001_gate_runner_naming_local_gate_runner(self):
+        # AC-6.2: deterministic P001 gates must not spend a model.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            init_state(state, "--ac", "AC-1")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            rejected = self.run_state(
+                state, "record-spawn", "PKG-01", "gate-runner",
+                "--command", "git diff --check",
+                "--command", "python3 ai/scripts/feature-state.py --help",
+                check=False,
+            )
+            self.assertEqual(rejected.returncode, 2)
+            self.assertIn("local-gate-runner", rejected.stdout)
+            self.assertEqual(json.loads(state.read_text())["packages"][0]["attempts"]["spawns"], 0)
+            mixed = self.run_state(
+                state, "record-spawn", "PKG-01", "gate-runner",
+                "--command", "git diff --check",
+                "--command", "./build.sh --check",
+            )
+            self.assertEqual(mixed.returncode, 0)
+
+    def test_p001_allowlist_matches_the_local_gate_guard(self):
+        sys.path.insert(0, str(ROOT / "ai/scripts"))
+        from feature_state_lib.model import is_p001_command
+        guard = (ROOT / "ai/scripts/claude_local_gate_guard.py").read_text(encoding="utf-8")
+        self.assertIn("python3", guard)
+        self.assertIn("git", guard)
+        self.assertTrue(is_p001_command("git diff --check"))
+        self.assertTrue(is_p001_command("python3 ai/scripts/feature-state.py --help"))
+        self.assertTrue(is_p001_command("python3 -m py_compile ai/scripts/feature-state.py"))
+        self.assertFalse(is_p001_command("./build.sh --check"))
+        self.assertFalse(is_p001_command("python3 ai/scripts/verify.sh"))
+
+    def test_start_review_panel_size_follows_complexity_and_risk(self):
+        # AC-6.3: small+low → one reviewer; medium/high → full panel. Persisted.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            data = json.loads(state.read_text())
+            package = data["packages"][0]
+            self.assertEqual(package["risk"], "low")
+            self.assertEqual(package["required_reviewers"], ["package-reviewer"])
+            too_many = self.run_state(
+                state, "start-review-panel", "PKG-01",
+                "--role", "package-reviewer", "--role", "security-auditor",
+                check=False,
+            )
+            self.assertEqual(too_many.returncode, 2)
+            self.assertIn("one reviewer", too_many.stdout)
+            self.run_state(state, "update-package", "PKG-01", "--complexity", "high")
+            after = json.loads(state.read_text())["packages"][0]
+            self.assertEqual(after["required_reviewers"], ["package-reviewer", "security-auditor"])
+            shrunk = self.run_state(
+                state, "start-review-panel", "PKG-01",
+                "--role", "package-reviewer",
+                check=False,
+            )
+            self.assertEqual(shrunk.returncode, 2)
+            self.assertIn("security-auditor", shrunk.stdout)
+            ok = self.run_state(
+                state, "start-review-panel", "PKG-01",
+                "--role", "package-reviewer", "--role", "security-auditor",
+            )
+            self.assertEqual(ok.returncode, 0)
+
+    def test_record_spawn_warns_at_eighty_percent_of_the_mode_ceiling(self):
+        # AC-6.4: warn at 80% BEFORE the hard cap. validate_state still rejects overflow.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state = root / "ai/state/features/feat.json"
+            state.parent.mkdir(parents=True)
+            init_state(state, "--ac", "AC-1", "--max-spawns-per-package", "5")
+            self.run_state(
+                state, "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            for index in range(3):
+                result = self.run_state(state, "record-spawn", "PKG-01", "implementer",
+                                        "--purpose", f"p{index}")
+                self.assertNotIn("SPAWN_BUDGET_WARN", result.stderr)
+            warned = self.run_state(state, "record-spawn", "PKG-01", "implementer", "--purpose", "p3")
+            self.assertIn("SPAWN_BUDGET_WARN", warned.stderr)
+            self.assertIn("4/5", warned.stderr)
+            self.assertIn("WARN 80%", warned.stderr)
+            status = (root / "ai/state/STATUS.md").read_text(encoding="utf-8")
+            self.assertIn("4/5 WARN 80%", status)
+            data = json.loads(state.read_text())
+            self.assertTrue(data["history"][-1]["metadata"].get("spawn_budget_warn"))
+            self.assertNotEqual(data["phase"], "BLOCKED")
+
+    def test_cost_report_section_two_ingests_feature_state_spawns(self):
+        # AC-6.5: Cursor never writes routing.db; Section 2 must still count record-spawn.
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td) / "proj"
+            features = project / "ai/state/features"
+            features.mkdir(parents=True)
+            (features / "033-menos-espera-menos-cuota.json").write_text(json.dumps({
+                "feature_id": "033-menos-espera-menos-cuota",
+                "packages": [{
+                    "package_id": "PKG-6",
+                    "spawns": [{
+                        "spawn_id": "SPAWN-001",
+                        "role": "implementer",
+                        "model": "inherit",
+                        "provider": "cursor",
+                        "at": "2026-08-18T23:17:52+00:00",
+                    }],
+                }],
+                "history": [],
+            }))
+            home = Path(td) / "home"
+            home.mkdir()
+            result = run("python3", str(COST_REPORT), "--home", str(home),
+                         "--project", str(project), "--since", "2026-08-10")
+        self.assertIn("Section 2", result.stdout)
+        self.assertIn("feature-state", result.stdout)
+        self.assertIn("implementer", result.stdout)
+        self.assertNotIn("No sessions matched.", result.stdout.split("Section 2", 1)[1].split("Section 3", 1)[0])
+
+    def test_shrinking_the_panel_cannot_let_implementer_self_approve_or_patch(self):
+        # AC-6.6: pins NON_ACCEPTING_ACTORS / package_accept_ready. Do not weaken.
+        sys.path.insert(0, str(ROOT / "ai/scripts"))
+        from feature_state_lib.model import NON_ACCEPTING_ACTORS, package_accept_ready
+        self.assertIn("implementer", NON_ACCEPTING_ACTORS)
+        self.assertIn("repair-agent", NON_ACCEPTING_ACTORS)
+        errors = package_accept_ready(
+            {"phase": "PACKAGE_RUNTIME_QA"},
+            {"tasks": [{"id": "T1", "status": "completed"}], "gates": [],
+             "acceptance_criteria": ["AC-1"], "findings": [], "reviews": [{"verdict": "pass"}],
+             "testing": [{"status": "pass"}], "runtime_qa": [{"status": "pass"}]},
+            "implementer",
+        )
+        self.assertTrue(any("implementer cannot accept packages" in item for item in errors))
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            as_writer = self.run_state(
+                state, "start-review-panel", "PKG-01", "--role", "implementer", check=False,
+            )
+            self.assertEqual(as_writer.returncode, 2)
+            self.assertIn("cannot include a writer", as_writer.stdout)
+            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer")
+            self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
+            self.run_state(state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier",
+                           "--url", "http://localhost:3000")
+            accept = self.run_state(state, "accept-package", "PKG-01", "--actor", "implementer", check=False)
+            self.assertEqual(accept.returncode, 2)
+            self.assertIn("implementer cannot accept packages", accept.stdout)
 
 
 class _FakeTTY:
