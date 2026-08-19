@@ -8517,11 +8517,12 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             # The reviewer that raised a finding cannot be the one that kills it.
             state = self.create_ready_package(td, review=False, verify=False)
-            self.run_state(state, "start-review-panel", "PKG-01", "--role", "finding-verifier")
+            self.run_state(state, "update-package", "PKG-01", "--complexity", "high")
+            self.run_state(state, "start-review-panel", "PKG-01", "--role", "package-reviewer", "--role", "security-auditor", "--role", "finding-verifier")
             own = json.dumps({"id": "F-OWN", "severity": "high", "category": "correctness"})
             self.run_state(state, "record-subreview", "PKG-01", "finding-verifier", "repair_required",
                            "--actor", "finding-verifier", "--finding", own)
-            self.run_state(state, "finalize-review-panel", "PKG-01", "repair_required", "--actor", "finding-verifier")
+            self.run_state(state, "finalize-review-panel", "PKG-01", "repair_required", "--actor", "finding-verifier", "--allow-missing")
             result = self.verify(state, json.dumps({
                 "id": "F-OWN", "verdict": "refuted", "reason": "r",
                 "evidence": "src/example.py:42 guards the cited branch"}), check=False)
