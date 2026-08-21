@@ -113,12 +113,22 @@ Every transition after USER_APPROVAL must be backed by the state CLI:
   budget exhausted), you stop delegating — that budget is the enforcement of the Spawn economy rules below,
   not a suggestion.
 - `record-gate`, including `check-owned-paths.py`, before package review.
-- `record-review`, `record-verification`, `record-repair`, `record-delta-review`, and `accept-package` after
-  the corresponding agent.
-- `start-review-panel`, `record-subreview`, and `finalize-review-panel` when multiple specialist reviewers are
-  useful. `--role` is required: name exactly the reviewers you are about to spawn, because `record-subreview`
-  refuses a role the panel never declared and refuses it only once the spawn is already paid for. A panel
-  consumes one deep review cycle no matter how many subreviewers contribute.
+- `record-verification`, `record-repair`, `record-delta-review`, and `accept-package` after the
+  corresponding agent.
+- **The review panel is the default door, not an upgrade.** `start-review-panel`,
+  `record-subreview` (one per role), and `finalize-review-panel` are MANDATORY whenever the
+  package's resolved panel is the full one — that is every package that is not `small`
+  complexity AND `low` risk, including any package whose `complexity` is unset, which fail-safes
+  to the full panel. `record-review` refuses every verdict there with `REVIEW_PANEL_REQUIRED`
+  (ADR-0065); it is not a shortcut you may take when a second reviewer feels unnecessary.
+  `--role` is required: name exactly the reviewers you are about to spawn, because
+  `record-subreview` refuses a role the panel never declared and refuses it only once the spawn
+  is already paid for. A panel consumes one deep review cycle no matter how many subreviewers
+  contribute.
+- `record-review` is the single-reviewer door, and only for a `small`+`low` package. It also
+  refuses `--verdict pass` with `BLOCKING_FINDING_OPEN` while a `critical`/`high`/`medium`
+  finding is open — the same set `finalize-review-panel` refuses; record `repair_required` or
+  refute the finding instead. Neither refusal costs a deep review cycle.
 - `extend-review-panel` when a specialist becomes necessary after the panel is already open. Opening a second
   panel against an existing `panel_id` is an error, not a correction. Growing the panel costs no extra cycle
   and requires `--reason`, so the record can tell a grown panel from one that named everyone up front.

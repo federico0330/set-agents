@@ -1,0 +1,1 @@
+TOOL_UNKNOWN nonexistent-tool-xyz — no está en el catálogo curado; proponelo (ADR-0038): --tools-propose nonexistent-tool-xyz --kind cli --detect <bin> --install-<method> "<cmd>" --why "<motivo>"

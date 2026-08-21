@@ -1,0 +1,10 @@
+Postura de autonomía -- cuánta autonomía le das al harness para actuar sin vos.
+actual: autonoma
+
+> POSTURA autonoma Autónoma -- Usa MCPs, CLIs y skills por su cuenta; narra por hito
+  POSTURA consultiva Consultiva -- Propone y espera confirmación en las acciones que mutan
+  POSTURA todo_consultado Todo consultado -- Pregunta antes de cada delegación
+
+Se apoya en doctrina ya existente (ADR-0025 resolve-first, ADR-0037 resolvé antes de preguntar, MCP enable->use->disable) y la vuelve un parámetro en vez de una constante.
+Cambiá con --postura {autonoma,consultiva,todo_consultado}.
+Canal: el orquestador lee esta postura en config.toml antes de actuar/proponer/preguntar -- ver Global/_canonical/agents/orchestrator.md, sección 'Postura de autonomía (ADR-0054)'.

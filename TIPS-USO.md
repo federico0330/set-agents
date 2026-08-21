@@ -1,17 +1,21 @@
 # SET-AGENTS usage
 
-This independent repository is the versioned source for OpenCode, Claude Code, and Codex.
+This independent repository is the versioned source for five harness trees — OpenCode, Claude Code,
+Codex, Cursor, and pi — plus `Global/_canonical` and `Global/_shared`.
 
 ## Control plane
 
-**OpenCode is the orchestration control plane.** Feature work always starts there with `/feature-batch`
-(its main session IS the orchestrator, with the model, permissions, and step budgets the harness actually
-enforces). The other two harnesses are single-task lanes, not orchestrators:
+**OpenCode, Claude Code, and Cursor can all orchestrate feature work** — each has the full role roster
+installed. OpenCode is still the lane where `/feature-batch` runs with generated hooks and step budgets;
+Claude Code carries the same roster (orchestration or focused review/debug); Cursor has been a host runtime
+since 032 (native subagents, ADR-0063). **That does not mean a review panel exists on every runtime:**
+without `init` with a risk signal there is no panel (invariant 2, ADR-0064).
 
-- **Claude Code**: review/debug lane (`/audit`, `/review-*`, focused debugging sessions).
+- **Claude Code**: full orchestration or review/debug lane (`/audit`, `/review-*`, focused debugging sessions).
 - **Codex**: second-opinion lane, one bounded task per session. Never orchestrate long features in Codex:
   its native `spawn_agent` inherits the session model (ignoring the per-agent TOML routing) and can fork
   the whole transcript into every subagent — the exact combination that burned a week of quota in two days.
+- **Cursor**: host runtime since 032; native subagents at `~/.cursor/agents/*.md`. No `--route-decide` on this lane.
 
 `ai/scripts/check-drift.sh` compares the live install against the repo; a post-commit hook (installed by
 `build.sh`) warns when the installation lags. Never leave a `DRIFT_DETECTED` unresolved — the July 2026
@@ -42,14 +46,14 @@ Detalles en `INSTALACION.md`.
   it applies fleet-wide on the next build/auto-update.
 - `Global/_canonical`: canonical prompts, commands, and skills.
 - `Global/_shared`: shared policy and disabled MCP configuration.
-- `Global/{opencode,claude-code,codex}`: generated, reviewable native output.
+- `Global/{opencode,claude-code,codex,cursor,pi}`: generated, reviewable native output.
 - `ai/scripts/verify.sh`: deterministic repository gate.
 
 ## Safe generation and installation
 
 ```bash
 ./build.sh --check     # forced --profile go-zen: diff a fresh build against Global/, fail
-                        # naming files on any drift (self-scaffold AND the four Global/ trees;
+                        # naming files on any drift (self-scaffold AND the five Global/ trees;
                         # ADR-0041). Ignores the local active-profile/--profile on purpose:
                         # Global/ is committed under go-zen, and a local lane would break
                         # install.sh's onboarding and every setup-models.sh model change.
@@ -126,12 +130,18 @@ and merge require separate confirmations, with green remote checks before merge.
 - OpenCode: `~/.config/opencode/agents/*.md`
 - Claude Code: `~/.claude/agents/*.md`, with Bash guards for read-only roles
 - Codex: `~/.codex/agents/*.toml`, with explicit model, reasoning effort, and sandbox
+- Cursor: `~/.cursor/agents/*.md` (host runtime since 032)
+- pi: `~/.pi/agent/agents/*.md` (dispatch lane; no event hooks)
 
 ## Measuring consumption
 
-`ai/scripts/cost-report.py` aggregates token usage per project across the three harnesses' own session
-stores (OpenCode sqlite, Claude Code transcripts, Codex threads), plus a fourth `pi` lane read from the
-routing database. Tokens only — with subscription plans the number that matters is quota, not dollars.
+`ai/scripts/cost-report.py` aggregates token usage per project from two vantage points (never summed —
+AC-04, 023 PKG-B2). Section 1 reads each CLI's own session store (OpenCode sqlite, Claude Code
+transcripts, Codex threads). Section 2 reads the harness dispatch registry: `routing.db` `dispatches`
+(router-dispatched runs through `set_agents_spawn.py` and sibling spawn scripts — empty on Cursor because
+native subagents never go through those CLIs) plus `ai/state/features/*.json` `spawns[]` / history
+`record-spawn` (this harness's own record on every runtime, including Cursor; token fields may be absent
+there but sessions still count). Tokens only — with subscription plans the number that matters is quota, not dollars.
 
 ```bash
 ai/scripts/cost-report.py                                         # everything

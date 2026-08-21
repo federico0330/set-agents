@@ -88,7 +88,14 @@ def _init_ready_package(root: Path) -> Path:
          "--state-file", str(state), "--actor", "test", cwd=root)
     _run("transition", "PACKAGE_REVIEW", "--package-id", "PKG-01",
          "--state-file", str(state), "--actor", "test", cwd=root)
-    _run("record-review", "PKG-01", "pass", "--actor", "package-reviewer", "--state-file", str(state), cwd=root)
+    _run("start-review-panel", "PKG-01", "--role", "package-reviewer", "--role", "security-auditor",
+         "--state-file", str(state), cwd=root)
+    _run("record-subreview", "PKG-01", "package-reviewer", "pass",
+         "--actor", "package-reviewer", "--state-file", str(state), cwd=root)
+    _run("record-subreview", "PKG-01", "security-auditor", "pass",
+         "--actor", "security-auditor", "--state-file", str(state), cwd=root)
+    _run("finalize-review-panel", "PKG-01", "pass",
+         "--actor", "package-reviewer", "--state-file", str(state), cwd=root)
     _run("record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify",
          "--state-file", str(state), cwd=root)
     _run("record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier", "--url", "http://x",

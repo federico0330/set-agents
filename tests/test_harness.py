@@ -307,6 +307,28 @@ def _find_build_sh_writes(tree, module_label):
     return sorted(unsafe)
 
 
+def full_panel_repair_required_run(state, finding):
+    """Panel path for medium-complexity tests that invoke FEATURE_STATE via run()."""
+    run(
+        "python3", str(FEATURE_STATE), "start-review-panel", "PKG-01",
+        "--role", "package-reviewer", "--role", "security-auditor",
+        "--state-file", str(state),
+    )
+    run(
+        "python3", str(FEATURE_STATE), "record-subreview", "PKG-01", "package-reviewer",
+        "repair_required", "--actor", "package-reviewer", "--finding", finding,
+        "--state-file", str(state),
+    )
+    run(
+        "python3", str(FEATURE_STATE), "record-subreview", "PKG-01", "security-auditor",
+        "pass", "--actor", "security-auditor", "--state-file", str(state),
+    )
+    run(
+        "python3", str(FEATURE_STATE), "finalize-review-panel", "PKG-01", "repair_required",
+        "--actor", "package-reviewer", "--state-file", str(state),
+    )
+
+
 def init_state(state, *extra, feature_id="feat", body="# contract\n", check=True):
     """`init` with a spec that really does hash to the hash it is handed.
 
@@ -465,6 +487,66 @@ class HarnessTests(unittest.TestCase):
                     "--verdict", json.dumps({"id": "F-001", "verdict": "upheld"}),
                     "--verdict", json.dumps({"id": "F-002", "verdict": "upheld"}),
                 )
+        return state
+
+    def full_panel_pass(self, state, package_id="PKG-01"):
+        self.run_state(
+            state, "start-review-panel", package_id,
+            "--role", "package-reviewer", "--role", "security-auditor",
+        )
+        self.run_state(
+            state, "record-subreview", package_id, "package-reviewer", "pass",
+            "--actor", "package-reviewer",
+        )
+        self.run_state(
+            state, "record-subreview", package_id, "security-auditor", "pass",
+            "--actor", "security-auditor",
+        )
+        self.run_state(
+            state, "finalize-review-panel", package_id, "pass",
+            "--actor", "package-reviewer",
+        )
+
+    def full_panel_repair_required(self, state, finding, package_id="PKG-01"):
+        self.run_state(
+            state, "start-review-panel", package_id,
+            "--role", "package-reviewer", "--role", "security-auditor",
+        )
+        self.run_state(
+            state, "record-subreview", package_id, "package-reviewer", "repair_required",
+            "--actor", "package-reviewer", "--finding", finding,
+        )
+        self.run_state(
+            state, "record-subreview", package_id, "security-auditor", "pass",
+            "--actor", "security-auditor",
+        )
+        self.run_state(
+            state, "finalize-review-panel", package_id, "repair_required",
+            "--actor", "package-reviewer",
+        )
+
+    def _medium_package_at_review(self, td):
+        state = Path(td) / "feature.json"
+        init_state(state, "--ac", "AC-1")
+        self.run_state(
+            state, "create-package", "PKG-01", "Slice",
+            "--ac", "AC-1", "--task", "T-001", "--task", "T-002",
+            "--owned-path", "src/**", "--complexity", "medium",
+        )
+        write_context_pack(state)
+        self.run_state(state, "transition", "PACKAGE_IMPLEMENTATION", "--package-id", "PKG-01")
+        for task_id in ("T-001", "T-002"):
+            self.run_state(
+                state, "complete-task", "PKG-01", task_id,
+                "--actor", "implementer", "--validation", "focused-test",
+            )
+        self.run_state(state, "transition", "PACKAGE_GATES", "--package-id", "PKG-01")
+        self.run_state(
+            state, "record-gate", "package verify", "pass",
+            "--package-id", "PKG-01", "--evidence", "ok",
+        )
+        self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "HEAD..work")
+        self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
         return state
 
     def test_check_and_native_codex_agents(self):
@@ -8577,7 +8659,7 @@ class HarnessTests(unittest.TestCase):
             self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
             self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "HEAD..work")
             self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
-            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer")
+            self.full_panel_pass(state)
             self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
             self.run_state(
                 state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier",
@@ -8819,6 +8901,164 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(package["review_panels"][0]["roles"], ["package-reviewer"])
         self.assertNotIn("extensions", package["review_panels"][0])
 
+    def test_record_review_rejects_full_panel_membership(self):
+        # AC-A.1: medium/high packages must use the review panel, not record-review.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer", check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+        self.assertIn("start-review-panel", result.stdout)
+        self.assertIn("security-auditor", result.stdout)
+        self.assertEqual(data["phase"], "PACKAGE_REVIEW")
+        self.assertEqual(data["packages"][0]["attempts"].get("deep_review_cycles", 0), 0)
+
+    def test_record_review_repair_required_on_full_panel_also_rejected(self):
+        # AC-A.1: all three verdicts are refused when the resolved panel is FULL.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            finding = json.dumps({"id": "F-FULL", "severity": "high", "category": "correctness"})
+            result = self.run_state(
+                state, "record-review", "PKG-01", "repair_required",
+                "--actor", "package-reviewer", "--finding", finding, check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+        self.assertEqual(data["phase"], "PACKAGE_REVIEW")
+        self.assertEqual(data["packages"][0]["attempts"].get("deep_review_cycles", 0), 0)
+
+    def test_record_review_small_low_still_passes(self):
+        # AC-A.2: unchanged single-reviewer door for small+low.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer",
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(data["phase"], "PACKAGE_TESTING")
+        self.assertEqual(data["packages"][0]["status"], "testing_required")
+
+    def test_record_review_rejects_when_required_reviewers_absent(self):
+        # AC-A.3 (i): legacy packages without the key re-derive FULL and reject.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            data = json.loads(state.read_text())
+            del data["packages"][0]["required_reviewers"]
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer", check=False,
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+
+    def test_record_review_rejects_when_required_reviewers_null(self):
+        # AC-A.3 (ii): explicit null re-derives FULL and rejects.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            data = json.loads(state.read_text())
+            data["packages"][0]["required_reviewers"] = None
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer", check=False,
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+
+    def test_record_review_rejects_when_required_reviewers_empty_list(self):
+        # AC-A.3 (iv): present-but-unusable empty list re-derives FULL and rejects.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            data = json.loads(state.read_text())
+            data["packages"][0]["required_reviewers"] = []
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer", check=False,
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+
+    def test_record_review_rejects_when_required_reviewers_blank_elements(self):
+        # AC-A.3 (iv): present-but-unusable list with blank/invalid elements re-derives FULL.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            data = json.loads(state.read_text())
+            data["packages"][0]["required_reviewers"] = ["", "package-reviewer"]
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer", check=False,
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+
+    def test_record_review_rejects_when_complexity_unset(self):
+        # AC-A.3 (iii): absent complexity fail-safes to FULL.
+        with tempfile.TemporaryDirectory() as td:
+            state = self._medium_package_at_review(td)
+            data = json.loads(state.read_text())
+            del data["packages"][0]["complexity"]
+            del data["packages"][0]["required_reviewers"]
+            state.write_text(json.dumps(data, indent=2) + "\n")
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass",
+                "--actor", "package-reviewer", check=False,
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("REVIEW_PANEL_REQUIRED", result.stdout)
+
+    def test_record_review_pass_rejects_blocking_finding(self):
+        # AC-A.4 / AC-A.5 (1): pass with an open blocking finding is refused.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            finding = json.dumps({"id": "F-H", "severity": "high", "category": "correctness"})
+            result = self.run_state(
+                state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer",
+                "--finding", finding, check=False,
+            )
+            data = json.loads(state.read_text())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("BLOCKING_FINDING_OPEN", result.stdout)
+        self.assertIn("blocking findings open", result.stdout)
+        self.assertEqual(data["phase"], "PACKAGE_REVIEW")
+
+    def test_next_advisor_fires_for_skip_delta_door_with_open_finding(self):
+        # AC-A.5 (2): PACKAGE_TESTING with a blocking finding via record-repair --skip-delta
+        # (the door this slice deliberately left open) — advisor names the finding, not
+        # the mechanism, and never blames a late review that did not happen.
+        with tempfile.TemporaryDirectory() as td:
+            state = self.create_ready_package(td, review=False)
+            finding_high = json.dumps({"id": "F-H", "severity": "high", "category": "correctness"})
+            finding_medium = json.dumps({"id": "F-M", "severity": "medium", "category": "testing"})
+            self.run_state(
+                state, "record-review", "PKG-01", "repair_required",
+                "--actor", "package-reviewer", "--finding", finding_high, "--finding", finding_medium,
+            )
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                "--verdict", json.dumps({"id": "F-H", "verdict": "upheld"}),
+                "--verdict", json.dumps({"id": "F-M", "verdict": "upheld"}),
+            )
+            self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-M", "--changed-file", "src/a.py", "--skip-delta",
+            )
+            data = json.loads(state.read_text())
+            advice = json.loads(self.run_state(state, "next").stdout)["next"]
+        self.assertEqual(data["phase"], "PACKAGE_TESTING")
+        self.assertEqual(advice["next"], "PACKAGE_REPAIR")
+        self.assertNotIn("late review", advice["reason"])
+        self.assertIn("blocking finding", advice["reason"])
+
     def test_extend_review_panel_refuses_a_closed_panel_and_names_the_late_channel(self):
         with tempfile.TemporaryDirectory() as td:
             state = self.create_ready_package(td, review=False)
@@ -9020,23 +9260,6 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("source_role", refused.stdout)
         self.assertEqual(package["findings"], [])
         self.assertEqual(package.get("late_reviews", []), [])
-
-    def test_next_does_not_blame_a_late_review_that_never_happened(self):
-        # Panel finding F-03, upheld. The branch was commented and shipped as "reachable
-        # only through record-late-review", and it is not: record-review is a documented
-        # door that sets PACKAGE_TESTING on `pass` without checking has_open_findings, so
-        # the advice fired while asserting a late review nobody ran. The advice was right
-        # and the reason was a lie, which is worse than useless to an agent reading it.
-        with tempfile.TemporaryDirectory() as td:
-            state = self.create_ready_package(td, review=False)
-            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer",
-                           "--finding", json.dumps({"id": "F-H", "severity": "high", "category": "correctness"}))
-            data = json.loads(state.read_text())
-            advice = json.loads(self.run_state(state, "next").stdout)["next"]
-        self.assertEqual(data["phase"], "PACKAGE_TESTING")
-        self.assertEqual(advice["next"], "PACKAGE_REPAIR")
-        self.assertNotIn("late review", advice["reason"])
-        self.assertIn("blocking finding", advice["reason"])
 
     def test_a_late_review_refuses_what_it_cannot_reach(self):
         with tempfile.TemporaryDirectory() as td:
@@ -10167,7 +10390,7 @@ class HarnessTests(unittest.TestCase):
             self.run_state(state, "record-gate", "package verify", "pass", "--package-id", "PKG-01", "--evidence", "ok")
             self.run_state(state, "update-package", "PKG-01", "--integrated", "true", "--diff-ref", "diff")
             self.run_state(state, "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01")
-            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer")
+            self.full_panel_pass(state)
             self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
 
         # Declared non-runtime package: accept-ready after testing, runtime QA waived.
@@ -11044,8 +11267,21 @@ class HarnessTests(unittest.TestCase):
     def test_accept_package_rejects_open_findings_and_bad_actors(self):
         with tempfile.TemporaryDirectory() as td:
             state = self.create_ready_package(td, review=False)
-            finding = json.dumps({"id": "F-001", "severity": "high", "category": "correctness"})
-            self.run_state(state, "record-review", "PKG-01", "pass", "--actor", "package-reviewer", "--finding", finding)
+            finding_high = json.dumps({"id": "F-001", "severity": "high", "category": "correctness"})
+            finding_medium = json.dumps({"id": "F-002", "severity": "medium", "category": "testing"})
+            self.run_state(
+                state, "record-review", "PKG-01", "repair_required",
+                "--actor", "package-reviewer", "--finding", finding_high, "--finding", finding_medium,
+            )
+            self.run_state(
+                state, "record-verification", "PKG-01", "--actor", "finding-verifier",
+                "--verdict", json.dumps({"id": "F-001", "verdict": "upheld"}),
+                "--verdict", json.dumps({"id": "F-002", "verdict": "upheld"}),
+            )
+            self.run_state(
+                state, "record-repair", "PKG-01", "--actor", "repair-agent",
+                "--finding-id", "F-002", "--changed-file", "src/a.py", "--skip-delta",
+            )
             self.run_state(state, "record-testing", "PKG-01", "pass", "--actor", "gate-runner", "--command", "verify")
             self.run_state(state, "record-runtime-qa", "PKG-01", "pass", "--actor", "runtime-verifier", "--url", "http://localhost:3000")
             result = self.run_state(state, "accept-package", "PKG-01", "--actor", "repair-agent", check=False)
@@ -12396,8 +12632,7 @@ class HarnessTests(unittest.TestCase):
             run("python3", str(FEATURE_STATE), "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01",
                 "--state-file", str(state))
             finding = json.dumps({"id": "F-1", "severity": "high"})
-            run("python3", str(FEATURE_STATE), "record-review", "PKG-01", "repair_required", "--finding", finding,
-                "--state-file", str(state))
+            full_panel_repair_required_run(state, finding)
             run("python3", str(FEATURE_STATE), "record-verification", "PKG-01", "--actor", "finding-verifier",
                 "--verdict", json.dumps({"id": "F-1", "verdict": "upheld"}), "--state-file", str(state))
             fake_sha = "deadbeefcafe0102"
@@ -12448,8 +12683,7 @@ class HarnessTests(unittest.TestCase):
             run("python3", str(FEATURE_STATE), "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01",
                 "--state-file", str(state))
             finding = json.dumps({"id": "F-1", "severity": "high"})
-            run("python3", str(FEATURE_STATE), "record-review", "PKG-01", "repair_required", "--finding", finding,
-                "--state-file", str(state))
+            full_panel_repair_required_run(state, finding)
             run("python3", str(FEATURE_STATE), "record-verification", "PKG-01", "--actor", "finding-verifier",
                 "--verdict", json.dumps({"id": "F-1", "verdict": "upheld"}), "--state-file", str(state))
             accepted = subprocess.run(
@@ -13003,8 +13237,7 @@ class HarnessTests(unittest.TestCase):
             run("python3", str(FEATURE_STATE), "transition", "PACKAGE_REVIEW", "--package-id", "PKG-01",
                 "--state-file", str(state))
             finding = json.dumps({"id": "F-1", "severity": "high"})
-            run("python3", str(FEATURE_STATE), "record-review", "PKG-01", "repair_required", "--finding", finding,
-                "--state-file", str(state))
+            full_panel_repair_required_run(state, finding)
             run("python3", str(FEATURE_STATE), "record-verification", "PKG-01", "--actor", "finding-verifier",
                 "--verdict", json.dumps({"id": "F-1", "verdict": "upheld"}), "--state-file", str(state))
             result = subprocess.run(

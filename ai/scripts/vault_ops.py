@@ -8,13 +8,11 @@ which must stay in set_agents_app.py -- see its own module docstring for why), a
 `apply_vault_migration`'s own call chain would need a live back-reference to `cmd_vault_link`;
 `cmd_vault_doctor`/`_vault_doctor_marker_path`/`vault_menu`/`VAULT_DOCTOR_MARKER_TTL_SECONDS`
 (entangled with `set_agents_app.STATE_DIR`/`cmd_vault_init`/`cmd_vault_link` monkeypatches in
-tests/test_harness.py). A module-level (or even a lazily call-time) `from set_agents_app import
-...` here would be a genuine circular import: set_agents_app.py imports this module, so the
-reverse edge breaks under tests/test_harness.py's `_import()` helper, which loads
-set_agents_app.py via `importlib.util.spec_from_file_location` WITHOUT registering it in
-`sys.modules` -- a nested `import set_agents_app` from inside this module, while that fresh
-instance's own top-level exec is still in progress, cannot find it there and instead starts a
-second, independent top-level exec of set_agents_app.py from disk. `atomic_write`/`_BACKED_UP`
+tests/test_harness.py). Residue anchors are enumerated in
+`docs/specs/035-panel-honesto-consola-y-tips/evidence/PKG-B-residue-matrix.md`; moving callers
+here would miss `patch.object(app, …)` on the `_import()` object (`tests/test_harness.py:4577`,
+`:3702-3703`), and `_import()` itself registers only for `exec_module` then restores
+`sys.modules` (`:788-796`) — not the old unregistered story. `atomic_write`/`_BACKED_UP`
 are duplicated here (identical logic) rather than imported back for the same reason; unlike
 `app_config`/`write_app_config`, `atomic_write` never reads `STATE_DIR`/`APP_CONFIG`, so the
 only cost of the duplication is a `_BACKED_UP` dedup set that is scoped per-module instead of

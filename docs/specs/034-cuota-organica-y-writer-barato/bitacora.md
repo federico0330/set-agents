@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-19T18:30:21+00:00
+Actualizado: 2026-08-21T13:49:43+00:00
 
 [2026-08-19T14:56:09+00:00] orchestrator · done
 Cliente: Aprobaste el contrato: el escritor arranca barato, un arreglo caro si falla, y un cambio chico no abre el proceso grande. El contexto sigue en Obsidian, no en Engram.

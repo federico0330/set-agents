@@ -1,104 +1,35 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-18T15:30:21` · generado 2026-08-19T18:30:21+00:00_
+_Ventana: desde `2026-08-21T00:00:00` · generado 2026-08-21T13:50:02+00:00_
 
 ## Necesita tu decisión
 
-- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 26 días)
-- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 20 días)
+- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 27 días)
+- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 21 días)
 
 ## Qué quedó listo
 
-- **033-menos-espera-menos-cuota · PKG-5 · orchestrator** — El segundo paquete quedo aceptado: los veinte minutos de chequeo ahora muestran progreso, la falla apenas ocurre, y un resumen con los tests mas lentos. Un primer intento se cayo porque el reporter no encontraba los tests; se arreglo y se clavo con una prueba.
-  - aprendimos: Invocar un script deja el path de import en la carpeta del archivo; cambiar el directorio de trabajo no lo arregla. Un probe dentro del mismo proceso no ve ese crash porque tests ya era importable.
-  - conviene ahora: Implementar el paquete del menu Modelos para que pinte en menos de 300 ms con lo que ya esta en disco, y los datos vivos lleguen despues.
-  - por qué ahora: Sin eso, abrir Modelos sigue congelando unos dieciseis segundos, que es lo que mas se siente al usarlo.
-- **033-menos-espera-menos-cuota · PKG-2 · finding-verifier** — El menu Modelos todavia no trae solo los datos vivos: hay que corregir dos fallas concretas antes de darlo por bueno.
-  - aprendimos: Una tecla de forzar refresco no sustituye el refresco in-place que pide el contrato del primer frame.
-  - conviene ahora: Un solo repair-agent cierra los dos hallazgos, con tests de mordida, y no toca el primer frame.
-  - por qué ahora: Sin el vivo automatico el operador ve pins viejos hasta que descubre una tecla; reparar ahora gasta el unico ciclo de review que queda.
-- **033-menos-espera-menos-cuota · PKG-2 · orchestrator** — El menu Modelos ya pinta al toque y despues trae solo los datos vivos, sin etiquetar como fallido lo que todavia no se midio. Lo damos por cerrado.
-  - aprendimos: El vivo automatico tiene que ir despues del primer frame, no escondido atras de una tecla de forzar.
-  - conviene ahora: Sigue el picker agrupado por proveedor, sin parpadeo, testeable sin terminal real.
-  - por qué ahora: El menu ya no congela; lo que mas se siente ahora es elegir entre una lista plana de 125 ids.
-- **033-menos-espera-menos-cuota · PKG-3 · orchestrator** — Elegir un modelo ahora es una lista agrupada, con lo actual marcado y sin que parpadee la pantalla. Lo damos por cerrado.
-  - aprendimos: Leer el valor actual no puede pasar por un parser que hace setdefault: eso escribe tablas vacias.
-  - conviene ahora: Sigue colapsar las tres lanes de OpenCode a un solo modelo por area.
-  - por qué ahora: La consola ya pinta rapido y se puede elegir; lo que queda es el eje lane, de alto riesgo.
-- **033-menos-espera-menos-cuota · PKG-1 · orchestrator** — OpenCode queda en un solo modelo por area, el que ya usabas. Si un proveedor se agota, el error nombra al proveedor y te dice que reasignes. Lo damos por cerrado.
-  - aprendimos: Sacar auto_profile no es un agujero si el agotamiento falla con nombre; el swap silencioso de lane era el defecto.
-  - conviene ahora: Ultimo paquete: que las cuotas alcancen, con context pack y aviso al 80 por ciento de spawns.
-  - por qué ahora: Las lanes ya no existen; lo que queda es no gastar despachos de mas.
-- **033-menos-espera-menos-cuota · PKG-6 · implementer** — El harness ya no arranca un paquete a ciegas: hace falta el resumen, los gates baratos no llaman a un modelo, y el reporte de costos dejo de medir cero.
-  - aprendimos: When the lib changes, the generated copies have to travel in the same package or a clean checkout lies about sync.
-  - conviene ahora: Freeze the candidate and run the package gates, using the local runner for the cheap commands.
-  - por qué ahora: Without freeze the risk classifier has no candidate, and without gates the review would bless an unproven tree.
-- **033-menos-espera-menos-cuota · PKG-6 · package-reviewer** — El ahorro de cuota todavia no cierra: el aviso del 80% se apaga cuando hay varios paquetes, y un panel chico puede abrir con el revisor equivocado.
-  - aprendimos: Status was summing every package against the per-package ceiling, so the 80% warning only worked on a one-package fixture.
-  - conviene ahora: Verify the three findings, then repair what survives. One spawn slot remains.
-  - por qué ahora: A false finding would spend the last spawn on a useless patch and leave the real repair unreachable.
-- **033-menos-espera-menos-cuota · PKG-6 · finding-verifier** — Los tres problemas que encontro la revision siguen en pie. No queda margen de despachos para arreglarlos sin pasarse del tope de este modo de trabajo.
-  - aprendimos: A duplicate follow-up spawn plus a separate local-gate-runner consumed the slack that repair-plus-delta needed.
-  - conviene ahora: Human decides: two extra spawns to finish PKG-6, or stop the package here.
-  - por qué ahora: The ninth spawn would freeze the feature. Skipping the second look after a high finding is not allowed.
-  - alternativa: Seguir con dos despachos extra (repair y la segunda mirada) sin tocar el tope del modo en el codigo, o dejar PKG-6 abierto.
-- **033-menos-espera-menos-cuota · PKG-6 · orchestrator** — El ultimo paquete cerro: el harness avisa el presupuesto a tiempo, no deja un panel chico con el revisor equivocado, y el reporte de costos deja de contar dos veces lo mismo.
-  - aprendimos: A test that used the small+low missing-role hole as setup broke verify until it was restaged on a high panel, eating the last 5 lines of the repair ceiling.
-  - conviene ahora: Integration: module-impact or waiver on all six packages, remedir the 2026-08-18 baseline, AC-4.5 CI SHAs if push is authorized.
-  - por qué ahora: Without the before/after comparison the feature has not proved it saved wait or quota.
-- **033-menos-espera-menos-cuota · PKG-6 · integrator** — Los seis paquetes cerraron. El menu deja de congelar, el gate bajo de veinte minutos a trece, y el reporte de costos deja de medir cero. Falta subir a GitHub para probar Windows/macOS en la misma corrida.
-  - aprendimos: Section 1 token totals did not drop on this window; the Cursor-host saving is invisible there. Section 2 going from 0 to 144 is the harness registry closing the omission.
-  - conviene ahora: Push main when you want AC-4.5; three green jobs in one GitHub run. Then DONE/judge.
-  - por qué ahora: Without a push there is no SHA triple for Windows/macOS/linux in the same cycle, which is the last acceptance leftover from PKG-4.
-- **034-cuota-organica-y-writer-barato · orchestrator** — Aprobaste el contrato: el escritor arranca barato, un arreglo caro si falla, y un cambio chico no abre el proceso grande. El contexto sigue en Obsidian, no en Engram.
-  - aprendimos: Engram no entra cuando el vault Obsidian ya es mandatory; el challenge bloqueo por HOW (grano de promotion, writer_tier=fast, pin repair pesado), no por recorte.
-  - conviene ahora: package-planner crea PKG-A..D con context packs; luego implementer PKG-A.
-  - por qué ahora: Sin plan de paquetes no hay implementacion legal; el context pack es obligatorio al entrar implementacion.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-A · orchestrator** — El cambio chico ya no puede colarse a la ceremonia completa: si alguien arranca un trabajo mediano o grande sin decir por que es riesgoso, el sistema lo corta. Los chequeos automaticos de este lote dieron verde.
-  - aprendimos: The ownership gate does not know which files this package created versus which were already dirty, so generated vault notes and a previous feature leftover must be waived by directory rather than by widening product ownership.
-  - conviene ahora: An independent reviewer who did not write the change checks the six acceptance criteria, then we skip app runtime checks because this package has no user interface.
-  - por qué ahora: Gates exist to prove the bite before a reviewer spends a spawn. They passed, so the remaining cost is independence, not more local compile.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-A · orchestrator** — El primer lote ya esta cerrado: un arreglo chico no puede colarse a la ceremonia grande sin decir el riesgo. Alguien que no escribio el cambio lo reviso y dio el visto bueno.
-  - aprendimos: The CLI mode flag default staying scoped is what makes a naked init fail closed; the operational default for a tiny change is simply not calling init.
-  - conviene ahora: Implement the cheap writer default, rewrite the fast-suffix test without deleting it, and persist a single salvage plus the consecutive-failure promotion counter.
-  - por qué ahora: Without the cheap default the rest of the quota work has nothing to count as first-attempt green.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-B · orchestrator** — El escritor barato y el salvamento unico ya pasaron los chequeos automaticos: el modelo por defecto es gratis, y si falla solo hay un intento caro.
-  - aprendimos: A package gate against the last commit still sees files the previous accepted package dirtied, so those paths need a pinpoint waiver rather than a wider product ownership.
-  - conviene ahora: Two independent reviewers look at quota routing and at whether salvage can be abused, then we skip app runtime checks.
-  - por qué ahora: Quota defaults and a salvage override change who spends money; that is why the security pass sits with the package review instead of waiting for a later audit.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-B · orchestrator** — El escritor barato ya esta en default y el salvamento unico funciona. Si el barato falla dos paquetes seguidos, el proximo sube un escalon. Eso ya esta cerrado.
-  - aprendimos: A named-gate PASS is not package close. The consecutive-miss counter is a package grain; resetting it per event hid promotion.
-  - conviene ahora: Implement the frontier cap of four per package and sixteen per feature, plus the cost-report percent that must not count salvage-green as first attempt.
-  - por qué ahora: Without a cap distinct from spawn count, salvage and judges still burn quota inside the same budget as cheap writers.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-C · orchestrator** — El cupo de modelos pesados ya se puede ver y se puede chocar: el quinto de un lote para, y un salvamento verde no cuenta como acierto a la primera.
-  - aprendimos: Frontier used is a counter beside spawn count, not inside attempts, so reopen can reset it without touching spawn budget.
-  - conviene ahora: Independent review plus a security pass on whether the cap can be bypassed by omitting flags.
-  - por qué ahora: A cap that does not fire is quota theatre; a cap that can be skipped by leaving --model empty is the remaining abuse path.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-C · orchestrator** — El cupo de modelos pesados ya corta de verdad: el quinto de un lote para, y un comando chico ya no disfraza un modelo caro. El reporte muestra que porcentaje del barato cierra a la primera.
-  - aprendimos: A caller-controlled --command list is not a role. The 033 P001 exemption is the local-gate-runner role, not the allowlist riding on a heavy spawn.
-  - conviene ahora: Emit Cursor frontmatter model per role: cheap writers, distinct-family judges, rewrite the inherit-everywhere test instead of deleting it.
-  - por qué ahora: Without Cursor pins the cheap default only exists on OpenCode; this host would keep spending whatever the user picked for every role.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-D · orchestrator** — En Cursor cada rol ya declara su modelo: quien escribe codigo usa el barato, quien juzga usa otra familia.
-  - aprendimos: Cursor cheap is not the OpenCode zen free id; it is a measured Cursor slug in a new models.toml dimension, while RUNTIMES stays without cursor.
-  - conviene ahora: Independent review of pins and a security pass on whether inherit-universal or a heavy repair-agent pin can sneak back.
-  - por qué ahora: A pin that silently becomes inherit everywhere would spend the session model on every role again, which is the quota leak this package exists to stop.
-  - alternativa: none
-- **034-cuota-organica-y-writer-barato · PKG-D · orchestrator** — En Cursor cada rol ya declara su modelo: el que escribe codigo usa uno barato, el que juzga usa otra familia, y si el juez deja el modelo en blanco el sistema lo corta. Los cuatro lotes de este trabajo estan cerrados.
-  - aprendimos: Cursor inherit is an alias of the parent, so treating the slug as its own family made a reviewer look independent while sharing the writer.
-  - conviene ahora: Integrate the four accepted packages: run the global verify, write the integration evidence, then the independent judge. Memory stays in the Obsidian vault, not Engram.
-  - por qué ahora: Without a global verify the four packages can be locally green and still fail together. The judge cannot run until that evidence exists.
-- **034-cuota-organica-y-writer-barato · PKG-D · orchestrator** — Engram no hace falta: el contexto ya vive en tu vault de Obsidian. El trabajo de cuota y escritor barato cerro: un arreglo chico no abre ceremonia, el que escribe codigo arranca barato, hay un techo de modelos pesados, y en Cursor cada rol declara su modelo.
-  - aprendimos: Treating Cursor inherit as its own family made reviewers look independent while they shared the parent model. The vault already covers what Engram would copy.
-  - conviene ahora: Nothing left in this pipeline. Commit or release only if you ask for it.
-  - por qué ahora: The judge and the global suite already passed, so the remaining work is a human cut, not another agent.
+- **035-panel-honesto-consola-y-tips · PKG-B · orchestrator** — Cerró el segundo lote: la consola no cambia los comandos que ya usás. Se fotografió de verdad, se enumeró qué no se puede partir y por qué, y se sacó una copia duplicada que no hacía falta.
+  - aprendimos: A three-channel compare that both sides fail with the same missing-file error is a false green. POSIX RoutingStore ignores HOME; isolation needs SET_AGENTS_ROUTING_TEST_ROOT.
+  - conviene ahora: Third lot: bring the usage tips in line with the five generated trees and the pointer from the how-it-works page.
+  - por qué ahora: Leaving the console lot open would mix an invalid characterization with the docs lot.
+  - alternativa: keep the duplicate vault helper and an unproven residue matrix
+- **035-panel-honesto-consola-y-tips · PKG-C · orchestrator** — Cerró el tercer lote: la guía de uso ya nombra los cinco programas, deja de decir que uno solo manda, y la página de cómo funciona deja de llamarla atrasada.
+  - aprendimos: DEC-TIPS-POINTER is physical: updating one surface without the other recreates the contradiction.
+  - conviene ahora: Integrate A+B+C against the feature contract and run the global verify.
+  - por qué ahora: Leaving the tips lot open would ship a how-it-works page that still called the guide stale.
+  - alternativa: rewrite all of TIPS for style; rejected by AC-C.5 closed scope
+- **035-panel-honesto-consola-y-tips · PKG-C · orchestrator** — Los tres lotes estan hechos y la verificacion global del repo paso. Para firmar el cierre hace falta una lectura independiente mas, y eso pide un permiso extra porque se agoto el cupo de este lote.
+  - aprendimos: A judge applying path-a baseline rules to path-b same-binary contradicts design.md:518-521. Stale INTEGRATION.md rows after record-gate are false blockers.
+  - conviene ahora: If federico authorizes JSON 10 to 11, spawn fourth adversarial-judge then DONE plus memory-scribe.
+  - por qué ahora: DONE without a passing judge violates the mandatory final gate. CLI reopen would reset PACKAGE_PLANNING and SPAWN-001.
+  - alternativa: DONE skipping the fourth judge; rejected by orchestrator.md:499
+- **035-panel-honesto-consola-y-tips · PKG-C · orchestrator** — Cerró el trabajo de las tres piezas: el panel ya no se puede saltear, la consola quedó fotografiada y enumerada, y la guía de uso coincide con los cinco programas y con la página de cómo funciona.
+  - aprendimos: JSON spawn ceiling can be raised per-feature without touching MODE_BUDGETS. Path-b same-binary is the characterization gift when nothing moves. A three-channel compare that both sides fail identically is a false green.
+  - conviene ahora: memory-scribe local vault; commit only if federico asks.
+  - por qué ahora: Leaving 035 open after JUDGE_PASS would keep an already-delivered scoped feature in INTEGRATION.
+  - alternativa: skip the fourth judge; rejected
 
 ## Qué se está haciendo
 
@@ -114,40 +45,16 @@ _Ventana: desde `2026-08-18T15:30:21` · generado 2026-08-19T18:30:21+00:00_
 
 ## Qué cambió en el software
 
-- **generacion-arboles** — Tres lanes OpenCode (go-zen/zen/openai-only) colapsaron a un string. active_profile, auto_profile, --profile y active-profile desaparecieron. Si el proveedor esta exhausto, falla en voz alta en vez d… (033-menos-espera-menos-cuota/PKG-1)
-- **generacion-arboles** — El wizard de modelos pinta el primer frame desde disco antes de probear suscripciones. El probe vivo corre despues, o con la tecla Refrescar. (033-menos-espera-menos-cuota/PKG-2)
-- **consola** — El picker agrupa por proveedor, muestra n de total, marca el actual con un punto, y wipea con ESC H J en vez de 2J. ENTER en un header no selecciona. (033-menos-espera-menos-cuota/PKG-3)
-- **estado** — PACKAGE_IMPLEMENTATION exige context pack. gate-runner all-P001 se rechaza a favor de local-gate-runner. El panel sale de complexity/risk. Status avisa al 80% del techo DEL PAQUETE actual. (033-menos-espera-menos-cuota/PKG-6)
-- **narracion-notas** — STATUS.md y las notas muestran spawns usados/techo del paquete corriente y WARN 80% antes del tope duro. (033-menos-espera-menos-cuota/PKG-6)
-- **estado** — init scoped y feature exigen un token de riesgo nombrado antes de escribir state; sin token el comando muere y no deja JSON. (034-cuota-organica-y-writer-barato/PKG-A)
-- **generacion-arboles** — La doctrina canónica (triage y orquestador) unifica el default 1-3 con el error nombrado del CLI; los espejos de cada runtime se regeneran desde canónico. (034-cuota-organica-y-writer-barato/PKG-A)
-- **routing** — El default de los escritores code-rw es el modelo gratis del catalogo que cumple tools; hay un solo salvage pesado por paquete y el contador de misses baratos es por paquete cerrado, no por gate suel… (034-cuota-organica-y-writer-barato/PKG-B)
-- **estado** — record-spawn --salvage exige --model no vacio; record-gate ya no resetea el consecutivo en un PASS parcial; el reset ocurre al pasar de gates a review si el paquete cerro green-on-first. (034-cuota-organica-y-writer-barato/PKG-B)
-- **estado** — Hay un cupo de modelos pesados (4 por paquete, 16 por feature) distinto del tope de despachos. Un comando P001 no disfraza un rol pesado. reopen puede resetear solo ese contador. (034-cuota-organica-y-writer-barato/PKG-C)
-- **narracion-notas** — STATUS muestra frontier_used/cap. cost-report seccion 2 muestra percent green-on-first-attempt derivado; salvage-verde no es first-attempt; no se suma con seccion 1. (034-cuota-organica-y-writer-barato/PKG-C)
-- **generacion-arboles** — generate.py emite model: por rol en Cursor; inherit en un reviewer (review-ro + audit/judge) muere en load_roles y validate_cursor_target. El escritor y repair-agent quedan en composer-2.5; los juece… (034-cuota-organica-y-writer-barato/PKG-D)
-- **generacion-arboles** — El orquestador canónico documenta un solo salvage por paquete: si el escritor code-rw barato deja el gate rojo, repair-agent corre una vez más con override de invocación; el pin de repair-agent sigue… (034-cuota-organica-y-writer-barato/PKG-B)
+- **consola** — La segunda pasada de extraccion no muda el residuo de routing/vault: queda enumerado con experimento propio. Se borro una copia identica de vault_link_private. El CLI publico no cambia. (035-panel-honesto-consola-y-tips/PKG-B)
 
 ## Decisiones nuevas
 
-- **Orden de paquetes: CI y gate primero, consola despues, lane y cuota al final** — Implementar un paquete por vez hasta accepted, en este orden: PKG-4, PKG-5, PKG-2, PKG-3, PKG-1, PKG-6. No abrir el siguiente con el anterior a medias.
-- **Independencia de review en Cursor: mismo modelo, contexto limpio, degradacion registrada** — Delegar solo con subagentes nativos de Cursor (implementer, package-reviewer, finding-verifier, etc.). Registrar la degradacion same-model/clean-context en record-subreview --evidence y finalize-review-panel --evidence de cada paquete. Nunca --route-decide ni dispatch.
-- **PKG-4 se commitea antes del freeze porque el candidato exige refs ya en git** — Un commit con el diff de PKG-4 mas los context packs y notas de 033, despues freeze-candidate --baseline HEAD^ --candidate-ref HEAD. No es un commit oportunista: es el invariante del freeze.
-- **El presenter del gate vive en un modulo Python testeable, no en el shell** — El implementer escribe ai/scripts/verify_reporter.py y tests/test_verify_reporter.py. Esas dos rutas se registran como excepciones de owned_paths (update-package no expone --owned-path). verify.sh solo invoca el reporter. AC-5.6 no se implementa en este paquete salvo prueba de aislamiento.
-- **Digest no ensucia el diff de un paquete con bitacoras ajenas** — Revertir esas bitacoras a HEAD. Registrar excepciones docs/notas y docs/specs/033-menos-espera-menos-cuota, igual que en PKG-4. El fallo de producto es otro: ImportError tests al invocar verify_reporter.py como script.
-- **El vivo llega solo despues del primer frame; el test de labels se aisla** — Si el cache falta o vencio, el segundo ciclo del menu mide vivo con with_progress y vuelve a pintar. La tecla Refrescar sigue forzando. Primer frame sigue sin probe. El test de labels mockea detect_subscriptions. None de primer frame no se etiqueta como probe fallido; despues del vivo se llena live_discovered.
-- **033-pkg6-techo-scoped-deja-repair-fuera** — No se despacha repair-agent. No se llama record-spawn contra el techo. El paquete queda en PACKAGE_REPAIR con findings upheld y verification grabada, a la espera de decision humana: dos despachos extra para cerrar el ciclo, o parar.
-- **033-pkg6-dos-despachos-extra-autorizados** — Se despacha repair-agent y despues delta-reviewer sin record-spawn. La excepcion queda en este log, no en model.py. El contador del paquete sigue en 8/8.
-- **033-push-main-para-ac-4-5** — Push de main a origin (no force). La corrida que dispare ese push es la de AC-4.5. No se commitean notas ni bitacoras ajenas en este paso.
-- **034 slice: cuota + ruteo orgánico; Engram no entra** — En alcance: (1) escritor barato + un salvage caro + techo frontier + % green-on-first-attempt; (2) ruteo orgánico real: quick-fix 1-3 archivos como default operativo, no solo doctrina ADR-0020; (3) Cursor pinnea modelo por rol, enmendar 032 AC-06. Fuera: 16 runtimes, RDD nativo, installer Go, bench Gentle, perfiles OpenCode Tab, Engram. Engram no se implementa: el vault Obsidian (ADR-0012) ya es la memoria durable y Federico lo usa como contexto.
-- **Engram no-goal: el vault Obsidian ya es el contexto** — Engram queda fuera de 034. El contexto durable es docs/notas/ (vault) mas feature-state.py. No hay paquete Engram ni MCP enable de engram para este slice.
-- **Excepciones de ownership PKG-A: docs vivos, spec 034 y suciedad 033** — Waivers de directorio: docs/notas/, docs/modules/, docs/specs/, docs/adr/, docs/architecture/. Se suman a los mirrors Global/*/PROYECTO y tests vecinos ya aprobados. No ensancha owned_paths de producto.
-- **Excepciones de ownership PKG-B: lifecycle, espejos y docs vivos** — Waivers: cli_lifecycle.py, Global/*/, PROYECTO feature_state_lib/, docs/{notas,modules,specs,adr,architecture}/, tests vecinos de init. No se ensancha owned_paths de producto.
-- **PKG-B waiver del skill de triage que ya cambio el lote anterior** — Exception puntual de Global/_canonical/skills/request-triage/SKILL.md como suciedad preexistente del lote A, no como ownership de B.
-- **Excepciones PKG-C: suciedad de A/B, espejos y docs** — Waivers de directorio para Global, PROYECTO, docs, y archivos puntuales de A/B. owned_paths de C no se ensancha.
-- **Excepciones PKG-D: arboles emitidos y suciedad A/B/C** — Waivers de Global/, PROYECTO/, docs/, tests/fixtures/models.toml y scripts de estado de A/B/C. owned_paths de D no se ensancha.
-- **No spawn test-writer: cada AC ya tiene mordida** — Skip test-writer. A-D already landed bite tests in test_harness (organic init, cheap writer, frontier cap, mixed inherit). No test-gap finding exists to close. Remaining spawns: integrator (global verify + evidence), adversarial-judge, memory-scribe (local vault only, Engram is no-goal).
-- **memory-scribe al cierre sin gastar el techo 12** — Mint gate-runner y adversarial-judge con record-spawn (11 y 12). memory-scribe corre al cierre SIN record-spawn, misma forma que 033-pkg6-dos-despachos-extra-autorizados. El techo en codigo no se toca. La excepcion queda en este log.
+- **Federico autoriza repair+delta de PKG-B** — federico 2026-08-20 OK para repair-agent (8) y delta-reviewer (9). Sin bump nuevo. Sin reopen. Constante intacta.
+- **Sin techo de repair: freeze committed vs HEAD es 0 lineas** — Pop candidate_identity.changed_lines de PKG-B. El gate post-repair usa --changed-lines del delta reportado, no el working tree entero vs freeze.
+- **Excepciones PKG-C por A y B sin commitear** — update-package --exception sobre suciedad de A/B y docs vivas. No ensancha owned_paths. No autoriza editar codigo.
+- **Juez bloquea: §11 miente y falta --provider-remove** — No BLOCKED todavia. Integrator reabre la composicion: reescribe §11 para apuntar a 035 A/B/C como entregados, y agrega caso aislado --provider-remove. Sin CLI reopen. Sin bump JSON. PKG-B queda en 10/10; el follow-up se registra en PKG-C.
+- **JUDGE-035-003 contradice el camino (b) aprobado** — 003 no es defecto. 004 si: el bundle no tenia los informes independientes como markdown; se depositan desde el state JSON (reviews, subreviews, verifications, deltas) sin reescribir veredictos.
+- **Federico autoriza spawn 11 para el cuarto juez** — federico 2026-08-21 OK para max_spawns_per_package 10->11 solo en el JSON de 035, un spawn: adversarial-judge. Constante intacta. Sin reopen.
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

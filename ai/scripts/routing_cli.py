@@ -9,10 +9,11 @@ command that needs `_routing_store()` (`routing_catalog`, `cmd_route_explain`,
 `cmd_routing_recent_writers`, `cmd_routing_migrate`, `cmd_doctor`) and `_routing_output`
 (reads the mutable `ROUTING_WARNINGS` global that only `main()` reassigns). `_routing_store`
 itself reads the mutable `PROJECT_KEY` global that only `set_agents_app.main()` ever
-reassigns (via `global PROJECT_KEY`) -- moving any of its callers here would need a
-back-reference into set_agents_app.py, which is a genuine circular import: set_agents_app.py
-imports this module, so the reverse edge breaks under tests/test_harness.py's `_import()`
-helper (see vault_ops.py's module docstring for the exact failure mode). This module only
+reassigns (via `global PROJECT_KEY`) -- residue anchors are enumerated in
+`docs/specs/035-panel-honesto-consola-y-tips/evidence/PKG-B-residue-matrix.md`, and
+`tests/test_harness.py:788-796` registers `set_agents_app` only for `exec_module` then
+restores `sys.modules` afterward (correcting the stale claim that `_import()` leaves it
+unregistered). This module only
 holds the functions tests/test_routing.py calls directly against the plain, cached
 `set_agents_app` module (`parse_usage`, `_decide_status`, `_validate_context_pack_path`,
 `_resolve_context_pack`, `_load_feature_doc`) plus their own small, self-contained helpers --

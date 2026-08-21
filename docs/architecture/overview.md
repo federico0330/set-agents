@@ -1,6 +1,6 @@
 # Architecture overview
 
-This is the high-level map of the harness as of ADR-0064 (feature 034-cuota-organica-y-writer-barato).
+This is the high-level map of the harness as of ADR-0065 (feature 035-panel-honesto-consola-y-tips).
 The trusted-routing diagrams below still describe that subsystem as of ADR-0036; 034 adds mode-selection
 and writer-quota on top of it (next section) without changing the SQLite dispatch path. It describes the
 accepted architecture target, not evidence that implementation is complete; decision rationale lives in the
@@ -123,6 +123,31 @@ Cursor pins a model per role and stays out of `RUNTIMES`. One heavy salvage per 
 repair ceiling (ADR-0023) still applies to post-panel diffs. Hitting the frontier cap beats salvage and
 auto-promotion.
 
+## Package review: which door may close it (035, ADR-0065)
+
+A package's review panel is **resolved**, never merely read: `small` complexity AND `low` risk resolve to one
+reviewer, anything else (unset `complexity` included, by fail-safe) resolves to the full panel. The resolved
+size decides which verb may close the review. Why: [ADR index](../adr/README.md) 0065.
+
+```mermaid
+flowchart TD
+    Rev["PACKAGE_REVIEW"] --> Resolve{"resolved panel size"}
+    Resolve -->|"1 (small+low)"| RR["record-review"]
+    Resolve -->|"2+ (full panel)"| Panel["start-review-panel → record-subreview per role → finalize-review-panel"]
+    RR --> Open{"blocking finding open?"}
+    Open -->|"sí"| RejectF["BLOCKING_FINDING_OPEN (pass only)"]
+    Open -->|"no"| Testing["PACKAGE_TESTING"]
+    Panel --> Testing
+    RR -.->|"panel resuelto 2+: cualquier verdict"| RejectP["REVIEW_PANEL_REQUIRED"]
+    Skip["record-repair --skip-delta"] -->|"puerta abierta, diferida"| Testing
+```
+
+Both refusals are named errors on the existing `{"ok": false, "error": ...}` envelope, cost no deep review
+cycle, and fire only in the mutating verb — historical `DONE`/`accepted` records are never re-judged.
+`PACKAGE_TESTING` with an open blocking finding stays **reachable** through `record-repair --skip-delta`,
+deliberately deferred; the advisory branch that warns about that state is kept for exactly that reason. No new
+module: this lives inside `module.estado` (`docs/modules/modules.toml`).
+
 ## Use cases and delivery boundary
 
 - Explain a trusted hypothetical route without mutating the SQLite dispatch/event state (it may read, never
@@ -139,6 +164,8 @@ auto-promotion.
   `scoped`/`feature` only with `--risk-signal` (ADR-0064).
 - Dispatch `code-rw` on the cheap/free default; one heavy salvage; stop at the frontier cap 4/16 (ADR-0060–0062).
   Cursor pins per role from `models.toml`, never as a routing lane (ADR-0063).
+- Close a package review through the door its resolved panel allows: `record-review` for `small`+`low`, the
+  review panel for everything else, and never a `pass` over an open blocking finding (ADR-0065).
 
 ## Adaptive dispatch CLI contract (004 P1-dispatch-core)
 

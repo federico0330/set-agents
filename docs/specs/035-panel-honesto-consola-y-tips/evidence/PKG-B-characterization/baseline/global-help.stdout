@@ -1,0 +1,104 @@
+usage: set-agents [-h] [--status] [--route-explain TASK_CLASS]
+                  [--route-doctor] [--routing-migrate] [--project DIR]
+                  [--scaffold [DIR]] [--json] [--check-update] [--update]
+                  [--yes] [--no-install] [--auto-update {on,off}] [--posturas]
+                  [--postura {autonoma,consultiva,todo_consultado}]
+                  [--metodologias] [--metodologia {sdd,rdd,off}] [--tools]
+                  [--tools-install NAME] [--dry-run] [--mcp] [--mcp-add NAME]
+                  [--mcp-remove NAME] [--mcp-on NAME] [--mcp-off NAME]
+                  [--harness {opencode,claude,codex,cursor,gemini,pi}]
+                  [--doctor] [--doctor-all] [--plugins] [--plugin-on NAME]
+                  [--plugin-off NAME] [--vault-init DIR]
+                  [--vault-link PROYECTO] [--vault DIR] [--vault-doctor]
+                  [--repair] [--include-notes] [--private] [--company NAME]
+                  [--model-preference-set CLASS] [--provider NAME]
+                  [--model-preference-role-override ROLE CLASS]
+                  [--model-preference-show]
+                  [--model-pin-set ROLE PROVIDER/MODEL]
+                  [--model-pin-clear ROLE]
+
+set-agents: unified console app for the SET-AGENTS harness (gentle-ai style).
+A TTY menu plus a scriptable CLI over the same primitives: install/repair
+(install.sh), self-update (git pull --ff-only + managed reinstall), model
+routing (setup-models.sh), and — in later sections — the optional tools
+catalog, MCP servers, and Claude Code plugins.
+
+options:
+  -h, --help            show this help message and exit
+  --status              estado en una línea (APP_STATUS ...)
+  --route-explain TASK_CLASS
+  --route-doctor        ADR-0035, solo lectura: por par OpenCode, auth/modelos
+                        listados/billing y diagnóstico del cache; expone
+                        credenciales sin CLI id verificado (M-1)
+  --routing-migrate     migra explícitamente la DB de routing al schema actual
+  --project DIR         ancla explícita del proyecto para ruteo
+  --scaffold [DIR]      crea el estado portable mínimo del proyecto
+  --json                salida JSON para comandos de observabilidad (routing,
+                        --context)
+  --check-update
+  --update
+  --yes
+  --no-install
+  --auto-update {on,off}
+  --posturas            explica las posturas de autonomía elegibles (AC-06)
+  --postura {autonoma,consultiva,todo_consultado}
+                        fija la postura de autonomía del harness
+  --metodologias        explica TDD estricto/RDD y SDD (AC-07/AC-08)
+  --metodologia {sdd,rdd,off}
+                        fija la preferencia de metodología para
+                        pedidos/paquetes nuevos
+  --tools               TOOL <name> installed=yes/no
+  --tools-install NAME
+  --dry-run
+  --mcp                 MCP <name> harness=<h> state=...
+  --mcp-add NAME
+  --mcp-remove NAME
+  --mcp-on NAME
+  --mcp-off NAME
+  --harness {opencode,claude,codex,cursor,gemini,pi}
+  --doctor              chequeo redactado del harness (usar con --harness pi)
+  --doctor-all          qué detecta esta máquina: harnesses, CLIs y
+                        proveedores autenticados
+  --plugins
+  --plugin-on NAME
+  --plugin-off NAME
+  --vault-init DIR      crea el vault Obsidian de la empresa en DIR/obsidian
+  --vault-link PROYECTO
+                        linkea docs/notas del proyecto al vault
+  --vault DIR           vault explícito para --vault-link
+  --vault-doctor        estado del vault: symlinks sanos, drift, no-
+                        registrados (report-only)
+  --repair              con --vault-doctor --project: aplica lo que el --dry-
+                        run inmediatamente anterior confirmó
+  --include-notes       con --vault-doctor --project --dry-run: docs/notas
+                        queda DENTRO del git del proyecto tras migrar (opt-out
+                        explícito; por defecto DEC-5 lo excluye)
+  --private             con --vault-link: las notas viven en el vault y el
+                        repo queda con un symlink excluido de git
+  --company NAME
+  --model-preference-set CLASS
+                        escribe [preference].CLASS en model-preference.toml;
+                        combinar con --provider (repetible, ordenado)
+  --provider NAME       con --model-preference-set: proveedor, repetible, el
+                        orden en la línea de comando es la preferencia
+  --model-preference-role-override ROLE CLASS
+                        escribe [role_override].ROLE = CLASS en model-
+                        preference.toml
+  --model-preference-show
+                        lee model-preference.toml (solo lectura)
+  --model-pin-set ROLE PROVIDER/MODEL
+                        escribe [model_pin].ROLE en model-preference.toml
+                        (ROLE puede ser '*')
+  --model-pin-clear ROLE
+                        borra [model_pin].ROLE de model-preference.toml
+
+Primera vez: leé README.md — explica qué vas a ver según tu sistema operativo.
+Dos verbos más (ADR-0038, interceptados antes de este parser, no listados
+arriba): --tools-propose <name> --kind cli|mcp|skill --detect <bin>
+--install-<method> "<cmd>" --why "<motivo>" (valida y imprime la pregunta
+consolidada, nunca instala) y --tools-approve <name> (la aprobación humana --
+nunca la corre un agente, sea cual sea su rol). Sesión virgen de una vez: set-
+agents --virgin {opencode,claude,codex,pi} -- [args]; la CLI corre con
+HOME/XDG temporales y no modifica tu instalación. AC-02 (ADR-0050): algunas
+flags de uso interno (spawns/orquestador) están ocultas de esta lista --
+siguen funcionando igual; --help --avanzado las muestra.

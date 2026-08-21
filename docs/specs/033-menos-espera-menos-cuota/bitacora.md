@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-19T18:30:21+00:00
+Actualizado: 2026-08-21T13:49:43+00:00
 
 [2026-08-18T15:48:35+00:00] PKG-4 · package-planner · started · modelo cursor/inherit
 Cliente: Se estan armando las hojas de ruta de cada paquete para que quien implemente no tenga que rebuscar el repo.

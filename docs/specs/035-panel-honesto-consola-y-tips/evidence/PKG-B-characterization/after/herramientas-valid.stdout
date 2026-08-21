@@ -1,0 +1,9 @@
+TOOL supabase installed=no
+TOOL vercel installed=no
+TOOL gcloud installed=yes
+TOOL gh installed=yes
+TOOL docker installed=yes
+TOOL jq installed=yes
+TOOL obsidian installed=yes
+TOOL syncthing installed=yes
+TOOL pnpm installed=yes

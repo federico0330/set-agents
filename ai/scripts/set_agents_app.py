@@ -2986,65 +2986,6 @@ def exclude_notes_from_git(project):
     return True
 
 
-def vault_link_private(project, target_vault, notes, notes_home):
-    """Private mode: notes live in the vault; the repo gets an excluded symlink."""
-    if notes.is_symlink():
-        if notes.resolve() == notes_home.resolve():
-            if exclude_notes_from_git(project):
-                print("VAULT_PRIVATE_EXCLUDED docs/notas (.git/info/exclude)")
-            write_vault_registry_entry(
-                target_vault, project, topology="private", vault_path=notes_home,
-                notes_excluded=_notes_currently_excluded(project),
-            )
-            print(f"VAULT_LINK_SKIP project={project.name} vault={target_vault} mode=private")
-            return 0
-        print(f"VAULT_LINK_CONFLICT {notes} ya apunta a {notes.resolve()} — resolvelo a mano")
-        return 1
-    if notes_home.is_symlink():
-        # Old outward link (vault -> repo) from default mode: replace with the real home.
-        notes_home.unlink()
-    if notes_home.exists() and not notes_home.is_dir():
-        print(f"VAULT_LINK_CONFLICT {notes_home} existe y no es un directorio — resolvelo a mano")
-        return 1
-    notes_home.mkdir(parents=True, exist_ok=True)
-    if notes.is_dir():
-        # Migrate repo-resident notes into the vault: never clobber a differing file.
-        files = [path for path in sorted(notes.rglob("*")) if path.is_file()]
-        conflicts = [
-            path.relative_to(notes) for path in files
-            if (notes_home / path.relative_to(notes)).exists()
-            and (notes_home / path.relative_to(notes)).read_bytes() != path.read_bytes()
-        ]
-        if conflicts:
-            listed = ", ".join(str(item) for item in conflicts[:5])
-            print(f"VAULT_LINK_CONFLICT notas difieren entre repo y vault ({listed}) — resolvelo a mano")
-            return 1
-        for path in files:
-            destination = notes_home / path.relative_to(notes)
-            if not destination.exists():
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(path), str(destination))
-        shutil.rmtree(notes)
-    seed = notes_home / "00 - Proyecto.md"
-    if not seed.exists():
-        seed.write_text(project_notes_seed(project.name), encoding="utf-8")
-        print(f"VAULT_CREATED {seed}")
-    notes.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        notes.symlink_to(os.path.relpath(notes_home, notes.parent))
-    except OSError as exc:
-        print(f"VAULT_LINK_CONFLICT no pude crear el symlink: {exc}")
-        return 1
-    if exclude_notes_from_git(project):
-        print("VAULT_PRIVATE_EXCLUDED docs/notas (.git/info/exclude)")
-    write_vault_registry_entry(
-        target_vault, project, topology="private", vault_path=notes_home,
-        notes_excluded=_notes_currently_excluded(project),
-    )
-    print(f"VAULT_LINK_OK project={project.name} vault={target_vault} mode=private")
-    return 0
-
-
 def cmd_vault_link(project, vault=None, private=False):
     project = Path(project).expanduser().resolve()
     if not project.is_dir():

@@ -18,6 +18,58 @@ from feature_state_lib.cli_lifecycle import state_file_arg, output_state, block_
 from feature_state_lib.cli_repair import normalize_findings, FINDING_BOOKKEEPING
 
 
+def _roles_without_subreview(package: dict[str, Any], roles: list[str]) -> list[str]:
+    subreviewed = {
+        item.get("role")
+        for panel in package.get("review_panels", [])
+        for item in panel.get("subreviews", [])
+        if item.get("role")
+    }
+    return [role for role in roles if role not in subreviewed]
+
+
+def require_review_panel(package: dict[str, Any]) -> None:
+    required = model.resolved_required_reviewers(package)
+    if len(required) <= 1:
+        return
+    missing = _roles_without_subreview(package, required)
+    missing_text = ", ".join(missing) if missing else "none (the open panel closes with finalize-review-panel)"
+    complexity = package.get("complexity") or "<unset>"
+    risk = model.resolve_package_risk(package)
+    roles_hint = ", ".join(f"--role {role}" for role in required)
+    raise StateError(
+        f"REVIEW_PANEL_REQUIRED: {package['package_id']} requires the full review panel "
+        f"({', '.join(required)}) for complexity={complexity} risk={risk}; "
+        "record-review is the small+low door and cannot record any verdict here. "
+        f"Roles with no recorded subreview: {missing_text}. "
+        f"Use: start-review-panel {roles_hint}, then record-subreview per role, "
+        "then finalize-review-panel."
+    )
+
+
+def _blocking_findings(package: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        finding for finding in package.get("findings", [])
+        if finding.get("status", "open") not in TERMINAL_FINDING_STATUSES
+        and finding.get("severity") in model.BLOCKING_SEVERITIES
+    ]
+
+
+def require_no_blocking_findings(package: dict[str, Any]) -> None:
+    if not has_open_findings(package, model.BLOCKING_SEVERITIES):
+        return
+    blocking = _blocking_findings(package)
+    details = ", ".join(
+        f"{finding.get('id', '<unnamed>')} ({finding.get('severity', 'unknown')})"
+        for finding in blocking
+    )
+    raise StateError(
+        f"BLOCKING_FINDING_OPEN: cannot pass review with blocking findings open: {details}. "
+        "Record --verdict repair_required instead, or refute the finding with record-verification. "
+        "Same severities finalize-review-panel refuses: critical, high, medium."
+    )
+
+
 def cmd_record_review(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
 
@@ -28,6 +80,7 @@ def cmd_record_review(args: argparse.Namespace) -> int:
         errors = package_review_ready(package)
         if errors:
             raise StateError("cannot record package review: " + "; ".join(errors))
+        require_review_panel(package)
         attempts = package.setdefault("attempts", {})
         if attempts.get("deep_review_cycles", 0) >= data["budgets"]["max_deep_review_cycles"]:
             return block_with_reason(data, args.actor, args.package_id, "deep review budget exhausted",
@@ -52,6 +105,7 @@ def cmd_record_review(args: argparse.Namespace) -> int:
             package["status"] = "repair_required"
             package["repair_entry"] = "review"
         elif args.verdict == "pass":
+            require_no_blocking_findings(package)
             data["phase"] = "PACKAGE_TESTING"
             package["status"] = "testing_required"
         else:
@@ -156,7 +210,7 @@ def cmd_finalize_review_panel(args: argparse.Namespace) -> int:
             package["status"] = "repair_required"
             package["repair_entry"] = "review"
         elif args.verdict == "pass":
-            if has_open_findings(package, {"critical", "high", "medium"}):
+            if has_open_findings(package, model.BLOCKING_SEVERITIES):
                 raise StateError("cannot pass review panel with blocking findings open")
             data["phase"] = "PACKAGE_TESTING"
             package["status"] = "testing_required"

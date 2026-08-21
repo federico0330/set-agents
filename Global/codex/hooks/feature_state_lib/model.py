@@ -94,6 +94,7 @@ NON_ACCEPTING_ACTORS = {"implementer", "frontend-engineer", "refactor-specialist
 DEFAULT_PACKAGE_RISK = "low"
 SINGLE_REVIEW_PANEL = ["package-reviewer"]
 FULL_REVIEW_PANEL = ["package-reviewer", "security-auditor"]
+BLOCKING_SEVERITIES = frozenset({"critical", "high", "medium"})
 # AC-6.4: warn while budget remains, not only after overflow. Integer used/ceiling
 # compared at 80%; the hard cap still lives in record-spawn / validate_state.
 SPAWN_BUDGET_WARN_RATIO = 0.8
@@ -581,6 +582,24 @@ def persist_review_requirements(package: dict[str, Any]) -> list[str]:
     reviewers = required_reviewers_for(package.get("complexity"), package["risk"])
     package["required_reviewers"] = reviewers
     return reviewers
+
+
+def resolved_required_reviewers(package: dict[str, Any]) -> list[str]:
+    """Return the package's review panel without writing state."""
+    stored = package.get("required_reviewers")
+    if isinstance(stored, list) and stored:
+        roles: list[str] = []
+        for item in stored:
+            if not isinstance(item, str):
+                break
+            role = item.strip()
+            if not role:
+                break
+            if role not in roles:
+                roles.append(role)
+        else:
+            return roles
+    return required_reviewers_for(package.get("complexity"), resolve_package_risk(package))
 
 
 def context_pack_path(data: dict[str, Any], package_id: str) -> Path:

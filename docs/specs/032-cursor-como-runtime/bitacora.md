@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-19T18:30:21+00:00
+Actualizado: 2026-08-21T13:49:43+00:00
 
 [2026-08-18T14:16:01+00:00] orchestrator · blocked
 Cliente: Aviso honesto: esta tanda la escribi y la probe yo mismo, sin un revisor independiente, porque la sesion tiene la delegacion desactivada. Los tests estan y pasan, pero la revision cruzada que el harness normalmente exige quedo pendiente.

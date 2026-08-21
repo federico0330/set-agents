@@ -1,0 +1,2 @@
+SCAFFOLD_CONFLICT path=ai/state/project.json reason=invalid_identity
+SCAFFOLD_CONFLICTS n=1

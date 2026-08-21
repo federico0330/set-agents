@@ -12,6 +12,7 @@ CLI+TUI unificado: install/repair, self-update, routing (--route-decide/--route-
 
 ## Últimos cambios estructurales
 
+- 2026-08-21 035-panel-honesto-consola-y-tips/PKG-B — La segunda pasada de extraccion no muda el residuo de routing/vault: queda enumerado con experimento propio. Se borro una copia identica de vault_link_private. El CLI publico no cambia.
 - 2026-08-19 033-menos-espera-menos-cuota/PKG-3 — El picker agrupa por proveedor, muestra n de total, marca el actual con un punto, y wipea con ESC H J en vez de 2J. ENTER en un header no selecciona.
 - 2026-08-17 025-consola-minima-y-flexible/D5-vault-en-todo-spawn — Los spawners de codex/opencode/claude ahora materializan el bloque de vault con degradacion honesta y sink protegido para fallas transitorias.
 - 2026-08-17 025-consola-minima-y-flexible/D4-harness-por-CLI — Sesión virgen por CLI con HOME/XDG/CODEX_HOME temporales y argv hijo opcional.

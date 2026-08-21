@@ -34,6 +34,7 @@
 - [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
 - [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `INTEGRATION` · paquetes 6/6
 - [[features/034-cuota-organica-y-writer-barato|034-cuota-organica-y-writer-barato]] — fase `DONE` · paquetes 4/4 · **DONE**
+- [[features/035-panel-honesto-consola-y-tips|035-panel-honesto-consola-y-tips]] — fase `DONE` · paquetes 3/3 · **DONE**
 
 ## Qué falta
 
@@ -56,14 +57,14 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-19 034-consola-no-copia-gentle-tui|No copiar la TUI de Gentle; SET ya cubre install/update/sync]]
-- [[decisiones/2026-08-19 034-memory-scribe-sin-record-spawn|memory-scribe al cierre sin gastar el techo 12]]
-- [[decisiones/2026-08-19 034-skip-test-writer-bites-already-landed|No spawn test-writer: cada AC ya tiene mordida]]
-- [[decisiones/2026-08-19 034-pkg-d-owned-path-exceptions|Excepciones PKG-D: arboles emitidos y suciedad A/B/C]]
-- [[decisiones/2026-08-19 034-pkg-c-owned-path-exceptions|Excepciones PKG-C: suciedad de A/B, espejos y docs]]
-- [[decisiones/2026-08-19 034-pkg-b-triage-skill-preexisting|PKG-B waiver del skill de triage que ya cambio el lote anterior]]
-- [[decisiones/2026-08-19 034-pkg-b-owned-path-exceptions|Excepciones de ownership PKG-B: lifecycle, espejos y docs vivos]]
-- [[decisiones/2026-08-19 034-pkg-a-owned-path-exceptions|Excepciones de ownership PKG-A: docs vivos, spec 034 y suciedad 033]]
+- [[decisiones/2026-08-21 035-pkg-c-authorized-fourth-judge-spawn|Federico autoriza spawn 11 para el cuarto juez]]
+- [[decisiones/2026-08-21 035-judge-003-path-b-same-binary|JUDGE-035-003 contradice el camino (b) aprobado]]
+- [[decisiones/2026-08-21 035-judge-fail-composition|Juez bloquea: §11 miente y falta --provider-remove]]
+- [[decisiones/2026-08-21 035-pkg-c-owned-exceptions-uncommitted-ab|Excepciones PKG-C por A y B sin commitear]]
+- [[decisiones/2026-08-21 035-pkg-b-repair-ceiling-uncommitted-freeze|Sin techo de repair: freeze committed vs HEAD es 0 lineas]]
+- [[decisiones/2026-08-21 035-pkg-b-authorized-two-extra-spawns|Federico autoriza repair+delta de PKG-B]]
+- [[decisiones/2026-08-20 035-pkg-b-owned-bitacoras-digest|Excepciones: bitacoras ajenas y estado.md regenerados]]
+- [[decisiones/2026-08-20 035-pkg-a-ceiling-cannot-revert|No se puede bajar el JSON a 8: PKG-A ya gasto 10]]
 
 ## Convenciones
 
@@ -73,18 +74,21 @@
 | 032-cursor-como-runtime | 10/10 | n/a, request |
 | 033-menos-espera-menos-cuota | 10/10 | n/a, request |
 | 034-cuota-organica-y-writer-barato | 10/10 | adr, n/a, notas |
+| 035-panel-honesto-consola-y-tips | 10/10 | n/a |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-19T18:29:58+00:00_
+_Actualizado: 2026-08-21T13:48:41+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias
 
 _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
+
+Guía pedagógica (2026-08-20): [[../COMO-FUNCIONA|Cómo funciona el harness de punta a punta]] — `docs/COMO-FUNCIONA.md`. No es spec; es el mapa de lanes, por qué Claude no instancia `security-auditor` en quick-fix, y qué te distingue.
 
 ### Lo que queda (actualizado 2026-08-02)
 

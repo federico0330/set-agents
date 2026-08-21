@@ -13,6 +13,7 @@ Máquina de estados de paquetes/features: fases legales, gates, reviews, finding
 
 ## Últimos cambios estructurales
 
+- 2026-08-20 035-panel-honesto-consola-y-tips/PKG-A — record-review ya no cierra un paquete de panel FULL ni pasa con finding bloqueante abierto; el predicado de findings es has_open_findings compartido con finalize.
 - 2026-08-19 034-cuota-organica-y-writer-barato/PKG-C — Hay un cupo de modelos pesados (4 por paquete, 16 por feature) distinto del tope de despachos. Un comando P001 no disfraza un rol pesado. reopen puede resetear solo ese contador.
 - 2026-08-19 034-cuota-organica-y-writer-barato/PKG-B — record-spawn --salvage exige --model no vacio; record-gate ya no resetea el consecutivo en un PASS parcial; el reset ocurre al pasar de gates a review si el paquete cerro green-on-first.
 - 2026-08-19 034-cuota-organica-y-writer-barato/PKG-A — init scoped y feature exigen un token de riesgo nombrado antes de escribir state; sin token el comando muere y no deja JSON.

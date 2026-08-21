@@ -97,14 +97,16 @@ def next_transition(data: dict[str, Any]) -> dict[str, Any]:
             # `next` is the machine advisor — leaving it on PACKAGE_RUNTIME_QA walks the
             # orchestrator into an accept-package that package_accept_ready then refuses,
             # which is verbatim the failure already fixed once for verification below.
-            # The reason names the state, not a cause: this branch was first written
-            # blaming record-late-review, and the review panel proved that wrong.
-            # `cmd_record_review` sets PACKAGE_TESTING on `pass` without checking
-            # has_open_findings — unlike finalize-review-panel and record-delta-review —
-            # so the same state is reachable with no late review anywhere in the history.
-            # That asymmetry is real and is registered as debt rather than repaired here:
-            # record-review is outside this package's criteria and every package in flight
-            # uses it.
+            # `record-review` no longer opens this door: since ADR-0065 it refuses `pass`
+            # while a blocking finding is open (BLOCKING_FINDING_OPEN), the same set
+            # finalize-review-panel and record-delta-review already refuse.
+            # This branch stays because the state is still REACHABLE, through a door this
+            # slice deliberately left open: `record-repair --skip-delta` sets PACKAGE_TESTING
+            # at cli_repair.py:280-282 while its guard at :246-253 inspects only the findings
+            # named by --finding-id on that call, so an unrepaired finding travels through.
+            # Deferred on purpose, not forgotten:
+            # docs/notas/decisiones/2026-08-20 035-skip-delta-fuera-del-slice.md
+            # Full door audit: docs/specs/035-panel-honesto-consola-y-tips/evidence/PKG-A-doors.md
             return {"phase": phase, "next": "PACKAGE_REPAIR",
                     "reason": "a blocking finding is open; repair or refute it before testing can advance"}
         if package and package.get("testing"):

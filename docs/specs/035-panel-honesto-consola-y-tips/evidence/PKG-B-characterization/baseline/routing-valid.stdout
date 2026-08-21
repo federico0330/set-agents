@@ -1,0 +1,1 @@
+{"command": "routing", "data": {}, "ok": false, "reason_codes": ["ROUTING_UNAVAILABLE"], "schema_version": 2, "warnings": ["PROJECT_IDENTITY_INVALID"]}

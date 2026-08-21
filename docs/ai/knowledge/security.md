@@ -9,6 +9,7 @@
 ## Invariantes
 - [2026-08][034-cuota-organica-y-writer-barato] Mixed inherit on review-ro + duty in {audit, judge} is forbidden at generate (reviewer independence). Cursor inherit is the parent model. Guards: models_config.py:644-652, generate.py:768-778. Bite: test_mixed_inherit_on_audit_reviewer_is_forbidden_at_generate.
 - [2026-08][034-cuota-organica-y-writer-barato] P001 --command must not exempt a heavy role from frontier classification. Exemption is local-gate-runner role only (model.py:683-697). Bite: test_fifth_heavy_implementer_with_p001_command_is_rejected.
+- [2026-08][035-panel-honesto-consola-y-tips] FULL_REVIEW_PANEL packages cannot use record-review to bypass mandatory security-auditor; REVIEW_PANEL_REQUIRED rejects all three verdicts (ADR-0065, AC-A.1).
 
 ## Errores conocidos y causas raíz
 - [2026-08][034-cuota-organica-y-writer-barato] SEC-001 PKG-D: mixed inherit on audit/reviewer passed generate because family() treated inherit as a distinct slug from composer-2.5. Runtime: reviewer shared the writer.

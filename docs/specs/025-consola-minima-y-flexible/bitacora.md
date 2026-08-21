@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-19T18:30:21+00:00
+Actualizado: 2026-08-21T13:49:43+00:00
 
 [2026-08-14T11:11:13+00:00] D1-superficie-humana · implementer · started · modelo anthropic/sonnet · effort medium
 Cliente: Que la aplicacion de terminal muestre solo lo que te sirve, sin caracteres raros ni comandos que no vas a usar.
