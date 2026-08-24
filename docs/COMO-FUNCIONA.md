@@ -31,6 +31,16 @@ Claude Code, Cursor, OpenCode, Codex y pi siguen siendo quien escribe. El harnes
 proceso **alrededor**: quién puede mutar, quién revisa, qué gate tiene que mirar de
 verdad, y dónde queda la evidencia cuando se corta la sesión.
 
+### Cómo te habla vs dónde mirar el detalle (ADR-0068)
+
+| Canal | Qué ves |
+|---|---|
+| **Chat en vivo** | Prosa informativa en hitos: qué proceso corre, por qué, qué busca. Sin prefijos `Cliente:`/`Ingeniería:`. |
+| **Vault Obsidian** (`docs/notas/`) | Estado del encargo, bitácoras, digest matinal, decisiones — incluye trazabilidad dual persistida. |
+
+El vocabulario usuario-facing (**encargo**, **tanda de trabajo**, **consulta**, **arreglo acotado**) aplica a
+cualquier dominio; no hay lista cerrada de “tipos de proyecto”.
+
 ---
 
 ## 2. Las tres capas físicas (si mezclás estas, todo se siente mágico)

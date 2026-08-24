@@ -14,11 +14,11 @@ Y las notas Obsidian eran write-only: ningún agente las leía al arrancar (la �
 
 ## Decisión
 
-1. **Narración por hito**: bloques Cliente/Ingeniería solo en inicio de feature/paquete, resultado de
-   review/delta, hallazgo inesperado o bloqueo, cierre de paquete/feature, y cierre de turno. Los spawns
+1. **Narración por hito**: bloques informativos en chat solo en inicio de encargo/tanda, resultado de
+   review/delta, hallazgo inesperado o bloqueo, cierre de tanda/encargo, y cierre de turno. Los spawns
    intermedios persisten igual (`record-spawn` al JSONL) pero sin bloque en chat. Quick-fix: un bloque al
-   cierre. La transparencia no se pierde: se muda del chat al log, y el chat queda para lo que un cliente
-   de verdad quiere leer.
+   cierre. **Enmienda ADR-0068:** el chat ya no usa registros etiquetados `Cliente:`/`Ingeniería:`; esos
+   registros persisten en vault/logs. Ver ADR-0068.
 2. **`feature-state.py digest [--since <ISO>|ayer]`**: regenera `docs/notas/BUENOS-DIAS.md` entre
    marcadores `notas:auto` (texto humano preservado vía `merge_note()`), con: qué quedó listo / qué se
    está haciendo / qué falta / decisiones nuevas / cola de trabajo. El digest deja de poder pudrirse:

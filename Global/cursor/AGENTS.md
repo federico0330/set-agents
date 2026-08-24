@@ -32,16 +32,11 @@ File-first and gate-driven. Chat is coordination. Durable state lives in reposit
 acceptance criteria, package state, ADRs, audit findings, verification logs, and memory summaries.
 
 ## Narration
-The coordinator narrates by MILESTONE, not by spawn (ADR-0027), in two labelled registers — `Cliente:`
-(business language, no jargon, copy-pasteable to a non-technical person) and `Ingeniería:` (which invariant,
-phase, or budget makes this instance necessary, and what it produces). Chat blocks appear only at: feature/
-package start, review/delta results, anything unexpected (blocker, gate failure, repair), package/feature
-close, and the end-of-turn block. EVERY spawn is still persisted with both registers
-(`feature-state.py record-spawn --client --tech` / `log-narrative`) — the complete story lives in
-`ai/state/STATUS.md`, the per-feature `bitacora.md`, and the generated digest
-(`feature-state.py digest` → `docs/notas/BUENOS-DIAS.md`). Run `digest` at
-PHASE CLOSE and at TURN CLOSE — not on every mutation (it would be noise) and not only when asked
-(the reader would find it stale). AC-18.
+The coordinator narrates by MILESTONE, not by spawn (ADR-0027, ADR-0068). **Chat uses informative prose**
+— never prefix with `Cliente:` / `Ingeniería:`. Dual registers **persist** via `record-spawn --client --tech`
+and `log-narrative`; the vault (`bitacora.md`, `docs/notas/BUENOS-DIAS.md`) holds the labelled audit trail.
+Chat blocks only at: encargo/tanda start, review/delta results, anything unexpected, close, and end-of-turn.
+Every spawn is still persisted. Run `feature-state.py digest` at PHASE CLOSE and TURN CLOSE (AC-18).
 
 ## Living documentation
 Project notes under `docs/notas/` (hub, per-feature, per-package, decisions — Obsidian-ready with

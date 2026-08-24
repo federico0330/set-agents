@@ -14,16 +14,9 @@ File-first and gate-driven. Durable state lives in repository files: specs, acce
 findings, gate logs, and memory summaries.
 
 ## Narration
-The coordinator narrates by MILESTONE, not by spawn (ADR-0027), in two labelled registers — `Cliente:`
-(business language, no jargon, copy-pasteable to a non-technical person) and `Ingeniería:` (which invariant,
-phase, or budget makes this instance necessary, and what it produces). Chat blocks appear only at: feature/
-package start, review/delta results, anything unexpected (blocker, gate failure, repair), package/feature
-close, and the end-of-turn block. EVERY spawn is still persisted with both registers
-(`feature-state.py record-spawn --client --tech` / `log-narrative`) — the complete story lives in
-`ai/state/STATUS.md`, the per-feature `bitacora.md`, and the generated digest
-(`feature-state.py digest` → `docs/notas/BUENOS-DIAS.md`). Run `digest` at
-PHASE CLOSE and at TURN CLOSE — not on every mutation (it would be noise) and not only when asked
-(the reader would find it stale). AC-18.
+The coordinator narrates by MILESTONE, not by spawn (ADR-0027, ADR-0068). **Chat uses informative prose**
+— never prefix with `Cliente:` / `Ingeniería:`. Dual registers **persist** via `record-spawn --client --tech`
+and `log-narrative`; the vault holds the labelled audit trail. Run `digest` at PHASE CLOSE and TURN CLOSE.
 See `## Narración — protocolo de transparencia` below for the full protocol.
 
 ## Living documentation
@@ -140,46 +133,34 @@ burned a week of quota in two days; treat them as invariants, not style advice.
 - **Soft cap: ~12 spawns per package.** If you are about to exceed it, stop and re-read the package plan — the
   decomposition is wrong, and that is a finding for `package-planner`, not a license to keep spawning.
 
-## Narración — protocolo de transparencia
+## Narración — protocolo de transparencia (ADR-0027, ADR-0033, ADR-0068)
 
-You narrate in two registers, always labelled, by MILESTONE (ADR-0027): chat blocks only at feature/package
-start, review/delta results, anything unexpected, package/feature close, and end of turn. Every other spawn
-is persisted (`record-spawn`/`log-narrative`) without a chat block. The blocks:
+Informative prose in chat — **never** `Cliente:` / `Ingeniería:` prefixes (ADR-0068). Persist dual registers
+with `record-spawn --client "..." --tech "..."` and `log-narrative`; vault files keep labelled audit trail.
 
-**a) At a narrated milestone that opens work**, immediately after `record-spawn`, BEFORE delegating:
-
-```
-▸ Instancio <role> [<provider>/<model> · effort <effort>] — <qué va a hacer, una frase>
-  Cliente: <qué se agrega o arregla y cómo lo afecta, sin jerga>
-  Ingeniería: <por qué hace falta ESTA instancia: qué invariante, fase o presupuesto la exige, y qué produce>
-```
-
-The bracket is the decision's identity (ADR-0031/0032); non-narrated spawns still show their model+effort
-via the `↳` provenance line the Spawn-economy rule above mandates.
-
-**b) At a narrated milestone that closes work:**
+**a) Opening milestone (max ~8 lines):**
 
 ```
-✓ <role> terminó — <resultado en pocas palabras>
-  Cliente: <qué quedó listo, o qué falta para que lo pueda usar>
-  Ingeniería: <evidencia concreta, transición registrada en estado, próximo eslabón>
+▸ Instancio <role> [<provider>/<model> · effort <effort>] — <one-line action>
+<Informative prose: what changes for the user, why this instance, what done looks like.>
 ```
 
-**c) At the end of EVERY turn**, this fixed plain-language block (user language, max ~8 lines). Never end a
-turn without it. Its intent is informative/educational (ADR-0033): assume the reader does NOT remember what
-the feature is about — the first line always re-explains it — and write at the level of a
-computer-engineering student, plainly, with no jargon beyond phase/package ids and no clever wording:
+**b) Closing milestone (max ~8 lines):**
 
 ```
-En qué estamos: <feature_id — qué se está construyendo y para qué, en una frase>  (o "consulta suelta" | "quick-fix: <tema>")
-Paquete: <id — qué resuelve este paquete, y "n de m"> | spawns x/y · reviews x/y  (o "-")
+✓ <role> terminó — <outcome in few words>
+<Informative prose: what is ready, evidence, next step and why.>
+```
+
+**c) End of EVERY turn** — ADR-0033 block (max ~8 lines), never skip:
+
+```
+En qué estamos: <feature_id — qué se está construyendo y para qué, en una frase>  (o "consulta suelta" | "arreglo acotado: <tema>")
+Paquete: <id — qué resuelve esta tanda, y "n de m"> | spawns x/y · reviews x/y  (o "-")
 Hice: <qué pasó este turno y por qué importa, 1-2 líneas>
 Conviene ahora: <próximo paso concreto Y por qué es el siguiente>
 Necesito de vos: <decisión concreta pendiente, o "nada">
 ```
 
-Every block is persisted through the state CLI, never only printed: the opening one via `record-spawn
---client "..." --tech "..."`, the closing one via `log-narrative --result done|blocked --client "..." --tech
-"..."`. The `Cliente:` line must survive a copy-paste to a non-technical person; the `Ingeniería:` line must
-name the concrete mechanism (separation-of-duties invariant, physical waiver, spawn budget, capability,
-`required_reviewers`, phase precondition) — "porque hace falta" is not a justification.
+Every block persists through the state CLI. `--client` stays non-technical; `--tech` names the concrete
+mechanism (invariant, waiver, budget, capability, reviewers, phase precondition).

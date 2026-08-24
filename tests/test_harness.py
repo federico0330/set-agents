@@ -6139,10 +6139,11 @@ class HarnessTests(unittest.TestCase):
         ]
         for text in artifacts:
             self.assertIn("▸ Instancio", text)
-            self.assertIn("Cliente:", text)
-            self.assertIn("Ingeniería:", text)
-            # Both halves of the cadence, and the durability rule that keeps the
-            # narration out of chat-only limbo.
+            self.assertIn("ADR-0068", text)
+            self.assertNotRegex(text, r"(?m)^\s+Cliente:")
+            self.assertNotRegex(text, r"(?m)^\s+Ingeniería:")
+            self.assertIn("informative prose", text.lower())
+            # Durability rule: persist dual registers even when chat is prose-only.
             self.assertIn("terminó", text)
             self.assertIn("log-narrative", text)
             self.assertIn("record-spawn --client", text)
@@ -6169,7 +6170,8 @@ class HarnessTests(unittest.TestCase):
         for name in ("AGENTS.opencode.md", "CLAUDE.md", "AGENTS.codex.md"):
             text = (ROOT / "Global/_shared" / name).read_text(encoding="utf-8")
             self.assertIn("## Narration", text, name)
-            self.assertIn("two labelled registers", text, name)
+            self.assertIn("informative prose", text.lower(), name)
+            self.assertIn("ADR-0068", text, name)
             self.assertIn("log-narrative", text, name)
             self.assertIn("bitacora.md", text, name)
 
@@ -6952,8 +6954,9 @@ class HarnessTests(unittest.TestCase):
             "## Turn continuity", "## MCP discipline", "## Human decision",
         ):
             self.assertIn(heading, text, heading)
-        self.assertIn("Cliente:", text)
-        self.assertIn("Ingeniería:", text)
+        self.assertIn("ADR-0068", text)
+        self.assertIn("informative prose", text.lower())
+        self.assertNotRegex(text, r"(?m)^\s+Cliente:")
         self.assertIn("Spawn economy", text)
         self.assertIn("spawns per package", text)
 
@@ -13361,7 +13364,7 @@ class HarnessTests(unittest.TestCase):
     def test_ac25_package_close_narrates_impacto_humano_subblock_additively(self):
         # AC-25: the fixed sub-block is inserted at the package-close narration milestone,
         # sourced verbatim from `record-module-impact`'s own stdout, and is explicitly
-        # additive to the Cliente:/Ingeniería: registers (ADR-0027) and the end-of-turn
+        # additive to the informative closing prose (ADR-0068) and the end-of-turn
         # block (ADR-0033) -- neither contract is disturbed by this package.
         orchestrator = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text()
         self.assertIn("Impacto humano:", orchestrator)

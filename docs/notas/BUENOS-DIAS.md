@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-23T09:51:56` · generado 2026-08-24T12:51:56+00:00_
+_Ventana: desde `2026-08-23T10:40:03` · generado 2026-08-24T13:40:03+00:00_
 
 ## Necesita tu decisión
 

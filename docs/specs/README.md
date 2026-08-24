@@ -43,3 +43,4 @@
 | [034](034-cuota-organica-y-writer-barato/spec.md) | Organic quota and cheap writer | Shipped | 2026-08-19 |
 | [035](035-panel-honesto-consola-y-tips/spec.md) | Honest panel, split console, TIPS updated | Shipped | 2026-08-20 |
 | [036](036-specs-vivos-indice-y-precedencia/spec.md) | Live spec index and cross-feature precedence | Shipped | 2026-08-24 |
+| [037](037-harness-humano-universal-y-terceros/spec.md) | Human chat narration, domain-neutral cycle, third-party polish | Shipped | 2026-08-24 |

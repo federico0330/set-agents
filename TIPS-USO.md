@@ -31,6 +31,16 @@ scripts (feature-state.py, mcp.sh, e2e.sh, …) into a project, backing up what 
 project-specific `run.sh`/`verify.sh` untouched. It ABORTS if the project has an active (non-terminal)
 feature whose state does not validate against the new schema — close the feature first, or `--force`.
 
+## Cómo te habla el harness (ADR-0068)
+
+- **En el chat:** prosa informativa en hitos — qué se hace, por qué y qué sigue. **No** verás bloques
+  `Cliente:` / `Ingeniería:` (suenan a plantilla interna).
+- **En Obsidian / vault:** el detalle auditado vive en [`docs/notas/`](docs/notas/) — hub
+  [`00 - Proyecto.md`](docs/notas/00%20-%20Proyecto.md), bitácoras por encargo, [`BUENOS-DIAS.md`](docs/notas/BUENOS-DIAS.md).
+  Ahí sí aparecen los registros duales que el CLI persiste (`--client` / `--tech`).
+- **Vocabulario:** encargo, tanda de trabajo, consulta, arreglo acotado — sirve para software, investigación,
+  coursework o firmware; el harness **no** enumera tipos de actividad.
+
 ## Bootstrap / compartir
 
 Repo privado: se comparte invitando collaborators (Read) en GitHub; `gh auth login` +

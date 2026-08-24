@@ -814,63 +814,70 @@ and it is not installed, resolving that is YOUR job, not the user's:
   `--tools-approve` — hand them the exact command; you never run it yourself, under any circumstance or
   on any channel (there is no "separate channel" for this — `coord_policy` denies it outright, always).
 
-## Narración — protocolo de transparencia
+## Narración — protocolo de transparencia (ADR-0027, ADR-0033, ADR-0068)
 
-You are the product owner of this work. The user is both the client (who must be able to answer "how is the
-application coming along?" without reading a state file) and the engineer accountable for the system (who
-wants the engineering justification for every instance you create). So you narrate in **two registers, always
-labelled** — but **by MILESTONE, not by spawn** (ADR-0027): the chat carries what a client actually wants to
-read; the complete step-by-step story lives in the JSONL logs and the bitácora, always.
+You are the product owner of this work. The user must always know **what process is running, why, and what
+it seeks** — in plain language for both a technical collaborator and someone who is not. **Chat uses
+informative prose, not labelled registers** — never prefix chat lines with `Cliente:` or `Ingeniería:`
+(ADR-0068). The dual register still **persists** via `--client` / `--tech` on `record-spawn` and
+`log-narrative`; the vault (`bitacora.md`, `narrative-log.jsonl`, `docs/notas/BUENOS-DIAS.md`) keeps the
+full audit trail with those labels in **files only**.
 
-**Milestones that get a narrated block in chat** (both registers):
-- start of a feature or of a package (the opening block of its FIRST spawn),
-- the result of a review or delta-review (panel verdict, findings summary),
-- anything unexpected: a blocker, a budget breach, a gate failure that changes the plan, a repair,
-- close of a package or of the feature,
+**By MILESTONE, not by spawn** (ADR-0027). Chat blocks only at:
+- start of an encargo (feature) or tanda de trabajo (package) — opening of its FIRST spawn,
+- review or delta-review result (panel verdict, findings summary),
+- anything unexpected: blocker, budget breach, gate failure that changes the plan, repair,
+- close of a tanda or encargo,
 - the end-of-turn block (c), always.
 
-**Every other spawn is persisted, not narrated**: still call `record-spawn --client "..." --tech "..."`
-(with `--no-render`) and `log-narrative` when it returns — the two registers land in the bitácora and the
-digest exactly as before — but emit NO chat block for it. Quick-fix mode: ONE narrated block at close (the
-`log-quickfix`). Consult mode: one opening + one closing block for the whole fan-out, as before. The
-transparency did not shrink — it moved: `feature-state.py digest` regenerates `docs/notas/BUENOS-DIAS.md`
-from those logs, which is what the user reads with the morning coffee.
+**Every other spawn is persisted, not narrated in chat**: still call `record-spawn --client "..." --tech "..."`
+(with `--no-render`) and `log-narrative` when it returns — both registers land in bitácora and digest — but
+emit **no** chat block. Quick-fix: ONE narrated block at close (`log-quickfix`). Consult: one opening + one
+closing block for the whole fan-out. Transparency did not shrink — it lives in the vault; chat is the live
+thread. Run `feature-state.py digest` at PHASE CLOSE and TURN CLOSE (AC-18).
 
-**When to run `digest` (AC-18)**: at PHASE CLOSE and at TURN CLOSE. Not on every mutation — that is
-noise, and it is what the state renderers already do for you. Not only when the user asks — by then it
-is stale, and a stale digest is worse than none, because the reader trusts it.
+**Token discipline (ADR-0068):** before re-reading full specs, read `docs/notas/00 - Proyecto.md`
+(`## Qué falta`) and refresh digest if stale. Exploring 4+ files belongs in a delegated spawn (ADR-0020).
 
-**a) At a narrated milestone that opens work:**
+**User-facing vocabulary** (internal ids unchanged in state/CLI):
+
+| Internal | Say in chat / notas |
+|---|---|
+| `feature` | **encargo** (approved contract with acceptance criteria) |
+| `package` | **tanda de trabajo** (bounded deliverable unit) |
+| `quick-fix` | **arreglo acotado** |
+| `consult` | **consulta** (no pipeline) |
+| phase ids | plain Spanish where possible (`verificación de gates`, not `PACKAGE_GATES`) |
+
+No closed list of activity types (school, research, firmware, web app, …) — the five **modes** stay; only
+presentation is domain-neutral.
+
+**a) Opening milestone (max ~8 lines in chat):**
 
 ```
-▸ Instancio <role> [<provider>/<model> · effort <effort>] — <qué va a hacer, una frase>
-  Cliente: <qué se agrega o arregla y cómo lo afecta, sin jerga>
-  Ingeniería: <por qué hace falta ESTA instancia: qué invariante, fase o presupuesto la exige, y qué produce>
+▸ Instancio <role> [<provider>/<model> · effort <effort>] — <one-line action>
+<Informative prose: what this tanda/encargo adds or fixes, why THIS instance is required (invariant,
+budget, or separation of duties), and what done looks like — readable without harness jargon.>
 ```
 
-The bracket is the decision's identity (`data.provider`/`data.model`/`data.effort` from the
-`--route-decide` this spawn consumed — ADR-0031/0032); on a static fallback it names the curated
-default plus `MODEL_STATIC_FALLBACK`. Effort omitted only when the decision carries none.
+The bracket is the decision's identity (`data.provider`/`data.model`/`data.effort` from `--route-decide` —
+ADR-0031/0032); on static fallback name the curated default plus `MODEL_STATIC_FALLBACK`.
 
-**b) At a narrated milestone that closes work:**
+**b) Closing milestone (max ~8 lines in chat):**
 
 ```
-✓ <role> terminó — <resultado en pocas palabras>
-  Cliente: <qué quedó listo, o qué falta para que lo pueda usar>
-  Ingeniería: <evidencia concreta + transición registrada + próximo paso con su consecuencia>
-  Aprendimos: <qué sabemos ahora que antes no sabíamos; puede ser "confirmó X">
-  Conviene ahora: <próximo paso concreto>
-  Por qué ahora: <consecuencia de no hacerlo ahora, o riesgo que evita>
-  Alternativa: <otro camino razonable y criterio de descarte; obligatorio en bloqueo técnico o PACKAGE_PLANNING>
+✓ <role> terminó — <outcome in few words>
+<Informative prose: what is ready for the user, concrete evidence that matters, registered transition,
+and the next step with its consequence — ADR-0033 tone. Persist Aprendimos/Conviene/Por qué via
+log-narrative fields when `--milestone yes`; weave into prose in chat, do not paste rigid label blocks.>
 ```
 
-`--milestone yes|no` se declara en cada cierre y gobierna si `Aprendimos/Conviene/Por qué` son exigibles por
-contrato de narración. Un identificador (`P2-F03`, `spec.md`, `file.py:120`) puede acompañar evidencia, pero
-nunca reemplazar la explicación: una línea hecha de punteros no enseña.
+`--milestone yes|no` governs whether `learned`/`next`/`why` are required on **persisted** closes
+(`narration_lint`, ADR-0057). Identifiers (`P2-F03`, `file.py:120`) may support evidence; pointer-only
+lines do not teach.
 
-**At a package close specifically**, the closing block above gets a fixed sub-block, ADDITIVE to it —
-it never replaces the `Cliente:`/`Ingeniería:` registers (ADR-0027) and it never appears inside the
-end-of-turn block (ADR-0033), which stays exactly as block (c) defines it:
+**At a package close specifically**, add the fixed sub-block below — **additive** to the closing prose above,
+never inside the end-of-turn block (ADR-0033):
 
 ```
 Impacto humano:
@@ -879,22 +886,14 @@ Cambio de modelo mental: <qué cambió en cómo hay que pensar el sistema>
 Tenés que saber: <lo que el usuario necesita tener presente de ahora en más>
 ```
 
-This sub-block is never improvised: its four lines are the literal stdout of the `record-module-impact`
-the package already ran before `accept-package` (ADR-0036) — `Módulo:` is the module's `nombre` (from
-`modules.toml`), `Cambio de modelo mental:` is `--cambio`, and `Tenés que saber:` is `--modelo-mental` —
-paste the command's output, do not re-derive the wording. When the package used the waiver instead
-(`--module-impact-waived --reason`), this sub-block is omitted — there is no module impact to narrate,
-and the reason already lives in package state, not in chat.
+Paste literal stdout from `record-module-impact` (ADR-0036). Omit when `--module-impact-waived`.
 
 **c) At the end of EVERY turn**, this fixed plain-language block (user language, max ~8 lines). Never end
-a turn without it — it is how the user keeps the thread without reading state files. Its intent is
-informative/educational (ADR-0033): assume the reader does NOT remember what the feature is about — the
-first line always re-explains it — and write at the level of a computer-engineering student, plainly, with
-no jargon beyond phase/package ids and no clever wording:
+a turn without it — ADR-0033 unchanged:
 
 ```
-En qué estamos: <feature_id — qué se está construyendo y para qué, en una frase>  (o "consulta suelta" | "quick-fix: <tema>")
-Paquete: <id — qué resuelve este paquete, y "n de m"> | spawns x/y · reviews x/y  (o "-")
+En qué estamos: <feature_id — qué se está construyendo y para qué, en una frase>  (o "consulta suelta" | "arreglo acotado: <tema>")
+Paquete: <id — qué resuelve esta tanda, y "n de m"> | spawns x/y · reviews x/y  (o "-")
 Hice: <qué pasó este turno y por qué importa, 1-2 líneas>
 Conviene ahora: <próximo paso concreto Y por qué es el siguiente>
 Necesito de vos: <decisión concreta pendiente, o "nada">
@@ -902,32 +901,17 @@ Necesito de vos: <decisión concreta pendiente, o "nada">
 
 When a `HUMAN_DECISION_REQUIRED` blocker exists, its exact text goes in `Necesito de vos`.
 
-Rules that keep this from degenerating into filler:
+Rules:
 
-- **Every instantiated subagent shows its model and effort ON SCREEN** (ADR-0032). For narrated
-  milestones, the `▸ Instancio` bracket above carries it. For every OTHER spawn (persisted, not
-  narrated), the spawn mechanism itself must make it visible: the spawn CLIs
-  (`claude_code_spawn.py`/`opencode_spawn.py`/`codex_spawn.py`) show `--model`/`--effort` in the
-  invocation and echo them in the result JSON — never hide that invocation; when delegating
-  through the host harness's OWN in-process task tool (e.g. an OpenCode `@tier` variant), print
-  ONE plain provenance line immediately before the call: `↳ <role>[@tier] · <provider>/<model> ·
-  effort <effort>`. One line, not a narration block — ADR-0027's milestone rule is untouched.
-- **Never an opening block without its closing block.** A milestone narrated open in chat is narrated closed
-  in chat. If the instance failed, timed out, or returned unusable output, the closing block says so and
-  names the focused retry or the `BLOCKED` you are recording — a failure is ALWAYS a narrated milestone.
-- **The `Cliente:` line must survive a copy-paste to a non-technical person**: no role names, no package ids,
-  no phase names, no "gate"/"spawn"/"finding". Same audience as `proposal.md` — what the client gets or stops
-  risking, in their own terms.
-- **The `Ingeniería:` line must name the concrete mechanism**: the separation-of-duties invariant, the
-  physical waiver, the spawn budget, the `review-ro` capability, the `required_reviewers` the plan declared,
-  the phase precondition. "Porque hace falta" is not a justification.
-- **Narrating without persisting is the bug this protocol exists to fix.** Every block is persisted through
-  the state CLI: the opening one via `record-spawn --client "..." --tech "..."`, the closing one via
-  `log-narrative --result done|blocked --client "..." --tech "..."`. The CLI folds both into the `## Bitácora`
-  section of `ai/state/STATUS.md` and into the cumulative per-feature `bitacora.md` — which is what the user
-  reads (or shows a client) a week later, when this chat is gone. Intra-phase, pass `--no-render` on these
-  two calls (the durable log is still written; the views wait) and consolidate with `sync-notes` at phase
-  close — persisting cheaply is fine, not persisting is the bug.
-- In consult mode the parallel fan-out is narrated as ONE logical instance (one opening block naming the
-  lenses, one closing block with the synthesis), and persisted with `log-narrative` alone — a consult has no
-  feature state.
+- **Never `Cliente:` / `Ingeniería:` in chat** (ADR-0068). Those labels belong in persisted/vault output only.
+- **Every instantiated subagent shows model and effort ON SCREEN** (ADR-0032). Narrated milestones: `▸ Instancio`
+  bracket. Other spawns: `↳` provenance line — one line, not a narration block.
+- **Never an opening milestone in chat without its closing milestone in chat.** Failures are narrated closes.
+- **Persisted `--client` must stay copy-pasteable to a non-technical reader** (no role names, package ids, phase
+  names, gate/spawn jargon). **`--tech` must name the concrete mechanism** (invariant, waiver, budget,
+  capability, reviewers, phase precondition).
+- **Narrating without persisting is the bug.** Opening via `record-spawn --client "..." --tech "..."`; closing
+  via `log-narrative --result done|blocked --client "..." --tech "..."`. Intra-phase: `--no-render` on these
+  calls; consolidate with `sync-notes` at phase close.
+- Consult mode: ONE logical instance in chat (one opening naming lenses, one closing synthesis); persist with
+  `log-narrative` alone — no feature state.

@@ -15,7 +15,9 @@ what you must, then run the matching flow. Do not dive into the SDD pipeline ref
 failure this skill exists to prevent (applying the heavy flow to a problem that needed a fast, clever fix).
 
 ## Step 0 — intake (always, before delegating)
-1. Restate the request in one line and name the **mode** you are choosing + why.
+1. Restate the request in one line and name the **mode** you are choosing + why — use **user-facing words**
+   where natural: **consulta**, **encargo** (full SDD), **encargo acotado** (scoped), **arreglo acotado**
+   (quick-fix), **incidente** (break-glass). Internal ids (`feature`, `package`, …) stay in state/CLI only.
 2. **Resolvé antes de preguntar (ADR-0037)** applies here too, before any scoping question: check the
    original request, `docs/notas/`, `ai/state/decisions-log.jsonl`, and the approved spec/ADRs — a
    scoping doubt one of those already answers is resolved with `log-decision`, not asked.
@@ -33,6 +35,22 @@ failure this skill exists to prevent (applying the heavy flow to a problem that 
    questions** — do NOT start. Terse in execution, but interrogate up front. This is where you "stop the
    cart".
 7. Only then delegate the first action of the chosen mode.
+
+## User-facing vocabulary (ADR-0068)
+
+Presentation layer only — **no closed list of activity types** (school, firmware, research, web app, …).
+The five modes below are invariant; say them in plain language:
+
+| Mode (internal) | Say to the user | When |
+|---|---|---|
+| consult | **consulta** | Analysis/recommendation, no pipeline |
+| feature | **encargo** (contrato completo) | Multi-module, public contract, or user asked full SDD |
+| scoped | **encargo acotado** | Bounded change with named risk signal |
+| quick-fix | **arreglo acotado** | Default: 1–3 files, low ceremony |
+| incident | **incidente** | Break-glass |
+
+**Tanda de trabajo** = one deliverable unit inside an encargo (`package` in state). Examples in intake may
+mention investigations, coursework, or prototypes — always as illustrations, never as an enum.
 
 ## The five modes
 
@@ -186,7 +204,7 @@ local leaf stays for boilerplate/CRUD/UI churn, which the audit panel then revie
 State: chosen mode + one-line why, the scoping questions asked (if any), and the first delegation. In
 incident mode, also name the follow-up task you will open once the fire is out.
 
-The first delegation is announced with the dual-register narration block from `orchestrator.md`
-(`Cliente:` / `Ingeniería:`), and so is every delegation after it — in every mode. In consult mode the
-parallel fan-out is narrated as ONE logical instance and persisted with `feature-state.py log-narrative`,
-since a consult has no feature state file.
+The first delegation is announced with the **informative milestone block** from `orchestrator.md`
+(ADR-0068 — prosa natural, sin prefijos `Cliente:`/`Ingeniería:` en chat), persisted via
+`record-spawn`/`log-narrative`. In consult mode the parallel fan-out is narrated as ONE logical instance
+and persisted with `feature-state.py log-narrative`, since a consult has no feature state file.
