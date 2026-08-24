@@ -31,6 +31,9 @@ scripts (feature-state.py, mcp.sh, e2e.sh, …) into a project, backing up what 
 project-specific `run.sh`/`verify.sh` untouched. It ABORTS if the project has an active (non-terminal)
 feature whose state does not validate against the new schema — close the feature first, or `--force`.
 
+**Etiqueta del hub:** `set-agents --project-label "Acme Labs"` writes a free string to `config.toml` and
+renames `docs/notas/00 - Proyecto.md`. Empty (`--project-label ""`) restores the directory name. No activity enum.
+
 ## Cómo te habla el harness (ADR-0068)
 
 - **En el chat:** prosa informativa en hitos — qué se hace, por qué y qué sigue. **No** verás bloques
@@ -156,7 +159,8 @@ transcripts, Codex threads). Section 2 reads the harness dispatch registry: `rou
 (router-dispatched runs through `set_agents_spawn.py` and sibling spawn scripts — empty on Cursor because
 native subagents never go through those CLIs) plus `ai/state/features/*.json` `spawns[]` / history
 `record-spawn` (this harness's own record on every runtime, including Cursor; token fields may be absent
-there but sessions still count). Tokens only — with subscription plans the number that matters is quota, not dollars.
+there but sessions still count). With `--project`, a companion table lists **sessions per encargo**
+(`feature_id`) — it does not invent token totals from those records. Tokens only — with subscription plans the number that matters is quota, not dollars.
 
 ```bash
 ai/scripts/cost-report.py                                         # everything

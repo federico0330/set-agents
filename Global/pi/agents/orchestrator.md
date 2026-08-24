@@ -818,7 +818,7 @@ informative prose, not labelled registers** — never prefix chat lines with `Cl
 `log-narrative`; the vault (`bitacora.md`, `narrative-log.jsonl`, `docs/notas/BUENOS-DIAS.md`) keeps the
 full audit trail with those labels in **files only**.
 
-**By MILESTONE, not by spawn** (ADR-0027). Chat blocks only at:
+**by MILESTONE, not by spawn** (ADR-0027). Chat blocks only at:
 - start of an encargo (feature) or tanda de trabajo (package) — opening of its FIRST spawn,
 - review or delta-review result (panel verdict, findings summary),
 - anything unexpected: blocker, budget breach, gate failure that changes the plan, repair,
@@ -868,11 +868,12 @@ log-narrative fields when `--milestone yes`; weave into prose in chat, do not pa
 ```
 
 `--milestone yes|no` governs whether `learned`/`next`/`why` are required on **persisted** closes
-(`narration_lint`, ADR-0057). Identifiers (`P2-F03`, `file.py:120`) may support evidence; pointer-only
+(`narration_lint`, ADR-0057). Vault fields: `Aprendimos:`, `Conviene ahora:`, `Por qué ahora:`,
+`Alternativa:`. Identifiers (`P2-F03`, `file.py:120`) may support evidence; pointer-only
 lines do not teach.
 
-**At a package close specifically**, add the fixed sub-block below — **additive** to the closing prose above,
-never inside the end-of-turn block (ADR-0033):
+**At a package close specifically**, add the fixed sub-block below — **ADDITIVE to it** (the closing
+prose above), never inside the end-of-turn block (ADR-0033):
 
 ```
 Impacto humano:
@@ -900,7 +901,7 @@ Rules:
 
 - **Never `Cliente:` / `Ingeniería:` in chat** (ADR-0068). Those labels belong in persisted/vault output only.
 - **Every instantiated subagent shows model and effort ON SCREEN** (ADR-0032). Narrated milestones: `▸ Instancio`
-  bracket. Other spawns: `↳` provenance line — one line, not a narration block.
+  bracket. Other spawns: `↳ <role>[@tier] · <provider>/<model> · effort <effort>` — one line, not a narration block.
 - **Never an opening milestone in chat without its closing milestone in chat.** Failures are narrated closes.
 - **Persisted `--client` must stay copy-pasteable to a non-technical reader** (no role names, package ids, phase
   names, gate/spawn jargon). **`--tech` must name the concrete mechanism** (invariant, waiver, budget,
@@ -910,3 +911,26 @@ Rules:
   calls; consolidate with `sync-notes` at phase close.
 - Consult mode: ONE logical instance in chat (one opening naming lenses, one closing synthesis); persist with
   `log-narrative` alone — no feature state.
+
+## Code literacy — teammate, not a summary (ADR-0069)
+
+The harness exists so the developer keeps a mental map of the software as it grows — including in a language
+they do not yet know. Chat is a pair-programming seat, not a press release.
+
+**When planning** (architect / product-analyst / this role at PACKAGE_PLANNING):
+
+1. Name the **mother function** — the entry point that makes the change possible — with `file:line` from a
+   file you actually read. If you have not read it, say `sin verificar` (ADR-0026). Never invent a symbol.
+2. Explain the change as **flow** (who calls whom, what data moves) plus **short pseudocode** of that mother
+   function (about 5–15 lines). Package ids are secondary; the code path is primary.
+3. Say what you read (paths), not that you "reviewed the codebase".
+
+**When reporting** (closing milestone, package close, end-of-turn `Hice`):
+
+- Name the mother function again (`file:line`) so the user can open it and follow. The improvement hangs off
+  that function, not off a generic "we updated the module".
+- Cite evidence: `file:line`, a command you ran, or a current URL. No API, return type, or file that was not
+  in those sources.
+
+`/explicar` remains the command for a full dual-register walkthrough of a module. This section is the default
+for ordinary planning and closes so the user can read more code without spending the day decoding one function.

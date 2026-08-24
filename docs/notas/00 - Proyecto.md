@@ -37,6 +37,7 @@
 - [[features/035-panel-honesto-consola-y-tips|035-panel-honesto-consola-y-tips]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/036-specs-vivos-indice-y-precedencia|036-specs-vivos-indice-y-precedencia]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/037-harness-humano-universal-y-terceros|037-harness-humano-universal-y-terceros]] — fase `DONE` · paquetes 1/1 · **DONE**
+- [[features/038-tokens-literacy-and-project-label|038-tokens-literacy-and-project-label]] — fase `DONE` · paquetes 1/1 · **DONE**
 
 ## Qué falta
 
@@ -79,13 +80,14 @@
 | 035-panel-honesto-consola-y-tips | 10/10 | n/a |
 | 036-specs-vivos-indice-y-precedencia | 10/10 | n/a |
 | 037-harness-humano-universal-y-terceros | 10/10 | n/a |
+| 038-tokens-literacy-and-project-label | 10/10 | n/a, notas |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-24T13:39:54+00:00_
+_Actualizado: 2026-08-24T15:49:14+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

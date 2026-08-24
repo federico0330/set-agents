@@ -56,6 +56,9 @@ def merge_note(existing: str | None, title: str, body: str) -> str:
     if existing and NOTES_AUTO_BEGIN in existing and NOTES_AUTO_END in existing:
         prefix, rest = existing.split(NOTES_AUTO_BEGIN, 1)
         _, suffix = rest.split(NOTES_AUTO_END, 1)
+        lines = prefix.splitlines(keepends=True)
+        if lines and lines[0].startswith("# ") and " — notas" in lines[0]:
+            prefix = f"# {title}\n" + "".join(lines[1:])
         return prefix + generated + suffix
     return (
         f"# {title}\n\n{generated}\n\n"

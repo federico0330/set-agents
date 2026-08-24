@@ -1206,6 +1206,30 @@ def cmd_metodologias():
     return 0
 
 
+# --------------------------------------------------------- project_label (038 / ADR-0069)
+# Free string for the living-notes hub title. Same store as postura (`write_app_config`).
+# No domain enum. Absent or empty → feature-state.py falls back to the directory name.
+PROJECT_LABEL_MAX = 80
+
+
+def sanitize_project_label(value):
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value.split())[:PROJECT_LABEL_MAX]
+
+
+def project_label_actual():
+    raw = app_config().get("project_label", "")
+    return sanitize_project_label(raw) if isinstance(raw, str) else ""
+
+
+def set_project_label(value):
+    label = sanitize_project_label(value)
+    write_app_config(project_label=label)
+    print(f"PROJECT_LABEL={label or '(directory name)'}")
+    return 0
+
+
 # ----------------------------------------------------------------------- git
 
 def git(*args, timeout=None):
@@ -4003,6 +4027,9 @@ def _build_parser(advanced=False):
                         help="explica TDD estricto/RDD y SDD (AC-07/AC-08)")
     parser.add_argument("--metodologia", choices=("sdd", "rdd", "off"),
                         help="fija la preferencia de metodología para pedidos/paquetes nuevos")
+    parser.add_argument("--project-label", metavar="TEXT",
+                        help="etiqueta libre del hub (docs/notas/00 - Proyecto.md); "
+                             "vacío restaura el nombre del directorio")
     parser.add_argument("--tools", action="store_true", help="TOOL <name> installed=yes/no")
     parser.add_argument("--tools-install", metavar="NAME")
     parser.add_argument("--dry-run", action="store_true")
@@ -4250,6 +4277,8 @@ def main():
     if args.metodologia:
         set_metodologia(args.metodologia)
         return 0
+    if args.project_label is not None:
+        return set_project_label(args.project_label)
     if args.model_preference_show:
         try:
             return cmd_model_preference_show()

@@ -1,7 +1,7 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-23T10:40:03` · generado 2026-08-24T13:40:03+00:00_
+_Ventana: desde `2026-08-23T12:49:40` · generado 2026-08-24T15:49:40+00:00_
 
 ## Necesita tu decisión
 
@@ -10,7 +10,10 @@ _Ventana: desde `2026-08-23T10:40:03` · generado 2026-08-24T13:40:03+00:00_
 
 ## Qué quedó listo
 
-- _sin cierres registrados en la ventana_
+- **038-tokens-literacy-and-project-label · PKG-1 · orchestrator** — Quedó cerrado el encargo 038. Podés ponerle un nombre libre al proyecto (se ve en las notas), la doctrina que se carga siempre es más corta, el plan tiene que nombrar la función madre con archivo y línea, y el informe de costo cuenta sesiones por encargo sin inventar tokens. No hay commit todavía.
+  - aprendimos: Compactar always-on no alcanza con un techo de líneas: hay que pinnear las frases en los mismos archivos del techo, porque Cursor no estaba en los tests viejos de doctrina. El reset vacío de project_label funciona y ahora tiene test.
+  - conviene ahora: Nada de implementación: el paquete está aceptado. El commit y el push quedan para cuando lo pidas.
+  - por qué ahora: Cerrar el estado ahora evita un digest mentiroso; commitear sin que lo pidas rompería la regla de git del repo.
 
 ## Qué se está haciendo
 

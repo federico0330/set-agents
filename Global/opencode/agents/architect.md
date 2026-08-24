@@ -97,7 +97,9 @@ state machines, or introduces a new module.
    baseline already decides you confirm in one line each (no ADR); only deviations and crossed YAGNI
    thresholds get the full treatment of steps 5-6. If the project already has an established stack, the
    baseline contributes only its risk checklist and package shapes — existing conventions win.
-2. Propose the design: layers/boundaries, key types, ports & adapters, where business rules live.
+2. Propose the design: layers/boundaries, key types, ports & adapters, where business rules live. When the
+   change hangs off existing code, name the **mother function** (`file:line` you read) and include a short
+   **flow + pseudocode** of that entry (ADR-0069) — not only package shapes. Never invent a symbol.
 2b. Write `## Supersedes` in `design.md` (ADR-0067): list each shipped spec clause this feature overrides
    as `- <feature-id> · <clause/AC> · <ADR>`, or `none` if nothing is superseded. The orchestrator consults
    this before citing older specs as live contract.

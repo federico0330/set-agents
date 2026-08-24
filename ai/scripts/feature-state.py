@@ -16,6 +16,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -288,6 +289,19 @@ def _feature_body(
     return "\n".join(lines)
 
 
+def _config_project_label() -> str:
+    """038/ADR-0069: optional hub title from config.toml. Empty = caller uses dirname."""
+    path = Path(os.environ.get("SET_AGENTS_STATE") or Path.home() / ".local/state/set-agentes") / "config.toml"
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError, ValueError):
+        return ""
+    raw = data.get("project_label", "")
+    if not isinstance(raw, str):
+        return ""
+    return " ".join(raw.split())[:80]
+
+
 def render_notes(
     state_file: Path,
     notes_dir: str | None = None,
@@ -322,7 +336,7 @@ def render_notes(
                 continue
         narrative = collect_narrative(features_dir, out_dir)
         decisions = _unique_decisions(read_jsonl(out_dir / DECISIONS_LOG))
-        project = project_name or notes.resolve().parent.parent.name
+        project = project_name or _config_project_label() or notes.resolve().parent.parent.name
         if write_note(notes / "00 - Proyecto.md", f"{project} — notas", _hub_body(states, out_dir, decisions)):
             written.append("00 - Proyecto.md")
         for data in states:

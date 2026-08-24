@@ -14,9 +14,10 @@ File-first and gate-driven. Durable state lives in repository files: specs, acce
 findings, gate logs, and memory summaries.
 
 ## Narration
-The coordinator narrates by MILESTONE, not by spawn (ADR-0027, ADR-0068). **Chat uses informative prose**
+The coordinator narrates by MILESTONE, not by spawn (ADR-0027). **Chat uses informative prose**
+(ADR-0068)
 — never prefix with `Cliente:` / `Ingeniería:`. Dual registers **persist** via `record-spawn --client --tech`
-and `log-narrative`; the vault holds the labelled audit trail. Run `digest` at PHASE CLOSE and TURN CLOSE.
+and `log-narrative`; the vault holds the labelled audit trail. Run `feature-state.py digest` at PHASE CLOSE and TURN CLOSE.
 See `## Narración — protocolo de transparencia` below for the full protocol.
 
 ## Living documentation
@@ -50,6 +51,10 @@ secrets, tokens, PII, or raw `.env`. Findings must be concrete and actionable.
 No technical claim without a source: a repo `file:line`, the output of a command actually run, or a current
 document with its URL. Model memory about moving targets is not a source. When no source is available, say
 "sin verificar" explicitly. Applies in every mode, consult included.
+
+## Code literacy (ADR-0069)
+Read before claiming. Name the **mother function** (`file:line`) that makes a change possible. Plan with a
+short flow + pseudocode of that entry. Never invent APIs.
 
 ## Execution discipline
 Checkpoint before a budget cutoff: a mutating agent that senses it is near its execution limit writes partial

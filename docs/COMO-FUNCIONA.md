@@ -35,7 +35,7 @@ verdad, y dónde queda la evidencia cuando se corta la sesión.
 
 | Canal | Qué ves |
 |---|---|
-| **Chat en vivo** | Prosa informativa en hitos: qué proceso corre, por qué, qué busca. Sin prefijos `Cliente:`/`Ingeniería:`. |
+| **Chat en vivo** | Prosa informativa en hitos: qué proceso corre, por qué, qué busca. Sin prefijos `Cliente:`/`Ingeniería:`. Al planear y al cerrar, nombra la **función madre** (`archivo:línea`) y explica el cambio como flujo + pseudocódigo corto (ADR-0069). |
 | **Vault Obsidian** (`docs/notas/`) | Estado del encargo, bitácoras, digest matinal, decisiones — incluye trazabilidad dual persistida. |
 
 El vocabulario usuario-facing (**encargo**, **tanda de trabajo**, **consulta**, **arreglo acotado**) aplica a

@@ -3904,6 +3904,34 @@ class HarnessTests(unittest.TestCase):
             )
             self.assertIn("NOTES_SYNCED", result.stdout)
 
+    def test_project_label_renames_hub_title(self):
+        with tempfile.TemporaryDirectory() as td:
+            env = {**os.environ, "SET_AGENTS_STATE": str(Path(td) / "state")}
+            labeled = run("bash", "set-agents", "--project-label", "Acme Labs", env=env)
+            self.assertIn("PROJECT_LABEL=Acme Labs", labeled.stdout)
+            app = self._import("set_agents_app")
+            self.assertEqual(app.sanitize_project_label("Acme\nLabs\tInc"), "Acme Labs Inc")
+            root, _state = self._notes_project(str(Path(td) / "clone"))
+            run(
+                "python3", str(FEATURE_STATE), "sync-notes",
+                "--state-dir", str(root / "ai/state"),
+                env=env,
+            )
+            hub = (root / "docs/notas/00 - Proyecto.md").read_text()
+            self.assertTrue(hub.startswith("# Acme Labs — notas"), hub.split("\n", 1)[0])
+            cleared = run("bash", "set-agents", "--project-label", "", env=env)
+            self.assertIn("PROJECT_LABEL=(directory name)", cleared.stdout)
+            run(
+                "python3", str(FEATURE_STATE), "sync-notes",
+                "--state-dir", str(root / "ai/state"),
+                env=env,
+            )
+            hub = (root / "docs/notas/00 - Proyecto.md").read_text()
+            self.assertTrue(
+                hub.startswith(f"# {root.name} — notas"),
+                hub.split("\n", 1)[0],
+            )
+
     def test_notes_are_idempotent_and_preserve_manual_edits(self):
         with tempfile.TemporaryDirectory() as td:
             root, state = self._notes_project(td)
@@ -6174,6 +6202,46 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("ADR-0068", text, name)
             self.assertIn("log-narrative", text, name)
             self.assertIn("bitacora.md", text, name)
+
+    def test_always_on_doctrine_stays_capped_and_points_at_orchestrator(self):
+        # 038 / ADR-0069: always-on AGENTS.md must not re-absorb orchestrator.md.
+        # Pi is excluded: it IS the interactive orchestrator (twelve sections + spawn economy).
+        caps = {
+            "AGENTS.opencode.md": 90,
+            "CLAUDE.md": 90,
+            "AGENTS.codex.md": 90,
+            "AGENTS.cursor.md": 100,
+        }
+        for name, cap in caps.items():
+            text = (ROOT / "Global/_shared" / name).read_text(encoding="utf-8")
+            n = len(text.splitlines())
+            self.assertLessEqual(n, cap, f"{name} is {n} lines (cap {cap})")
+            self.assertIn("ADR-0069", text, name)
+            self.assertIn("orchestrator.md", text, name)
+            self.assertIn("mother function", text, name)
+            self.assertIn("by MILESTONE, not by spawn (ADR-0027)", text, name)
+            self.assertIn("Resolve-first (ADR-0025)", text, name)
+            self.assertIn("WITHOUT asking", text, name)
+            self.assertIn("feature-state.py digest", text, name)
+
+    def test_orchestrator_code_literacy_and_milestone_template_size(self):
+        text = (ROOT / "Global/_canonical/agents/orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("## Code literacy", text)
+        self.assertIn("mother function", text)
+        self.assertIn("pseudocode", text)
+        self.assertIn("file:line", text)
+        self.assertIn("↳ <role>[@tier] · <provider>/<model> ·", text)
+        architect = (ROOT / "Global/_canonical/agents/architect.md").read_text(encoding="utf-8")
+        self.assertIn("mother function", architect)
+        self.assertIn("ADR-0069", architect)
+        self.assertIn("flow + pseudocode", architect)
+        self.assertIn("file:line", architect)
+        section = text.split("## Narración", 1)[1].split("## Code literacy", 1)[0]
+        fences = re.findall(r"```\n(.*?)```", section, re.DOTALL)
+        self.assertGreaterEqual(len(fences), 2, "expected opening and closing milestone fences")
+        for block in fences[:3]:
+            lines = [ln for ln in block.splitlines() if ln.strip()]
+            self.assertLessEqual(len(lines), 8, block)
 
     def test_turn_continuity_doctrine_reaches_all_three_harnesses(self):
         # 008-P1. The harness mandates an end-of-turn block whose last line is
@@ -13838,6 +13906,46 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("feature-state", result.stdout)
         self.assertIn("implementer", result.stdout)
         self.assertNotIn("No sessions matched.", result.stdout.split("Section 2", 1)[1].split("Section 3", 1)[0])
+
+    def test_cost_report_per_encargo_counts_sessions_without_inventing_tokens(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td) / "proj"
+            features = project / "ai/state/features"
+            features.mkdir(parents=True)
+            (features / "038-tokens-literacy-and-project-label.json").write_text(json.dumps({
+                "feature_id": "038-tokens-literacy-and-project-label",
+                "phase": "PACKAGE_IMPLEMENTATION",
+                "frontier_used": 1,
+                "packages": [{
+                    "package_id": "PKG-1",
+                    "spawns": [
+                        {
+                            "spawn_id": "SPAWN-001",
+                            "role": "implementer",
+                            "model": "inherit",
+                            "at": "2026-08-24T12:00:00+00:00",
+                        },
+                        {
+                            "spawn_id": "SPAWN-002",
+                            "role": "package-reviewer",
+                            "model": "inherit",
+                            "at": "2026-08-24T13:00:00+00:00",
+                        },
+                    ],
+                }],
+                "history": [],
+            }))
+            home = Path(td) / "home"
+            home.mkdir()
+            result = run(
+                "python3", str(COST_REPORT), "--home", str(home),
+                "--project", str(project), "--since", "2026-08-10",
+            )
+        self.assertIn("per encargo", result.stdout)
+        self.assertIn("038-tokens-literacy-and-project-label", result.stdout)
+        self.assertIn("token fields absent on spawn records", result.stdout)
+        self.assertRegex(result.stdout, r"038-tokens-literacy-and-project-label\s+2\s+")
+        self.assertIn("tokens: not measured on spawn records", result.stdout)
 
     def test_cost_report_does_not_double_count_pi_and_feature_state(self):
         # AC-6.5 / PKG6-F03: pi + feature-state for the same work must not TOTAL sessions=2.

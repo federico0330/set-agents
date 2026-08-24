@@ -30,6 +30,9 @@ Adding the two sections' totals into one grand total would double-count that spe
 section prints only its OWN total; this report never prints one total across sections
 (AC-05 -- no total anywhere on this surface without saying which section it came from).
 
+A companion table groups feature-state spawn sessions **per encargo** (`feature_id`)
+without inventing token totals (038 / ADR-0069).
+
 Tokens only — subscription plans have no meaningful dollar-per-token, what matters is quota.
 
 Section 3 -- ESTIMATED REMAINING QUOTA (023-senales-de-consumo PKG-B4, AC-08/AC-09/AC-10,
@@ -486,6 +489,72 @@ def collect_feature_spawns(report, project, since_ms):
             })
 
 
+def collect_engagements(project, since_ms):
+    """038/ADR-0069: sessions per encargo from feature-state spawn records.
+
+    Token fields are absent on those records — this collector never invents them.
+    """
+    rows = []
+    if not project:
+        return rows
+    features_dir = Path(project) / "ai" / "state" / "features"
+    if not features_dir.is_dir():
+        return rows
+    for path in sorted(features_dir.glob("*.json")):
+        if path.name.startswith("_"):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        feature_id = data.get("feature_id") or path.stem
+        sessions = 0
+        for spawn in _iter_recorded_spawns(data):
+            stamp_ms = _iso_to_ms(spawn.get("at"))
+            if since_ms and stamp_ms is not None and stamp_ms < since_ms:
+                continue
+            sessions += 1
+        rows.append({
+            "feature_id": feature_id,
+            "sessions": sessions,
+            "phase": data.get("phase") or "?",
+            "frontier_used": data.get("frontier_used") or 0,
+        })
+    return rows
+
+
+def render_engagements(rows, md):
+    heading = (
+        "Section 2 -- per encargo (feature-state spawn sessions; "
+        "token fields absent on spawn records)"
+    )
+    if md:
+        print(f"## {heading}")
+    else:
+        print(heading)
+        print("=" * len(heading))
+    if not rows:
+        print("No feature-state encargo records matched.")
+        print()
+        return
+    header = ("encargo", "sessions", "phase", "frontier_used")
+    body = [
+        (row["feature_id"], str(row["sessions"]), str(row["phase"]), str(row["frontier_used"]))
+        for row in rows
+    ]
+    widths = [max(len(str(row[i])) for row in [header, *body]) for i in range(len(header))]
+    for row in [header, *body]:
+        print("  ".join(str(cell).ljust(width) for cell, width in zip(row, widths)))
+    print()
+    print(
+        "tokens: not measured on spawn records -- see Section 1 for CLI-native token totals; "
+        "do not sum this session count with Section 1 tokens (AC-04/AC-05)."
+    )
+    print()
+
+
 def _is_cheap_implement_model(model):
     """PKG-B cheap BASE cell. Full slug or trailing id. Duplicated (AC-16)."""
     if not model:
@@ -881,6 +950,7 @@ def main():
         render(pi_registry, args.md, title=_SECTION_2_TITLE, source=_SECTION_2_SOURCE)
     organic = collect_organic_quota(args.project, since_ms)
     render_organic_quota(organic, args.md)
+    render_engagements(collect_engagements(args.project, since_ms), args.md)
     print(_NEVER_SUM_DISCLAIMER)
     print()
 
