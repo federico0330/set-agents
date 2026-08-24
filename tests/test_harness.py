@@ -1149,11 +1149,8 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(FRONTIER_CAP_PER_FEATURE, 16)
         self.assertEqual(CHEAP_IMPLEMENT_MODEL, self.CHEAP_IMPLEMENT)
         source = (ROOT / "ai/scripts/feature_state_lib/model.py").read_text(encoding="utf-8")
-        scoped_row = (
-            '    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, '
-            '"max_gate_failures_per_package": 3, "max_verifications_per_package": 6},\n'
-        )
-        self.assertIn(scoped_row, source)
+        self.assertIn('"scoped": {"max_spawns_per_package": 8', source)
+        self.assertIn('"max_verification_waivers_per_package": 6', source)
         start = source.index("MODE_BUDGETS = {")
         end = source.index("FRONTIER_CAP_PER_PACKAGE")
         self.assertNotIn("FRONTIER_CAP", source[start:end])
@@ -5912,7 +5909,7 @@ class HarnessTests(unittest.TestCase):
                        feature_id="feat-n")
             run("python3", str(FEATURE_STATE), "log-narrative",
                 "--client", "ya podés cobrar con tarjeta",
-                "--tech", "cierre del paquete de pagos, gate verde",
+                "--tech", "cierre del paquete de pagos, gate verde (payments/gate.py:42)",
                 "--milestone", "yes",
                 "--learned", "Que faltaba cerrar explícitamente el gate de pagos antes del cierre.",
                 "--next", "Validar el cierre completo del flujo de cobro en staging.",
@@ -7520,7 +7517,7 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(extra, [], f"README rows without spec folders: {extra}")
 
         valid_status = re.compile(
-            r"^(Draft|Approved|Shipped|Superseded by .+)$"
+            r"^(Draft|Approved|Shipped(?: \(.+\))?|Superseded by .+)$"
         )
         for spec_id, status in indexed.items():
             self.assertRegex(
@@ -7537,7 +7534,7 @@ class HarnessTests(unittest.TestCase):
         for spec_id in done_ids:
             status = indexed[spec_id]
             self.assertTrue(
-                status == "Shipped" or status.startswith("Superseded by"),
+                status == "Shipped" or status.startswith("Shipped (") or status.startswith("Superseded by"),
                 f"feature {spec_id} is DONE in project notes but README status is {status!r}",
             )
 
@@ -13946,6 +13943,61 @@ class HarnessTests(unittest.TestCase):
         self.assertIn("token fields absent on spawn records", result.stdout)
         self.assertRegex(result.stdout, r"038-tokens-literacy-and-project-label\s+2\s+")
         self.assertIn("tokens: not measured on spawn records", result.stdout)
+
+    def test_cost_report_section1_prints_cursor_not_measured(self):
+        """044: never invent zero Cursor token rows — explicit not measured footer."""
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            home.mkdir()
+            project = Path(td) / "proj"
+            project.mkdir()
+            result = run(
+                "python3", str(COST_REPORT), "--home", str(home),
+                "--project", str(project), "--since", "2026-08-10",
+            )
+        self.assertIn("Section 1", result.stdout)
+        self.assertIn("Cursor: not measured", result.stdout)
+        section1, _, _ = result.stdout.partition("Section 2")
+        self.assertNotRegex(section1, r"\|\s*cursor\s*\|")
+
+    def test_log_narrative_reader_trace_aliases_persist_client_tech_keys(self):
+        """042: --reader/--trace write client/tech JSON keys."""
+        with tempfile.TemporaryDirectory() as td:
+            log_file = Path(td) / "narrative-log.jsonl"
+            result = run(
+                "python3", str(FEATURE_STATE), "log-narrative",
+                "--reader", "Cerramos anclas rotas en los módulos.",
+                "--trace", "Ocho punteros en docs/modules/consola.md:33 apuntaban a símbolos viejos.",
+                "--result", "done", "--milestone", "yes",
+                "--learned", "check-anchors no es gate; solo avisa.",
+                "--next", "Lint de alfabetismo en cierres de hito.",
+                "--why", "Sin anclas, la documentación modular miente.",
+                "--feature-id", "042-reader-trace-aliases",
+                "--log-file", str(log_file),
+            )
+            entry = json.loads(log_file.read_text(encoding="utf-8").strip())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(entry["client"], "Cerramos anclas rotas en los módulos.")
+        self.assertIn("consola.md:33", entry["tech"])
+        self.assertNotIn("reader", entry)
+        self.assertNotIn("trace", entry)
+
+    def test_done_ready_allows_superseded_package_with_superseded_metadata(self):
+        module = self._feature_state_module()
+        data = {
+            "packages": [{
+                "package_id": "P1",
+                "status": "package_review",
+                "superseded": {"reason": "003 replaced scope"},
+                "acceptance_criteria": ["AC-1"],
+            }],
+            "global_gates": [{"name": "g", "status": "pass", "required": True}],
+            "acceptance_criteria": ["AC-1", "AC-2"],
+            "blockers": [],
+        }
+        errors = module.done_ready(data)
+        self.assertNotIn("all packages must be accepted", errors)
+        self.assertNotIn("not all acceptance criteria are covered by accepted packages", errors)
 
     def test_cost_report_does_not_double_count_pi_and_feature_state(self):
         # AC-6.5 / PKG6-F03: pi + feature-state for the same work must not TOTAL sessions=2.

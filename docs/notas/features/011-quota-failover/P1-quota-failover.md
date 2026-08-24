@@ -15,13 +15,21 @@
 
 ## Tareas
 
-- [ ] additive schema/migration and invariants (planned)
-- [ ] narrow classifier + Pi terminal plumbing (planned)
-- [ ] BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion (planned)
-- [ ] deterministic routing/migration/concurrency tests (planned)
-- [ ] credential-gated real exhausted-provider E2E runner/evidence (planned)
+- [x] additive schema/migration and invariants (completed) · tests/test_routing.py
+- [x] narrow classifier + Pi terminal plumbing (completed) · tests/test_routing.py
+- [x] BEGIN IMMEDIATE close/exhaust/authorize idempotent transition + selection exclusion (completed) · tests/test_routing.py
+- [x] deterministic routing/migration/concurrency tests (completed) · tests/test_routing.py
+- [x] credential-gated real exhausted-provider E2E runner/evidence (completed) · tests/test_routing.py
 
-context pack: `docs/specs/011-quota-failover`
+## Recorrido
+
+- review: pass (0 hallazgos)
+- testing: pass
+- runtime QA: pass
+- gate `verify.sh`: pass
+- gate `build-check`: pass
+
+context pack: `docs/specs/011-quota-failover/context/P1-quota-failover.md`
 
 ↩ [[features/011-quota-failover|011-quota-failover]]
 <!-- /notas:auto -->

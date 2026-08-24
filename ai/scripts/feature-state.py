@@ -17,6 +17,8 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import fcntl
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +41,7 @@ from feature_state_lib.model import (
     DEFAULT_MAX_VERIFICATIONS, MODE_BUDGETS, TERMINAL_FINDING_STATUSES,
     is_p001_command, persist_review_requirements, spawn_budget_counts, spawn_budget_warns,
     spawn_budget_label, is_frontier_spawn, frontier_budget_counts, frontier_budget_label,
+    resolve_dual_register,
 )
 from feature_state_lib.transitions import check_transition, next_transition
 from feature_state_lib.render_status import status_root, summarize_feature, render_status
@@ -154,29 +157,66 @@ def record_event(
     data.setdefault("history", []).append(entry)
     return True
 
+
+    return client, tech
+
+
+CAS_SENSITIVE_OPERATIONS = frozenset({
+    "transition",
+    "record-spawn",
+    "record-gate",
+    "start-task",
+    "complete-task",
+    "fail-task",
+    "record-verification",
+    "record-repair",
+    "accept-package",
+    "record-review",
+    "record-subreview",
+    "finalize-review-panel",
+    "record-delta-review",
+    "record-testing",
+    "record-runtime-qa",
+})
+
+
+@contextmanager
+def _state_file_lock(path: Path):
+    """PR-11 (016 audit debt): exclusive lock for read-modify-write on feature JSON."""
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def mutate(
     path: Path,
     args: argparse.Namespace,
     operation: str,
     updater,
 ) -> tuple[dict[str, Any], bool]:
-    data = load_state(path)
-    fail_if_invalid(data)
-    expected = getattr(args, "expect_revision", None)
-    if expected is not None and data.get("revision") != expected:
-        raise StateError(f"stale revision: expected {expected}, found {data.get('revision')}")
-    before = deepcopy(data)
-    changed = updater(data)
-    if changed:
-        data["revision"] = int(data.get("revision", 0)) + 1
-        data["updated_at"] = now()
+    with _state_file_lock(path):
+        data = load_state(path)
         fail_if_invalid(data)
-        atomic_write(path, data)
-        only = data.get("feature_id")
-        render_status(path)
-        render_bitacora(path, only_feature=only)
-        render_notes(path, only_feature=only)
-        render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
+        expected = getattr(args, "expect_revision", None)
+        if expected is not None and data.get("revision") != expected:
+            raise StateError(f"stale revision: expected {expected}, found {data.get('revision')}")
+        before = deepcopy(data)
+        changed = updater(data)
+        if changed:
+            data["revision"] = int(data.get("revision", 0)) + 1
+            data["updated_at"] = now()
+            fail_if_invalid(data)
+            atomic_write(path, data)
+            only = data.get("feature_id")
+            render_status(path)
+            render_bitacora(path, only_feature=only)
+            render_notes(path, only_feature=only)
+            render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
     return data, before != data
 
 
@@ -487,12 +527,13 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
             # hand-corrupted fixture -- no real caller ever provides spawn_id, only
             # this command mints it.
             raise StateError(f"spawn {spawn_id} already exists on {args.package_id}: counter out of sync")
+        client, tech = resolve_dual_register(args)
         entry = {
             "spawn_id": spawn_id,
             "role": args.role,
             "purpose": args.purpose,
-            "client": args.client,
-            "tech": args.tech,
+            "client": client,
+            "tech": tech,
             "at": now(),
         }
         metadata = {"role": args.role, "purpose": args.purpose, "spawns": attempts["spawns"], "spawn_id": spawn_id}
@@ -503,10 +544,10 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
         # The two registers of the opening narration block. Optional so older
         # callers keep working, but the orchestrator doctrine requires them:
         # they are what render_bitacora turns into the durable story.
-        if args.client:
-            metadata["client"] = args.client
-        if args.tech:
-            metadata["tech"] = args.tech
+        if client:
+            metadata["client"] = client
+        if tech:
+            metadata["tech"] = tech
         # ADR-0031: the routing decision, when the caller passes it, lands on the spawn
         # entry AND the event metadata so both the state record and the bitacora carry it.
         # Absent flags leave the keys absent — old state files and old callers are identical.
@@ -790,14 +831,14 @@ def cmd_record_late_review(args: argparse.Namespace) -> int:
 
 
 def _apply_verification_waiver(data: dict[str, Any], package: dict[str, Any], attempts: dict[str, Any],
-                                verdicts: list[dict[str, Any]], budget: int, args: argparse.Namespace) -> bool:
+                                verdicts: list[dict[str, Any]], waiver_budget: int, args: argparse.Namespace) -> bool:
     """The `--skip-reason` branch of `record-verification`: waive instead of verdicting."""
     if verdicts:
         raise StateError("--skip-reason cannot be combined with --verdict")
     # Waivers keep their own counter so the cheap path stays reachable once the
     # verification budget is spent — but they are still a loop, and this harness
     # caps every loop.  Same ceiling, separate dimension, no second key to drift.
-    if attempts.get("verification_waivers", 0) >= budget:
+    if attempts.get("verification_waivers", 0) >= waiver_budget:
         return block_with_reason(data, args.actor, args.package_id,
                                  f"verification waiver budget exhausted for {args.package_id}",
                                  counter={"scope": "attempts", "key": "verification_waivers"})
@@ -909,11 +950,15 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         package = package_by_id(data, args.package_id)
         attempts = package.setdefault("attempts", {})
         verdicts = normalize_verdicts(args.verdict or [])
-        budget = data.get("budgets", {}).get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
+        budgets = data.get("budgets", {})
+        verification_budget = budgets.get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
+        waiver_budget = budgets.get(
+            "max_verification_waivers_per_package", verification_budget
+        )
 
         if args.skip_reason:
-            return _apply_verification_waiver(data, package, attempts, verdicts, budget, args)
-        return _apply_verdicts(data, package, attempts, verdicts, budget, args)
+            return _apply_verification_waiver(data, package, attempts, verdicts, waiver_budget, args)
+        return _apply_verdicts(data, package, attempts, verdicts, verification_budget, args)
 
     data, changed = mutate(path, args, "record-verification", update)
     return output_state(data, changed, path)
@@ -1048,6 +1093,8 @@ def build_parser() -> argparse.ArgumentParser:
     spawn.add_argument("--purpose", default="")
     spawn.add_argument("--client", default="")
     spawn.add_argument("--tech", default="")
+    spawn.add_argument("--reader", default="", help="alias for --client (042; JSON key stays client)")
+    spawn.add_argument("--trace", default="", help="alias for --tech (042; JSON key stays tech)")
     # ADR-0031: the routing decision travels structured, not as prose inside --tech.
     spawn.add_argument("--model")
     spawn.add_argument("--provider")
@@ -1280,8 +1327,10 @@ def build_parser() -> argparse.ArgumentParser:
     # rationale warns about) -- the fields the guard needs (--phase, --human-decision
     # below) travel as their own explicit flags instead, so the guard stays a pure
     # function of its arguments even under `cwd=ROOT` test runs.
-    narrative.add_argument("--client", required=True)
-    narrative.add_argument("--tech", required=True)
+    narrative.add_argument("--client", default="")
+    narrative.add_argument("--tech", default="")
+    narrative.add_argument("--reader", default="", help="alias for --client (042; JSON key stays client)")
+    narrative.add_argument("--trace", default="", help="alias for --tech (042; JSON key stays tech)")
     narrative.add_argument("--result", default="done", choices=["started", "done", "blocked"])
     narrative.add_argument("--role")
     narrative.add_argument("--package-id")

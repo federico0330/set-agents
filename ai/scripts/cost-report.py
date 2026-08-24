@@ -200,6 +200,18 @@ def collect_claude(report, home, project, since_ms):
             continue
 
 
+def collect_cursor(report, home, project, since_ms):
+    """044: Cursor has no token ledger like opencode.db or Claude transcripts.
+
+    ~/.cursor/ai-tracking/ai-code-tracking.db tracks code hashes, not usage tokens.
+    Return False so Section 1 never invents zero rows for Cursor."""
+    return False
+
+
+def cursor_section1_footer():
+    return "Cursor: not measured (no CLI-native token store found under ~/.cursor)"
+
+
 def codex_rollout_breakdown(rollout_path):
     """Last cumulative token_count of a rollout → cached/reasoning split."""
     last = None
@@ -898,7 +910,7 @@ def render(report, md, *, title, source):
 # see the module docstring's "WHY THESE NEVER SUM" paragraph for the double-count risk this
 # split exists to prevent.
 _SECTION_1_TITLE = "Section 1 -- CLI-native stores"
-_SECTION_1_SOURCE = "opencode.db / .claude/projects transcripts / codex rollouts (each CLI's own accounting)"
+_SECTION_1_SOURCE = "opencode.db / .claude/projects transcripts / codex rollouts / Cursor (see footer)"
 _SECTION_2_TITLE = "Section 2 -- harness dispatch registry"
 _SECTION_2_SOURCE = (
     "routing.db `dispatches` plus ai/state/features/*.json spawns[] / history record-spawn "
@@ -932,6 +944,7 @@ def main():
     collect_opencode(cli_native, home, args.project, since_ms)
     collect_claude(cli_native, home, args.project, since_ms)
     collect_codex(cli_native, home, args.project, since_ms, args.deep)
+    collect_cursor(cli_native, home, args.project, since_ms)
 
     pi_registry = defaultdict(new_bucket)
     collect_pi(pi_registry, home, args.project, since_ms)
@@ -939,6 +952,8 @@ def main():
     collect_feature_spawns(spawn_registry, args.project, since_ms)
 
     render(cli_native, args.md, title=_SECTION_1_TITLE, source=_SECTION_1_SOURCE)
+    print(cursor_section1_footer())
+    print()
     # Dual-source hosts record the same work in both ledgers. Each ledger keeps
     # its own TOTAL so Section 2 sessions never become pi+spawns (AC-6.5).
     if pi_registry and spawn_registry:

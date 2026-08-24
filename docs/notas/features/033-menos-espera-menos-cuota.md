@@ -3,7 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `INTEGRATION` · modo: scoped · revisión 244
+- fase: `DONE` · modo: scoped · revisión 246
+- estado final: **DONE**
 - spec: `docs/specs/033-menos-espera-menos-cuota/spec.md` (hash `18dcffafa809`)
 
 ## Criterios de aceptación
@@ -96,7 +97,7 @@
 
 ## Qué falta
 
-- → faltan correr los gates globales finales
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -104,7 +105,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/033-menos-espera-menos-cuota/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/033-menos-espera-menos-cuota/bitacora.md`
 
-_Actualizado: 2026-08-19T02:09:59+00:00_
+_Actualizado: 2026-08-24T16:14:18+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

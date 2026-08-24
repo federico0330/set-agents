@@ -419,6 +419,14 @@ def lint_narrative(
                 "lector no puede juzgar si el paso que sigue es el correcto.",
             ))
 
+    if is_declared_milestone and tech and not _EVIDENCE_FILE_LINE.search(tech):
+        violations.append(Violation(
+            "TECH_EVIDENCE_REQUIRED",
+            "--tech en un cierre con --milestone yes debe citar al menos un archivo:línea "
+            "(ADR-0026 / alfabetismo de código): sin evidencia verificable el lector no "
+            "puede abrir el código y comprobar lo que decís que pasó.",
+        ))
+
     # --- AC-03: --alternative, sólo en bloqueo técnico y PACKAGE_PLANNING --------
     alternative_required = (
         (result == "blocked" and not human_decision)

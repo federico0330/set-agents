@@ -1,12 +1,11 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-23T12:49:40` · generado 2026-08-24T15:49:40+00:00_
+_Ventana: desde `2026-08-24T00:00:00` · generado 2026-08-24T16:22:27+00:00_
 
 ## Necesita tu decisión
 
-- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 30 días)
-- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 24 días)
+- _nada pendiente de tu decisión_ ✅
 
 ## Qué quedó listo
 
@@ -17,19 +16,22 @@ _Ventana: desde `2026-08-23T12:49:40` · generado 2026-08-24T15:49:40+00:00_
 
 ## Qué se está haciendo
 
-- **032-cursor-como-runtime** — fase `PACKAGE_GATES`
-- **033-menos-espera-menos-cuota** — fase `INTEGRATION`
+- _ninguna feature activa_
 
 ## Qué falta
 
-- **002-adaptive-pi-orchestration** 5 hallazgos abiertos
-- **011-quota-failover** 5 tareas pendientes en P1-quota-failover
-- **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
-- **033-menos-espera-menos-cuota** → faltan correr los gates globales finales
+- _nada pendiente_ ✅
 
 ## Qué cambió en el software
 
-- _sin cambios de módulo registrados en la ventana_
+- **generacion-arboles** — Cursor target in build/install (032-cursor-como-runtime/C1)
+- **generacion-arboles** — Cursor target in build/install (032-cursor-como-runtime/C2)
+- **generacion-arboles** — bootstrap cursor rules (032-cursor-como-runtime/C2)
+- **generacion-arboles** — cursor target (032-cursor-como-runtime/C1)
+
+## Quick-fixes
+
+- 040: repair eight stale file:line anchors in docs/modules (done)
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

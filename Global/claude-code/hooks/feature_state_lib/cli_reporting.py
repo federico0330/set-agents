@@ -14,6 +14,7 @@ from typing import Any
 from feature_state_lib import model
 from feature_state_lib.model import (
     StateError, now, base_state, compact_package, fail_if_invalid, print_json, package_accept_ready,
+    resolve_dual_register,
 )
 from feature_state_lib.transitions import check_transition
 from feature_state_lib.render_status import status_root, render_status
@@ -72,9 +73,10 @@ def cmd_log_narrative(args: argparse.Namespace) -> int:
     # because they never invoke this command.
     import narration_lint
 
+    client, tech = resolve_dual_register(args, require=True)
     violations = narration_lint.lint_narrative(
-        client=args.client,
-        tech=args.tech,
+        client=client,
+        tech=tech,
         result=args.result,
         milestone=args.milestone,
         learned=args.learned,
@@ -97,8 +99,8 @@ def cmd_log_narrative(args: argparse.Namespace) -> int:
         "package_id": args.package_id or "-",
         "role": args.role or "-",
         "result": args.result,
-        "client": args.client,
-        "tech": args.tech,
+        "client": client,
+        "tech": tech,
         "actor": args.actor,
     }
     # AC-01: absence of key IS the version -- a legacy reader of an old entry never

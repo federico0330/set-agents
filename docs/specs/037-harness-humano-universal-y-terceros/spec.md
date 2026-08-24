@@ -20,7 +20,11 @@ dominios. La narración duplicada (chat + vault) gasta tokens.
 
 ## Fuera de alcance
 
-- Renombrar CLI `--client`/`--tech`.
+- Renombrar CLI `--client`/`--tech` *(superseded parcialmente por [042](../042-reader-trace-aliases/spec.md) + ADR-0070: aliases `--reader`/`--trace`; keys JSON sin cambio)*.
+
+## ## Supersedes
+
+- Cláusula “no rename `--client`/`--tech`” → ver [042-reader-trace-aliases](../042-reader-trace-aliases/spec.md) (aliases, no breaking rename)
 - Hardcodear tipos de actividad (escolar, Proteus, …).
 - `/explicar` conserva salida dual como comando, no como plantilla de orquestación.
 

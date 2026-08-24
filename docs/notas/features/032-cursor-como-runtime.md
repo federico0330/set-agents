@@ -3,8 +3,9 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `PACKAGE_GATES` · modo: scoped · revisión 25
-- spec: `docs/specs/032-cursor-como-runtime/spec.md` (hash `180fc0a3e1fa`)
+- fase: `DONE` · modo: scoped · revisión 51
+- estado final: **DONE**
+- spec: `docs/specs/032-cursor-como-runtime/spec.md` (hash `17fbbb6050a7`)
 
 ## Criterios de aceptación
 
@@ -18,8 +19,8 @@
 
 ## Paquetes
 
-- [[features/032-cursor-como-runtime/C1|C1]] — planned · Target cursor en el build y en el instalador: agentes, skills, doctrina y managed-files, …
-- [[features/032-cursor-como-runtime/C2|C2]] — planned · Proyeccion por proyecto: .cursor/rules con alwaysApply y .cursor/commands, mas documentac…
+- [[features/032-cursor-como-runtime/C1|C1]] — accepted · Target cursor en el build y en el instalador: agentes, skills, doctrina y managed-files, …
+- [[features/032-cursor-como-runtime/C2|C2]] — accepted · Proyeccion por proyecto: .cursor/rules con alwaysApply y .cursor/commands, mas documentac…
 
 ## Approach y decisiones
 
@@ -45,7 +46,7 @@
 
 ## Qué falta
 
-- → el paquete está listo para la revisión profunda
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -53,7 +54,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/032-cursor-como-runtime/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/032-cursor-como-runtime/bitacora.md`
 
-_Actualizado: 2026-08-18T15:14:03+00:00_
+_Actualizado: 2026-08-24T16:21:15+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

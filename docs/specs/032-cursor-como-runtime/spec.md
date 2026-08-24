@@ -6,8 +6,8 @@
 part by [034-cuota-organica-y-writer-barato](../034-cuota-organica-y-writer-barato/spec.md) and
 [ADR-0063](../../adr/0063-cursor-pins-por-rol.md): Cursor agents may pin models from `models.toml` (`cursor=`
 dimension) instead of forcing `inherit`. The rest of this spec (Cursor target, skills, install, `--check`,
-bootstrap, no event hooks) remains in force. This feature is not DONE; the index row stays `Approved`, not
-`Superseded by`.
+bootstrap, no event hooks) remains in force. Feature **Shipped** (2026-08-24); AC-06/`inherit`
+partially superseded by 034 + ADR-0063.
 
 ## Problema
 

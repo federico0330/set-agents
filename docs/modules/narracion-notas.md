@@ -52,7 +52,7 @@ _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
   que viene de estado pasa por acá antes de tocar disco.
   `:37` `notes_root(state_file)` — el marcador es `ai/state/`, nunca "¿ya existe
   `docs/notas/`?".
-- `render_status.py:70` `render_status(state_file)` — `STATUS.md`, la tabla multi-feature.
+- `render_status.py:253` `render_status(state_file)` — `STATUS.md`, la tabla multi-feature.
 - `render_bitacora.py` — la bitácora por feature (registros Cliente/Ingeniería, ADR-0027).
 - `render_modules.py` (este mismo paquete, ADR-0036) — reutiliza `merge_note`/`write_note`/
   `_short` de acá; nunca reimplementa el merge.

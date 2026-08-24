@@ -3,8 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `BLOCKED` · modo: feature · revisión 57
-- estado final: **BLOCKED**
+- fase: `DONE` · modo: feature · revisión 66
+- estado final: **DONE**
 - spec: `docs/specs/002-adaptive-pi-orchestration/spec.md` (hash `77fed4274cc4`)
 
 ## Criterios de aceptación
@@ -27,7 +27,7 @@
 
 ## Paquetes
 
-- [[features/002-adaptive-pi-orchestration/P1-routing-core|P1-routing-core]] — repair_required · Schema-2 configuration, deterministic routing, proportional flows, telemetry, CLI, and na…
+- [[features/002-adaptive-pi-orchestration/P1-routing-core|P1-routing-core]] — superseded · Schema-2 configuration, deterministic routing, proportional flows, telemetry, CLI, and na…
 
 ## Approach y decisiones
 
@@ -58,8 +58,6 @@
 
 ## Qué falta
 
-- → corresponde tu decisión (ver Blocker)
-- ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
 - 5 hallazgos abiertos
 
 ## Presupuestos
@@ -68,7 +66,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/002-adaptive-pi-orchestration/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/002-adaptive-pi-orchestration/bitacora.md`
 
-_Actualizado: 2026-07-24T16:16:04+00:00_
+_Actualizado: 2026-08-24T16:19:13+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

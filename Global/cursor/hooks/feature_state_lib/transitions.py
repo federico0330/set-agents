@@ -10,13 +10,22 @@ from typing import Any
 from feature_state_lib.model import (
     StateError, LEGAL_TRANSITIONS, TERMINAL, has_open_findings, package_by_id,
     package_accept_ready, package_review_ready, tasks_complete, done_ready,
-    module_impacts_ready, context_pack_errors,
+    module_impacts_ready, context_pack_errors, package_is_retired,
 )
+
+
+def _all_packages_superseded(data: dict[str, Any]) -> bool:
+    """True when every package was retired by supersede (002/003 closure path)."""
+    packages = data.get("packages") or []
+    if not packages:
+        return False
+    return all(p.get("status") == "superseded" or bool(p.get("superseded")) for p in packages)
 
 
 def check_transition(data: dict[str, Any], to_phase: str, package_id: str | None, actor: str) -> None:
     from_phase = data.get("phase")
-    if to_phase not in LEGAL_TRANSITIONS.get(from_phase, set()):
+    superseded_closure = to_phase == "INTEGRATION" and _all_packages_superseded(data)
+    if not superseded_closure and to_phase not in LEGAL_TRANSITIONS.get(from_phase, set()):
         raise StateError(f"illegal transition: {from_phase} -> {to_phase}")
     if to_phase == "PACKAGE_IMPLEMENTATION":
         errors = context_pack_errors(data, package_id)
@@ -41,14 +50,15 @@ def check_transition(data: dict[str, Any], to_phase: str, package_id: str | None
         if not package.get("testing") or package["testing"][-1].get("status") != "pass":
             raise StateError("cannot enter PACKAGE_RUNTIME_QA: package testing must pass first")
     if to_phase == "INTEGRATION":
-        # ADR-0036: deliberately DOES include a hard precondition here, unlike
-        # candidate_identity.integration_ready (ADR-0024) -- see that ADR's comparison.
-        # module_impacts_ready reads only this package's own state and has a one-command
-        # cheap waiver, so it never has ADR-0024's "external verification with no escape
-        # hatch" shape.
-        errors = module_impacts_ready(data)
-        if errors:
-            raise StateError("cannot enter INTEGRATION: " + "; ".join(errors))
+        if not superseded_closure:
+            # ADR-0036: deliberately DOES include a hard precondition here, unlike
+            # candidate_identity.integration_ready (ADR-0024) -- see that ADR's comparison.
+            # module_impacts_ready reads only this package's own state and has a one-command
+            # cheap waiver, so it never has ADR-0024's "external verification with no escape
+            # hatch" shape.
+            errors = module_impacts_ready(data)
+            if errors:
+                raise StateError("cannot enter INTEGRATION: " + "; ".join(errors))
     if to_phase == "DONE":
         errors = done_ready(data)
         if errors:

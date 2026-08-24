@@ -15,6 +15,19 @@ from pathlib import Path
 from typing import Any
 
 
+def resolve_dual_register(args: Any, *, require: bool = False) -> tuple[str, str]:
+    """042: --reader/--trace are CLI aliases; persisted JSON keys stay client/tech."""
+    client = (getattr(args, "client", "") or getattr(args, "reader", "") or "").strip()
+    tech = (getattr(args, "tech", "") or getattr(args, "trace", "") or "").strip()
+    if getattr(args, "client", "") and getattr(args, "reader", "") and args.client.strip() != args.reader.strip():
+        raise StateError("--client and --reader disagree")
+    if getattr(args, "tech", "") and getattr(args, "trace", "") and args.tech.strip() != args.trace.strip():
+        raise StateError("--tech and --trace disagree")
+    if require and (not client or not tech):
+        raise StateError("requires --client/--reader and --tech/--trace")
+    return client, tech
+
+
 PHASES = {
     "REQUIREMENTS",
     "SPEC_DRAFT",
@@ -122,10 +135,10 @@ DEFAULT_MAX_VERIFICATIONS = 6
 # legitimately be split across two calls.  Sized below `max_deep_review_cycles` it would
 # BLOCK a package that is inside every other budget.
 MODE_BUDGETS = {
-    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 6},
-    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 6},
-    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3},
-    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3},
+    "feature": {"max_spawns_per_package": 12, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 6, "max_verification_waivers_per_package": 6},
+    "scoped": {"max_spawns_per_package": 8, "max_deep_review_cycles": 2, "max_gate_failures_per_package": 3, "max_verifications_per_package": 6, "max_verification_waivers_per_package": 6},
+    "quick-fix": {"max_spawns_per_package": 4, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3, "max_verification_waivers_per_package": 3},
+    "incident": {"max_spawns_per_package": 6, "max_deep_review_cycles": 1, "max_gate_failures_per_package": 2, "max_verifications_per_package": 3, "max_verification_waivers_per_package": 3},
 }
 # ADR-0061 (034 PKG-C): heavy-model cupo, DISTINCT from MODE_BUDGETS spawn volume.
 # Caps live only here — never duplicated onto the feature JSON (drift). Status
@@ -508,9 +521,10 @@ def validate_state(data: dict[str, Any]) -> list[str]:
             errors.append(f"{pid}: duplicate finding ids: {', '.join(sorted(duplicates))}")
         # Defaulted, not required: state files written before this budget existed stay valid.
         verification_budget = budgets.get("max_verifications_per_package", DEFAULT_MAX_VERIFICATIONS)
+        waiver_budget = budgets.get("max_verification_waivers_per_package", verification_budget)
         if attempts.get("verifications", 0) > verification_budget:
             errors.append(f"{pid}: verification budget exceeded")
-        if attempts.get("verification_waivers", 0) > verification_budget:
+        if attempts.get("verification_waivers", 0) > waiver_budget:
             errors.append(f"{pid}: verification waiver budget exceeded")
         # RDD-inspired additions (docs/adr/0020-*.md and siblings). Both are static, pure-dict
         # backstop tripwires -- like `gate_failures` above, real enforcement happens at the
@@ -871,11 +885,18 @@ def module_impacts_ready(data: dict[str, Any]) -> list[str]:
     return errors
 
 
+def package_is_retired(package: dict[str, Any]) -> bool:
+    """True when a package no longer blocks feature closure (accepted or superseded)."""
+    if package.get("status") in ("accepted", "superseded"):
+        return True
+    return bool(package.get("superseded"))
+
+
 def done_ready(data: dict[str, Any]) -> list[str]:
     errors = []
     # ADR-0028: `superseded` is the second terminal package state — a package the
     # amended scope retired keeps its history and stops blocking the feature.
-    if any(package.get("status") not in ("accepted", "superseded") for package in data.get("packages", [])):
+    if any(not package_is_retired(package) for package in data.get("packages", [])):
         errors.append("all packages must be accepted")
     required = [gate for gate in data.get("global_gates", []) if gate.get("required", True)]
     if not required:
@@ -889,10 +910,14 @@ def done_ready(data: dict[str, Any]) -> list[str]:
     if any(not blocker.get("resolved_at") for blocker in data.get("blockers", [])):
         errors.append("open blocker exists")
     covered = {ac for package in data.get("packages", [])
-               if package.get("status") != "superseded"
+               if package.get("status") != "superseded" and not package.get("superseded")
                for ac in package.get("acceptance_criteria", [])}
     required_criteria = set(data.get("acceptance_criteria") or [])
-    if required_criteria and not required_criteria.issubset(covered):
+    all_superseded = bool(data.get("packages")) and all(
+        p.get("status") == "superseded" or bool(p.get("superseded"))
+        for p in data.get("packages", [])
+    )
+    if required_criteria and not required_criteria.issubset(covered) and not all_superseded:
         errors.append("not all acceptance criteria are covered by accepted packages")
     # ADR-0036: same-shaped backstop as the receipt tripwire above -- the real enforcement
     # is transitions.check_transition's INTEGRATION precondition; this is the safety net for

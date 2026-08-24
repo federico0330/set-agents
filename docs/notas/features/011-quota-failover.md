@@ -3,8 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `BLOCKED` · modo: feature · revisión 7
-- estado final: **BLOCKED**
+- fase: `DONE` · modo: feature · revisión 31
+- estado final: **DONE**
 - spec: `docs/specs/011-quota-failover/spec.md` (hash `280c60a041c4`)
 
 ## Criterios de aceptación
@@ -18,7 +18,7 @@
 
 ## Paquetes
 
-- [[features/011-quota-failover/P1-quota-failover|P1-quota-failover]] — package_gates · Atomically classify the exact settled Anthropic/Pi quota exhaustion, preserve its failed …
+- [[features/011-quota-failover/P1-quota-failover|P1-quota-failover]] — accepted · Atomically classify the exact settled Anthropic/Pi quota exhaustion, preserve its failed …
 
 ## Approach y decisiones
 
@@ -48,9 +48,7 @@
 
 ## Qué falta
 
-- → corresponde tu decisión (ver Blocker)
-- ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
-- 5 tareas pendientes en P1-quota-failover
+- _nada pendiente_ ✅
 
 ## Presupuestos
 
@@ -58,7 +56,7 @@
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/011-quota-failover/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/011-quota-failover/bitacora.md`
 
-_Actualizado: 2026-07-30T17:04:39+00:00_
+_Actualizado: 2026-08-24T16:20:17+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

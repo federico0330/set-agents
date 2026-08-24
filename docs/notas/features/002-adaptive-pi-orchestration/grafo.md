@@ -51,7 +51,7 @@ subgraph sg_002_adaptive_pi_orchestration["002-adaptive-pi-orchestration"]
     repair_002_adaptive_pi_orchestration_p1_routing_core_1["6 changed files"]
     repair_002_adaptive_pi_orchestration_p1_routing_core_2["6 changed files"]
     blocker_002_adaptive_pi_orchestration_p1_routing_core_1["blocker: resolved"]
-    blocker_002_adaptive_pi_orchestration_p1_routing_core_2["blocker: open"]
+    blocker_002_adaptive_pi_orchestration_p1_routing_core_2["blocker: resolved"]
   end
 end
 review_002_adaptive_pi_orchestration_p1_routing_core_1 -->|produjo| finding_002_adaptive_pi_orchestration_p1_routing_core_1

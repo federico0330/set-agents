@@ -17,7 +17,7 @@
 | [008](008-dynamic-selection/spec.md) | Dynamic selection | Shipped | 2026-07-30 |
 | [009](009-self-application/spec.md) | Self-application | Shipped | 2026-07-30 |
 | [010](010-spawn-provenance/spec.md) | Spawn provenance | Shipped | 2026-07-30 |
-| [011](011-quota-failover/spec.md) | Quota failover | Approved | 2026-07-30 |
+| [011](011-quota-failover/spec.md) | Quota failover | Shipped (AC-06 live blocked) | 2026-07-30 |
 | [012](012-discovered-inventory/spec.md) | Discovered inventory | Shipped | 2026-07-31 |
 | [013](013-pi-interactive-target/spec.md) | Pi interactive target | Shipped | 2026-08-02 |
 | [014](014-model-preference-policy/spec.md) | Model preference policy | Shipped | 2026-08-02 |
@@ -38,10 +38,16 @@
 | [029](029-convenciones-antes-del-codigo/spec.md) | Conventions before code | Shipped | 2026-08-16 |
 | [030](030-guardas-que-no-se-pueden-prefijar/spec.md) | Guards that cannot be prefix-matched | Shipped | 2026-08-17 |
 | [031](031-registro-correctivo/spec.md) | Registry correction verbs | Shipped | 2026-08-17 |
-| [032](032-cursor-como-runtime/spec.md) | Cursor as harness runtime (partial AC-06 superseded by 034) | Approved | 2026-08-18 |
-| [033](033-menos-espera-menos-cuota/spec.md) | Less waiting, less quota | Approved | 2026-08-18 |
+| [032](032-cursor-como-runtime/spec.md) | Cursor as harness runtime (partial AC-06 superseded by 034) | Shipped | 2026-08-18 |
+| [033](033-menos-espera-menos-cuota/spec.md) | Less waiting, less quota | Shipped | 2026-08-18 |
 | [034](034-cuota-organica-y-writer-barato/spec.md) | Organic quota and cheap writer | Shipped | 2026-08-19 |
 | [035](035-panel-honesto-consola-y-tips/spec.md) | Honest panel, split console, TIPS updated | Shipped | 2026-08-20 |
 | [036](036-specs-vivos-indice-y-precedencia/spec.md) | Live spec index and cross-feature precedence | Shipped | 2026-08-24 |
 | [037](037-harness-humano-universal-y-terceros/spec.md) | Human chat narration, domain-neutral cycle, third-party polish | Shipped | 2026-08-24 |
 | [038](038-tokens-literacy-and-project-label/spec.md) | Token budget, code literacy, project label | Shipped | 2026-08-24 |
+| [039](039-honest-ledger-closures/spec.md) | Honest index and feature ledger closures | Shipped | 2026-08-24 |
+| [040](040-module-anchors-repair/spec.md) | Repair docs/modules anchors | Shipped | 2026-08-24 |
+| [041](041-code-literacy-lint/spec.md) | Enforce file:line in milestone tech closes | Shipped | 2026-08-24 |
+| [042](042-reader-trace-aliases/spec.md) | --reader/--trace CLI aliases | Shipped | 2026-08-24 |
+| [043](043-mutate-cas-and-verification-ceilings/spec.md) | mutate file lock and verification waiver ceilings | Shipped | 2026-08-24 |
+| [044](044-cursor-token-honesty/spec.md) | Cursor Section 1 honesty (not measured) | Shipped | 2026-08-24 |

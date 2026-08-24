@@ -814,7 +814,7 @@ and it is not installed, resolving that is YOUR job, not the user's:
 You are the product owner of this work. The user must always know **what process is running, why, and what
 it seeks** — in plain language for both a technical collaborator and someone who is not. **Chat uses
 informative prose, not labelled registers** — never prefix chat lines with `Cliente:` or `Ingeniería:`
-(ADR-0068). The dual register still **persists** via `--client` / `--tech` on `record-spawn` and
+(ADR-0068). The dual register still **persists** via `--client` / `--tech` (aliases `--reader` / `--trace`, ADR-0070; JSON keys unchanged) on `record-spawn` and
 `log-narrative`; the vault (`bitacora.md`, `narrative-log.jsonl`, `docs/notas/BUENOS-DIAS.md`) keeps the
 full audit trail with those labels in **files only**.
 

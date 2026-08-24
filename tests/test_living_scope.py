@@ -107,13 +107,15 @@ class SupersedePackageTests(unittest.TestCase):
             package = state["packages"][0]
             self.assertEqual(package["status"], "superseded")
             self.assertEqual(package["superseded"]["reason"], "el alcance nuevo lo dejó sin objeto")
-            # done_ready: the superseded package no longer blocks on status, but its
-            # AC is uncovered again — exactly the honest remaining error.
+            # done_ready: superseded packages no longer block on status; when every
+            # package is superseded the feature may close without re-covering ACs
+            # (002/003 supersede path). Remaining blockers are global gates etc.
             sys.path.insert(0, str(ROOT / "ai/scripts"))
             from feature_state_lib.model import done_ready
             errors = done_ready(state)
             self.assertNotIn("all packages must be accepted", errors)
-            self.assertIn("not all acceptance criteria are covered by accepted packages", errors)
+            self.assertNotIn("not all acceptance criteria are covered by accepted packages", errors)
+            self.assertIn("at least one required global gate must be recorded", errors)
 
     def test_an_accepted_package_cannot_be_superseded(self):
         with tempfile.TemporaryDirectory() as raw:

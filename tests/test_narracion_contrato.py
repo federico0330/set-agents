@@ -129,7 +129,7 @@ B4 = dict(  # Pn/Dn/Rn pelados
 
 B5 = dict(  # prosa vaga alrededor de archivos sueltos -- declarada VERDE (spec)
     client="El paquete quedó cerrado siguiendo lo acordado con el equipo.",
-    tech="Se revisó la documentación antes de cerrar y el gate quedó verde.",
+    tech="Se revisó la documentación en docs/specs/028-narracion-que-ensena/spec.md:12 antes de cerrar y el gate quedó verde.",
     result="done", milestone="yes",
     learned="Que la revisión no encontró discrepancias entre los dos documentos.",
     next_step="Cerrar el paquete y avisar al equipo.",
@@ -326,7 +326,7 @@ class Ac02MilestoneTests(unittest.TestCase):
 
     def test_milestone_yes_requires_learned_next_why(self):
         violations = nl.lint_narrative(
-            client="ya podés cobrar con tarjeta", tech="cierre del paquete de pagos, gate verde",
+            client="ya podés cobrar con tarjeta", tech="cierre del paquete de pagos, gate verde (payments/gate.py:42)",
             result="done", milestone="yes", feature_id="feat-n",
         )
         codes = {v.code for v in violations}
@@ -340,7 +340,7 @@ class Ac03AlternativeTests(unittest.TestCase):
 
     def test_technical_block_requires_alternative(self):
         violations = nl.lint_narrative(
-            client="quedó bloqueado", tech="bloqueado por falta de credencial",
+            client="quedó bloqueado", tech="bloqueado por falta de credencial (auth.py:10)",
             result="blocked", milestone="yes",
             learned="x", next_step="y", why="z", feature_id="feat-x",
         )
@@ -349,7 +349,7 @@ class Ac03AlternativeTests(unittest.TestCase):
     def test_human_decision_block_does_not_require_alternative(self):
         violations = nl.lint_narrative(
             client="quedó bloqueado, corresponde tu decisión",
-            tech="bloqueado por HUMAN_DECISION_REQUIRED",
+            tech="bloqueado por HUMAN_DECISION_REQUIRED (blocker.md:1)",
             result="blocked", milestone="yes",
             learned="x", next_step="y", why="z", feature_id="feat-x",
             human_decision=True,
@@ -358,7 +358,7 @@ class Ac03AlternativeTests(unittest.TestCase):
 
     def test_package_planning_close_requires_alternative(self):
         violations = nl.lint_narrative(
-            client="se planificó el próximo paquete", tech="se armó el paquete siguiente",
+            client="se planificó el próximo paquete", tech="se armó el paquete siguiente (plan.md:3)",
             result="done", milestone="yes",
             learned="x", next_step="y", why="z", feature_id="feat-x",
             phase="PACKAGE_PLANNING",
@@ -367,7 +367,7 @@ class Ac03AlternativeTests(unittest.TestCase):
 
     def test_other_phase_close_does_not_require_alternative(self):
         violations = nl.lint_narrative(
-            client="se cerró el paquete", tech="gates verdes",
+            client="se cerró el paquete", tech="gates verdes (verify.sh:1)",
             result="done", milestone="yes",
             learned="x", next_step="y", why="z", feature_id="feat-x",
             phase="PACKAGE_TESTING",
@@ -376,7 +376,7 @@ class Ac03AlternativeTests(unittest.TestCase):
 
     def test_alternative_none_without_why_is_rejected(self):
         violations = nl.lint_narrative(
-            client="se planificó el próximo paquete", tech="se armó el paquete siguiente",
+            client="se planificó el próximo paquete", tech="se armó el paquete siguiente (plan.md:3)",
             result="done", milestone="yes",
             learned="x", next_step="y", why="",
             alternative="none", feature_id="feat-x", phase="PACKAGE_PLANNING",
@@ -385,7 +385,7 @@ class Ac03AlternativeTests(unittest.TestCase):
 
     def test_alternative_none_with_why_is_legal(self):
         violations = nl.lint_narrative(
-            client="se planificó el próximo paquete", tech="se armó el paquete siguiente",
+            client="se planificó el próximo paquete", tech="se armó el paquete siguiente (plan.md:3)",
             result="done", milestone="yes",
             learned="no había otra opción real",
             next_step="arrancar el paquete único que queda",
@@ -606,6 +606,33 @@ class GuardCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("MILESTONE_REQUIRED", result.stderr)
         self.assertEqual(entries, [])
+
+    def test_milestone_tech_requires_file_line_evidence(self):
+        """041: code literacy — milestone closes must cite file:line in --tech."""
+        violations = nl.lint_narrative(
+            client="Cerramos el índice para que el digest deje de mentir.",
+            tech="Se actualizaron filas en docs/specs/README.md sin citar línea.",
+            result="done",
+            milestone="yes",
+            learned="El hub ya no pide decisión sobre contratos muertos.",
+            next_step="Seguir con anclas y lint.",
+            why="Si el digest miente, nadie confía en el estado.",
+            feature_id="041-code-literacy-lint",
+        )
+        codes = {v.code for v in violations}
+        self.assertIn("TECH_EVIDENCE_REQUIRED", codes)
+
+        ok = nl.lint_narrative(
+            client="Cerramos el índice para que el digest deje de mentir.",
+            tech="Se actualizaron filas en docs/specs/README.md:20 tras auditar HEAD.",
+            result="done",
+            milestone="yes",
+            learned="El hub ya no pide decisión sobre contratos muertos.",
+            next_step="Seguir con anclas y lint.",
+            why="Si el digest miente, nadie confía en el estado.",
+            feature_id="041-code-literacy-lint",
+        )
+        self.assertNotIn("TECH_EVIDENCE_REQUIRED", {v.code for v in ok})
 
     # `verify.sh` is the ONE deliberate divergence: `ai/scripts/verify.sh` gates this
     # repository (Python suite, build.sh --check), while the template copy is the

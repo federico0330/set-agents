@@ -3,7 +3,7 @@
 <!-- notas:auto -->
 ## Features
 
-- [[features/002-adaptive-pi-orchestration|002-adaptive-pi-orchestration]] — fase `BLOCKED` · paquetes 0/1 · **BLOCKED**
+- [[features/002-adaptive-pi-orchestration|002-adaptive-pi-orchestration]] — fase `DONE` · paquetes 0/1 · **DONE**
 - [[features/003-trusted-routing-pi-runtime|003-trusted-routing-pi-runtime]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/004-adaptive-dispatch|004-adaptive-dispatch]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/005-portable-harness|005-portable-harness]] — fase `DONE` · paquetes 3/3 · **DONE**
@@ -12,7 +12,7 @@
 - [[features/008-dynamic-selection|008-dynamic-selection]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/009-self-application|009-self-application]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/010-spawn-provenance|010-spawn-provenance]] — fase `DONE` · paquetes 1/1 · **DONE**
-- [[features/011-quota-failover|011-quota-failover]] — fase `BLOCKED` · paquetes 0/1 · **BLOCKED**
+- [[features/011-quota-failover|011-quota-failover]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/012-discovered-inventory|012-discovered-inventory]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/013-pi-interactive-target|013-pi-interactive-target]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/014-model-preference-policy|014-model-preference-policy]] — fase `DONE` · paquetes 1/1 · **DONE**
@@ -31,8 +31,8 @@
 - [[features/029-convenciones-antes-del-codigo|029-convenciones-antes-del-codigo]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/030-guardas-que-no-se-pueden-prefijar|030-guardas-que-no-se-pueden-prefijar]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/031-registro-correctivo|031-registro-correctivo]] — fase `DONE` · paquetes 1/1 · **DONE**
-- [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `PACKAGE_GATES` · paquetes 0/2
-- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `INTEGRATION` · paquetes 6/6
+- [[features/032-cursor-como-runtime|032-cursor-como-runtime]] — fase `DONE` · paquetes 2/2 · **DONE**
+- [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `DONE` · paquetes 6/6 · **DONE**
 - [[features/034-cuota-organica-y-writer-barato|034-cuota-organica-y-writer-barato]] — fase `DONE` · paquetes 4/4 · **DONE**
 - [[features/035-panel-honesto-consola-y-tips|035-panel-honesto-consola-y-tips]] — fase `DONE` · paquetes 3/3 · **DONE**
 - [[features/036-specs-vivos-indice-y-precedencia|036-specs-vivos-indice-y-precedencia]] — fase `DONE` · paquetes 1/1 · **DONE**
@@ -41,22 +41,15 @@
 
 ## Qué falta
 
-- **002-adaptive-pi-orchestration** → corresponde tu decisión (ver Blocker)
-- **002-adaptive-pi-orchestration** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhau…
-- **002-adaptive-pi-orchestration** 5 hallazgos abiertos
-- **011-quota-failover** → corresponde tu decisión (ver Blocker)
-- **011-quota-failover** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor a…
-- **011-quota-failover** 5 tareas pendientes en P1-quota-failover
-- **032-cursor-como-runtime** → el paquete está listo para la revisión profunda
-- **033-menos-espera-menos-cuota** → faltan correr los gates globales finales
+- _nada pendiente en features activas_ ✅
 
 ## Quick-fixes recientes
 
+- 2026-08-24T16:21 — 040: repair eight stale file:line anchors in docs/modules (done)
 - 2026-08-18T02:48 — F-04 (020-honest-dashboard/P2-anclas-verificables) cerrado: verify.sh ahora pasa --profile go-zen a ./build.sh --output… (done)
 - 2026-08-18T02:48 — P1F-01 cerrado: fix validado — cmd_transition ya tiene try/except alrededor del pop de repair_entry, cubriendo el caso … (done)
 - 2026-08-12T15:24 — render_notes emitia trailing whitespace en la linea de un finding sin category ni summary, rompiendo git diff --check y… (done)
 - 2026-08-06T13:33 — Preserve explicit --project context in set_agents_app.py script mode by aliasing __main__ for lazy routing_cli imports (done)
-- 2026-08-03T02:36 — P1F-01: cmd_transition's repair_entry pop for PACKAGE_REPAIR was nested under 'if args.package_id:'; since --package-id… (done)
 
 ## Decisiones
 
@@ -87,7 +80,7 @@
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-24T15:49:14+00:00_
+_Actualizado: 2026-08-24T16:21:15+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

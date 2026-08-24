@@ -30,7 +30,7 @@ _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
 
 ## Puntos de entrada
 
-- `ai/scripts/set_agents_app.py:3252` `main()` — arma el `ArgumentParser` (`prog="set-agents"`)
+- `ai/scripts/set_agents_app.py:4127` `main()` — arma el `ArgumentParser` (`prog="set-agents"`)
   con todos los flags mutuamente excluyentes de rutas de routing (`--route-decide`,
   `--route-explain`, `--route-doctor`, `--routing-report`, ...) más install/update/tools/MCP.
 - `set-agents` (script wrapper en la raíz del repo/instalado) invoca este `main()`.
@@ -42,7 +42,7 @@ _Lo que escribas fuera del bloque auto se preserva en cada regeneración._
   compone contra `routing.py`/`routing_core/` (módulo `routing`) o `models_config.py`.
 - `set_agents_app.py:327-414` — `cmd_model_preference_*`/`cmd_model_pin_*`: el wizard de
   preferencias/pines de modelo.
-- `set_agents_app.py:1089` `cmd_status(human=False)` — el `--status` de una línea.
+- `set_agents_app.py:1380` `cmd_status(human=False)` — el `--status` de una línea.
 - `ai/scripts/tui.py` — el picker interactivo (`run_picker`) que los distintos menús
   reutilizan.
 
