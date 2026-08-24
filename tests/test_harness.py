@@ -7425,6 +7425,51 @@ class HarnessTests(unittest.TestCase):
             run("python3", "ai/scripts/bootstrap_project.py", td)
             self.assertEqual(gitignore.read_text(), "# custom rules\n", "never overwrite an existing .gitignore")
 
+    def test_spec_index_matches_disk_and_project_notes(self):
+        """ADR-0067 / 036 AC-07: README row per spec, closed status vocabulary, DONE → Shipped."""
+        specs_root = ROOT / "docs/specs"
+        spec_dirs = sorted(
+            p.parent.name
+            for p in specs_root.glob("[0-9][0-9][0-9]-*/spec.md")
+        )
+        self.assertGreaterEqual(len(spec_dirs), 35, "expected full spec tree on disk")
+
+        readme = (specs_root / "README.md").read_text(encoding="utf-8")
+        row_re = re.compile(
+            r"^\|\s*\[(\d{3})\]\([^)]+\)\s*\|[^|]+\|\s*([^|]+?)\s*\|",
+            re.MULTILINE,
+        )
+        indexed = {m.group(1): m.group(2).strip() for m in row_re.finditer(readme)}
+
+        disk_ids = {name.split("-", 1)[0] for name in spec_dirs}
+        missing = sorted(disk_ids - indexed.keys())
+        self.assertEqual(missing, [], f"README missing rows for spec ids: {missing}")
+
+        extra = sorted(indexed.keys() - disk_ids)
+        self.assertEqual(extra, [], f"README rows without spec folders: {extra}")
+
+        valid_status = re.compile(
+            r"^(Draft|Approved|Shipped|Superseded by .+)$"
+        )
+        for spec_id, status in indexed.items():
+            self.assertRegex(
+                status,
+                valid_status,
+                f"spec {spec_id} has invalid status {status!r}",
+            )
+
+        project_notes = (ROOT / "docs/notas/00 - Proyecto.md").read_text(encoding="utf-8")
+        done_re = re.compile(
+            r"features/(\d{3})-[^\|\]]+\][^\n]*fase `DONE`"
+        )
+        done_ids = {m.group(1) for m in done_re.finditer(project_notes)}
+        for spec_id in done_ids:
+            status = indexed[spec_id]
+            self.assertTrue(
+                status == "Shipped" or status.startswith("Superseded by"),
+                f"feature {spec_id} is DONE in project notes but README status is {status!r}",
+            )
+
     def test_domain_knowledge_is_wired_through_the_canon(self):
         generated = _generate_output()
         run("./build.sh", "--output", str(generated))

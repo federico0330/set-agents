@@ -5,6 +5,11 @@ Codex, Cursor, and pi — plus `Global/_canonical` and `Global/_shared`.
 
 ## Control plane
 
+**Contract precedence (ADR-0067):** when sources disagree, code/tests/`generate.py` beat ADRs; newest
+Accepted ADR beats older prose; the active feature spec beats shipped specs. See `.cursor/rules/00-harness.mdc`
+and `Global/_canonical/agents/orchestrator.md` for the full law stack; [`docs/specs/README.md`](docs/specs/README.md)
+is the vigor table.
+
 **OpenCode, Claude Code, and Cursor can all orchestrate feature work** — each has the full role roster
 installed. OpenCode is still the lane where `/feature-batch` runs with generated hooks and step budgets;
 Claude Code carries the same roster (orchestration or focused review/debug); Cursor has been a host runtime

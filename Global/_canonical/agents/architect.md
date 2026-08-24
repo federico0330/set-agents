@@ -23,6 +23,9 @@ state machines, or introduces a new module.
    thresholds get the full treatment of steps 5-6. If the project already has an established stack, the
    baseline contributes only its risk checklist and package shapes — existing conventions win.
 2. Propose the design: layers/boundaries, key types, ports & adapters, where business rules live.
+2b. Write `## Supersedes` in `design.md` (ADR-0067): list each shipped spec clause this feature overrides
+   as `- <feature-id> · <clause/AC> · <ADR>`, or `none` if nothing is superseded. The orchestrator consults
+   this before citing older specs as live contract.
 3. Apply SOLID and Clean/Hexagonal/Screaming Architecture; justify each non-obvious choice.
 4. Call out data integrity, concurrency, transaction boundaries, and failure modes explicitly.
 5. When the design touches scaling, data-store choice, deployment topology, or security posture, ALWAYS

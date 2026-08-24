@@ -1,35 +1,16 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-21T00:00:00` · generado 2026-08-21T13:50:02+00:00_
+_Ventana: desde `2026-08-23T09:51:56` · generado 2026-08-24T12:51:56+00:00_
 
 ## Necesita tu decisión
 
-- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 27 días)
-- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 21 días)
+- **002-adaptive-pi-orchestration** — HUMAN_DECISION_REQUIRED: user-authorized third repair cycle failed final review; five high findings remain and P1 exhausted 12 spawns plus 2 deep-review cycles. Requires redesign of trusted catalog/observations and crash-safe telemetry before further implementation. (hace 30 días)
+- **011-quota-failover** — HUMAN_DECISION_REQUIRED: AC-06 exige una suscripción Anthropic controlada y genuinamente agotada junto a un proveedor alterno usable; la precondición no está verificada en esta sesión. El runner fail-closed fue verificado y no ejecutó Pi ni mutó DB sin ella. (hace 24 días)
 
 ## Qué quedó listo
 
-- **035-panel-honesto-consola-y-tips · PKG-B · orchestrator** — Cerró el segundo lote: la consola no cambia los comandos que ya usás. Se fotografió de verdad, se enumeró qué no se puede partir y por qué, y se sacó una copia duplicada que no hacía falta.
-  - aprendimos: A three-channel compare that both sides fail with the same missing-file error is a false green. POSIX RoutingStore ignores HOME; isolation needs SET_AGENTS_ROUTING_TEST_ROOT.
-  - conviene ahora: Third lot: bring the usage tips in line with the five generated trees and the pointer from the how-it-works page.
-  - por qué ahora: Leaving the console lot open would mix an invalid characterization with the docs lot.
-  - alternativa: keep the duplicate vault helper and an unproven residue matrix
-- **035-panel-honesto-consola-y-tips · PKG-C · orchestrator** — Cerró el tercer lote: la guía de uso ya nombra los cinco programas, deja de decir que uno solo manda, y la página de cómo funciona deja de llamarla atrasada.
-  - aprendimos: DEC-TIPS-POINTER is physical: updating one surface without the other recreates the contradiction.
-  - conviene ahora: Integrate A+B+C against the feature contract and run the global verify.
-  - por qué ahora: Leaving the tips lot open would ship a how-it-works page that still called the guide stale.
-  - alternativa: rewrite all of TIPS for style; rejected by AC-C.5 closed scope
-- **035-panel-honesto-consola-y-tips · PKG-C · orchestrator** — Los tres lotes estan hechos y la verificacion global del repo paso. Para firmar el cierre hace falta una lectura independiente mas, y eso pide un permiso extra porque se agoto el cupo de este lote.
-  - aprendimos: A judge applying path-a baseline rules to path-b same-binary contradicts design.md:518-521. Stale INTEGRATION.md rows after record-gate are false blockers.
-  - conviene ahora: If federico authorizes JSON 10 to 11, spawn fourth adversarial-judge then DONE plus memory-scribe.
-  - por qué ahora: DONE without a passing judge violates the mandatory final gate. CLI reopen would reset PACKAGE_PLANNING and SPAWN-001.
-  - alternativa: DONE skipping the fourth judge; rejected by orchestrator.md:499
-- **035-panel-honesto-consola-y-tips · PKG-C · orchestrator** — Cerró el trabajo de las tres piezas: el panel ya no se puede saltear, la consola quedó fotografiada y enumerada, y la guía de uso coincide con los cinco programas y con la página de cómo funciona.
-  - aprendimos: JSON spawn ceiling can be raised per-feature without touching MODE_BUDGETS. Path-b same-binary is the characterization gift when nothing moves. A three-channel compare that both sides fail identically is a false green.
-  - conviene ahora: memory-scribe local vault; commit only if federico asks.
-  - por qué ahora: Leaving 035 open after JUDGE_PASS would keep an already-delivered scoped feature in INTEGRATION.
-  - alternativa: skip the fourth judge; rejected
+- _sin cierres registrados en la ventana_
 
 ## Qué se está haciendo
 
@@ -45,16 +26,7 @@ _Ventana: desde `2026-08-21T00:00:00` · generado 2026-08-21T13:50:02+00:00_
 
 ## Qué cambió en el software
 
-- **consola** — La segunda pasada de extraccion no muda el residuo de routing/vault: queda enumerado con experimento propio. Se borro una copia identica de vault_link_private. El CLI publico no cambia. (035-panel-honesto-consola-y-tips/PKG-B)
-
-## Decisiones nuevas
-
-- **Federico autoriza repair+delta de PKG-B** — federico 2026-08-20 OK para repair-agent (8) y delta-reviewer (9). Sin bump nuevo. Sin reopen. Constante intacta.
-- **Sin techo de repair: freeze committed vs HEAD es 0 lineas** — Pop candidate_identity.changed_lines de PKG-B. El gate post-repair usa --changed-lines del delta reportado, no el working tree entero vs freeze.
-- **Excepciones PKG-C por A y B sin commitear** — update-package --exception sobre suciedad de A/B y docs vivas. No ensancha owned_paths. No autoriza editar codigo.
-- **Juez bloquea: §11 miente y falta --provider-remove** — No BLOCKED todavia. Integrator reabre la composicion: reescribe §11 para apuntar a 035 A/B/C como entregados, y agrega caso aislado --provider-remove. Sin CLI reopen. Sin bump JSON. PKG-B queda en 10/10; el follow-up se registra en PKG-C.
-- **JUDGE-035-003 contradice el camino (b) aprobado** — 003 no es defecto. 004 si: el bundle no tenia los informes independientes como markdown; se depositan desde el state JSON (reviews, subreviews, verifications, deltas) sin reescribir veredictos.
-- **Federico autoriza spawn 11 para el cuarto juez** — federico 2026-08-21 OK para max_spawns_per_package 10->11 solo en el JSON de 035, un spawn: adversarial-judge. Constante intacta. Sin reopen.
+- _sin cambios de módulo registrados en la ventana_
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

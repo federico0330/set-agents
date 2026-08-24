@@ -35,6 +35,7 @@
 - [[features/033-menos-espera-menos-cuota|033-menos-espera-menos-cuota]] — fase `INTEGRATION` · paquetes 6/6
 - [[features/034-cuota-organica-y-writer-barato|034-cuota-organica-y-writer-barato]] — fase `DONE` · paquetes 4/4 · **DONE**
 - [[features/035-panel-honesto-consola-y-tips|035-panel-honesto-consola-y-tips]] — fase `DONE` · paquetes 3/3 · **DONE**
+- [[features/036-specs-vivos-indice-y-precedencia|036-specs-vivos-indice-y-precedencia]] — fase `DONE` · paquetes 1/1 · **DONE**
 
 ## Qué falta
 
@@ -75,13 +76,14 @@
 | 033-menos-espera-menos-cuota | 10/10 | n/a, request |
 | 034-cuota-organica-y-writer-barato | 10/10 | adr, n/a, notas |
 | 035-panel-honesto-consola-y-tips | 10/10 | n/a |
+| 036-specs-vivos-indice-y-precedencia | 10/10 | n/a |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-21T13:48:41+00:00_
+_Actualizado: 2026-08-24T12:51:39+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

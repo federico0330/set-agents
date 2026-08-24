@@ -19,6 +19,8 @@ Drafting or checking the spec before implementation.
 - Domain invariants and public contracts.
 - Risks, assumptions, and explicit decisions.
 - Approval marker with version/hash.
+- For architecture handoff: `design.md` must include `## Supersedes` (ADR-0067) — `- <id> · <clause/AC> · <ADR>`
+  per superseded shipped behavior, or `none`.
 
 ## Rules
 - Do not leave product decisions implicit.

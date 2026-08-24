@@ -1,5 +1,14 @@
 # 032 — Cursor como runtime del harness
 
+## Supersession notice
+
+**Partial supersession (body unchanged).** AC-06 and the `model: inherit` clause in AC-01 are superseded in
+part by [034-cuota-organica-y-writer-barato](../034-cuota-organica-y-writer-barato/spec.md) and
+[ADR-0063](../../adr/0063-cursor-pins-por-rol.md): Cursor agents may pin models from `models.toml` (`cursor=`
+dimension) instead of forcing `inherit`. The rest of this spec (Cursor target, skills, install, `--check`,
+bootstrap, no event hooks) remains in force. This feature is not DONE; the index row stays `Approved`, not
+`Superseded by`.
+
 ## Problema
 
 El harness genera artefactos nativos para cuatro runtimes (`opencode`, `claude-code`, `codex`, `pi`).

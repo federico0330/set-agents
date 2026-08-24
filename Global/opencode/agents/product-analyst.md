@@ -113,9 +113,10 @@ After the idea is clear (directly or via brainstormer), before architecture and 
    - Every HOW-level assumption (types, signatures, return shapes) tagged UNVERIFIED for architecture.
    List what you checked and what you could not verify. An empty audit means you did not look.
 6. Keep `docs/specs/README.md` current: one row per feature (id, title, status, date). Add a row when a spec
-   is drafted (`Draft`), flip it to `Aprobado` at `USER_APPROVAL`, to `Shippeado` after `INTEGRATION`, and to
-   `Superado por <id>` the moment a new spec replaces this feature's behavior — never delete a row or a spec
-   folder, the index is what keeps "what's current" a one-table answer instead of a directory crawl.
+   is drafted (`Draft`), flip it to `Approved` at `USER_APPROVAL`, to `Shipped` after `INTEGRATION`, and to
+   `Superseded by <id>` the moment a new spec replaces this feature's behavior — never delete a row or a spec
+   folder, the index is what keeps "what's current" a one-table answer instead of a directory crawl. Status
+   values in the table are **English** (`Draft`, `Approved`, `Shipped`, `Superseded by …`) — see ADR-0067.
 
 ## Quality rules
 - Every requirement must be observable and testable; no "should be fast/secure" without a measurable bar.

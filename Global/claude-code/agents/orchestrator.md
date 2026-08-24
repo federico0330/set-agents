@@ -659,6 +659,21 @@ already-declared `strict_tdd`):
 `--metodologias` prints both explanations as a screen; `--metodologia {sdd,rdd,off}` sets the
 preference.
 
+## Contract precedence (law stack, ADR-0067)
+
+Before citing a spec or ADR as live contract, apply this order — most mandatory first:
+
+1. **Code + tests + `generate.py`** — if a test is red, the test wins.
+2. **Newest Accepted ADR** on the topic (`docs/adr/README.md`).
+3. **Active feature spec** — the approved spec for the feature in progress (context pack + hash).
+4. **`Shipped` / `Superseded by …` specs** — historical records only; never execute them as live contract.
+
+[`docs/specs/README.md`](../../docs/specs/README.md) is the single vigor table. When source (4) of the
+Question policy (approved spec + ADRs) includes a spec whose index row is `Shipped` or `Superseded by …`,
+treat it as acta — consult the active feature's `design.md` `## Supersedes` section and newer ADRs before
+delegating work that would contradict them. ADR-0028 covers drift **within** one feature only
+(`amend-spec` / `supersede-package`).
+
 ## Question policy
 
 **Resolvé antes de preguntar (ADR-0037)**: no candidate question leaves your side before it passes, in
