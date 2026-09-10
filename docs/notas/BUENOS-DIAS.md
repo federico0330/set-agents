@@ -1,11 +1,11 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-09-10T00:00:00` · generado 2026-09-10T17:05:00+00:00_
+_Ventana: desde `2026-09-10T00:00:00` · generado 2026-09-10T17:52:51+00:00_
 
 ## Necesita tu decisión
 
-- **049-identidad-honesta-modelos** — HUMAN_DECISION_REQUIRED: adversarial-judge FAIL J-049-001 (AC-09 verify.sh rc≠0; cannot green on C2+D2 candidate while 045-048 dirty tree remains unintegrated) and J-049-002 (contract quartet absent from candidate commit; hash taken from root). Options: (1) amend AC-09 to accept hermetic 049 gates already green, (2) land/integrate 045-048 then re-verify, (3) authorize formal waiver of verify for this feature close. (hace 0 días)
+- _nada pendiente de tu decisión_ ✅
 
 ## Qué quedó listo
 
@@ -46,6 +46,8 @@ _Ventana: desde `2026-09-10T00:00:00` · generado 2026-09-10T17:05:00+00:00_
 - **Ampliar frontier PKG-D2 tras FRONTIER_CAP_EXHAUSTED** — Reabrir con autorización del mandato de continuar el plan hasta completar los to-dos; frontier reset para cerrar reparación D2 sin ampliar producto.
 - **Waiver techo reparación PKG-D2 a 170** — Autorizar USER_WAIVER_EXTENDED budget 170 bajo el mandato de continuar el plan hasta completar to-dos; el delta es sólo fixture TTY + evidencia owned.
 - **049 bloqueado por juicio adversario en verify.sh** — Detener DONE. Pedir decisión humana: enmendar AC-09, integrar 045-048 primero, o waiver explícito de verify.
+- **Cerrar 049 vía integrar 045-048 primero** — El usuario eligió la opción 2: integrar/commitear 045-048 primero; luego reabrir 049, re-correr verify.sh y el juicio adversario.
+- **049 close after option-2 + whitespace fix** — Close 049 on tip 95edc56 after JUDGE_PASS; keep Global orchestrator.toml pin and $TMP uncommitted
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

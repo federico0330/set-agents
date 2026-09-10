@@ -50,6 +50,9 @@
 - SPAWN-006 delta-reviewer · modelo local/BASE · effort low
 - SPAWN-007 runtime-verifier · modelo local/BASE · effort low
 - SPAWN-008 adversarial-judge · modelo local/BASE · effort low
+- SPAWN-009 adversarial-judge · modelo local/BASE · effort low
+- SPAWN-010 adversarial-judge · modelo local/BASE · effort low
+- SPAWN-011 adversarial-judge · modelo local/BASE · effort low
 
 context pack: `docs/specs/049-identidad-honesta-modelos/context/PKG-D2.md`
 

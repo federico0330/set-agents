@@ -202,9 +202,12 @@ subgraph sg_049_identidad_honesta_modelos["049-identidad-honesta-modelos"]
     spawn_049_identidad_honesta_modelos_pkg_d2_6["SPAWN-006 delta-reviewer Delta review D2 repair 6bd4253..9bc4e2d #91;BASE#93;"]
     spawn_049_identidad_honesta_modelos_pkg_d2_7["SPAWN-007 runtime-verifier PKG-D2 runtime QA hermetic TTY/isolation #91;BASE#93;"]
     spawn_049_identidad_honesta_modelos_pkg_d2_8["SPAWN-008 adversarial-judge Final adversarial judge for 049 feature closure #91;BASE#93;"]
+    spawn_049_identidad_honesta_modelos_pkg_d2_9["SPAWN-009 adversarial-judge Re-judge 049 after option-2 integrated tip 5076dd2 #91;BASE#93;"]
+    spawn_049_identidad_honesta_modelos_pkg_d2_10["SPAWN-010 adversarial-judge Re-judge after J-049-003 whitespace fix #91;BASE#93;"]
+    spawn_049_identidad_honesta_modelos_pkg_d2_11["SPAWN-011 adversarial-judge Re-judge after J-049-003 whitespace fix — JUDGE_PASS tip 95edc56 #91;BASE#93;"]
     blocker_049_identidad_honesta_modelos_pkg_d2_1["blocker: resolved"]
     blocker_049_identidad_honesta_modelos_pkg_d2_2["blocker: resolved"]
-    blocker_049_identidad_honesta_modelos_pkg_d2_3["blocker: open"]
+    blocker_049_identidad_honesta_modelos_pkg_d2_3["blocker: resolved"]
   end
 end
 review_049_identidad_honesta_modelos_pkg_a_1 -->|produjo| finding_049_identidad_honesta_modelos_pkg_a_1

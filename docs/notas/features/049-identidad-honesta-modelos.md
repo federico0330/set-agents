@@ -3,8 +3,8 @@
 <!-- notas:auto -->
 ## Estado
 
-- fase: `BLOCKED` · modo: feature · revisión 355
-- estado final: **BLOCKED**
+- fase: `DONE` · modo: feature · revisión 370
+- estado final: **DONE**
 - spec: `docs/specs/049-identidad-honesta-modelos/spec.md` (hash `0ed880d4bbb7`)
 
 ## Criterios de aceptación
@@ -36,12 +36,12 @@
 - ruteo PKG-D: Route decision dec1_874f5386d86738581762fbe607c1dc46 was supplied; its resolved provider/model is not present in readab…
 - ruteo PKG-C2: Replacement explicitly chosen by user after unrecoverable dirty-worktree candidate identity; isolated Git reconstructio…
 - ruteo PKG-D2: Replacement integration package depends on the isolated PKG-C2 candidate chosen by the user.
-- [2026-09-10] security-auditor: ROUTING_UNAVAILABLE→BASE; evidence sanitization; no product patch
-- [2026-09-10] finding-verifier: ROUTING_UNAVAILABLE→BASE; uphold or refute with evidence
-- [2026-09-10] repair-agent: ROUTING_UNAVAILABLE→BASE; NEW_D2_REF=9bc4e2d; +170 lines vs 6bd4253
 - [2026-09-10] delta-reviewer: ROUTING_UNAVAILABLE→BASE; close F01/SEC-001/SEC-002; no new findings preferred
 - [2026-09-10] runtime-verifier: ROUTING_UNAVAILABLE→BASE; evidence PKG-D2-tty.md + 19 tests
 - [2026-09-10] adversarial-judge: ROUTING_UNAVAILABLE→BASE; INTEGRATION; all packages accepted
+- [2026-09-10] adversarial-judge: ROUTING_UNAVAILABLE→BASE; tip 5076dd2; J-049-001/002 remediated
+- [2026-09-10] adversarial-judge: tip 95edc5654c218c0f7e8fa52d66cc015abcd6350f; J-049-003 fixed
+- [2026-09-10] adversarial-judge: JUDGE_PASS eaa1dfd8; tip 95edc5654c218c0f7e8fa52d66cc015abcd6350f
 - decisión: [[decisiones/2026-09-09 rehacer-pkg-c-desde-candidato-git-aislado|Rehacer PKG-C desde candidato Git aislado]]
 - decisión: [[decisiones/2026-09-09 fundación-preexistente-de-c2|Fundación preexistente de C2]]
 - decisión: [[decisiones/2026-09-09 navegación-tty-como-fundación-preexistente-de-c2|Navegación TTY como fundación preexistente de C2]]
@@ -56,6 +56,8 @@
 - decisión: [[decisiones/2026-09-10 ampliar-frontier-pkg-d2-tras-frontier-cap-exhausted|Ampliar frontier PKG-D2 tras FRONTIER_CAP_EXHAUSTED]]
 - decisión: [[decisiones/2026-09-10 waiver-techo-reparación-pkg-d2-a-170|Waiver techo reparación PKG-D2 a 170]]
 - decisión: [[decisiones/2026-09-10 049-bloqueado-por-juicio-adversario-en-verify-sh|049 bloqueado por juicio adversario en verify.sh]]
+- decisión: [[decisiones/2026-09-10 cerrar-049-vía-integrar-045-048-primero|Cerrar 049 vía integrar 045-048 primero]]
+- decisión: [[decisiones/2026-09-10 049-close-after-option-2-whitespace-fix|049 close after option-2 + whitespace fix]]
 
 ## Convenciones
 
@@ -74,16 +76,15 @@
 
 ## Qué falta
 
-- → corresponde tu decisión (ver Blocker)
-- ⛔ bloqueo: HUMAN_DECISION_REQUIRED: adversarial-judge FAIL J-049-001 (AC-09 verify.sh rc≠0; cannot green on C2+D2 candidate while …
+- WARN spawns 11/12 WARN 80%
 
 ## Presupuestos
 
-- spawns: 30 (máx 12/paquete) · deep review máx 2 ciclos
+- spawns: 33 (máx 12/paquete) · deep review máx 2 ciclos
 
 [[00 - Proyecto|⌂ Proyecto]] · [[features/049-identidad-honesta-modelos/grafo|grafo]] · bitácora: `/home/federico/SET-AGENTES/docs/specs/049-identidad-honesta-modelos/bitacora.md`
 
-_Actualizado: 2026-09-10T17:04:59+00:00_
+_Actualizado: 2026-09-10T17:52:36+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

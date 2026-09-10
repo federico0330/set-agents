@@ -7,6 +7,9 @@
 > dedupe, generalizar, borrar lo obsoleto. Nunca secretos, tokens, PII ni valores de `.env`.
 
 ## Invariantes
+- [2026-09][049-identidad-honesta-modelos] Console home is cache-first: first frame reads ModelState cache/absence with no subprocesses; Actualizar estado is the sole measurement path (ADR-0076 §UX, menu() set_agents_app.py:4002).
+- [2026-09][049-identidad-honesta-modelos] Apply/restore/pin writers share one exclusive lock; only exact readback yields applied, otherwise pending_apply (PKG-C2 accepted, docs/modules/consola.md).
+- [2026-09][049-identidad-honesta-modelos] Honest model identity: session/default/installed/routing are independent evidence layers; footer shows last response, selector prepares next send; plugins are read-only (ADR-0076).
 
 ## Errores conocidos y causas raíz
 

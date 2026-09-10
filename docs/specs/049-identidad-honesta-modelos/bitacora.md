@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-09-10T17:04:59+00:00
+Actualizado: 2026-09-10T17:52:49+00:00
 
 [2026-09-09T13:22:50+00:00] product-analyst · started
 Cliente: Abrimos el encargo para hacer visible la identidad real de modelos y alinear la consola sin perder el trabajo 045–048.
@@ -311,3 +311,15 @@ Ingeniería: ROUTING_UNAVAILABLE→BASE; evidence PKG-D2-tty.md + 19 tests
 [2026-09-10T17:01:03+00:00] PKG-D2 · adversarial-judge · started · modelo local/BASE · effort low · spawns 8/12
 Cliente: Juicio adversario final 049.
 Ingeniería: ROUTING_UNAVAILABLE→BASE; INTEGRATION; all packages accepted
+
+[2026-09-10T17:48:49+00:00] PKG-D2 · adversarial-judge · started · modelo local/BASE · effort low · spawns 9/12
+Cliente: Re-juicio 049 con verify verde.
+Ingeniería: ROUTING_UNAVAILABLE→BASE; tip 5076dd2; J-049-001/002 remediated
+
+[2026-09-10T17:50:27+00:00] PKG-D2 · adversarial-judge · started · modelo local/BASE · effort low · spawns 10/12 WARN 80%
+Cliente: Re-juicio post-whitespace.
+Ingeniería: tip 95edc5654c218c0f7e8fa52d66cc015abcd6350f; J-049-003 fixed
+
+[2026-09-10T17:51:09+00:00] PKG-D2 · adversarial-judge · started · modelo local/BASE · effort low · spawns 11/12 WARN 80%
+Cliente: Juicio PASS post-whitespace.
+Ingeniería: JUDGE_PASS eaa1dfd8; tip 95edc5654c218c0f7e8fa52d66cc015abcd6350f
