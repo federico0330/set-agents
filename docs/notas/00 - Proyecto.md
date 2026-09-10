@@ -38,10 +38,12 @@
 - [[features/036-specs-vivos-indice-y-precedencia|036-specs-vivos-indice-y-precedencia]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/037-harness-humano-universal-y-terceros|037-harness-humano-universal-y-terceros]] — fase `DONE` · paquetes 1/1 · **DONE**
 - [[features/038-tokens-literacy-and-project-label|038-tokens-literacy-and-project-label]] — fase `DONE` · paquetes 1/1 · **DONE**
+- [[features/049-identidad-honesta-modelos|049-identidad-honesta-modelos]] — fase `BLOCKED` · paquetes 4/6 · **BLOCKED**
 
 ## Qué falta
 
-- _nada pendiente en features activas_ ✅
+- **049-identidad-honesta-modelos** → corresponde tu decisión (ver Blocker)
+- **049-identidad-honesta-modelos** ⛔ bloqueo: HUMAN_DECISION_REQUIRED: adversarial-judge FAIL J-049-001 (AC-09 verify.sh rc≠0; cannot green on C2+D2 candidate while …
 
 ## Quick-fixes recientes
 
@@ -53,14 +55,14 @@
 
 ## Decisiones
 
-- [[decisiones/2026-08-21 035-pkg-c-authorized-fourth-judge-spawn|Federico autoriza spawn 11 para el cuarto juez]]
-- [[decisiones/2026-08-21 035-judge-003-path-b-same-binary|JUDGE-035-003 contradice el camino (b) aprobado]]
-- [[decisiones/2026-08-21 035-judge-fail-composition|Juez bloquea: §11 miente y falta --provider-remove]]
-- [[decisiones/2026-08-21 035-pkg-c-owned-exceptions-uncommitted-ab|Excepciones PKG-C por A y B sin commitear]]
-- [[decisiones/2026-08-21 035-pkg-b-repair-ceiling-uncommitted-freeze|Sin techo de repair: freeze committed vs HEAD es 0 lineas]]
-- [[decisiones/2026-08-21 035-pkg-b-authorized-two-extra-spawns|Federico autoriza repair+delta de PKG-B]]
-- [[decisiones/2026-08-20 035-pkg-b-owned-bitacoras-digest|Excepciones: bitacoras ajenas y estado.md regenerados]]
-- [[decisiones/2026-08-20 035-pkg-a-ceiling-cannot-revert|No se puede bajar el JSON a 8: PKG-A ya gasto 10]]
+- [[decisiones/2026-09-10 049-bloqueado-por-juicio-adversario-en-verify-sh|049 bloqueado por juicio adversario en verify.sh]]
+- [[decisiones/2026-09-10 waiver-techo-reparación-pkg-d2-a-170|Waiver techo reparación PKG-D2 a 170]]
+- [[decisiones/2026-09-10 ampliar-frontier-pkg-d2-tras-frontier-cap-exhausted|Ampliar frontier PKG-D2 tras FRONTIER_CAP_EXHAUSTED]]
+- [[decisiones/2026-09-10 waiver-del-techo-pkg-c2-ampliado-a-454|Waiver del techo PKG-C2 ampliado a 454]]
+- [[decisiones/2026-09-10 waiver-del-techo-pkg-c2-ampliado-a-416|Waiver del techo PKG-C2 ampliado a 416]]
+- [[decisiones/2026-09-10 segundo-repair-delta-elevó-el-total-a-416|Segundo repair delta elevó el total a 416]]
+- [[decisiones/2026-09-10 waiver-del-techo-de-reparación-pkg-c2-a-315|Waiver del techo de reparación PKG-C2 a 315]]
+- [[decisiones/2026-09-10 pkg-c2-repair-ceiling-exceeded-after-unique-retry|PKG-C2 repair ceiling exceeded after unique retry]]
 
 ## Convenciones
 
@@ -71,16 +73,15 @@
 | 033-menos-espera-menos-cuota | 10/10 | n/a, request |
 | 034-cuota-organica-y-writer-barato | 10/10 | adr, n/a, notas |
 | 035-panel-honesto-consola-y-tips | 10/10 | n/a |
-| 036-specs-vivos-indice-y-precedencia | 10/10 | n/a |
-| 037-harness-humano-universal-y-terceros | 10/10 | n/a |
 | 038-tokens-literacy-and-project-label | 10/10 | n/a, notas |
+| 049-identidad-honesta-modelos | 10/10 | adr, n/a, request |
 
 ## Referencias
 
 - `ai/state/STATUS.md` — dashboard técnico
 - `docs/adr/` — decisiones formales de arquitectura
 
-_Actualizado: 2026-08-24T16:21:15+00:00_
+_Actualizado: 2026-09-10T17:04:59+00:00_
 <!-- /notas:auto -->
 
 ## Notas propias

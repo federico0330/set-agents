@@ -95,6 +95,10 @@ note = "requiere SUPABASE_ACCESS_TOKEN en el entorno"
 type = "remote"
 url = "https://mcp.context7.com/mcp"
 
+[mcp.huggingface]
+type = "remote"
+url = "https://hf.co/mcp"
+
 [mcp.playwright]
 type = "local"
 command = ["npx", "-y", "@playwright/mcp@latest"]

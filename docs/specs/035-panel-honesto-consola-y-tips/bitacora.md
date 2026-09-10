@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-24T16:22:26+00:00
+Actualizado: 2026-09-10T17:04:59+00:00
 
 [2026-08-20T14:58:34+00:00] orchestrator · done
 Cliente: Aprobaste el contrato de las tres piezas: el control de calidad deja de poder saltearse, la consola se parte sin cambiar comandos, y la guia de uso se pone al dia. Ahora hay que partir el trabajo en tres lotes antes de tocar codigo.

@@ -44,7 +44,7 @@ class FirstPaintTests(unittest.TestCase):
 
         def fake_picker(*_args, **_kwargs):
             first_frame.append(time.monotonic())
-            return setup_models.tui.Selected(4)  # Salir sin guardar (index 4, pinned)
+            return setup_models.tui.Selected(3)  # Listo
 
         with tempfile.TemporaryDirectory() as td, \
              mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \

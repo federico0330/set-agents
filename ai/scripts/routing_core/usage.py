@@ -94,7 +94,7 @@ than silently vanishing as `absent`.
 
 from __future__ import annotations
 
-RUNTIMES = ("pi", "claude-code", "opencode", "codex")
+RUNTIMES = ("pi", "claude-code", "opencode", "codex", "agy", "copilot")
 
 
 def _propagate_unrecognized(raw: dict, mapped: dict) -> dict:
@@ -180,6 +180,21 @@ NORMALIZERS = {
     "claude-code": normalize_claude_code,
     "opencode": normalize_opencode,
     "codex": normalize_codex,
+}
+
+# Runtimes that are DECLARED in `RUNTIMES` but have no translator yet, each with the reason.
+# Named absence, not silence: `RUNTIMES` was widened by 047 when the agy/copilot lanes landed,
+# and a normalizer cannot be written from imagination -- nobody has measured what those CLIs
+# report, and this module's whole contract is "never guess a mapping" (module docstring, which
+# cites a live wire sample for each of the four it does map).
+#
+# The gap is LATENT, not active: `agy_spawn.py` reports no usage at all, and neither lane has a
+# usage-reporting spawn, so nothing calls `normalize("agy", ...)` today. It becomes real the day
+# one of them does -- and `test_usage_normalize_dispatch_table_covers_every_runtime` fails the
+# moment a runtime is added to `RUNTIMES` without landing here or in NORMALIZERS.
+UNMAPPED_RUNTIMES = {
+    "agy": "sin muestra medida de lo que reporta `agy`; el lane no reporta usage todavía (047)",
+    "copilot": "sin muestra medida de lo que reporta `copilot`; el lane no reporta usage todavía (047)",
 }
 
 

@@ -22,21 +22,6 @@
 
 - [[features/037-harness-humano-universal-y-terceros/P1-human-narration-and-terceros|P1-human-narration-and-terceros]] — accepted · ADR-0068, informative chat narration, domain-neutral triage, third-party docs
 
-## Convenciones
-
-| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
-|---|---|---|---|---|---|
-| data-store | n/a | deferred | - | - | - |
-| api-gateway | n/a | deferred | - | - | - |
-| deploy-platform | n/a | deferred | - | - | - |
-| audience | n/a | deferred | - | - | - |
-| embeddings | n/a | deferred | - | - | - |
-| realtime | n/a | deferred | - | - | - |
-| mobile | n/a | deferred | - | - | - |
-| auth | n/a | deferred | - | - | - |
-| cost | n/a | deferred | - | - | - |
-| legal | n/a | deferred | - | - | - |
-
 ## Qué falta
 
 - _nada pendiente_ ✅

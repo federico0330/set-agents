@@ -209,26 +209,47 @@ mantiene (reviewers/gates no pueden editar; el orchestrator sigue deny-by-defaul
 preferís aprobar cada comando: en `models.toml` poné `[permissions] profile = "guarded"` y
 corré `./build.sh --install`.
 
+## La primera vez
+
+La primera vez que corrés `./set-agents` no caés en un menú: te guía en cinco pasos.
+
+```
+Paso 1 de 5 · Qué encontré en tu máquina      ●○○○○
+Paso 2 de 5 · Qué querés que configure        ●●○○○   (marcás con espacio)
+Paso 3 de 5 · Cómo querés trabajar            ●●●○○   (equilibrado / cuidadoso / suelto)
+Paso 4 de 5 · Revisá antes de aplicar         ●●●●○   ← nada se tocó todavía
+Paso 5 de 5 · Aplicando                       ●●●●●
+```
+
+Cancelar en cualquiera de los primeros cuatro pasos no escribe nada. Podés volver a correrlo
+cuando quieras desde **Configurar**.
+
 ## El menú
 
 `./set-agents` abre un selector de flechas (stdlib puro, sin librerías de terceros): ↑↓ para
 moverte, Enter para elegir, `/` para buscar (con texto libre donde tiene sentido, ej. el picker
-de modelos), Esc o Ctrl-C para volver/cancelar sin dejar rastro de error. Las opciones, en orden:
+de modelos), Esc o Ctrl-C para volver/cancelar sin dejar rastro de error.
 
-- 🩺 Estado general — el doctor completo, formateado: harnesses con versión y auth, lane pi,
-  alcance de instalación, catálogo de CLIs y proveedores autenticados (probe)
-- 📦 Instalar / Reparar — primero elegís qué CLI de IA instalar o aplicarle el harness
-  (Todos / Claude Code+pi / OpenCode / Codex / Pi)
-- 🔄 Actualizar
-- 🧠 Modelos — panel compacto + fijar modelo por área/rol, suscripciones tri-estado
-  (pin/off/auto por probe) y proveedores descubiertos (ADR-0029). La tabla que muestra son
-  los **defaults curados (fallback)**: el router decide en vivo por spawn para los 28 roles
-  y la pisa donde el lane lo permite (ADR-0030)
-- 🧰 Herramientas (CLIs) — con método de instalación y nota por herramienta
-- 🔌 MCPs
-- 🧩 Plugins Claude Code
-- 🗒 Vault Obsidian
-- ⏻ Salir
+Arranca en **modo simple**, con lo que un usuario final necesita y nada más:
+
+```
+  Configurar      poné a punto tus CLIs de IA
+  Cómo está       qué tenés instalado y qué falta
+  Modelos         quién responde y con cuánto esfuerzo
+  Cómo trabaja    cuánto te consulta y con qué método
+  Modo experto    mostrar las opciones de ingeniería
+  Salir
+```
+
+**Modo experto** queda recordado y agrega, al mismo nivel: `Otras CLIs` (medir agy, copilot y
+compañía, y fijarles modelo y esfuerzo), `Herramientas`, `Proponer herramienta`, `MCPs`,
+`Plugins` y `Vault`.
+
+**Modelos** muestra un panel compacto y te deja fijar modelo por área o por rol, manejar
+suscripciones tri-estado (pin/off/auto por probe) y proveedores descubiertos (ADR-0029). La
+tabla de la vista Avanzado son los **defaults curados (fallback)**: el router decide en vivo por
+spawn para los 28 roles y la pisa donde el lane lo permite (ADR-0030). Tu gusto se guarda en
+`~/.local/state/set-agentes/models.local.toml`, nunca en el `models.toml` del repo (ADR-0071).
 
 Todo tiene equivalente scripteable (`set-agents --help`): `--status`, `--update`,
 `--tools-install gcloud`, `--mcp-add supabase --harness opencode`, etc.

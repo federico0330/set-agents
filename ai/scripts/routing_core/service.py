@@ -263,19 +263,12 @@ class RoutingService:
         return runtime
 
     def route(self, request: TaskRequest, facts, review_of_run_id=None, unverified_review=False,
-              model_request=None) -> RouteDecision:
-        """`model_request` (AC-04..AC-07, 026-orquestador-elige-modelo P2): an OPTIONAL,
-        per-CALL `(provider, model)` tuple -- the ephemeral, per-instance sibling of
-        `review_of_run_id` above, never a `TaskRequest` field (so every existing
-        `TaskRequest(...)` construction site, and every existing caller of `route()`,
-        stays byte-identical). It never touches disk, never widens `self._model_pin`
-        (the PERSISTENT `[model_pin]` table, ADR-0032), and never outlives this one call
-        -- `set_agents_app.cmd_route_decide` is the only production caller that ever
-        supplies it, straight from `--route-decide`'s descriptor, never persisted
-        anywhere (AC-07). Same soft-preference discipline as the persistent pin: it can
-        only ever reorder candidates that ALREADY survived every hard exclusion below
-        (AC-05) -- see `model_request_reason`/the sort key/the additive reason-code block
-        further down, none of which run before the exclusion loop.
+              model_request=None, effort_request=None) -> RouteDecision:
+        """`model_request` (AC-04..AC-07, 026): OPTIONAL per-CALL `(provider, model)`.
+        `effort_request` (ADR-0073 / 045 PKG-D): OPTIONAL per-CALL effort string from
+        `models_config.EFFORTS` — soft preference that selects among existing routes
+        carrying that effort; never mutates a route's effort identity.
+        Both are ephemeral siblings of `review_of_run_id`, never persisted.
         """
         issuer = self._facts.pop(id(facts), None)
         if not isinstance(request, TaskRequest) or issuer is None or not issuer.consume(facts, set(self.roster)):
@@ -287,10 +280,13 @@ class RoutingService:
         # raising; the real production caller (`cmd_route_decide`) already validated its shape
         # at parse time (ROUTING_INPUT_INVALID/rc=2), this is a second, cheap, defensive floor
         # for every other caller of this internal API.
+        # ADR-0073: `effort_request` is None or a non-empty string (parse already closed the
+        # EFFORTS membership); a non-string here degrades to FACTS_INCOMPLETE.
         if (request.risk not in RISK_ORDER or not isinstance(request.required_tools, (tuple, list))
                 or not all(isinstance(tool, str) for tool in request.required_tools)
                 or (model_request is not None and (not isinstance(model_request, tuple) or len(model_request) != 2
-                    or not all(isinstance(v, str) and v for v in model_request)))):
+                    or not all(isinstance(v, str) and v for v in model_request)))
+                or (effort_request is not None and (not isinstance(effort_request, str) or not effort_request))):
             return RouteDecision(None,None,None,None,None,None,False,("FACTS_INCOMPLETE",))
         role_class = self._role_class(facts.role)
         # AC-01/AC-05/AC-08 (014-model-preference-policy): resolved exactly once, right
@@ -451,10 +447,21 @@ class RoutingService:
         # _bias_rank/is_inferred/curated_priority/route_id chain relative to itself -- it is
         # purely an ADDED column, same discipline ADR-0035's billing_rank insertion below
         # already establishes as precedent.
-        # Final tuple this ADR leaves:
-        # (same_provider_as_writer, pin_rank, TIER_ORDER, model_request_rank, billing_rank,
-        #  _bias_rank, is_inferred, curated_priority, route_id).
-        candidates.sort(key=lambda x: ((x[0].provider == writer.provider) if writer else False, 0 if pin and (x[0].provider, x[0].model) == pin else 1, TIER_ORDER[x[0].tier], 0 if model_request and (x[0].provider, x[0].model) == model_request else 1, billing_rank(x[0].provider, x[0].model), _bias_rank(x[0].provider, bias_preference), 1 if x[0].route_id in self._inferred_ids else 0, x[0].curated_priority, x[0].route_id))
+        # Final tuple (ADR-0073):
+        # (same_provider_as_writer, pin_rank, TIER_ORDER, model_request_rank,
+        #  effort_request_rank, billing_rank, _bias_rank, is_inferred, curated_priority, route_id).
+        candidates.sort(key=lambda x: (
+            (x[0].provider == writer.provider) if writer else False,
+            0 if pin and (x[0].provider, x[0].model) == pin else 1,
+            TIER_ORDER[x[0].tier],
+            0 if model_request and (x[0].provider, x[0].model) == model_request else 1,
+            0 if effort_request and x[0].effort == effort_request else 1,
+            billing_rank(x[0].provider, x[0].model),
+            _bias_rank(x[0].provider, bias_preference),
+            1 if x[0].route_id in self._inferred_ids else 0,
+            x[0].curated_priority,
+            x[0].route_id,
+        ))
         if not candidates:
             no_route_reasons = ("REVIEWER_INDEPENDENCE_UNAVAILABLE" if writer else "NO_ELIGIBLE_ROUTE",)
             # AC-07 (024/C3): additive only, and only for the plain NO_ELIGIBLE_ROUTE case
@@ -538,6 +545,20 @@ class RoutingService:
                         why = "NOT_IN_CATALOG"
                     redirect_reason = redirect_reason + (
                         f"MODEL_REQUEST_UNAVAILABLE requested={model_request[0]}/{model_request[1]} reason={why}",)
+            # ADR-0073 / 045 AC-D.2/D.3: effort_request soft preference — always named.
+            if effort_request:
+                if selected.effort == effort_request:
+                    redirect_reason = redirect_reason + (
+                        f"EFFORT_REQUEST_APPLIED {effort_request}",)
+                else:
+                    if any(c[0].effort == effort_request for c in candidates):
+                        why = "OUTRANKED"
+                    elif any(r.effort == effort_request for r in self.snapshot.routes):
+                        why = "EXCLUDED"
+                    else:
+                        why = "NOT_IN_CATALOG"
+                    redirect_reason = redirect_reason + (
+                        f"EFFORT_REQUEST_UNAVAILABLE requested={effort_request} reason={why}",)
             if self.simulate or role_class != "writer":
                 # SEC-A01: independence_verified is positive proof, never inferred from the absence of a
                 # reason code — true only for a review decision that matched a real terminal writer and

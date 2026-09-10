@@ -17,7 +17,7 @@ CRITICAL = {"architecture", "security", "money", "migration", "concurrency", "pu
 RISK_ORDER = {"low": 0, "medium": 1, "high": 2}
 OPERATIONS = {"inspection", "change"}
 TIER_ORDER = {"fast": 0, "balanced": 1, "frontier": 2}
-SELECTED_RUNTIMES = {"opencode", "claude-code", "codex", "pi"}
+SELECTED_RUNTIMES = {"opencode", "claude-code", "codex", "pi", "agy", "copilot"}
 _FAST_ELIGIBLE = {"mechanical", "documentation", "inspection"}
 
 # Feature 011 deliberately recognizes one *normalized* Pi result only.  Keeping this

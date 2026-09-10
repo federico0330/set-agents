@@ -37,11 +37,17 @@ READ_ONLY = {"coord-ro", "review-ro"}
 IMPLEMENT_DUTIES = {"implement"}
 REVIEW_DUTIES = {"audit", "judge"}
 AREA_FIELDS = ("claude", "codex", "codex_effort", "opencode", "cursor")
+# ADR-0073: closed effort vocabulary shared by codex spawn, opencode --variant,
+# [catalog].codex_effort, and the ephemeral effort_request descriptor key.
+EFFORTS = ("low", "medium", "high", "xhigh")
+# Lanes that expose an effort override row in the Overrides matrix (AC-D.1).
+# Only codex_effort has a curated consumer today; the others render a named absence.
+EFFORT_LANE_FIELDS = ("claude_effort", "codex_effort", "opencode_effort", "cursor_effort")
 # The one role-override field that is NOT an area field: a per-role OpenCode
 # tier table consumed only by load_role_tiers, never by resolve_role's base merge.
 # Areas never declare it — only [roles.<role>] may.
 TIER_FIELD = "tiers"
-RUNTIMES = ("opencode", "claude-code", "codex", "pi")
+RUNTIMES = ("opencode", "claude-code", "codex", "pi", "agy", "copilot")
 MODEL_TIERS = ("fast", "balanced", "frontier")
 ROUTING_PROVIDERS = {"openai-codex", "anthropic"}
 # ADR-0029 (017 PKG-B2): providers eligible for SYNTHESIZED routes (probe-discovered,
@@ -83,9 +89,9 @@ MANAGED_MCP = ("engram", "context7", "playwright", "brave-cdp")
 _OPENCODE_FAMILY_SUFFIX = re.compile(r"(?:-mini|-flash-free|-code-free)$")
 
 EMIT_HEADER = (
-    "# models.toml — model routing source of truth (subscriptions, areas, role overrides).\n"
-    "# Edit by hand or via ./setup-models.sh; the wizard rewrites this file\n"
-    "# deterministically and does not preserve standalone comments.\n"
+    "# models.toml — factory model routing (subscriptions, areas, role overrides).\n"
+    "# Instance taste (wizard Overrides / --set on areas|roles) writes STATE_DIR/models.local.toml\n"
+    "# (ADR-0071) and never dirties this tracked file. Catalog/routing edits still land here.\n"
 )
 
 
@@ -179,6 +185,10 @@ def load_config(models_path=None):
         values = config["catalog"].get(key)
         if not isinstance(values, list) or not values or not all(isinstance(item, str) and item for item in values) or len(values) != len(set(values)):
             die(f"models.toml: [catalog].{key} must be a non-empty list of strings")
+    # ADR-0073: catalog.codex_effort must stay inside the closed EFFORTS set so the
+    # constant and the tracked file cannot drift apart (ADR-0042 lesson).
+    if not set(config["catalog"]["codex_effort"]) <= set(EFFORTS):
+        die("models.toml: [catalog].codex_effort must be a subset of " + ", ".join(EFFORTS))
     # ADR-0042 (022 PKG-2, AC-04): tri-state declared allowlist ceiling for the two
     # probeable-only OpenCode-lane providers (routing_core/catalog.py's `resolve_ceiling`
     # is the sole consumer). Three shapes, all valid: the key ABSENT means "auto" — no
@@ -292,14 +302,11 @@ def permission_profile(models_path=None):
     return load_config(models_path)["permissions"].get("profile", "guarded")
 
 
-# ADR-0048 (024 C2, AC-05): per-machine [subscriptions] overlay -- the ONE
-# models.toml section that is a machine credential fact, never a project-curated
-# default (unlike [areas.*]/[roles.*], which stay in the tracked file by design --
-# see docs/adr/0048-*.md). Absent file == no overlay == every subscription "auto"
-# (ADR-0029). `setup_models.py`'s wizard (Suscripciones) and its `--add`/`--drop`
-# flags write here now, immediately, never into the tracked models.toml -- that
-# rewrite is what used to dirty the tree and block `--update` forever via
-# `set_agents_app.tree_clean()` (AC-05).
+# ADR-0048 (024 C2, AC-05): per-machine [subscriptions] overlay -- machine credential
+# fact. ADR-0071 (045 PKG-B) extends the same pattern to [areas.*]/[roles.*] taste
+# via models.local.toml; the tracked file stays factory. Absent file == no overlay.
+# Wizard Suscripciones / --add/--drop write subscriptions here immediately; wizard
+# area/role/effort/cursor writes models.local.toml (never emit_atomic for taste).
 
 
 def subscriptions_overlay_path():
@@ -375,6 +382,150 @@ def effective_subscriptions(config):
     Read-only view for validation/display -- `config["subscriptions"]` itself (what
     `emit()` serializes) is never touched by this."""
     return {**config.get("subscriptions", {}), **config.get("_subscriptions_overlay", {})}
+
+
+# ADR-0071 (045 PKG-B): per-machine [areas.*]/[roles.*] overlay. Factory stays in
+# tracked models.toml; taste lives in STATE_DIR/models.local.toml. load_config still
+# returns factory only (build.sh --check / Global/ must stay reproducible); callers
+# that need the instance view call effective_models_config().
+
+
+def models_overlay_path():
+    """Same private STATE_DIR as subscriptions_overlay_path (lazy import; no second
+    literal — ADR-0043 tripwire). Honors SET_AGENTS_STATE at call time."""
+    root = os.environ.get("SET_AGENTS_STATE")
+    if root:
+        return Path(root) / "models.local.toml"
+    import set_agents_app
+    return set_agents_app.STATE_DIR / "models.local.toml"
+
+
+# ADR-0071 grew a third family. `areas`/`roles` are DUTY-scoped taste (which model runs the
+# implementer). `hosts` is MACHINE-scoped taste (which model this box's `agy` binary should
+# use, and with how much effort) -- a different axis, so it gets its own family instead of
+# being squeezed into AREA_FIELDS, which would have put a host into the per-duty matrix and
+# dragged the wizard's field picker and the catalog validator along with it.
+OVERLAY_FAMILIES = ("areas", "roles", "hosts")
+HOST_PIN_FIELDS = ("model", "effort")
+
+
+def _overlay_field_allowed(field, family="areas"):
+    if family == "hosts":
+        return field in HOST_PIN_FIELDS
+    return field in AREA_FIELDS or field in EFFORT_LANE_FIELDS
+
+
+def load_models_overlay(path=None):
+    """Best-effort read: missing/malformed → {} (AC-B.2). Only [areas.*]/[roles.*]
+    with legal field names survive; unknown keys are dropped, never fatal."""
+    overlay_path = Path(path) if path is not None else models_overlay_path()
+    try:
+        raw = tomllib.loads(overlay_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    result = {family: {} for family in OVERLAY_FAMILIES}
+    for family in OVERLAY_FAMILIES:
+        table = raw.get(family)
+        if not isinstance(table, dict):
+            continue
+        for name, fields in table.items():
+            if not isinstance(name, str) or not isinstance(fields, dict):
+                continue
+            cleaned = {
+                key: value for key, value in fields.items()
+                if isinstance(key, str) and _overlay_field_allowed(key, family)
+                and isinstance(value, str) and value
+            }
+            if cleaned:
+                result[family][name] = cleaned
+    if not any(result[family] for family in OVERLAY_FAMILIES):
+        return {}
+    return result
+
+
+def write_models_overlay_field(scope, field, value, path=None):
+    """Atomic read-modify-write of one overlay cell. `scope` is ("areas", duty) or
+    ("roles", role). `value=None` deletes the key (back to factory). Returns the
+    full overlay dict."""
+    if scope[0] not in OVERLAY_FAMILIES or not isinstance(scope[1], str) or not scope[1]:
+        die(f"models overlay: invalid scope {scope!r}")
+    if not _overlay_field_allowed(field, scope[0]):
+        die(f"models overlay: unknown field {field!r}")
+    overlay_path = Path(path) if path is not None else models_overlay_path()
+    current = load_models_overlay(overlay_path)
+    family, name = scope
+    bucket = current.setdefault(family, {})
+    cell = bucket.setdefault(name, {})
+    if value is None:
+        cell.pop(field, None)
+        if not cell:
+            bucket.pop(name, None)
+    else:
+        if not isinstance(value, str) or not value:
+            die(f"models overlay: value for {family}.{name}.{field} must be a non-empty string")
+        cell[field] = value
+    if not bucket:
+        current.pop(family, None)
+    lines = [
+        "# models.local.toml -- per-machine [areas.*]/[roles.*]/[hosts.*] overlay (ADR-0071).",
+        "# Written by ./setup-models.sh (wizard Overrides / --set); models.toml stays factory.",
+    ]
+    for family in OVERLAY_FAMILIES:
+        table = current.get(family) or {}
+        for name in sorted(table):
+            lines.append(f"[{family}.{name}]")
+            for key in sorted(table[name]):
+                val = table[name][key].replace("\\", "\\\\").replace('"', '\\"')
+                lines.append(f'{key} = "{val}"')
+            lines.append("")
+    content = "\n".join(lines).rstrip() + "\n"
+    overlay_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{overlay_path.name}.", dir=overlay_path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, overlay_path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return current
+
+
+def host_pin(host_id, path=None):
+    """This machine's taste for one host: {"model": ..., "effort": ...}, missing keys meaning
+    "let SET choose". Absent or malformed overlay reads as no taste at all, never as an error
+    (the AC-B.2 degradation the areas/roles families already promise)."""
+    return dict((load_models_overlay(path).get("hosts") or {}).get(host_id) or {})
+
+
+def write_host_pin(host_id, field, value, path=None):
+    """Pin (or, with `value=None`, unpin) one host field in the instance overlay. `effort` is
+    checked against the closed EFFORTS set here so a bad value is refused at the writer rather
+    than surfacing later as an argv the host CLI rejects."""
+    if field == "effort" and value is not None and value not in EFFORTS:
+        die(f"host pin: unknown effort {value!r} (elegí una de {EFFORTS})")
+    return write_models_overlay_field(("hosts", host_id), field, value, path)
+
+
+def effective_models_config(config, overlay=None):
+    """Factory ∪ overlay, cell-by-cell (ADR-0071). Never mutates `config` or what
+    emit() would serialize. Overlay wins per (family, name, field); unspecified
+    cells keep the tracked value (AC-B.3)."""
+    import copy
+    overlay = overlay if overlay is not None else load_models_overlay()
+    if not overlay:
+        return config
+    merged = copy.deepcopy(config)
+    for family in ("areas", "roles"):
+        table = overlay.get(family) or {}
+        target = merged.setdefault(family, {})
+        for name, fields in table.items():
+            cell = target.setdefault(name, {})
+            cell.update(fields)
+    merged["_models_overlay"] = overlay
+    return merged
 
 
 # ADR-0029 (017 PKG-A1): provider→subscription map for probe-backed detection.
@@ -598,6 +749,10 @@ def resolve_role(row, config, exhausted_providers=()):
     for source, label, allow_tiers in ((area, f"areas.{row['duty']}", False), (override, f"roles.{row['role']}", True)):
         for key in source:
             if key == TIER_FIELD and allow_tiers:
+                continue
+            # ADR-0071/0073: overlay may carry reserved <lane>_effort cells that have no
+            # curated consumer yet — ignore for resolve, never die (AC-D.1 schema reserve).
+            if key in EFFORT_LANE_FIELDS and key not in AREA_FIELDS:
                 continue
             if key not in AREA_FIELDS:
                 die(f"models.toml: [{label}] has unknown field {key}")

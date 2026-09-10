@@ -25,6 +25,12 @@ python3 -m py_compile ai/scripts/*.py ai/scripts/routing_core/*.py ai/scripts/fe
   PROYECTO/ai/scripts/feature_state_lib/*.py tests/*.py
 git diff --check
 
+# The `trap` below cleans up on any normal exit, but not when this script is KILLED (a CI
+# timeout, a `pkill`, Ctrl-C twice) -- so each run also sweeps the stagings its killed
+# predecessors left behind. One full day: no verify run lasts anywhere near that, so a
+# concurrent run's staging can never be caught. `-maxdepth 1` and the fixed prefix keep the
+# blast radius to exactly this script's own temporaries.
+find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'set-agentes-verify.??????' -type d -mtime +0   -exec rm -rf {} + 2>/dev/null || true
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes-verify.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 ./build.sh --output "$STAGING" >/dev/null

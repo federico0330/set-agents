@@ -3241,9 +3241,24 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual(fn(None), {})
             self.assertEqual(routing_store._usage_row(fn({}))[-1], "absent")
 
-    def test_usage_normalize_dispatch_table_covers_all_four_runtimes(self):
-        self.assertEqual(set(routing_usage.RUNTIMES),
-                         {"pi", "claude-code", "opencode", "codex"})
+    def test_usage_normalize_dispatch_table_covers_every_runtime(self):
+        """Was pinned to the literal four runtimes, which went stale the moment 047 widened
+        `RUNTIMES` with agy and copilot -- and a literal set says nothing about the property
+        that matters. The property: every declared runtime either HAS a translator, or is
+        listed in `UNMAPPED_RUNTIMES` with the reason it does not. A runtime added to
+        `RUNTIMES` and to neither fails here, instead of silently normalizing to `{}` and
+        making a lane's token usage vanish as `absent` -- the exact failure this module's
+        docstring says it exists to prevent."""
+        declared = set(routing_usage.RUNTIMES)
+        mapped = set(routing_usage.NORMALIZERS)
+        unmapped = set(routing_usage.UNMAPPED_RUNTIMES)
+        self.assertEqual(mapped | unmapped, declared,
+                         f"runtimes sin translator ni ausencia nombrada: {declared - mapped - unmapped}")
+        self.assertEqual(mapped & unmapped, set(), "un runtime no puede estar en las dos listas")
+        for runtime, reason in routing_usage.UNMAPPED_RUNTIMES.items():
+            self.assertTrue(reason.strip(), runtime)
+        # The four measured lanes keep their translators -- no named absence may swallow one.
+        self.assertEqual({"pi", "claude-code", "opencode", "codex"} - mapped, set())
         self.assertEqual(routing_usage.normalize("claude-code", self._CLAUDE_CODE_SAMPLE),
                          routing_usage.normalize_claude_code(self._CLAUDE_CODE_SAMPLE))
         self.assertEqual(routing_usage.normalize("unknown-runtime", {"input": 1}), {})
@@ -5397,9 +5412,29 @@ class RoutingTests(unittest.TestCase):
         reintroducing `cache_root=STATE_DIR` (or the equivalent bare `Path.home() /
         ".local/state/set-agentes"` literal in models_config.py) would silently reopen
         the two-caches defect this whole package exists to close."""
+        import re
         app_source = (ROOT / "ai/scripts/set_agents_app.py").read_text()
         self.assertNotIn("cache_root=STATE_DIR", app_source)
-        self.assertEqual(app_source.count("cache_root=_probe_cache_root()"), 4)
+        # Was a hard-coded `== 4`. That number went stale the moment 045 AC-A.1 deleted the
+        # `listado=`/`usable=` block from the Estado panel (its own
+        # `test_estado_omits_listado_usable_doctor_detail` forbids that text), taking the
+        # fourth call site with it -- and a bare count says nothing about the call sites that
+        # remain. The rule this tripwire actually exists to enforce is stated directly instead:
+        # EVERY probe entry point passes the single store root, and none passes anything else.
+        # That is stronger than a count -- it fails on a new call site with a wrong root, which
+        # a count of 4 would have happily accepted after a matching deletion elsewhere.
+        # `(?<![\w.])` keeps `cmd_route_doctor(...)` -- the CLI wrapper, which takes no root --
+        # out of the match; the window of three lines survives a call broken across lines.
+        lines = app_source.splitlines()
+        pattern = re.compile(r"(?<![\w.])(?:probe_inventory|route_doctor|probe_listed_and_usable)\(")
+        found = 0
+        for index, line in enumerate(lines):
+            if not pattern.search(line):
+                continue
+            found += 1
+            window = "\n".join(lines[index:index + 3])
+            self.assertIn("cache_root=_probe_cache_root()", window, window)
+        self.assertTrue(found, "no probe entry point found in set_agents_app.py")
         mc_source = (ROOT / "ai/scripts/models_config.py").read_text()
         self.assertNotIn('Path.home() / ".local/state/set-agentes"', mc_source)
         self.assertEqual(mc_source.count("cache_root=_probe_cache_root()"), 1)
@@ -5951,11 +5986,17 @@ class RoutingTests(unittest.TestCase):
         # never the first) -- so ANY future shape change (this contract's, 014's, 019
         # PKG-1's, PKG-2's, or 026 P2's) fails loudly, not silently.
         source = (ROOT / "ai/scripts/routing_core/service.py").read_text()
-        match = re.search(r"candidates\.sort\(key=lambda x: \((.*?)\)\)", source)
+        # `re.DOTALL`: the call is written across lines since ADR-0073 added a tenth element,
+        # and a single-line regex silently stopped matching -- which turned this tripwire into
+        # a test that could only ever fail on "call not found", never on a real shape change.
+        match = re.search(r"candidates\.sort\(key=lambda x: \((.*?)\)\)", source, re.DOTALL)
         self.assertIsNotNone(match, "candidates.sort(...) call not found")
         elements = match.group(1)
         for token in ("writer.provider", "TIER_ORDER[x[0].tier]",
                       "model_request and (x[0].provider, x[0].model) == model_request",
+                      # ADR-0073: effort is a SOFT preference, so it ranks strictly after the
+                      # model request and strictly before billing -- never a hard exclusion.
+                      "effort_request and x[0].effort == effort_request",
                       "billing_rank(x[0].provider, x[0].model)",
                       "_bias_rank(x[0].provider, bias_preference)",
                       "x[0].route_id in self._inferred_ids", "x[0].curated_priority", "x[0].route_id"):
@@ -5963,6 +6004,7 @@ class RoutingTests(unittest.TestCase):
         independence_pos = elements.index("writer.provider")
         tier_pos = elements.index("TIER_ORDER[x[0].tier]")
         model_request_pos = elements.index("model_request and (x[0].provider, x[0].model) == model_request")
+        effort_request_pos = elements.index("effort_request and x[0].effort == effort_request")
         billing_pos = elements.index("billing_rank(")
         bias_pos = elements.index("_bias_rank(")
         inferred_pos = elements.index("x[0].route_id in self._inferred_ids")
@@ -5970,7 +6012,8 @@ class RoutingTests(unittest.TestCase):
         route_id_pos = elements.rindex("x[0].route_id")  # the trailing tie-break, not the is_inferred lookup
         self.assertLess(independence_pos, tier_pos)
         self.assertLess(tier_pos, model_request_pos)
-        self.assertLess(model_request_pos, billing_pos)
+        self.assertLess(model_request_pos, effort_request_pos)
+        self.assertLess(effort_request_pos, billing_pos)
         self.assertLess(billing_pos, bias_pos)
         self.assertLess(bias_pos, inferred_pos)
         self.assertLess(inferred_pos, priority_pos)

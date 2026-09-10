@@ -50,7 +50,13 @@ HOOK
 if [ "$MODE" != "check" ]; then
   STAGING="$(mktemp -d "${TMPDIR:-/tmp}/set-agentes.XXXXXX")"
   trap 'rm -rf "$STAGING"' EXIT
-  python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING"
+  generate_args=()
+  # Instance taste belongs only in the local tree that will be installed.  The
+  # --diff and tracked Global/ projections intentionally remain factory-only.
+  if [ "$MODE" = "install" ]; then
+    generate_args+=(--effective)
+  fi
+  python3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" ${generate_args[@]+"${generate_args[@]}"}
 fi
 
 case "$MODE" in

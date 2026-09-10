@@ -22,21 +22,6 @@
 
 - [[features/036-specs-vivos-indice-y-precedencia/P1-spec-index-precedence|P1-spec-index-precedence]] — accepted · Law stack, ADR-0067, spec index backfill, 032 banner, Supersedes doctrine, index test
 
-## Convenciones
-
-| Eje | Origen | Stance | Umbral | Siguiente | Revisit |
-|---|---|---|---|---|---|
-| data-store | n/a | deferred | - | - | - |
-| api-gateway | n/a | deferred | - | - | - |
-| deploy-platform | n/a | deferred | - | - | - |
-| audience | n/a | deferred | - | - | - |
-| embeddings | n/a | deferred | - | - | - |
-| realtime | n/a | deferred | - | - | - |
-| mobile | n/a | deferred | - | - | - |
-| auth | n/a | deferred | - | - | - |
-| cost | n/a | deferred | - | - | - |
-| legal | n/a | deferred | - | - | - |
-
 ## Qué falta
 
 - _nada pendiente_ ✅

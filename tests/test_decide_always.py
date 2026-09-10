@@ -67,13 +67,29 @@ class NonTieredDecisionTests(unittest.TestCase):
 
 
 class PanelRelabelTests(unittest.TestCase):
-    def test_panel_names_the_table_as_curated_fallback(self):
+    """The curated table must never read as "what the router decided". 045 AC-A.1 moved it off
+    the first screen (which is now two human lines) and behind Overrides, so this test follows
+    it to `_overrides_matrix_lines` -- the label and the @tier count are the contract, the
+    screen they live on is not. The ADR reference is deliberately gone: 045 bans ADR ids from
+    human surfaces, and `test_consola_viva_hosts::test_panel_header_is_human_compact` asserts
+    that directly."""
+
+    def test_the_curated_table_is_labelled_as_a_fallback_and_counts_tier_variants(self):
         import setup_models
-        config = {"areas": {}, "roles": {"debugger": {"tiers": {}}}, "subscriptions": {}}
-        text = "\n".join(setup_models._panel_lines(config, []))
-        self.assertIn("DEFAULTS CURADOS", text)
-        self.assertIn("ADR-0030", text)
+        config = {"areas": {}, "roles": {"debugger": {"tiers": {"fast": {}}}}, "subscriptions": {}}
+        text = "\n".join(setup_models._overrides_matrix_lines(config))
+        self.assertIn("fallback", text)
+        self.assertIn("1 roles distintos", text)
         self.assertIn("variantes @tier: 1", text)
+
+    def test_the_first_screen_never_shows_the_curated_matrix(self):
+        # The other half of AC-A.1, asserted here too so the pair cannot drift apart again.
+        import setup_models
+        config = {"areas": {}, "roles": {"debugger": {"tiers": {"fast": {}}}}, "subscriptions": {}}
+        text = "\n".join(setup_models._panel_lines(config, []))
+        self.assertNotIn("DEFAULTS CURADOS", text)
+        self.assertNotIn("variantes @tier", text)
+        self.assertNotIn("ADR-", text)
 
 
 if __name__ == "__main__":

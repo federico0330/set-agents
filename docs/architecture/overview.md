@@ -1,6 +1,7 @@
 # Architecture overview
 
-This is the high-level map of the harness as of ADR-0065 (feature 035-panel-honesto-consola-y-tips).
+This is the high-level map of the harness including the ADR-0076 target (feature 049, model identity and
+console convergence); the package-review door is as of ADR-0065 (feature 035-panel-honesto-consola-y-tips).
 The trusted-routing diagrams below still describe that subsystem as of ADR-0036; 034 adds mode-selection
 and writer-quota on top of it (next section) without changing the SQLite dispatch path. It describes the
 accepted architecture target, not evidence that implementation is complete; decision rationale lives in the
@@ -24,8 +25,14 @@ automatically kept in sync with this narrative.
 
 ```mermaid
 flowchart LR
-    Harness["Harness / CLI"] --> Facade["routing.py facade"]
-    Harness --> Facts["Fresh fact builder"]
+    Console["set-agents CLI / TUI"] --> ModelState["ModelState use case"]
+    Session["Ephemeral OpenCode CLI adapter"] --> ModelState
+    Desired["Factory + instance overlay adapter"] --> ModelState
+    Installed["Installed-artifact readback adapter"] --> ModelState
+    Policy["Validated routing-policy adapter"] --> ModelState
+    Console --> Facade["routing.py facade"]
+    Console --> Generator["generate.py / install.py"]
+    Console --> Facts["Fresh fact builder"]
     Facade --> Service["RoutingService use cases"]
     Facts --> Service
     Service --> Domain["Routing domain"]
@@ -37,9 +44,10 @@ flowchart LR
     Store --> DB[("routing-v2/routing.db")]
 ```
 
-Policy and immutable values live in the domain; dependencies point inward. Caller intent cannot supply observed
-facts, catalog, auth, IDs, or paths. Production persistence is fixed-root POSIX/local only; simulation is composed
-without the SQLite mutation or dispatch capability.
+Policy and immutable values live in use cases/domain; subprocess, filesystem and renderers stay at the edge.
+`ModelState` is a read model in the existing console module, not a new store: only its OpenCode adapter may receive
+a sanitized transcript, inside a bounded short-lived process. Routing persistence remains fixed-root POSIX/local;
+the observation path never reads or writes routing SQLite.
 
 ## Data flow
 
@@ -148,6 +156,39 @@ cycle, and fire only in the mutating verb — historical `DONE`/`accepted` recor
 deliberately deferred; the advisory branch that warns about that state is kept for exactly that reason. No new
 module: this lives inside `module.estado` (`docs/modules/modules.toml`).
 
+## Model truth, factory vs. instance, hosts, and effort (045–049, ADR-0071–0076)
+
+Factory, instance taste, installed projection, session evidence and routing policy are independent.
+Factory remains the only input to tracked `Global/**`, `build.sh --check` and `--diff`; install and
+local drift use the effective view. A SET preference is `applied` only after exact installed-artifact
+readback, while a session `/model` choice remains temporary evidence and never rewrites SET.
+
+```mermaid
+flowchart TD
+    OC["OpenCode list + sanitized export\nroot only; 20 / 1 MiB total / 5 s; no retention"] --> Obs["last user/submitted of newest canonical root"]
+    Factory["models.toml (tracked factory)"] --> Eff["effective view"]
+    Overlay["STATE_DIR/models.local.toml"] --> Eff
+    Eff --> Desired["desired SET default"]
+    Installed["installed target readback"] --> MS["ModelState"]
+    Obs --> MS
+    Desired --> MS
+    Pins["validated model_pin: role > * > auto"] --> MS
+    Factory --> GenF["factory generation"] --> Global["Global/** + check + diff"]
+    Eff --> GenE["generate --effective"] --> Home["install --target"] --> Installed
+    Eff --> Drift["check-drift --effective"]
+    Hosts["HOSTS registry"] --> Panel["Estado / Hosts"]
+    Req["model_request + effort_request"] --> Sort["routing sort after hard exclusions"]
+```
+
+`ModelState` has one scope only: resolved primary runtime + `orchestrator`. It observes OpenCode only; any
+other runtime yields `unsupported_runtime` without invoking it. The observer admits only canonical project
+roots, orders them by `updated_at` then internal opaque ID, excludes children, and reads the final
+`user/submitted` message of the selected root. It exposes no session ID and degrades through the shared
+reason enum on ambiguity, 20-root cap, 1 MiB aggregate stdout or 5 s deadline; the other evidences remain
+usable. Every `checked_at` is `null` before first measurement. The home is cache-only before first paint,
+has direct `Modo experto`, and supersedes 048 automatic onboarding/`first_run`; plugins stay strictly
+read-only. Host inventory and effort routing retain ADR-0072/0073 semantics. Why: [ADR index](../adr/README.md) 0071–0076.
+
 ## Use cases and delivery boundary
 
 - Explain a trusted hypothetical route without mutating the SQLite dispatch/event state (it may read, never
@@ -166,6 +207,16 @@ module: this lives inside `module.estado` (`docs/modules/modules.toml`).
   Cursor pins per role from `models.toml`, never as a routing lane (ADR-0063).
 - Close a package review through the door its resolved panel allows: `record-review` for `small`+`low`, the
   review panel for everything else, and never a `pass` over an open blocking finding (ADR-0065).
+- Change instance taste (area, role, effort, `cursor`) without dirtying the tracked tree, and keep
+  `build.sh --check` reproducible on any machine (ADR-0071).
+- Compare a bounded, metadata-only last OpenCode send with SET desired, installed readback and routing
+  policy without calling any of them “current”; session ambiguity degrades to `sin observar` (ADR-0076).
+- Persist a valid local preference before installation, install only its proven consumer and declare
+  `applied` only after exact readback; a failed install remains retryable and pending (ADR-0076).
+- List every candidate host with exactly one state, discovering by `PATH` only, installing nothing and
+  routing nothing (ADR-0072; installs stay ADR-0038).
+- Ask for a model and an effort per decision, ephemerally, without either request ever relaxing a hard
+  exclusion or degrading silently (ADR-0073).
 
 ## Adaptive dispatch CLI contract (004 P1-dispatch-core)
 

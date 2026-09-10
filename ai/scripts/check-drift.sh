@@ -16,7 +16,7 @@ trap 'rm -rf "$STAGING"' EXIT
 
 # Generation failure is an internal error (2), never "stale" (1): the caller's
 # badge must not read a broken generator as a drifted install.
-if ! $PYTHON3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" >/dev/null; then
+if ! $PYTHON3 "$ROOT/ai/scripts/generate.py" --output "$STAGING" --effective >/dev/null; then
   echo "DRIFT_UNKNOWN: generate.py falló; corré ./build.sh --check para ver el detalle." >&2
   exit 2
 fi
@@ -36,7 +36,7 @@ try:
     scope = json.load(open('$SCOPE_FILE'))
 except Exception:
     scope = []
-known = {'opencode', 'claude-code', 'codex', 'pi'}
+known = {'opencode', 'claude-code', 'codex', 'pi', 'cursor'}
 scope = [t for t in scope if t in known]
 if scope and set(scope) != known:
     print('\n'.join(scope))

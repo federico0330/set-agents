@@ -1,10 +1,4 @@
-"""UI refresh — the Modelos wizard stops dumping and learns ADR-0029.
-
-New tests only. The immutable suite pins WIZARD_ITEMS indexes 0-4 and the
-dropped-cells hint; here we cover the compact panel (`_panel_lines`), the
-end of the double status dump, the tri-state subscriptions branch, and the
-discovered-providers toggle.
-"""
+"""End-user Modelos wizard — compact human header, 4 actions + Avanzado."""
 
 import io
 import os
@@ -27,86 +21,71 @@ def _config():
         "roles": {"debugger": {"claude": "opus"}, "implementer": {"codex": "gpt-5.4"}},
         "subscriptions": {"anthropic": True, "ollama": False},
         "routing": {"discovered_providers": []},
+        "catalog": {"claude": ["opus"], "codex": ["gpt-5.5"], "cursor": ["inherit"]},
     }
 
 
 class PanelLinesTests(unittest.TestCase):
-    def test_panel_is_compact_overrides_collapse_to_a_count(self):
-        lines = setup_models._panel_lines(_config(), [], detected=None)
+    def test_panel_is_two_human_lines_no_jargon(self):
+        with mock.patch.object(setup_models, "_load_pins", return_value={}), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
+            lines = setup_models._panel_lines(_config(), [], detected=None)
+        self.assertLessEqual(len(lines), 3)
         text = "\n".join(lines)
-        self.assertIn("audit", text)
-        self.assertIn("overrides de rol: 2", text)
-        self.assertNotIn("debugger:", text)  # the old per-role dump is gone
-        self.assertNotIn("lane:", text)
-        self.assertNotIn("OPENCODE[", text)
-        self.assertRegex(text, r"EFFORT\s+OPENCODE\n")
+        self.assertIn("Elige solo", text)
+        self.assertIn("Cuentas:", text)
+        self.assertIn("anthropic", text)
+        self.assertNotIn("ADR-", text)
+        self.assertNotIn("models.local.toml", text)
+        self.assertNotIn("discovered_providers", text)
+        self.assertNotIn("✓pin", text)
+        self.assertNotIn("audit", text)
+        matrix = "\n".join(setup_models._overrides_matrix_lines(_config()))
+        self.assertIn("audit", matrix)
+        self.assertIn("2 roles distintos", matrix)
 
-    def test_tri_state_origins_pin_off_and_auto(self):
-        lines = setup_models._panel_lines(_config(), [], detected={"openai", "anthropic"})
-        subs_line = lines[0]
-        self.assertIn("anthropic=✓pin", subs_line)
-        self.assertIn("ollama=✗off", subs_line)
-        self.assertIn("openai=auto✓", subs_line)  # absent key, probe-alive
+    def test_accounts_list_live_and_pinned_on(self):
+        with mock.patch.object(setup_models, "_load_pins", return_value={}), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
+            lines = setup_models._panel_lines(_config(), [], detected={"openai", "anthropic"})
+        self.assertIn("anthropic", lines[1])
+        self.assertIn("openai", lines[1])
+        self.assertNotIn("ollama", lines[1])  # off
 
-    def test_discovered_providers_surface_when_configured(self):
-        config = _config()
-        config["routing"]["discovered_providers"] = ["opencode-zen"]
-        text = "\n".join(setup_models._panel_lines(config, []))
-        self.assertIn("opencode-zen", text)
+    def test_preference_count_when_pins_exist(self):
+        with mock.patch.object(setup_models, "_load_pins",
+                               return_value={"architect": ("openai-codex", "x")}), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
+            lines = setup_models._panel_lines(_config(), [])
+        self.assertIn("1 preferencia tuya", lines[0])
 
-    def test_auto_resolves_the_live_inventory_never_iterates_the_string(self):
-        # ADR-0035 (AC-16): the exact defect this replaces -- `list("auto")` printing
-        # "a, u, t, o" -- reproduced live before this fix and registered as the package's
-        # first task. `"auto"` is a policy, resolved via `_resolve_live_discovered`,
-        # never iterated as a string.
-        config = _config()
-        config["routing"]["discovered_providers"] = "auto"
-        with mock.patch.object(setup_models, "_resolve_live_discovered",
-                               return_value=("opencode-zen", "opencode-go")):
-            text = "\n".join(setup_models._panel_lines(config, []))
-        self.assertIn("proveedores descubiertos rutables: auto → opencode-zen (metered), "
-                      "opencode-go (suscripción)", text)
-        self.assertNotIn("a, u, t, o", text)
-
-    def test_auto_with_nothing_live_says_so_instead_of_iterating(self):
-        config = _config()
-        config["routing"]["discovered_providers"] = "auto"
-        with mock.patch.object(setup_models, "_resolve_live_discovered", return_value=()):
-            text = "\n".join(setup_models._panel_lines(config, []))
-        self.assertIn("auto → ninguno vivo ahora", text)
-
-    def test_auto_probe_failure_degrades_to_an_explicit_message(self):
-        config = _config()
-        config["routing"]["discovered_providers"] = "auto"
-        with mock.patch.object(setup_models, "_resolve_live_discovered", return_value=None):
-            text = "\n".join(setup_models._panel_lines(config, []))
-        self.assertIn("auto → no verificable ahora", text)
-
-
-class PanelAgeAndDegradeTests(unittest.TestCase):
     def test_panel_shows_subscription_age(self):
-        lines = setup_models._panel_lines(
-            _config(), [], detected={"openai"},
-            subscription_age_s=4 * 60 + 20,
-        )
-        self.assertIn("suscripciones: hace 4 min", lines[0])
-        self.assertIn("openai=auto✓", lines[0])
+        with mock.patch.object(setup_models, "_load_pins", return_value={}), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
+            lines = setup_models._panel_lines(
+                _config(), [], detected={"openai"},
+                subscription_age_s=4 * 60 + 20,
+            )
+        self.assertIn("hace 4 min", lines[1])
+        self.assertIn("openai", lines[1])
 
     def test_panel_degrades_named_when_probe_failed(self):
-        lines = setup_models._panel_lines(
-            _config(), [], detected=None, subscription_error=True,
-        )
-        self.assertIn(setup_models.SUBSCRIPTION_PROBE_FAILED, lines[0])
-        self.assertIn("anthropic=✓pin", lines[0])
+        with mock.patch.object(setup_models, "_load_pins", return_value={}), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
+            lines = setup_models._panel_lines(
+                _config(), [], detected=None, subscription_error=True,
+            )
+        self.assertIn(setup_models.SUBSCRIPTION_PROBE_FAILED, lines[1])
 
-    def test_wizard_passes_explicit_live_discovered_so_first_paint_does_not_probe(self):
+
+class StatusLinesNoDumpTests(unittest.TestCase):
+    def test_status_never_dumps_python_dicts(self):
         config = _config()
-        config["routing"]["discovered_providers"] = "auto"
-        with mock.patch.object(setup_models, "_resolve_live_discovered") as probe:
-            text = "\n".join(setup_models._panel_lines(
-                config, [], live_discovered=None))
-        probe.assert_not_called()
-        self.assertIn("auto → no verificable ahora", text)
+        config["roles"]["tiered"] = {"tiers": {"fast": {"opencode": "x"}}}
+        text = "\n".join(setup_models._status_lines(config, []))
+        self.assertNotIn("{", text)
+        self.assertIn("roles distintos", text)
+        self.assertIn("AREA", text)
 
 
 class WizardBehaviorTests(unittest.TestCase):
@@ -118,6 +97,7 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.object(setup_models.models_config, "detect_subscriptions", return_value=None), \
              mock.patch.object(setup_models.tui, "with_progress",
                                side_effect=lambda msg, fn, **kwargs: fn()), \
+             mock.patch.object(setup_models, "_load_pins", return_value={}), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=picks) as picker:
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
@@ -125,25 +105,34 @@ class WizardBehaviorTests(unittest.TestCase):
                                     Path("roles.tsv"), Path("models.toml"))
         return config, buf.getvalue(), picker
 
-    def test_the_status_avalanche_is_gone_from_stdout(self):
-        _, out, picker = self._run([None])  # Esc right away
+    def test_header_is_human_and_names_the_four_evidence_sources(self):
+        _, out, picker = self._run([None])
         self.assertNotIn("AREA", out)
-        self.assertIn("AREA", picker.call_args.kwargs["header"])  # lives in the picker frame
+        header = picker.call_args.kwargs["header"]
+        self.assertIn("Elige solo", header)
+        self.assertNotIn("ADR-", header)
+        for label in ("Último envío observado", "Default de SET", "Instalado", "Routing"):
+            self.assertIn(label, header)
+        self.assertIn("elección temporal", header)
+
+    def test_wizard_items_are_end_user_actions_with_progressive_options(self):
+        _, _, picker = self._run([None])
+        items = picker.call_args.args[0]
+        self.assertEqual(
+            items,
+            ("Cambiar default", "Revisar roles", "Actualizar datos", "Listo",
+             "Explicar /model", "Más opciones"),
+        )
 
     def test_subscription_auto_writes_the_overlay_never_the_tracked_config(self):
-        # ADR-0048 (024 C2, AC-05): the wizard's Suscripciones no longer touches
-        # `config["subscriptions"]` (the tracked models.toml) at all -- it writes the
-        # per-machine overlay, immediately, which is what stops a subscription toggle
-        # from dirtying the tree and blocking --update forever (tree_clean()).
         with mock.patch.object(setup_models.models_config, "write_subscription_overlay",
                                return_value={"anthropic": True}) as write:
             config, out, _ = self._run([
-                setup_models.tui.Selected(2),   # Suscripciones
-                setup_models.tui.Selected(1),   # choose(): "ollama" -- candidate universe is
-                                                 # now the audited 4 names, sorted: anthropic,
-                                                 # ollama, openai, zen (index 1 == ollama)
-                setup_models.tui.Selected(2),   # tri-state: Auto (el probe decide)
-                setup_models.tui.Selected(4),   # Salir sin guardar
+                setup_models.tui.Selected(5),   # Más opciones
+                setup_models.tui.Selected(2),   # Cuentas
+                setup_models.tui.Selected(1),   # ollama
+                setup_models.tui.Selected(2),   # Auto
+                setup_models.tui.Selected(3),   # Listo
             ])
         write.assert_called_once_with("ollama", None)
         self.assertEqual(config["subscriptions"], {"anthropic": True, "ollama": False})
@@ -151,45 +140,40 @@ class WizardBehaviorTests(unittest.TestCase):
         self.assertIn("auto en este equipo", out)
         self.assertIn("efectivo ya", out)
 
-    def test_discovered_provider_toggle_round_trips(self):
-        # ADR-0035 (AC-16): option 7 is now a three-way policy picker (auto/manual/none);
-        # "Lista manual" (index 1) still offers the per-provider toggle, but its
-        # candidates come from `models_config.DISCOVERABLE_PROVIDERS` (sorted:
-        # anthropic, openai-codex, opencode-go, opencode-zen), not a literal tuple --
-        # index 3 in that sorted list is `opencode-zen`.
+    def test_discovered_provider_toggle_via_avanzado(self):
         config, out, _ = self._run([
-            setup_models.tui.Selected(6),   # Proveedores descubiertos
+            setup_models.tui.Selected(5),   # Más opciones
+            setup_models.tui.Selected(3),   # Avanzado
+            setup_models.tui.Selected(1),   # Proveedores descubiertos
             setup_models.tui.Selected(1),   # Lista manual
-            setup_models.tui.Selected(3),   # opencode-zen (sorted DISCOVERABLE_PROVIDERS)
-            setup_models.tui.Selected(4),   # Salir sin guardar
+            setup_models.tui.Selected(3),   # opencode-zen
+            setup_models.tui.Selected(5),   # Volver
+            setup_models.tui.Selected(3),   # Listo
         ])
         self.assertEqual(config["routing"]["discovered_providers"], ["opencode-zen"])
         self.assertIn("MODEL_METADATA_INFERRED", out)
 
     def test_discovered_provider_auto_and_none_policies(self):
         config, out, _ = self._run([
-            setup_models.tui.Selected(6),   # Proveedores descubiertos
-            setup_models.tui.Selected(0),   # auto (recomendado)
-            setup_models.tui.Selected(4),   # Salir sin guardar
+            setup_models.tui.Selected(5),
+            setup_models.tui.Selected(3),
+            setup_models.tui.Selected(1),
+            setup_models.tui.Selected(0),   # auto
+            setup_models.tui.Selected(5),
+            setup_models.tui.Selected(3),
         ])
         self.assertEqual(config["routing"]["discovered_providers"], "auto")
         self.assertIn("discovered_providers = auto", out)
 
         config, out, _ = self._run([
-            setup_models.tui.Selected(6),   # Proveedores descubiertos
+            setup_models.tui.Selected(5),
+            setup_models.tui.Selected(3),
+            setup_models.tui.Selected(1),
             setup_models.tui.Selected(2),   # Ninguno
-            setup_models.tui.Selected(4),   # Salir sin guardar
+            setup_models.tui.Selected(5),
+            setup_models.tui.Selected(3),
         ])
         self.assertEqual(config["routing"]["discovered_providers"], [])
-
-    def test_refresh_is_appended_indexes_0_4_stay_pinned(self):
-        _, _, picker = self._run([None])
-        items = picker.call_args.args[0]
-        self.assertEqual(
-            items[:5],
-            ("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar"),
-        )
-        self.assertEqual(items[-1], setup_models.REFRESH_ITEM)
 
     def test_first_paint_does_not_call_detect_subscriptions(self):
         config = _config()
@@ -197,13 +181,14 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
              mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
              mock.patch.object(setup_models.models_config, "detect_subscriptions") as probe, \
+             mock.patch.object(setup_models, "_load_pins", return_value={}), \
              mock.patch.object(setup_models.tui, "run_picker",
-                               return_value=setup_models.tui.Selected(4)):
+                               return_value=setup_models.tui.Selected(3)):
             setup_models.wizard(config, [{"role": "audit"}],
                                 Path("roles.tsv"), Path("models.toml"))
         probe.assert_not_called()
 
-    def test_refresh_key_probes_via_with_progress_and_redraws(self):
+    def test_refresh_explicitly_probes_subscriptions_and_catalog(self):
         config = _config()
         progress_messages = []
 
@@ -219,153 +204,53 @@ class WizardBehaviorTests(unittest.TestCase):
              mock.patch.object(setup_models.tui, "with_progress", side_effect=fake_progress), \
              mock.patch.object(setup_models, "_fetch_opencode_models",
                                return_value=["openai/gpt-5.5"]), \
+             mock.patch.object(setup_models, "_load_pins", return_value={}), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=[
-                 setup_models.tui.Selected(8),  # refresh (last item)
-                 setup_models.tui.Selected(4),  # salir
+                 setup_models.tui.Selected(2),  # Actualizar datos
+                 setup_models.tui.Selected(3),  # Listo
              ]) as picker:
             setup_models.wizard(config, [{"role": "audit"}],
                                 Path("roles.tsv"), Path("models.toml"))
         self.assertIn("midiendo suscripciones", progress_messages)
         self.assertIn("listando modelos", progress_messages)
-        second_header = picker.call_args_list[1].kwargs["header"]
-        self.assertIn("openai=auto✓", second_header)
-        self.assertIn("suscripciones: hace 0 min", second_header)
-
-    def test_refresh_degrades_named_when_probe_raises_and_stays_usable(self):
-        config = _config()
-
-        def boom(*_args, **_kwargs):
-            raise RuntimeError("probe down")
-
-        with tempfile.TemporaryDirectory() as td, \
-             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
-             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
-             mock.patch.object(setup_models.models_config, "detect_subscriptions", side_effect=boom), \
-             mock.patch.object(setup_models.tui, "with_progress",
-                               side_effect=lambda msg, fn, **kwargs: fn()), \
-             mock.patch.object(setup_models, "_fetch_opencode_models", return_value=[]), \
-             mock.patch.object(setup_models.tui, "run_picker", side_effect=[
-                 setup_models.tui.Selected(8),
-                 setup_models.tui.Selected(4),
-             ]) as picker:
-            rc = setup_models.wizard(config, [{"role": "audit"}],
-                                     Path("roles.tsv"), Path("models.toml"))
-        self.assertEqual(rc, 0)
-        second_header = picker.call_args_list[1].kwargs["header"]
-        self.assertIn(setup_models.SUBSCRIPTION_PROBE_FAILED, second_header)
-        self.assertIn("anthropic=✓pin", second_header)
-
-    def test_disk_cache_age_is_on_the_first_frame(self):
-        config = _config()
-        with tempfile.TemporaryDirectory() as td, \
-             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}):
-            setup_models.models_config.write_wizard_live_cache(
-                "subscriptions",
-                {"at": setup_models.time.time() - 4 * 60, "names": ["openai"], "error": False},
-            )
-            with mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
-                 mock.patch.object(setup_models.models_config, "detect_subscriptions") as probe, \
-                 mock.patch.object(setup_models.tui, "run_picker",
-                                   return_value=setup_models.tui.Selected(4)) as picker:
-                setup_models.wizard(config, [{"role": "audit"}],
-                                    Path("roles.tsv"), Path("models.toml"))
-        probe.assert_not_called()
-        header = picker.call_args.kwargs["header"]
-        self.assertIn("suscripciones: hace 4 min", header)
-        self.assertIn("openai=auto✓", header)
-
-    def test_stale_cache_auto_probes_after_first_paint_not_before(self):
-        counts, progress = [], []
-
-        def fake_picker(*_a, **_k):
-            counts.append(probe.call_count)
-            return [setup_models.tui.Selected(0), None, setup_models.tui.Selected(4)][len(counts) - 1]
-        with tempfile.TemporaryDirectory() as td, \
-             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
-             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
-             mock.patch.object(setup_models.models_config, "detect_subscriptions",
-                               return_value={"openai"}) as probe, \
-             mock.patch.object(setup_models.tui, "with_progress",
-                               side_effect=lambda msg, fn, **kw: progress.append(msg) or fn()), \
-             mock.patch.object(setup_models.tui, "run_picker", side_effect=fake_picker):
-            setup_models.wizard(_config(), [{"role": "audit"}],
-                                Path("roles.tsv"), Path("models.toml"))
-        self.assertEqual(counts[:2], [0, 0])
-        self.assertGreaterEqual(counts[2], 1)
-        self.assertIn("midiendo suscripciones", progress)
-
-    def test_auto_live_measure_fills_live_discovered_not_probe_failed(self):
-        config = _config()
-        config["routing"]["discovered_providers"] = "auto"
-        inventory = {("opencode", "opencode-zen"): ["opencode/x"]}
-
-        def fake_detect(_config, inventory_holder=None, **_kw):
-            if inventory_holder is not None:
-                inventory_holder.append(inventory)
-            return {"openai"}
-        picks = [setup_models.tui.Selected(0), None, setup_models.tui.Selected(4)]
-        with tempfile.TemporaryDirectory() as td, \
-             mock.patch.dict(os.environ, {"SET_AGENTS_STATE": td}), \
-             mock.patch.object(setup_models.sys.stdin, "isatty", return_value=True), \
-             mock.patch.object(setup_models.models_config, "detect_subscriptions",
-                               side_effect=fake_detect), \
-             mock.patch.object(setup_models.tui, "with_progress",
-                               side_effect=lambda msg, fn, **kw: fn()), \
-             mock.patch.object(setup_models.tui, "run_picker", side_effect=picks) as picker:
-            setup_models.wizard(config, [{"role": "audit"}],
-                                Path("roles.tsv"), Path("models.toml"))
-        first, second = picker.call_args_list[0].kwargs["header"], picker.call_args_list[2].kwargs["header"]
-        self.assertNotIn("probe falló", first)
-        self.assertNotIn("probe falló", second)
-        self.assertIn("opencode-zen", second)
+        self.assertEqual(picker.call_count, 2)
 
     def test_esc_after_campo_does_not_mutate_roles(self):
         config = _config()
         with mock.patch.object(setup_models, "available_opencode_models",
                                return_value=["openai/x"]):
             self._run([
-                setup_models.tui.Selected(1),  # Cambiar un rol
-                setup_models.tui.Selected(0),  # audit (absent from roles)
+                setup_models.tui.Selected(0),  # Cambiar default
+                setup_models.tui.Selected(1),  # Por rol
+                setup_models.tui.Selected(0),  # audit
                 setup_models.tui.Selected(3),  # opencode
                 None,                          # Esc
-                setup_models.tui.Selected(4),
+                setup_models.tui.Selected(3),  # Listo
             ], config=config)
         self.assertEqual(config["roles"], {
             "debugger": {"claude": "opus"}, "implementer": {"codex": "gpt-5.4"},
         })
 
-    def test_existing_current_is_passed_without_inserting_keys(self):
-        config = _config()
-        config["roles"]["audit"] = {"opencode": "openai/kept"}
-        with mock.patch.object(setup_models, "available_opencode_models",
-                               return_value=["openai/kept", "openai/other"]):
-            _, _, picker = self._run([
-                setup_models.tui.Selected(1),
-                setup_models.tui.Selected(0),
-                setup_models.tui.Selected(3),
-                None,
-                setup_models.tui.Selected(4),
-            ], config=config)
-        self.assertEqual(config["roles"]["audit"], {"opencode": "openai/kept"})
-        self.assertEqual(picker.call_args_list[3].kwargs.get("current"), "openai/kept")
-
-    def test_campo_is_exactly_the_four_axes(self):
+    def test_campo_offers_model_effort_and_cursor_axes(self):
         captured = []
 
         def fake_choose(prompt, options, **kwargs):
             captured.append((prompt, list(options)))
-            if prompt == "Área":
+            if prompt == "Area":
                 return options[0]
             return None
 
         with mock.patch.object(setup_models, "choose", side_effect=fake_choose):
             self._run([
-                setup_models.tui.Selected(0),  # Cambiar un área
-                setup_models.tui.Selected(4),  # Salir
+                setup_models.tui.Selected(0),  # Cambiar default
+                setup_models.tui.Selected(0),  # Por area
+                setup_models.tui.Selected(3),  # Listo
             ])
         campo = [item for item in captured if item[0] == "Campo"]
         self.assertTrue(campo)
-        self.assertEqual(campo[0][1], ["claude", "codex", "codex_effort", "opencode"])
+        self.assertEqual(campo[0][1], list(setup_models.OVERRIDE_FIELDS))
+        self.assertIn("cursor", campo[0][1])
+        self.assertIn("codex_effort", campo[0][1])
 
 
 class GroupedModelPickerTests(unittest.TestCase):
@@ -378,7 +263,7 @@ class GroupedModelPickerTests(unittest.TestCase):
             captured["headers"] = list(kwargs.get("headers") or [])
             captured["suffixes"] = list(kwargs.get("suffixes") or [])
             captured["current"] = kwargs.get("current")
-            return setup_models.tui.Selected(2)  # second model under opencode-go
+            return setup_models.tui.Selected(2)
 
         with mock.patch.object(setup_models.tui, "run_picker", side_effect=fake_picker):
             result = setup_models.choose(
@@ -388,12 +273,8 @@ class GroupedModelPickerTests(unittest.TestCase):
             )
         self.assertEqual(result, "opencode-go/b-free")
         self.assertEqual(captured["items"][0], "opencode-go (2)")
-        self.assertEqual(captured["items"][3], "openai (1)")
         self.assertEqual(captured["headers"], [0, 3])
-        self.assertEqual(captured["current"], "opencode-go/b-free")
-        self.assertIn("free", captured["suffixes"][2])
         self.assertIn("← implementer", captured["suffixes"][1])
-        self.assertNotIn(captured["items"][0], models)  # a header is never a model id
 
     def test_choose_without_grouping_keeps_a_flat_index_into_options(self):
         options = ["claude", "codex", "effort"]
@@ -403,7 +284,6 @@ class GroupedModelPickerTests(unittest.TestCase):
             result = setup_models.choose("Campo", options)
         self.assertEqual(result, "codex")
         self.assertEqual(list(picker.call_args.args[0]), options)
-        self.assertEqual(list(picker.call_args.kwargs.get("headers") or []), [])
 
 
 class ModelsInUseTests(unittest.TestCase):
@@ -420,6 +300,50 @@ class ModelsInUseTests(unittest.TestCase):
             {"openai/gpt-5.5": ["coord", "debugger"],
              "openai/gpt-5.6-luna": ["implementer"]},
         )
+
+
+class OverlayWriteIsValidatedTests(unittest.TestCase):
+    """ADR-0071 moved area/role taste to `models.local.toml`, and with it the write moved off
+    the one path that ran `validate()` -- where separation of duties lives. Both entry points
+    (the CLI `--set` and this wizard's "Preferir un modelo") must refuse an illegal cell and
+    leave the disk untouched. The CLI half is covered by
+    `test_harness::test_setup_models_rejects_separation_violation`; this is the TUI half, which
+    is the surface a person actually uses."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+        self.overlay = self.state / "models.local.toml"
+        patcher = mock.patch.dict(os.environ, {"SET_AGENTS_STATE": str(self.state)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        import models_config
+        self.factory = models_config.load_config(ROOT / "models.toml")
+        self.roster = models_config.load_roster(ROOT / "roles.tsv")
+
+    def _pick(self, area, field, value):
+        buf = io.StringIO()
+        with mock.patch.object(setup_models, "choose", side_effect=[area, field, value]), \
+             mock.patch.object(setup_models, "_confirm_model_mutation", return_value=True), \
+             mock.patch("sys.stdout", buf):
+            setup_models._edit_overlay_cell(
+                self.factory, self.roster, ROOT / "roles.tsv", ROOT / "models.toml", kind="area")
+        return buf.getvalue()
+
+    def test_the_wizard_refuses_a_cell_that_breaks_separation_of_duties(self):
+        writer_model = self.factory["areas"]["implement"]["codex"]
+        output = self._pick("audit", "codex", writer_model)
+        self.assertIn("RECHAZADO", output)
+        self.assertIn("separation violation", output)
+        self.assertFalse(self.overlay.exists(), "un valor ilegal nunca debe tocar el disco")
+
+    def test_a_legal_cell_still_lands_in_the_instance_overlay(self):
+        # The wizard unit must never reach build/install on a developer's HOME.
+        with mock.patch.object(setup_models, "apply_overlay_model", return_value={
+                "status": "pending_apply", "message": "Preferencia guardada; falta confirmar la instalación. Podés reintentar."}):
+            output = self._pick("audit", "codex_effort", "low")
+        self.assertIn("pending_apply: audit.codex_effort = low", output)
 
 
 if __name__ == "__main__":

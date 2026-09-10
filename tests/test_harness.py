@@ -1685,16 +1685,26 @@ class HarnessTests(unittest.TestCase):
         ), models
 
     def test_setup_models_set_and_check_roundtrip(self):
+        """ADR-0071 moved area/role taste to the per-machine overlay, so `--set` writes
+        `models.local.toml` and leaves the tracked `models.toml` byte-identical -- that is the
+        whole point (a taste edit used to dirty the tree and block `--update` forever). The
+        round-trip this test guards is unchanged in substance: the value lands, re-applying it
+        is a no-op, and `--check` still passes. Only the file it lands in moved."""
         with tempfile.TemporaryDirectory() as td:
             result, models = self._setup_models(td, "--set", "audit.codex_effort=high")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("MODELS_WRITTEN", result.stdout)
-            first = models.read_text()
-            self.assertIn('codex_effort = "high"', first)
-            # Re-applying the same change is a byte-identical no-op (deterministic emitter).
+            self.assertIn("OVERLAY_WRITTEN areas.audit.codex_effort=high", result.stdout)
+            self.assertNotIn("MODELS_WRITTEN", result.stdout)
+            tracked = models.read_text()
+            overlay = Path(td) / "state" / "models.local.toml"
+            self.assertIn('codex_effort = "high"', overlay.read_text())
+            # Re-applying the same change is a byte-identical no-op in BOTH files.
+            first = overlay.read_text()
             result, _ = self._setup_models(td, "--set", "audit.codex_effort=high")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(first, models.read_text())
+            self.assertEqual(first, overlay.read_text())
+            self.assertEqual(tracked, models.read_text(),
+                             "una preferencia de instancia nunca toca el models.toml trackeado")
             result, _ = self._setup_models(td, "--check")
             self.assertIn("MODELS_CHECK_PASS", result.stdout)
 
@@ -1733,10 +1743,7 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("ollama = false", overlay.read_text())
 
     def test_wizard_drop_subscription_hint_references_menu_labels_not_stale_numbers(self):
-        # D-05: same defect as F-09 (fixed in set_agents_app.py) but left behind in
-        # setup_models.py's own wizard() -- "opción 1/2" stopped meaning anything the day the
-        # numbered grid was replaced by the arrow selector; the real labels are "Cambiar un
-        # área" (option 1) and "Cambiar un rol" (option 2).
+        # Hint must name the end-user action, never stale numbered options.
         setup_models = self._import("setup_models")
         config = {
             "areas": {"audit": {"claude": "x", "codex": "y", "codex_effort": "high", "opencode": "m"}},
@@ -1751,23 +1758,22 @@ class HarnessTests(unittest.TestCase):
                                return_value=set()), \
              mock.patch.object(setup_models.tui, "with_progress",
                                side_effect=lambda msg, fn, **kw: fn()), \
+             mock.patch.object(setup_models, "_load_pins", return_value={}), \
              mock.patch.object(
                  setup_models, "dropped_cells", return_value=[("audit", "provider/model-a")],
              ), \
              mock.patch.object(setup_models.tui, "run_picker", side_effect=[
-                 setup_models.tui.Selected(2),  # WIZARD_ITEMS[2] == "Suscripciones"
-                 # ADR-0048 (024 C2): the candidate universe is the audited 4 names
-                 # now, sorted: anthropic, ollama, openai, zen -- index 3 is "zen".
-                 setup_models.tui.Selected(3),  # choose(): "zen"
-                 setup_models.tui.Selected(4),  # next loop: "Salir sin guardar"
+                 setup_models.tui.Selected(5),  # Más opciones
+                 setup_models.tui.Selected(2),  # Cuentas
+                 setup_models.tui.Selected(3),  # zen (sorted candidates)
+                 setup_models.tui.Selected(3),  # Listo
              ]):
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
                 setup_models.wizard(config, roster, Path("roles.tsv"), Path("models.toml"))
         output = buf.getvalue()
         self.assertNotIn("opción 1/2", output)
-        self.assertIn("Cambiar un área", output)
-        self.assertIn("Cambiar un rol", output)
+        self.assertIn("Preferir un modelo", output)
 
     def test_setup_models_check_rejects_opencode_separation_violation(self):
         with tempfile.TemporaryDirectory() as td:
@@ -3307,7 +3313,11 @@ class HarnessTests(unittest.TestCase):
             for line in result.stdout.splitlines():
                 if line.startswith("MCP supabase"):
                     self.assertIn("state=absent", line)
-            self.assertTrue((home / ".config/opencode/opencode.json.bak").exists())
+            oc_dir = home / ".config/opencode"
+            self.assertTrue(
+                any(oc_dir.glob(".opencode.json.*.bak")),
+                "expected pid-scoped backup beside opencode.json",
+            )
 
     def test_set_agents_plugins(self):
         with tempfile.TemporaryDirectory() as td:
@@ -3540,25 +3550,31 @@ class HarnessTests(unittest.TestCase):
             app.tools_propose_menu()
         propose.assert_not_called()
 
-    def test_menu_items_include_proponer_herramienta_between_tools_and_mcp(self):
-        app = self._import("set_agents_app")
-        labels = [item.strip() for item in app.MENU_ITEMS]
-        tools_index = next(i for i, item in enumerate(labels) if "Herramientas" in item)
-        mcp_index = next(i for i, item in enumerate(labels) if "MCP" in item)
-        propose_index = next(i for i, item in enumerate(labels) if "Proponer" in item)
-        self.assertEqual(propose_index, tools_index + 1, app.MENU_ITEMS)
-        self.assertEqual(mcp_index, propose_index + 1, app.MENU_ITEMS)
-        # Vault-before-Salir invariant (test_menu_orders_vault_immediately_before_salir)
-        # must still hold after inserting a new item -- proven independently there.
+    @staticmethod
+    def _home_pick(app, key, experto=True):
+        """Locate a home row by its STABLE KEY (ADR-0074) instead of by position. The old
+        tests hard-coded the integer, which stayed green even if the label had moved to a
+        different branch; this cannot, because the key IS the dispatch."""
+        keys = [action.key for action in app.visible_actions(experto=experto)]
+        return app.tui.Selected(keys.index(key))
 
-    def test_menu_dispatches_the_proponer_item_to_tools_propose_menu(self):
+    def test_engineering_rows_keep_tools_then_propose_then_mcp_in_that_order(self):
         app = self._import("set_agents_app")
-        index = next(i for i, item in enumerate(app.MENU_ITEMS) if "Proponer" in item)
+        keys = [action.key for action in app.visible_actions(experto=True)]
+        self.assertEqual(keys.index("proponer"), keys.index("herramientas") + 1, keys)
+        self.assertEqual(keys.index("mcps"), keys.index("proponer") + 1, keys)
+
+    def test_menu_dispatches_the_proponer_row_to_tools_propose_menu(self):
+        app = self._import("set_agents_app")
         with mock.patch.object(app, "first_run", return_value=False), \
              mock.patch.object(app, "launch_update_check", return_value="al día"), \
+             mock.patch.object(app, "measure_hosts", return_value={}), \
+             mock.patch.object(app, "experto_activo", return_value=True), \
              mock.patch.object(app, "drift_state", return_value="ok"), \
              mock.patch.object(app, "banner"), mock.patch.object(app, "short_sha", return_value="abc"), \
-             mock.patch.object(app.tui, "run_picker", side_effect=[app.tui.Selected(index), None]), \
+             mock.patch.object(app, "_home_header", return_value="SET"), \
+             mock.patch.object(app.tui, "run_picker", side_effect=[
+                 self._home_pick(app, "proponer"), None, None]), \
              mock.patch.object(app, "tools_propose_menu") as propose_menu:
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
@@ -3633,30 +3649,57 @@ class HarnessTests(unittest.TestCase):
         self.assertNotIn("enabled=", buf.getvalue())
         self.assertEqual(picker.call_args.args[0], ["foo@bar — activado", "baz@qux — apagado"])
 
-    def test_menu_orders_vault_immediately_before_salir(self):
+    def test_vault_is_expert_only_and_salir_stays_last_in_both_modes(self):
+        """Vault never greets a first-time user, and the exit is always the last row -- the
+        two placement facts the old MENU_ITEMS/MORE_ITEMS pin was protecting."""
         app = self._import("set_agents_app")
-        labels = [item.strip() for item in app.MENU_ITEMS]
-        vault_index = next(i for i, item in enumerate(labels) if "Vault" in item)
-        salir_index = next(i for i, item in enumerate(labels) if "Salir" in item)
-        self.assertEqual(salir_index, vault_index + 1, app.MENU_ITEMS)
-        self.assertEqual(salir_index, len(app.MENU_ITEMS) - 1, "Salir must stay last")
+        simple = [action.key for action in app.visible_actions(experto=False)]
+        expert = [action.key for action in app.visible_actions(experto=True)]
+        self.assertEqual(simple[-1], "salir")
+        self.assertEqual(expert[-1], "salir")
+        self.assertNotIn("vault", simple)
+        self.assertIn("vault", expert)
+        # Vault is the last engineering row before the mode toggle and the exit.
+        self.assertEqual(expert[expert.index("vault") + 1:], ["modo", "salir"])
 
-    def test_menu_items_carry_no_emoji_and_single_space_layout(self):
-        # AC-01 (025/D1): no emoji as structural icons -- they depend on the font, break
-        # alignment, and can't be themed. The old tuple's own patched-in double space on
-        # "🗒  Vault Obsidian"/"⏻  Salir" (compensating for glyph width) was the proof of
-        # the problem; a plain-ASCII/Latin label never needs that compensation, so every
-        # item is exactly one un-doubled space away from having none at all -- this
-        # asserts BOTH "no emoji" and "the double-space patch is gone", not just one.
-        # D1-F06: positive rule (isascii + Latin-1 punctuation) instead of emoji blacklist —
-        # the old negative regex didn't cover U+23FB (⏻, the catalyst for this whole D1).
+    def test_every_visible_label_is_fixed_width_and_free_of_emoji(self):
+        # AC-01 (025/D1) / ADR-0050, restated by ADR-0075 as the rule it always was: no emoji
+        # or symbol as a structural icon -- they depend on the font, break alignment, and
+        # can't be themed. The old tuple's patched-in double space on "🗒  Vault Obsidian" /
+        # "⏻  Salir" (compensating for glyph width) was the proof of the problem.
+        #
+        # The pin used to be `isascii()`, which was BOTH too strict and too loose: it rejected
+        # honest Spanish ("Cómo está") while a caller could still put a symbol inside a panel
+        # header, which is exactly what happened -- 🧰/⚙️/🛡️/📐 reached the more/preferencias
+        # headers and passed this gate because it only ever looked at MENU_ITEMS.
+        #
+        # `ui.is_safe_label` states the real rule positively (letters, digits, spaces and a
+        # closed punctuation set: a decorative glyph belongs to the renderer, never to the
+        # text), and it is applied to EVERY user-facing label, not just the home tuple.
         app = self._import("set_agents_app")
-        for item in app.MENU_ITEMS:
-            # Only ASCII letters, digits, spaces, hyphens, and parentheses are allowed
-            # (no emoji, no extended Unicode punctuation, no accented letters)
-            self.assertTrue(all(c.isascii() for c in item), f"non-ASCII character in menu item: {item!r}")
+        import ui
+        labels = [action.label for action in app.visible_actions(experto=True)]
+        labels += [action.hint for action in app.visible_actions(experto=True) if action.hint]
+        labels += [label for label, _ in app.HARNESS_CHOICES]
+        labels += list(app.HOST_LABELS.values()) + list(app.HOST_STATE_LABEL.values())
+        labels += [target.label for target in app.onboarding.TARGETS]
+        labels += [preset.label for preset in app.onboarding.PRESETS]
+        labels += [label for _, label, _ in app.POSTURAS]
+        for item in labels:
+            self.assertTrue(ui.is_safe_label(item), f"glifo prohibido en la etiqueta: {item!r}")
+            self.assertEqual(ui.cell_width(item), len(item), f"ancho de glifo variable en: {item!r}")
             self.assertNotIn("  ", item, f"double-space glyph-width patch left in: {item!r}")
             self.assertEqual(item, item.strip(), f"stray leading/trailing space in: {item!r}")
+
+    def test_the_label_rule_still_rejects_the_glyphs_that_motivated_it(self):
+        # The negative half, bitten on purpose: this is the assertion the old isascii() pin
+        # was there to make, and it must keep failing for the exact characters from ADR-0050.
+        import ui
+        for bad in ("⏻ Salir", "🗒 Vault", "🧰 Herramientas", "⚙️ Modo", "📐 Metodología"):
+            self.assertFalse(ui.is_safe_label(bad), f"debería rechazarse: {bad!r}")
+        for good in ("Cómo está", "Más", "Configurar", "Proponer herramienta", "MCPs"):
+            self.assertTrue(ui.is_safe_label(good), f"debería aceptarse: {good!r}")
+            self.assertEqual(ui.cell_width(good), len(good))
 
     def test_menu_esc_or_ctrl_c_exits_cleanly_like_picking_salir(self):
         # AC-29: no traceback on Esc/Ctrl-C/EOF -- run_picker already resolves those to
@@ -3664,6 +3707,7 @@ class HarnessTests(unittest.TestCase):
         app = self._import("set_agents_app")
         with mock.patch.object(app, "first_run", return_value=False), \
              mock.patch.object(app, "launch_update_check", return_value="al día"), \
+             mock.patch.object(app, "measure_hosts", return_value={}), \
              mock.patch.object(app, "drift_state", return_value="ok"), \
              mock.patch.object(app, "banner"), mock.patch.object(app, "short_sha", return_value="abc"), \
              mock.patch.object(app.tui, "run_picker", return_value=None):
@@ -3672,23 +3716,27 @@ class HarnessTests(unittest.TestCase):
                 rc = app.menu()
         self.assertEqual(rc, 0)
 
-    def test_menu_header_carries_the_drift_update_banner_into_the_pickers_own_frame(self):
-        # F-03: the "=== SET-AGENTS sha === / drift: ... | update: ..." banner used to be
-        # print()ed to the normal screen right before `run_picker` cleared it into the
-        # alternate screen -- invisible exactly while the user is choosing.
+    def test_home_header_reaches_the_pickers_own_frame_and_carries_no_jargon(self):
+        # End-user home header: the wordmark, one measured sentence, and only the warnings
+        # that need action. No SHA, no ADR, no drift/probe/overlay vocabulary.
         app = self._import("set_agents_app")
         with mock.patch.object(app, "first_run", return_value=False), \
              mock.patch.object(app, "launch_update_check", return_value="al día"), \
-             mock.patch.object(app, "drift_state", return_value="ok"), \
+             mock.patch.object(app, "measure_hosts", return_value={}), \
+             mock.patch.object(app, "drift_state", return_value="stale"), \
              mock.patch.object(app, "banner"), mock.patch.object(app, "short_sha", return_value="abc123"), \
              mock.patch.object(app, "auto_update_enabled", return_value=True), \
+             mock.patch.object(app, "postura_actual", return_value="autonoma"), \
              mock.patch.object(app.tui, "run_picker", return_value=None) as picker:
             buf = io.StringIO()
             with mock.patch("sys.stdout", buf):
                 app.menu()
         header = picker.call_args.kwargs.get("header", "")
-        self.assertIn("SET-AGENTS abc123", header)
-        self.assertIn("drift:", header)
+        self.assertIn("SET-AGENTS", header)
+        # First frame is cache-only: honest pulse, no live drift probe on entry.
+        self.assertIn("Todavía no revisé", header)
+        for jargon in ("ADR-", "models.local.toml", "drift", "probe", "listado=", "abc123"):
+            self.assertNotIn(jargon, header, f"jerga en el header del home: {jargon}")
 
     def test_vault_menu_cancelling_target_never_reaches_vault_init(self):
         # F-07: vault_menu had zero test coverage -- the riskiest of the 5 rewritten menus
@@ -6065,6 +6113,48 @@ class HarnessTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("SPAWN-002", result.stdout)
         self.assertEqual(before, after)  # fail-closed: nothing written on rejection
+
+    def test_record_spawn_after_reopen_uses_a_fresh_id_without_respending_historical_budget(self):
+        # A spawn-budget blocker resets attempts.spawns on reopen but deliberately
+        # retains provenance. The next spawn therefore starts a fresh budget window
+        # while its globally unique ID follows the historical inventory.
+        with tempfile.TemporaryDirectory() as td:
+            state = Path(td) / "feature.json"
+            def run_root_state(*args, check=True):
+                return run("python3", str(ROOT / "ai/scripts/feature-state.py"), *args,
+                           "--state-file", str(state), check=check)
+
+            init_state(state, "--ac", "AC-1", "--max-spawns-per-package", "2")
+            run_root_state(
+                "create-package", "PKG-01", "Slice",
+                "--ac", "AC-1", "--task", "T-001",
+                "--owned-path", "src/**", "--complexity", "small",
+            )
+            run_root_state("record-spawn", "PKG-01", "implementer", "--purpose", "first")
+            run_root_state("record-spawn", "PKG-01", "gate-runner", "--purpose", "second")
+            run_root_state("record-spawn", "PKG-01", "debugger", check=False)
+            run_root_state(
+                "reopen", "--reason", "new approved attempt window",
+                "--authorized-by", "human:test",
+            )
+            resumed = run_root_state(
+                "record-spawn", "PKG-01", "implementer", "--purpose", "resumed",
+            )
+            after_first = json.loads(state.read_text())
+            run_root_state("record-spawn", "PKG-01", "gate-runner", "--purpose", "resumed second")
+            exhausted_again = run_root_state("record-spawn", "PKG-01", "debugger", check=False)
+            final = json.loads(state.read_text())
+        package = after_first["packages"][0]
+        self.assertEqual(resumed.returncode, 0)
+        self.assertEqual(
+            [item["spawn_id"] for item in package["spawns"]],
+            ["SPAWN-001", "SPAWN-002", "SPAWN-003"],
+        )
+        self.assertEqual(package["attempts"]["spawns"], 1)
+        self.assertEqual(final["packages"][0]["attempts"]["spawns"], 2)
+        self.assertEqual(exhausted_again.returncode, 0)
+        self.assertEqual(final["phase"], "BLOCKED")
+        self.assertIn("spawn budget exhausted", json.dumps(final["blockers"]))
 
     # ------------------------------------------------- ADR-0031 per-spawn observability
 

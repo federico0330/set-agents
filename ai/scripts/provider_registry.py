@@ -73,6 +73,78 @@ PROVIDERS: dict[str, ProviderSpec] = {
 }
 
 
+# ================================================================= 046 / ADR-0072
+#
+# THIRD independent registry in this neutral module: HOSTS (CLI binaries on PATH).
+# Never mixed with PROVIDERS (OpenCode-facing identities). Order is display-only;
+# no other table derives from tuple(HOSTS). Cursor stays out (ADR-0063 / 046 AC-01).
+
+HOST_STATES = ("ausente", "sin lane", "unlistable", "vivo")
+
+
+@dataclasses.dataclass(frozen=True)
+class HostSpec:
+    """One host binary family. `detect_bins` is ordered; presence = any which().
+    `lane` is a RUNTIMES member that materializes this host, or None (sin lane).
+    `has_lane` is derived: `lane is not None` — never stored twice (ADR-0042 lesson)."""
+
+    detect_bins: tuple[str, ...]
+    lane: str | None = None
+
+    @property
+    def has_lane(self) -> bool:
+        return self.lane is not None
+
+
+# Display order is the closed 046 universe (AC-01). agy/fx/copilot start with lane=None
+# until 047 registers a measured adapter; existing harness CLIs keep their lanes.
+HOSTS: dict[str, HostSpec] = {
+    "agy": HostSpec(detect_bins=("agy",), lane="agy"),
+    "fx": HostSpec(detect_bins=("fx",), lane=None),  # SPAWN_DEFERRED until probe stable
+    "copilot": HostSpec(detect_bins=("copilot",), lane="copilot"),
+    "claude": HostSpec(detect_bins=("claude",), lane="claude-code"),
+    "codex": HostSpec(detect_bins=("codex",), lane="codex"),
+    "opencode": HostSpec(detect_bins=("opencode",), lane="opencode"),
+    "pi": HostSpec(detect_bins=("pi", "pnpm"), lane="pi"),
+}
+
+
+def host_detect(host_id: str, which=None) -> str | None:
+    """Return the first detect_bins entry that resolves, or None (ausente)."""
+    import shutil
+    which = which or shutil.which
+    spec = HOSTS[host_id]
+    for binary in spec.detect_bins:
+        if which(binary):
+            return binary
+    return None
+
+
+def resolve_host_state(host_id: str, *, which=None, model_count=None) -> str:
+    """Total function: exactly one of HOST_STATES. First match wins (046 AC-01).
+    `model_count` is the verified probe result when known: None = no probe yet
+    (unlistable if has lane), 0 = unlistable, >0 = vivo. Never invents models."""
+    if host_id not in HOSTS:
+        raise KeyError(host_id)
+    if host_detect(host_id, which=which) is None:
+        return "ausente"
+    if not HOSTS[host_id].has_lane:
+        return "sin lane"
+    if model_count is None or model_count <= 0:
+        return "unlistable"
+    return "vivo"
+
+
+def list_host_rows(*, which=None, model_counts=None) -> list[tuple[str, str]]:
+    """All seven candidates, one (id, state) each — never omit an absent host."""
+    model_counts = model_counts or {}
+    rows = []
+    for host_id in HOSTS:
+        count = model_counts.get(host_id)
+        rows.append((host_id, resolve_host_state(host_id, which=which, model_count=count)))
+    return rows
+
+
 # ================================================================= 022 PKG-4 (AC-11..15)
 #
 # A SECOND, INDEPENDENT registry in this same neutral module -- NOT the routing-identity

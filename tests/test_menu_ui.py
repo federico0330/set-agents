@@ -39,7 +39,7 @@ class TableLinesTests(unittest.TestCase):
 
 
 class EstadoGeneralTests(unittest.TestCase):
-    def test_panel_carries_harnesses_scope_tools_and_providers(self):
+    def test_panel_carries_harnesses_scope_and_tools_without_probe_jargon(self):
         data = {"rows": [("claude", "1.0", "ok")], "drift": "ok"}
         with mock.patch.object(app, "_pi_lane_state", return_value="via-pnpm-dlx"), \
              mock.patch.object(app, "_install_scope", return_value=["claude-code", "pi"]), \
@@ -47,30 +47,26 @@ class EstadoGeneralTests(unittest.TestCase):
              mock.patch.object(app.models_config, "load_config", side_effect=OSError("hermetic")):
             lines = app._estado_general_lines(data)
         text = "\n".join(lines)
-        self.assertIn("Harnesses", text)
+        self.assertIn("Versiones y sesión", text)
         self.assertIn("vía pnpm dlx", text)
         self.assertIn("claude-code, pi", text)
         self.assertIn("gh", text)
-        self.assertIn("probe no disponible", text)
+        self.assertNotIn("listado=", text)
+        self.assertNotIn("usable=", text)
+        self.assertNotIn("probe no disponible", text)
         self.assertNotIn("drift:", text)
 
-    def test_ac19_panel_labels_listado_and_usable_separately_when_they_differ(self):
-        # AC-19: the 'vidriera' surface (first menu item) -- proven with a listed/
-        # usable pair that genuinely DIFFERS, so a regression that reused one count
-        # for both labels (or dropped the split entirely, back to a bare `models=<N>`)
-        # fails this test, not just "some numbers printed".
+    def test_estado_omits_listado_usable_doctor_detail(self):
+        # End-user Estado: probe detail stays in --doctor-all, not the home panel.
         data = {"rows": [], "drift": "ok"}
-        fake_listed = {("opencode", "opencode-zen"): {"a", "b", "c"}}
-        fake_usable = {("opencode", "opencode-zen"): {"a"}}
         with mock.patch.object(app, "_pi_lane_state", return_value="no"), \
              mock.patch.object(app, "_install_scope", return_value=None), \
              mock.patch.object(app, "_tools_data", return_value=[]), \
-             mock.patch.object(app.models_config, "load_config", return_value={}), \
-             mock.patch("routing_core.catalog.prune_legacy_probe_cache", return_value=False), \
-             mock.patch("routing_core.catalog.probe_listed_and_usable", return_value=(fake_listed, fake_usable)):
+             mock.patch.object(app.models_config, "load_config", return_value={}):
             text = "\n".join(app._estado_general_lines(data))
-        self.assertIn("listado=3", text)
-        self.assertIn("usable=1", text)
+        self.assertNotIn("listado=", text)
+        self.assertNotIn("usable=", text)
+        self.assertIn("Tus CLIs de IA", text)
 
     def test_stale_drift_adds_the_repair_hint(self):
         data = {"rows": [], "drift": "stale"}
@@ -79,60 +75,122 @@ class EstadoGeneralTests(unittest.TestCase):
              mock.patch.object(app, "_tools_data", return_value=[]), \
              mock.patch.object(app.models_config, "load_config", side_effect=OSError("hermetic")):
             text = "\n".join(app._estado_general_lines(data))
-        self.assertIn("Instalar / Reparar", text)
+        self.assertIn("Configurar", text)
 
 
 class MenuDispatchTests(unittest.TestCase):
-    def _menu(self, picks):
+    """The home dispatches on a stable key (ADR-0074), so these tests name the ACTION they
+    want and let the helper find its row. A pin on the integer position would have stayed
+    green if the label ever moved to a different branch; naming the key cannot."""
+
+    def _key_index(self, key, experto=False):
+        keys = [action.key for action in app.visible_actions(experto=experto)]
+        self.assertIn(key, keys, f"la acción {key!r} desapareció del home")
+        return keys.index(key)
+
+    def _pick(self, key, experto=False):
+        return app.tui.Selected(self._key_index(key, experto=experto))
+
+    def _menu(self, picks, experto=False):
         with mock.patch.object(app, "first_run", return_value=False), \
-             mock.patch.object(app, "launch_update_check", return_value="al día"), \
+             mock.patch.object(app, "launch_update_check", return_value="al dia"), \
+             mock.patch.object(app, "measure_hosts", return_value={}), \
+             mock.patch.object(app, "experto_activo", return_value=experto), \
              mock.patch.object(app, "drift_state", return_value="ok"), \
              mock.patch.object(app, "banner"), \
              mock.patch.object(app, "short_sha", return_value="abc"), \
              mock.patch.object(app, "auto_update_enabled", return_value=True), \
+             mock.patch.object(app, "_home_header", return_value="SET"), \
              mock.patch.object(app.tui, "run_picker", side_effect=picks) as picker, \
              mock.patch.object(app, "run_tty", return_value=0) as tty, \
              mock.patch("sys.stdout", io.StringIO()):
             rc = app.menu()
         return rc, picker, tty
 
-    def test_estado_general_is_first_and_renders_inside_the_picker_frame(self):
+    def test_estado_renders_inside_the_pickers_own_frame(self):
         with mock.patch.object(app, "_status_data", return_value={"rows": [], "drift": "ok",
                                                                   "sha": "abc", "behind": 0,
-                                                                  "auto_update": True}), \
-             mock.patch.object(app, "_estado_general_lines", return_value=["Harnesses"]):
-            rc, picker, _ = self._menu([app.tui.Selected(0), None, None])
+                                                                  "auto_update": True}) as status:
+            rc, picker, _ = self._menu([self._pick("estado"), None, None])
         self.assertEqual(rc, 0)
         estado_call = picker.call_args_list[1]
-        self.assertIn("Harnesses", estado_call.kwargs["header"])
+        self.assertIn("Instalación", estado_call.kwargs["header"])
+        self.assertIn("Actualizar estado", estado_call.kwargs["header"])
+        status.assert_not_called()
 
-    def test_estado_general_reports_delayed_progress_and_a_persistent_final_status(self):
-        # D2-F01: the menu's first action includes provider probing and must not fall back to
-        # the former static "relevando estado" line when a dependency crosses 300ms.
-        stderr = _FakeStream(is_tty=False)
-        data = {"rows": [], "drift": "ok", "sha": "abc", "behind": 0, "auto_update": True}
-        with mock.patch.object(app, "_status_data", side_effect=lambda **_k: (time.sleep(0.35), data)[1]), \
-             mock.patch.object(app, "_estado_general_lines", return_value=["Harnesses"]), \
-             mock.patch("sys.stderr", stderr):
-            rc, _, _ = self._menu([app.tui.Selected(0), None, None])
-        self.assertEqual(rc, 0)
-        self.assertIn("· relevando estado…\n", stderr.getvalue())
-        self.assertTrue(stderr.getvalue().endswith("relevando estado: listo\n"))
+    def test_actualizar_is_the_only_estado_path_that_measures(self):
+        ctx = {"drift": "unknown", "update_badge": "sin revisar"}
+        with mock.patch.object(app, "launch_update_check", return_value="al día") as update, \
+             mock.patch.object(app, "measure_hosts_visibly") as hosts, \
+             mock.patch.object(app, "drift_state", return_value="ok") as drift:
+            app._run_home_action("actualizar", {}, ctx)
+        update.assert_called_once()
+        hosts.assert_called_once_with(refresh=True)
+        drift.assert_called_once()
+        self.assertEqual({"drift": "ok", "update_badge": "al día"}, ctx)
 
-    def test_instalar_picks_a_harness_and_passes_it_to_install_sh(self):
-        rc, _, tty = self._menu([app.tui.Selected(1), app.tui.Selected(2), None])
+    def test_configurar_runs_the_guided_wizard_and_installs_what_it_returns(self):
+        """The install path still ends in `install.sh --harness <value>`, verbatim -- the
+        guided wizard replaced the two nested pickers that used to lead there, not the
+        command they produced."""
+        def fake_run(ops, style=None):
+            ops["set_postura"]("autonoma")
+            ops["set_metodologia"]("sdd")
+            ops["install"]("opencode")
+            return True
+
+        with mock.patch.object(app.onboarding, "run", side_effect=fake_run), \
+             mock.patch.object(app, "set_postura"), mock.patch.object(app, "set_metodologia"):
+            rc, _, tty = self._menu([self._pick("configurar"), None])
         self.assertEqual(rc, 0)
         command = tty.call_args.args[0]
         self.assertTrue(command[0].endswith("install.sh"))
         self.assertEqual(command[1:], ["--harness", "opencode"])
 
-    def test_cancelling_the_harness_picker_runs_nothing(self):
-        rc, _, tty = self._menu([app.tui.Selected(1), None, None])
+    def test_cancelling_the_guided_wizard_runs_nothing(self):
+        with mock.patch.object(app.onboarding, "run", return_value=False):
+            rc, _, tty = self._menu([self._pick("configurar"), None])
         self.assertEqual(rc, 0)
         tty.assert_not_called()
 
-    def test_menu_items_start_with_estado_general(self):
-        self.assertIn("Estado general", app.MENU_ITEMS[0])
+    def test_salir_is_last_and_ends_the_session_in_both_modes(self):
+        for experto in (False, True):
+            rows = app.visible_actions(experto=experto)
+            self.assertEqual(rows[-1].key, "salir")
+            rc, _, _ = self._menu([self._pick("salir", experto=experto)], experto=experto)
+            self.assertEqual(rc, 0)
+
+    def test_engineering_surfaces_are_hidden_until_expert_mode_is_on(self):
+        simple = {action.key for action in app.visible_actions(experto=False)}
+        expert = {action.key for action in app.visible_actions(experto=True)}
+        for key in ("vault", "mcps", "plugins", "herramientas", "proponer", "hosts"):
+            self.assertNotIn(key, simple, f"{key} no debería estar en el modo simple")
+            self.assertIn(key, expert, f"{key} debería estar en el modo experto")
+        self.assertEqual(simple, expert - {"vault", "mcps", "plugins", "herramientas",
+                                           "proponer", "hosts"})
+
+    def test_modo_toggles_expert_mode_and_nothing_else(self):
+        with mock.patch.object(app, "write_app_config") as writer:
+            rc, _, _ = self._menu([self._pick("modo"), None])
+        self.assertEqual(rc, 0)
+        writer.assert_called_once_with(experto=True)
+
+    def test_every_visible_label_is_one_cell_per_character_and_free_of_emoji(self):
+        """ADR-0050's real rule (ADR-0075 restates it): a label carries text, never a
+        decorative glyph, so nothing in it can have a font-dependent width. This admits
+        accented Spanish -- which `isascii()` used to reject -- and still refuses U+23FB,
+        the symbol that motivated the original pin."""
+        import ui
+        labels = [action.label for action in app.visible_actions(experto=True)]
+        labels += [label for label, _ in app.HARNESS_CHOICES]
+        labels += [target.label for target in app.onboarding.TARGETS]
+        labels += [preset.label for preset in app.onboarding.PRESETS]
+        labels += list(app.HOST_LABELS.values())
+        for label in labels:
+            self.assertTrue(ui.is_safe_label(label), f"etiqueta con glifo prohibido: {label!r}")
+            self.assertEqual(ui.cell_width(label), len(label), f"ancho variable en: {label!r}")
+            self.assertEqual(label, label.strip(), f"espacio al borde en: {label!r}")
+            self.assertNotIn("  ", label, f"doble espacio en: {label!r}")
 
 
 if __name__ == "__main__":
@@ -301,3 +359,80 @@ class DoctorAllProgressTests(unittest.TestCase):
         self.assertNotIn("\r", out)
         self.assertNotIn("\x1b", out)
         self.assertIn("consultando proveedores: listo", out)
+
+
+class InteractiveNavigationTests(unittest.TestCase):
+    """Tests for Vim keys (hjkl/q), direct numeric keys (1-9), left/right arrows, and `ui`."""
+
+    def test_vim_keys_navigate_and_select(self):
+        import tui
+        state = tui.PickerState(items=("Opcion A", "Opcion B", "Opcion C"))
+        self.assertEqual(state.cursor, 0)
+        # 'j' moves down
+        s2 = tui.reduce(state, tui.KeyEvent("CHAR", "j"))
+        self.assertEqual(s2.cursor, 1)
+        # 'k' moves up
+        s3 = tui.reduce(s2, tui.KeyEvent("CHAR", "k"))
+        self.assertEqual(s3.cursor, 0)
+        # 'l' selects
+        s4 = tui.reduce(s2, tui.KeyEvent("CHAR", "l"))
+        self.assertEqual(s4.result, tui.Selected(1))
+        # 'h' cancels
+        s5 = tui.reduce(s2, tui.KeyEvent("CHAR", "h"))
+        self.assertIsNone(s5.result)
+        # 'q' cancels
+        s6 = tui.reduce(s2, tui.KeyEvent("CHAR", "q"))
+        self.assertIsNone(s6.result)
+
+    def test_numeric_keys_direct_selection(self):
+        import tui
+        state = tui.PickerState(items=("Opcion 1", "Opcion 2", "Opcion 3", "Opcion 4"))
+        # Press '3' selects index 2
+        s = tui.reduce(state, tui.KeyEvent("CHAR", "3"))
+        self.assertEqual(s.result, tui.Selected(2))
+        # Press '1' selects index 0
+        s1 = tui.reduce(state, tui.KeyEvent("CHAR", "1"))
+        self.assertEqual(s1.result, tui.Selected(0))
+
+    def test_left_right_keys(self):
+        import tui
+        state = tui.PickerState(items=("Alpha", "Beta"))
+        # RIGHT selects current
+        s_right = tui.reduce(state, tui.KeyEvent("RIGHT"))
+        self.assertEqual(s_right.result, tui.Selected(0))
+        # LEFT cancels
+        s_left = tui.reduce(state, tui.KeyEvent("LEFT"))
+        self.assertIsNone(s_left.result)
+
+    def test_decode_keys_left_right(self):
+        import tui
+        events, rem = tui.decode_keys(b"\x1b[C\x1b[D")
+        self.assertEqual(rem, b"")
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0].kind, "RIGHT")
+        self.assertEqual(events[1].kind, "LEFT")
+
+    def test_ui_rule_and_cache(self):
+        import ui
+        line = ui.rule("Test Title", width=60)
+        self.assertIn("Test Title", line)
+        self.assertIn("─", line)
+
+        # SessionCache
+        cache = ui.SessionCache(ttl_seconds=10.0)
+        compute_count = 0
+
+        def compute():
+            nonlocal compute_count
+            compute_count += 1
+            return "computed_val"
+
+        v1 = cache.get_or_compute("key", compute)
+        v2 = cache.get_or_compute("key", compute)
+        self.assertEqual(v1, "computed_val")
+        self.assertEqual(v2, "computed_val")
+        self.assertEqual(compute_count, 1)  # cached, not recomputed
+
+        cache.invalidate("key")
+        v3 = cache.get_or_compute("key", compute)
+        self.assertEqual(compute_count, 2)  # recomputed after invalidation

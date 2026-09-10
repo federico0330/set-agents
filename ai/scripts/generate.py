@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -492,9 +493,23 @@ def _roster_filtered_role_tiers(roles, role_tiers):
     return role_tiers
 
 
-def generate(out, roles_path=None, models_path=None, routes_path=None):
-    roles = load_roles(roles_path, models_path)
+def generate(out, roles_path=None, models_path=None, routes_path=None, *, effective=False):
+    """Generate a factory tree by default, or an instance-effective local tree.
+
+    The effective view is deliberately opt-in: tracked ``Global/`` artifacts must
+    remain reproducible from ``models.toml`` alone.  ``load_roles`` accepts a file,
+    so serialize the in-memory view only to a private temporary file while resolving
+    it; no caller-visible configuration is written or changed.
+    """
     config = models_config.load_config(models_path)
+    if effective:
+        config = models_config.effective_models_config(config)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".toml") as handle:
+            handle.write(models_config.emit(config))
+            handle.flush()
+            roles = load_roles(roles_path, handle.name)
+    else:
+        roles = load_roles(roles_path, models_path)
     role_tiers = _roster_filtered_role_tiers(roles, models_config.load_role_tiers(config))
     variant_names = sorted(f"{role}@{tier}" for role, tiers in role_tiers.items() for tier in tiers)
     yolo = models_config.permission_profile(models_path) == "yolo"
@@ -861,9 +876,11 @@ def main():
     parser.add_argument("--roles")
     parser.add_argument("--models")
     parser.add_argument("--routes")
+    parser.add_argument("--effective", action="store_true",
+                        help="apply the per-machine models overlay (local installs only)")
     args = parser.parse_args()
     try:
-        generate(Path(args.output), args.roles, args.models, args.routes)
+        generate(Path(args.output), args.roles, args.models, args.routes, effective=args.effective)
     except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
         print(f"CHECK_FAILED: {exc}", file=sys.stderr)
         return 2

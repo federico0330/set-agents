@@ -515,18 +515,33 @@ def cmd_record_spawn(args: argparse.Namespace) -> int:
                     counter={"scope": "frontier", "key": "used", "grain": "feature"},
                 )
         attempts["spawns"] = attempts.get("spawns", 0) + 1
-        # AC-01: the id is always derived from the counter, never from
-        # len(package["spawns"]) -- a package that already had spawns recorded before
-        # this feature existed (e.g. attempts.spawns=8, no spawns[] key at all, the
-        # exact shape of 006's own P3 package) continues the SAME counter: its next
-        # spawn is SPAWN-009, not SPAWN-001.
+        # AC-01: normally the id follows the counter, never len(package["spawns"])
+        # -- a package that already had spawns recorded before this feature existed
+        # (e.g. attempts.spawns=8, no spawns[] key at all) continues at SPAWN-009.
+        # A resolved spawn-budget blocker resets that counter, however, while retaining
+        # provenance; in that one legitimate reset shape, continue after history.
         spawn_id = f"SPAWN-{attempts['spawns']:03d}"
         spawns = package.setdefault("spawns", [])
         if any(item.get("spawn_id") == spawn_id for item in spawns):
-            # Defense in depth against a desynced counter. Reachable only by a
-            # hand-corrupted fixture -- no real caller ever provides spawn_id, only
-            # this command mints it.
-            raise StateError(f"spawn {spawn_id} already exists on {args.package_id}: counter out of sync")
+            reset_spawn_budget = any(
+                blocker.get("package_id") == args.package_id
+                and blocker.get("resolved_at")
+                and isinstance(blocker.get("counter"), dict)
+                and blocker["counter"].get("scope") == "attempts"
+                and blocker["counter"].get("key") == "spawns"
+                for blocker in data.get("blockers", [])
+            )
+            if not reset_spawn_budget:
+                # Defense in depth against a desynced counter. Reachable only by a
+                # hand-corrupted fixture -- no real caller ever provides spawn_id, only
+                # this command mints it.
+                raise StateError(f"spawn {spawn_id} already exists on {args.package_id}: counter out of sync")
+            historical_ids = [
+                int(match.group(1))
+                for item in spawns
+                if (match := re.fullmatch(r"SPAWN-(\d+)", str(item.get("spawn_id", ""))))
+            ]
+            spawn_id = f"SPAWN-{max(historical_ids) + 1:03d}"
         client, tech = resolve_dual_register(args)
         entry = {
             "spawn_id": spawn_id,

@@ -1,61 +1,19 @@
-# models.toml — model routing source of truth (subscriptions, areas, role overrides).
-# Edit by hand or via ./setup-models.sh; the wizard rewrites this file
-# deterministically and does not preserve standalone comments.
+# models.toml — factory model routing (subscriptions, areas, role overrides).
+# Instance taste (wizard Overrides / --set on areas|roles) writes STATE_DIR/models.local.toml
+# (ADR-0071) and never dirties this tracked file. Catalog/routing edits still land here.
 schema = 2
 
 [subscriptions]
-# ADR-0029/ADR-0048 (024 C2, AC-03): ausente = auto for every provider -- the tracked
-# repo declares no machine's credentials. A third-party clone starts here: the probe
-# decides live, and a first `./build.sh`/`--route-decide` neither dies nor lies about
-# a subscription nobody has. Your OWN machine's true/false pins (curated intent that
-# should survive "ausente = auto") live beside this file, never in it: run
-# `./setup-models.sh` (Suscripciones) or `./setup-models.sh --add|--drop <name>` --
-# both write the per-machine overlay (`$STATE_DIR/subscriptions.local.toml`), never
-# this tracked file, so using them can never dirty the tree or block `--update`.
 
 [catalog]
 claude = ["fable", "haiku", "opus", "sonnet"]
 codex = ["gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]
 codex_effort = ["high", "low", "medium", "xhigh"]
-# 034 / ADR-0063: measured Cursor frontmatter slugs (V-D01, 2026-08-19).
-# Sources: https://cursor.com/docs/subagents (composer-2, composer-2.5,
-# composer-2.5[fast=false], gpt-5.6-sol, claude-opus-5, claude-opus-5[effort=high],
-# inherit) and https://cursor.com/docs/models-and-pricing (Cursor Models pool:
-# Grok 4.6 / Grok 4.5 / Composer 2.5; Other Models GPT-5.6 Luna through Sol,
-# Claude Opus 5). Pin outside this list → die. Not a routing lane.
 cursor = ["claude-opus-5", "claude-opus-5[effort=high]", "composer-2", "composer-2.5", "composer-2.5[fast=false]", "gpt-5.6-luna", "gpt-5.6-sol", "grok-4.5", "grok-4.6", "inherit"]
-# ADR-0042 (022 PKG-2, AC-04): tri-state declared ceiling for the two OpenCode-lane
-# providers (routing_core/catalog.py's `resolve_ceiling`, consumed by `_probe_pairs`,
-# `_read_probe_cache`, and `build_snapshot` alike) — bare model ids (no provider prefix,
-# same convention as claude/codex above). Three shapes, all valid TOML for this key:
-#   - present as a non-empty list (today's state, both keys below): "curated" — the
-#     audited ceiling every probed/routed model for that provider must be a member of.
-#   - ABSENT entirely: "auto" — no ceiling; whatever the live probe reports for that
-#     provider routes as-is, unfiltered. (Removing a key below, not emptying it, opts a
-#     provider INTO auto.)
-#   - present as `[]`: "veto" — curated, explicit "never route this provider", even if
-#     the live probe would otherwise show it authenticated with real models.
-# `claude`/`codex`/`codex_effort` above do NOT get this tri-state — they stay mandatory,
-# non-empty lists (`models_config.load_config` dies otherwise); only `opencode_zen`/
-# `opencode_go` (and any future provider with no dedicated key at all) are tri-state.
-# Re-measured live 2026-08-12 against `opencode models opencode --pure` (61 ids) /
-# `opencode models opencode-go --pure` (18 ids); this allowlist curates 60 of the 61
-# zen ids (a one-id snapshot drift, not a defect). ADR-0034's `[routing].
-# discovered_providers = "auto"` is a SEPARATE axis from this ceiling: it derives its
-# candidate PROVIDER set from the live probe intersected against the audited pair table,
-# while THIS ceiling bounds which MODELS of an already-candidate provider are curated
-# (when curated) or left unfiltered (when auto/absent) — `resolve_discovered_providers`
-# can never exceed either. The curated `routes.v1.toml` path stays closed regardless of
-# this ceiling's state: neither OpenCode-lane provider is in `routes.v1.toml`,
-# `[routing].enabled_providers`, or `models_config.ROUTING_PROVIDERS` — a curated row
-# that named one anyway would fail `CATALOG_CEILING_REQUIRED` unless this ceiling were
-# "curated" for it (AC-06).
 opencode_zen = ["big-pickle", "claude-fable-5", "claude-haiku-4-5", "claude-opus-4-5", "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-sonnet-4", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-sonnet-5", "deepseek-v4-flash", "deepseek-v4-flash-free", "deepseek-v4-pro", "gemini-3-flash", "gemini-3.1-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "glm-5", "glm-5.1", "glm-5.2", "gpt-5", "gpt-5-codex", "gpt-5-nano", "gpt-5.1", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini", "gpt-5.2", "gpt-5.2-codex", "gpt-5.3-codex", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-pro", "gpt-5.5", "gpt-5.5-pro", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "grok-4.5", "grok-build-0.1", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "laguna-s-2.1-free", "ling-3.0-tiny-free", "longcat-2.0-free", "mimo-v2.5-free", "minimax-m2.5", "minimax-m2.7", "minimax-m3", "nemotron-3-ultra-free", "north-mini-code-free", "qwen3.5-plus", "qwen3.6-plus"]
 opencode_go = ["deepseek-v4-flash", "deepseek-v4-pro", "glm-5.1", "glm-5.2", "gpt-5.6-luna", "grok-4.5", "hy3", "kimi-k2.6", "kimi-k2.7-code", "kimi-k3", "mimo-v2.5", "mimo-v2.5-pro", "minimax-m2.7", "minimax-m3", "qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-max"]
 
 [session]
-# Single OpenCode dimension (033 PKG-1): keep the former go-zen small model.
-# openai-only's gpt-5.4-mini is dropped with that lane.
 opencode_small_model = "opencode/north-mini-code-free"
 
 [permissions]
@@ -90,127 +48,73 @@ incident_spawns = 2
 
 [areas.coord]
 claude = "sonnet"
-codex = "gpt-5.6-terra"
+codex = "gpt-5.6-sol"
 codex_effort = "high"
-# ADR-0044 puso al coordinador en `opencode-go/grok-4.5` porque esa lane es subscription-billed
-# y no consumia el presupuesto por token de Copilot ni de zen. Medido en uso real (Federico,
-# 2026-08-18): la cuota DIARIA de opencode-go se agota antes de terminar una sola sesion de
-# coordinacion, asi que "subscription-billed" no significo "presupuesto suficiente" — significo
-# un techo mas duro y menos visible. Decision del usuario: el orquestador vuelve a la lane
-# openai-codex. `openai/gpt-5.5` ya esta curado en [catalog].opencode_zen y en [areas.audit] /
-# [areas.judge], y no colisiona con ningun [roles.<role>.tiers.*] (todos son luna/sol/terra).
-opencode = "openai/gpt-5.5"
 cursor = "composer-2.5"
+opencode = "openai/gpt-5.5"
 
 [areas.analysis]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = "openai/gpt-5.4-fast"
 cursor = "composer-2.5"
+opencode = "openai/gpt-5.4-fast"
 
 [areas.docs]
 claude = "sonnet"
 codex = "gpt-5.6-sol"
 codex_effort = "high"
-opencode = "openai/gpt-5.4-fast"
-# AC-D.2: product-analyst / architect MAY pin frontier. claude-opus-5 is a
-# distinct family from the cheap writer (composer-2.5).
 cursor = "claude-opus-5"
+opencode = "openai/gpt-5.4-fast"
 
 [areas.implement]
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
-# ADR-0060 (034 PKG-B): BASE cheap/free cell for every code-rw role. billing_rank==0
-# plus writer tools floor; prefer -free among rank 0. NEVER put this opencode/*
-# id into [roles.*.tiers.*] — generate.py:_opencode_projected_route only projects
-# openai/<M> and the variant-coherence gate dies. Feature-new default is this BASE,
-# never writer_tier=fast / implementer@fast (luna/sol/terra stay the @tier ladder).
-opencode = "opencode/deepseek-v4-flash-free"
-# Cursor counterpart of the cheap BASE writer (V-D01: Composer 2.5 is in the
-# Cursor Models pool at $0.5). repair-agent inherits this; salvage/promote are
-# Task-tool model overrides, never a heavy frontmatter pin.
 cursor = "composer-2.5"
+opencode = "opencode/deepseek-v4-flash-free"
 
 [areas.gate]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = "openai/gpt-5.4-mini"
 cursor = "composer-2.5"
+opencode = "openai/gpt-5.4-mini"
 
 [areas.audit]
-# 015-anthropic-dispatch-parity AC-06(b) (round 3, decision 1): was "opus" -- collided with the
-# anthropic-frontier route's curated "opus" model once claude-code became a real dispatch target
-# (`## Contexto` §G-bis). "fable" collides with NOTHING on this tree: not the three curated
-# anthropic route models (haiku/sonnet/opus), not [areas.implement].claude ("sonnet", the
-# collision round 2's rejected "sonnet" fix would have introduced), and not any other
-# [areas.*]/[roles.*].claude value -- live-verified `fable` -> `claude-fable-5`, distinct from
-# `opus` -> `claude-opus-5`. See docs/adr/0019-anthropic-dispatch-parity.md.
 claude = "fable"
 codex = "gpt-5.6-sol"
 codex_effort = "xhigh"
-# 015 AC-06(a): go-zen was "openai/gpt-5.6-sol" -- an exact same-provider-and-same-model collision
-# with [roles.implementer.tiers.balanced].opencode."go-zen" (also "openai/gpt-5.6-sol"), letting a
-# BASE (non-routed) audit reviewer on OpenCode coincide with a DYNAMICALLY tiered implementer@balanced
-# writer. Realigned to "openai/gpt-5.5", matching this area's own zen/openai-only lanes, which collides with
-# no [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree.
-opencode = "openai/gpt-5.5"
-# DEC-ROLES-FRONTIER: spec-challenger, package-reviewer (audit). Distinct
-# family from implementer's composer-2.5 (V-D02: family() returns the raw slug).
 cursor = "gpt-5.6-sol"
+opencode = "openai/gpt-5.5"
 
 [areas.judge]
-# 015 AC-06(b): same fix, same reason as [areas.audit].claude above.
 claude = "fable"
 codex = "gpt-5.6-sol"
 codex_effort = "xhigh"
-# 015 repair (panel RP-01, F-02, user decision: widen AC-06(a)): go-zen was
-# "openai/gpt-5.6-sol" -- the IDENTICAL same-provider-and-same-model collision AC-06(a)
-# already closed for [areas.audit] above, left open here because the original AC-06(i)
-# regression test's role-side universe (`models_config.IMPLEMENT_DUTIES`) never covered
-# the four audit-duty tiered roles at all. Realigned to "openai/gpt-5.5", the SAME value
-# and SAME reasoning as [areas.audit].opencode."go-zen" -- collides with no
-# [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value
-# is one of luna/sol/terra, never "gpt-5.5"). See docs/adr/0019-anthropic-dispatch-parity.md D8.
-opencode = "openai/gpt-5.5"
-# DEC-ROLES-FRONTIER: adversarial-judge. Same family as audit, distinct from
-# implementer's composer-2.5.
 cursor = "gpt-5.6-sol"
+opencode = "openai/gpt-5.5"
 
 [areas.release]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = "openai/gpt-5.4-mini"
 cursor = "composer-2.5"
+opencode = "openai/gpt-5.4-mini"
 
 [areas.memory]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-opencode = "openai/gpt-5.4-mini"
 cursor = "composer-2.5"
+opencode = "openai/gpt-5.4-mini"
 
 [areas.ops]
 claude = "haiku"
 codex = "gpt-5.6-luna"
 codex_effort = "low"
-# 015 repair, round 2 (user decision: fix the named [areas.ops] residual from AC-06(a)'s
-# widened generic scan -- see docs/adr/0019-anthropic-dispatch-parity.md D8): go-zen was
-# "openai/gpt-5.6-terra", an exact same-provider-and-same-model collision with
-# [roles.<tiered-role>.tiers.frontier].opencode."go-zen" (also "openai/gpt-5.6-terra") across
-# all six tiered-role ladders, letting a BASE (non-routed) ops area coincide with a
-# DYNAMICALLY tiered frontier writer -- the same collision class already closed for
-# [areas.audit] and [areas.judge] this session. Realigned to "openai/gpt-5.4-mini", matching
-# this area's own zen/openai-only lanes AND its sibling operational areas ([areas.gate],
-# [areas.release], [areas.memory], which share this area's claude/codex/codex_effort triplet
-# and already used this exact go-zen value) -- collides with no
-# [roles.<tiered-role>.tiers.*].opencode."go-zen" value on this tree (every tiered value is
-# one of luna/sol/terra, never "gpt-5.4-mini").
-opencode = "openai/gpt-5.4-mini"
 cursor = "composer-2.5"
+opencode = "openai/gpt-5.4-mini"
 
 [roles.agent-factory]
 claude = "opus"
@@ -232,12 +136,6 @@ opencode = "opencode/nemotron-3-ultra-free"
 [roles.debugger]
 codex_effort = "high"
 
-# Per-role OpenCode tier tables (contract 004 / AC-06). These are the ONLY
-# consumers of MODEL_TIERS: the tier table IS the declaration of the OpenCode
-# row per (role, tier); generate.py's build-time coherence gate requires every
-# declared model here to project to EXACTLY ONE routes.v1.toml row (openai-codex
-# provider, matching tier, role-compatible) — see models_config.load_role_tiers.
-# Collapsed from three identical lane values (033 PKG-1 AC-1.5).
 [roles.debugger.tiers.fast]
 opencode = "openai/gpt-5.6-luna"
 
@@ -246,6 +144,8 @@ opencode = "openai/gpt-5.6-sol"
 
 [roles.debugger.tiers.frontier]
 opencode = "openai/gpt-5.6-terra"
+
+[roles.delta-reviewer]
 
 [roles.delta-reviewer.tiers.fast]
 opencode = "openai/gpt-5.6-luna"
@@ -256,6 +156,8 @@ opencode = "openai/gpt-5.6-sol"
 [roles.delta-reviewer.tiers.frontier]
 opencode = "openai/gpt-5.6-terra"
 
+[roles.finding-verifier]
+
 [roles.finding-verifier.tiers.fast]
 opencode = "openai/gpt-5.6-luna"
 
@@ -264,6 +166,8 @@ opencode = "openai/gpt-5.6-sol"
 
 [roles.finding-verifier.tiers.frontier]
 opencode = "openai/gpt-5.6-terra"
+
+[roles.implementer]
 
 [roles.implementer.tiers.fast]
 opencode = "openai/gpt-5.6-luna"
@@ -279,6 +183,8 @@ opencode = "opencode/deepseek-v4-flash-free"
 
 [roles.package-planner]
 codex = "gpt-5.6-terra"
+
+[roles.package-reviewer]
 
 [roles.package-reviewer.tiers.fast]
 opencode = "openai/gpt-5.6-luna"
@@ -303,6 +209,8 @@ codex = "gpt-5.6-luna"
 claude = "sonnet"
 codex = "gpt-5.6-terra"
 codex_effort = "medium"
+
+[roles.security-auditor]
 
 [roles.security-auditor.tiers.fast]
 opencode = "openai/gpt-5.6-luna"

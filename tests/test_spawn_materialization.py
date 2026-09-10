@@ -324,25 +324,33 @@ class AllowlistTests(unittest.TestCase):
 class WizardPanelTests(unittest.TestCase):
     _CONFIG = {"areas": {}, "roles": {}, "subscriptions": {}, "catalog": {"codex": ["gpt-5.6-sol"]}}
 
-    def test_panel_declares_automatic_policy_and_keeps_the_frozen_markers(self):
-        with mock.patch.object(setup_models, "_load_pins", return_value={}):
-            text = "\n".join(setup_models._panel_lines(self._CONFIG, []))
-        self.assertIn("Automático (recomendado)", text)
-        self.assertIn("DEFAULTS CURADOS", text)
-        self.assertIn("ADR-0030", text)
+    def test_panel_is_human_compact_without_engineering_jargon(self):
+        with mock.patch.object(setup_models, "_load_pins", return_value={}), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
+            lines = setup_models._panel_lines(self._CONFIG, [])
+        text = "\n".join(lines)
+        self.assertLessEqual(len(lines), 3)
+        self.assertIn("Elige solo", text)
+        self.assertNotIn("ADR-", text)
+        self.assertNotIn("DEFAULTS CURADOS", text)
+        self.assertNotIn("models.local.toml", text)
 
-    def test_panel_shows_pinned_roles_with_their_source(self):
+    def test_panel_shows_preference_count_when_pins_exist(self):
         pins = {"architect": ("openai-codex", "gpt-5.6-terra")}
-        with mock.patch.object(setup_models, "_load_pins", return_value=pins):
+        with mock.patch.object(setup_models, "_load_pins", return_value=pins), \
+             mock.patch.object(setup_models.models_config, "load_models_overlay", return_value={}):
             text = "\n".join(setup_models._panel_lines(self._CONFIG, []))
-        self.assertIn("1 pin(s)", text)
-        self.assertIn("architect=openai-codex/gpt-5.6-terra", text)
+        self.assertIn("1 preferencia tuya", text)
 
-    def test_wizard_items_keep_the_pinned_prefix_and_gain_the_routing_action(self):
+    def test_wizard_items_are_end_user_contract(self):
         source = (ROOT / "ai/scripts/setup_models.py").read_text()
-        self.assertIn('"Routing: fijar modelo / automático"', source)
-        self.assertIn('("Cambiar un área", "Cambiar un rol", "Suscripciones", "Guardar", "Salir sin guardar"',
-                      source)
+        self.assertIn('"Dejar que el router elija"', source)
+        self.assertIn('"Preferir un modelo"', source)
+        self.assertIn('"Cuentas"', source)
+        self.assertIn('"Listo"', source)
+        self.assertIn('"Más opciones"', source)
+        self.assertIn('"Avanzado de ingeniería"', source)
+        self.assertIn('"Routing: fijar modelo / automatico"', source)
 
 
 class SelectionPathTests(unittest.TestCase):

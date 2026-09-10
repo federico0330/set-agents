@@ -8,6 +8,7 @@ catalog, MCP servers, and Claude Code plugins.
 """
 
 import argparse
+import dataclasses
 import hashlib
 import json
 import os
@@ -20,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 import urllib.error
 import urllib.request
@@ -32,11 +34,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Importing normally already has this key, so setdefault is behavior-preserving there.
 sys.modules.setdefault("set_agents_app", sys.modules[__name__])
 import coord_policy
+import host_adapters
 import models_config
+import model_state
+import onboarding
 import provider_registry
 import routing
 import set_agents_spawn
 import tui
+import ui
 from routing_core.domain import classify_pi_terminal_error
 
 # SET_AGENTS_ROOT/SET_AGENTS_STATE/SET_AGENTS_ROUTING_TEST_ROOT are test seams; real runs
@@ -454,17 +460,23 @@ def cmd_model_pin_set(role, target):
     for the global default) to one catalog identity; the router honors it as a soft
     override (pin > dynamic > curated fallback) and reports MODEL_PINNED /
     MODEL_PIN_UNAVAILABLE in the decision's reason codes."""
+    import setup_models
     roster_roles = {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
     # ADR-0034 (AC-09): same live-effective-set validation as cmd_model_preference_set.
     provider, model = _validate_model_pin_entry(role, target, roster_roles, _effective_preference_providers())
     # RF14-06: whole-document validation before any merge/re-serialize.
     load_model_preference(roster_roles)
     load_model_pin(roster_roles)
-    doc = _read_model_preference_raw()
-    model_pin = dict(doc.get("model_pin") or {})
-    model_pin[role] = f"{provider}/{model}"
-    doc = {**doc, "model_pin": model_pin}
-    atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    handle = setup_models._locked_preference_writer()
+    try:
+        doc = _read_model_preference_raw()
+        model_pin = dict(doc.get("model_pin") or {})
+        model_pin[role] = f"{provider}/{model}"
+        doc = {**doc, "model_pin": model_pin}
+        atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    finally:
+        setup_models.fcntl.flock(handle.fileno(), setup_models.fcntl.LOCK_UN)
+        handle.close()
     print(f"MODEL_PIN_SET role={role} model={provider}/{model}")
     return 0
 
@@ -472,17 +484,23 @@ def cmd_model_pin_set(role, target):
 def cmd_model_pin_clear(role):
     """ADR-0032: `--model-pin-clear ROLE` — removes ROLE's pin (or `*`'s); an absent pin
     is reported, never an error."""
+    import setup_models
     roster_roles = {row["role"] for row in models_config.load_roster(ROOT / "roles.tsv")}
     load_model_preference(roster_roles)
     load_model_pin(roster_roles)
-    doc = _read_model_preference_raw()
-    model_pin = dict(doc.get("model_pin") or {})
-    if role not in model_pin:
-        print(f"MODEL_PIN_ABSENT role={role}")
-        return 0
-    del model_pin[role]
-    doc = {**doc, "model_pin": model_pin}
-    atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    handle = setup_models._locked_preference_writer()
+    try:
+        doc = _read_model_preference_raw()
+        model_pin = dict(doc.get("model_pin") or {})
+        if role not in model_pin:
+            print(f"MODEL_PIN_ABSENT role={role}")
+            return 0
+        del model_pin[role]
+        doc = {**doc, "model_pin": model_pin}
+        atomic_write(MODEL_PREFERENCE_PATH, _serialize_model_preference(doc))
+    finally:
+        setup_models.fcntl.flock(handle.fileno(), setup_models.fcntl.LOCK_UN)
+        handle.close()
     print(f"MODEL_PIN_CLEARED role={role}")
     return 0
 
@@ -669,11 +687,9 @@ def _append_decision_log(entry: dict) -> None:
 
 
 def cmd_route_decide(source, human=False, fresh=False):
-    # AC-04 (026-orquestador-elige-modelo P2): `model_request` is the ONE new key -- the
-    # closed set stays closed, an unrecognized key stays ROUTING_INPUT_INVALID/rc=2
-    # exactly as before (see the `set(doc) - allowed` check below, untouched shape).
+    # AC-04 (026): `model_request`; ADR-0073 (045): `effort_request` — closed set stays closed.
     allowed = {"role", "task_class", "risk", "review_of_run_id", "selected_runtime", "feature_id",
-               "package_id", "model_request"}
+               "package_id", "model_request", "effort_request"}
     try:
         raw = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
         doc = json.loads(raw)
@@ -693,6 +709,14 @@ def cmd_route_decide(source, human=False, fresh=False):
         # same PARSE-failure/rc=2 path as every other malformed descriptor field above.
         model_request_raw = doc.get("model_request")
         model_request = _validate_model_request(model_request_raw) if model_request_raw is not None else None
+        # ADR-0073: effort_request membership checked at PARSE time against EFFORTS.
+        effort_request_raw = doc.get("effort_request")
+        if effort_request_raw is None:
+            effort_request = None
+        else:
+            if not isinstance(effort_request_raw, str) or effort_request_raw not in models_config.EFFORTS:
+                raise ValueError
+            effort_request = effort_request_raw
     except (OSError, ValueError):
         _routing_output(routing.cli_envelope(False, "route-decide", {}, (), ("ROUTING_INPUT_INVALID",)), human); return 2
     try:
@@ -732,7 +756,7 @@ def cmd_route_decide(source, human=False, fresh=False):
             context_required=needs_context,
             context_present=context_flag, critical_coverage=context_flag, selected_runtime=runtime)
         decision = service.route(request, facts, review_of, unverified_review=unverified_review,
-                                 model_request=model_request)
+                                 model_request=model_request, effort_request=effort_request)
         tier = next((r.tier for r in service.snapshot.routes if r.route_id == decision.route_id), None)
         data = decision.to_dict(); data["tier"] = tier; data["role_class"] = role_class
         # F03: the effective (feature_id, package_id, context_ok) is always in the envelope,
@@ -1010,49 +1034,42 @@ def dim(text):
     return color(text, "2")
 
 
+def accent(text):
+    """Cyan — titles / selected emphasis."""
+    return color(text, "36")
+
+
+def ok(text):
+    return color(text, "32")
+
+
+def warn(text):
+    return color(text, "33")
+
+
+def inverse(text):
+    """Reverse video + cyan — selected picker row."""
+    return color(text, "7;36")
+
+
+def menu_style():
+    """The one style dict every picker in this app receives. Row painting lives in `ui`
+    so a theme change is one module, not a grep across menus."""
+    return {
+        "color": color, "bold": ui.bold, "dim": ui.muted,
+        "accent": ui.accent, "ok": ui.ok, "warn": ui.warn, "inverse": inverse,
+        "selected_row": ui.row_selected if ui.use_color() else None,
+        "unselected_row": ui.row_unselected if ui.use_color() else None,
+        "raw_header": True,
+        "hint": "↑↓ mover · Enter elegir · Esc volver · / buscar",
+    }
+
+
 # --------------------------------------------------------------------- banner
 
-# Two-row half-block wordmark; per-character truecolor gradient cyan -> violet.
-WORDMARK = (
-    "█▀▀ █▀▀ ▀█▀ ▄▄ ▄▀▄ █▀▀ █▀▀ █▄ █ ▀█▀ █▀▀",
-    "▄▄█ █▄▄  █     █▀█ █▄█ █▄▄ █ ▀█  █  ▄▄█",
-)
-GRADIENT = ((0, 229, 255), (167, 80, 255))
-# The app's motif: three agent nodes (one per harness) wired into one system.
-NODES = (("opencode", "38;2;77;208;225"), ("claude", "38;2;217;119;87"), ("codex", "38;2;120;220;120"))
-
-
-def _lerp(t):
-    (r1, g1, b1), (r2, g2, b2) = GRADIENT
-    return (round(r1 + (r2 - r1) * t), round(g1 + (g2 - g1) * t), round(b1 + (b2 - b1) * t))
-
-
-def _gradient_row(row, offset):
-    width = max(1, len(row) - 1)
-    out = []
-    for index, char in enumerate(row):
-        if char == " ":
-            out.append(char)
-            continue
-        r, g, b = _lerp(min(1.0, (index + offset) / width))
-        out.append(f"\033[38;2;{r};{g};{b}m{char}")
-    return "".join(out) + "\033[0m"
-
-
 def banner():
-    if not use_color():
-        print("SET-AGENTS — opencode · claude · codex")
-        return
-    node_rows = [
-        f"  \033[{code}m●\033[0m \033[2m{name:<8}\033[0m" for name, code in NODES
-    ]
-    wire = ["─┐", "─┤", "─┘"]
-    rows = [
-        f"{node_rows[0]}\033[2m{wire[0]}\033[0m   {_gradient_row(WORDMARK[0], 0)}",
-        f"{node_rows[1]}\033[2m{wire[1]}\033[0m   {_gradient_row(WORDMARK[1], 6)}",
-        f"{node_rows[2]}\033[2m{wire[2]}\033[0m   " + dim("un comando · tres agentes · cero drift"),
-    ]
-    print("\n".join(rows))
+    """The product signature, painted by the one visual system (`ui.wordmark`)."""
+    print("\n".join(ui.wordmark("un comando, tus CLIs de IA coordinadas")))
 
 
 def platform_label():
@@ -2303,9 +2320,14 @@ _BACKED_UP = set()
 
 def atomic_write(path, content):
     path = Path(path)
+    if path.is_symlink():
+        raise OSError(f"refusing to write through symlink: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and path not in _BACKED_UP:
-        shutil.copy2(path, str(path) + ".bak")
+        backup = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(6)}.bak")
+        fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as backup_handle, open(path, "rb") as source_handle:
+            shutil.copyfileobj(source_handle, backup_handle)
         _BACKED_UP.add(path)
     fd, temp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -3604,7 +3626,7 @@ def cmd_routing_migrate() -> int:
     return 0
 
 
-def run_tty(command):
+def run_tty(command, *, operation=None):
     """Foreground child with inherited TTY: sudo/login prompts must reach the user. AC-26:
     wrapped with `tui.suspend_terminal()` so a subprocess launched while a picker session is
     still active (nested composition) gets cooked mode for its prompts too -- a no-op under
@@ -3613,8 +3635,16 @@ def run_tty(command):
     with tui.suspend_terminal():
         # Wizards and installers can print a prompt and then read stdin. They must be the
         # exclusive writer while active; an outer spinner would redraw over that prompt.
-        result = subprocess.run(command, check=False).returncode
-    print("ejecutando instalador: listo", file=sys.stderr)
+        try:
+            result = subprocess.run(command, check=False).returncode
+        except OSError:
+            print(ui.err(f"{operation or 'La operación'} no pudo iniciarse. Reintentá."), file=sys.stderr)
+            return 127
+    label = operation or "ejecutando instalador"
+    if result == 0:
+        print(ui.ok(f"{label}: listo"), file=sys.stderr)
+    else:
+        print(ui.err(f"{label}: terminó con error (código {result})"), file=sys.stderr)
     return result
 
 
@@ -3719,53 +3749,54 @@ def table_lines(rows, indent="  "):
 
 
 def _estado_general_lines(data):
-    """The 'Estado general' panel: everything --doctor-all knows, formatted for
-    humans — harnesses with version+auth, install scope, catalog CLIs, live
-    providers. Reuses _status_data's rows (already probed) and the shared probe
-    cache; never prints credential material.
-
-    ADR-0043 (022 PKG-3, AC-10): this is the first-menu-item 'vidriera' surface —
-    probes against the SAME cache root `--route-decide` uses (`_probe_cache_root()`),
-    never the legacy `STATE_DIR` one, and best-effort prunes the stale legacy sibling
-    on the way (same discipline as `_write_probe_cache`).
-
-    AC-19 (022 PKG-5): THE surface this AC names explicitly as "la vidriera" -- what a
-    non-technical user checks to see "¿el harness ya ve mi suscripción nueva?" -- so the
-    `listado`/`usable` split lands here too, not only in `--route-doctor`. `listado` is
-    the raw, pre-ceiling count the provider's own CLI reports; `usable` is what survives
-    the curated ceiling and is therefore actually routable."""
-    lines = ["Harnesses"]
+    """The Estado panel a person reads: what is on this machine, what is missing, and the one
+    thing to do about it. Probe vocabulary (listado=/usable=) stays in --doctor-all."""
+    host_label = {
+        "vivo": "listo",
+        "ausente": "no está",
+        "unlistable": "sin sesión iniciada",
+        "sin lane": "todavía sin lane",
+    }
+    lines = [ui.rule("Tus CLIs de IA"), ""]
+    try:
+        counts = measure_hosts()
+        host_rows = provider_registry.list_host_rows(model_counts=counts)
+        installed = {cli for cli, _, _ in data.get("rows", ())}
+        adjusted = []
+        for host_id, state in host_rows:
+            if state == "unlistable" and host_id in ("claude", "codex", "opencode") and host_id in installed:
+                adjusted.append((HOST_LABELS.get(host_id, host_id), "listo"))
+            elif state == "unlistable" and host_id == "pi":
+                pi = _pi_lane_state()
+                adjusted.append((HOST_LABELS.get(host_id, host_id),
+                                 "listo" if pi in ("yes", "via-pnpm-dlx") else host_label.get(state, state)))
+            else:
+                adjusted.append((HOST_LABELS.get(host_id, host_id), host_label.get(state, state)))
+        lines += table_lines(adjusted)
+    except Exception:
+        lines.append("  No pude revisar las CLIs ahora mismo.")
+    lines += ["", ui.rule("Versiones y sesión"), ""]
     lines += table_lines([(cli, version, auth) for cli, version, auth in data["rows"]])
     lines += table_lines([("pi", {"yes": "instalado", "via-pnpm-dlx": "vía pnpm dlx",
-                                  "no": "FALTA (sin pnpm)"}[_pi_lane_state()], "-")])
+                                  "no": "falta (sin pnpm)"}[_pi_lane_state()], "-")])
     scope = _install_scope()
     if isinstance(scope, list):
-        lines += ["", "Alcance de instalación", *table_lines([(", ".join(scope) or "none",)])]
-    lines.append("")
-    lines.append("Herramientas (catálogo)")
-    lines += table_lines([(name, "instalado" if installed else "falta") for name, installed in _tools_data()])
-    lines.append("")
-    lines.append("Proveedores autenticados (probe)")
-    try:
-        from routing_core.catalog import prune_legacy_probe_cache, probe_listed_and_usable
-        prune_legacy_probe_cache(STATE_DIR)
-        listed, usable = probe_listed_and_usable(models_config.load_config(), cache_root=_probe_cache_root())
-        all_pairs = sorted(set(listed) | set(usable))
-        pairs = [(provider, runtime, f"listado={len(listed.get((runtime, provider), set()))} "
-                                     f"usable={len(usable.get((runtime, provider), set()))}")
-                 for (runtime, provider) in all_pairs]
-        lines += table_lines(pairs) if pairs else ["  (ninguno — logueate en al menos una herramienta)"]
-    except Exception:
-        lines.append("  probe no disponible ahora (corré set-agents --doctor-all)")
+        lines += ["", ui.rule("Dónde está aplicado el harness"), "",
+                  *table_lines([(", ".join(scope) or "en ninguna todavía",)])]
+    lines += ["", ui.rule("Herramientas del catálogo"), ""]
+    lines += table_lines([(name, "instalada" if installed else "falta")
+                          for name, installed in _tools_data()])
     if data["drift"] == "stale":
-        lines += ["", "drift: la instalación quedó atrás del repo → Instalar / Reparar o ./build.sh --install"]
+        lines += ["", f"  {ui.warn(ui.DOT_WARN)} {ui.warn('La instalación quedó atrás del repo. Entrá a Configurar.')}"]
+    lines += ["", ui.kv("Autonomía", postura_actual()),
+              ui.kv("Metodología", metodologia_preferida() or "sin preferencia")]
     return lines
 
 
-# Instalar / Reparar wizard: which AI CLI to install or apply the harness to
-# (gentle-ai-style onboarding); values feed install.sh --harness verbatim.
+# Instalar / Reparar wizard: which AI CLI to install or apply the harness to;
+# values feed install.sh --harness verbatim.
 HARNESS_CHOICES = (
-    ("Todos (recomendado)", "all"),
+    ("Todas (recomendado)", "all"),
     ("Claude Code (incluye el lane pi)", "claude"),
     ("OpenCode", "opencode"),
     ("Codex", "codex"),
@@ -3773,110 +3804,516 @@ HARNESS_CHOICES = (
 )
 
 
-# AC-24/AC-29: the single source of truth for the main menu's order -- Vault sits right
-# before Salir (closing the menu-debt finding: the old numbered grid had it AFTER Salir, at
-# index 9 while Salir was 8). Arrow-key navigation makes the bracketed numbers themselves
-# cosmetic history, not a contract -- README.md/INSTALACION.md (AC-30) describe the selector,
-# not literal [N] numbers.
+# --------------------------------------------------------------- home actions
 #
-# AC-01 (025/D1, ADR-0050): no emoji as structural icons -- they depend on the font, break
-# alignment (proof was already IN this tuple: "🗒  Vault Obsidian"/"⏻  Salir" carried a
-# patched-in second space because those two glyphs render at a different width than every
-# other entry's emoji), and can't be themed. Hierarchy is now carried by `tui._render_items`
-# alone: the `›` marker plus `bold()` on the selected row (already existed, unrelated to this
-# change) IS the espaciado/peso the spec asks for -- consistent one-space `marker + text`,
-# nothing here needs to compensate for glyph width ever again.
-MENU_ITEMS = (
-    "Estado general",
-    "Instalar / Reparar",
-    "Actualizar",
-    "Modelos",
-    "Herramientas (CLIs)",
-    "Proponer herramienta nueva",
-    "MCPs",
-    "Plugins Claude Code",
-    "Vault Obsidian",
-    "Salir",
+# ADR-0074: the home dispatches on a STABLE KEY, never on the row's integer position.
+# The old `if index == 0 ... elif index == 5` ladder made the tests pin integers, and an
+# index pin stays green even when the label it was meant to guard moved to another branch.
+# `key` is the contract; `label` and `hint` are free to be rewritten for humans.
+#
+# Labels obey `ui.is_safe_label`: letters, digits, spaces and a closed punctuation set.
+# Decorative glyphs (the cursor, the state dot) belong to the renderer, never to the text --
+# that is what ADR-0050 actually decided, and it admits accented Spanish while still
+# rejecting a variable-width symbol.
+
+@dataclasses.dataclass(frozen=True)
+class Action:
+    """One row of a menu. `level` is "simple" (everyone) or "experto" (shown only once the
+    user has turned expert mode on, and remembered in app.toml)."""
+
+    key: str
+    label: str
+    hint: str = ""
+    level: str = "simple"
+
+
+HOME_ACTIONS = (
+    Action("estado", "Estado", "qué tenés instalado y qué falta"),
+    Action("configurar", "Configurar", "poné a punto tus CLIs de IA"),
+    Action("modelos", "Modelos", "quién responde y con cuánto esfuerzo"),
+    Action("trabajo", "Forma de trabajo", "cuánto te consulta y con qué método"),
+    Action("actualizar", "Actualizar estado", "revisar CLIs e instalación ahora"),
+    Action("hosts", "Otras CLIs", "agy, copilot y compañía", "experto"),
+    Action("herramientas", "Herramientas", "gh, docker, vercel y demás", "experto"),
+    Action("proponer", "Proponer herramienta", "sumar una al catálogo", "experto"),
+    Action("mcps", "MCPs", "servidores que amplían a los agentes", "experto"),
+    Action("plugins", "Plugins", "extensiones de Claude Code", "experto"),
+    Action("vault", "Vault", "tus notas en Obsidian", "experto"),
+    Action("modo", "Modo experto", "mostrar las opciones de ingeniería"),
+    Action("salir", "Salir"),
 )
+
+HOME_ACTIONS_BY_KEY = {action.key: action for action in HOME_ACTIONS}
+
+
+def experto_activo():
+    return bool(app_config().get("experto", False))
+
+
+def visible_actions(experto=None):
+    """The rows the home shows right now. `modo` flips its own label so the row reads as
+    the destination, not as the current value -- `salir` is always last."""
+    experto = experto_activo() if experto is None else experto
+    rows = []
+    for action in HOME_ACTIONS:
+        if action.level == "experto" and not experto:
+            continue
+        if action.key == "modo":
+            rows.append(dataclasses.replace(
+                action,
+                label="Modo simple" if experto else "Modo experto",
+                hint="ocultar las opciones de ingeniería" if experto
+                     else "mostrar las opciones de ingeniería"))
+            continue
+        rows.append(action)
+    return tuple(rows)
+
+
+def MENU_ITEMS_for(experto=None):
+    return tuple(action.label for action in visible_actions(experto))
+
+
+# Kept as a module-level name because README, docs and several callers read it. Derived,
+# never hand-maintained: the simple-mode home, which is what a new user actually sees.
+MENU_ITEMS = tuple(action.label for action in HOME_ACTIONS if action.level == "simple")
+
+
+def _menu_rows(actions):
+    """Labels padded to a common width with their hint dimmed alongside, so the eye reads a
+    column of verbs and a column of explanations instead of one ragged sentence per row."""
+    width = max((ui.cell_width(a.label) for a in actions), default=0)
+    rows = []
+    for action in actions:
+        if action.hint and ui.use_color():
+            rows.append(f"{ui.pad(action.label, width)}   {ui.muted(action.hint)}")
+        elif action.hint:
+            rows.append(f"{ui.pad(action.label, width)}   {action.hint}")
+        else:
+            rows.append(action.label)
+    return rows
+
+
+# ------------------------------------------------------------------ home paint
+
+# Measuring the hosts costs one subprocess per CLI, and a CLI that is installed but not
+# logged in burns its full timeout before answering "nothing" -- on a machine with agy and
+# copilot present that was ~30 s of dead air on EVERY launch. The counts change when you log
+# in or install something, not minute to minute, so they get the same disk cache with a TTL
+# that the models wizard already uses for its own probes (spec 033 AC-2.3).
+HOST_COUNTS_CACHE = STATE_DIR / "host-counts.json"
+HOST_COUNTS_TTL_SECONDS = 30 * 60
+
+
+def _load_host_counts_cache(now=None, path=None):
+    """Best-effort read; `None` means "no usable cache" (missing, malformed, or expired).
+    Every key is checked against the closed HOSTS universe and every value must be a
+    non-negative int -- a hand-edited file can never inject a host or a bogus count."""
+    cache_path = Path(path) if path is not None else HOST_COUNTS_CACHE
+    try:
+        doc = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(doc, dict):
+        return None
+    at = doc.get("at")
+    if not isinstance(at, (int, float)) or isinstance(at, bool):
+        return None
+    now = time.time() if now is None else now
+    if not 0 <= now - at <= HOST_COUNTS_TTL_SECONDS:
+        return None
+    counts = doc.get("counts")
+    if not isinstance(counts, dict):
+        return None
+    cleaned = {}
+    for host_id, value in counts.items():
+        if host_id not in provider_registry.HOSTS:
+            return None
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            return None
+        cleaned[host_id] = value
+    return cleaned
+
+
+def _write_host_counts_cache(counts, now=None, path=None):
+    cache_path = Path(path) if path is not None else HOST_COUNTS_CACHE
+    payload = json.dumps({"at": time.time() if now is None else now, "counts": counts},
+                         sort_keys=True)
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{cache_path.name}.", dir=cache_path.parent)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, cache_path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    except OSError:
+        pass  # a cache that cannot be written is a slow console, never a broken one
+    return counts
+
+
+def measure_hosts(*, force=False):
+    """Model counts per host: session cache → disk cache (TTL) → real probe. Called from the
+    ONE place that may pay for it -- never from a paint function: `probe_host_model_counts`
+    shells out to each CLI, and a header that measured on every redraw would stall the picker
+    on each keystroke."""
+    if not force:
+        cached = ui.GLOBAL_CACHE.get("host_counts")
+        if cached is not None:
+            return cached
+        cached = _load_host_counts_cache()
+        if cached is not None:
+            ui.GLOBAL_CACHE.set("host_counts", cached)
+            return cached
+    counts = host_adapters.probe_host_model_counts()
+    _write_host_counts_cache(counts)
+    ui.GLOBAL_CACHE.set("host_counts", counts)
+    return counts
+
+
+def measure_hosts_visibly(*, refresh=False):
+    """Measure with the work VISIBLE. `probe_host_model_counts` can take many seconds (one
+    subprocess per CLI, each with its own timeout); doing that from inside the alternate
+    screen leaves the user staring at a blank terminal, because the progress line goes to
+    stderr and the next repaint wipes it. `suspend_terminal()` drops back to the normal
+    screen for the duration -- and is a no-op when no session is active, so the same call
+    works before the first picker and from inside a menu branch."""
+    if refresh:
+        ui.GLOBAL_CACHE.invalidate("host_counts")
+    with tui.suspend_terminal():
+        return tui.with_progress("revisando tus CLIs", lambda: measure_hosts(force=refresh),
+                                 stream=sys.stderr,
+                                 final=lambda _r: "revisando tus CLIs: listo")
+
+
+def _pulse_line():
+    """One honest sentence about this machine, read from the measurement `menu()` already
+    paid for. Cache-only by design: a paint function never probes. When nothing has been
+    measured yet the line says exactly that instead of printing a zero (045 AC-A.2)."""
+    counts = ui.GLOBAL_CACHE.get("host_counts")
+    if counts is None:
+        return "Todavía no revisé tus CLIs."
+    try:
+        rows = provider_registry.list_host_rows(model_counts=counts)
+    except Exception:
+        return "No pude revisar tus CLIs ahora mismo."
+    listas = [host for host, state in rows if state == "vivo"]
+    presentes = [host for host, state in rows if state != "ausente"]
+    if listas:
+        return f"{len(listas)} de {len(presentes)} CLIs listas para trabajar."
+    if presentes:
+        return f"{len(presentes)} CLIs instaladas, ninguna con sesión iniciada todavía."
+    return "Todavía no encontré ninguna CLI de IA en esta máquina."
+
+
+def _home_header(drift, update_badge) -> str:
+    """Wordmark, one honest pulse line, and only the warnings that need action today."""
+    lines = list(ui.wordmark("un comando, tus CLIs de IA coordinadas"))
+    lines.append("")
+    lines.append(f"  {ui.body(_pulse_line())}")
+    avisos = []
+    if drift == "stale":
+        avisos.append("la instalación quedó atrás del repo → Configurar")
+    if update_badge and update_badge not in ("al dia", "al día"):
+        avisos.append(f"actualización: {update_badge}")
+    if avisos:
+        lines.append(f"  {ui.warn(ui.DOT_WARN)} {ui.warn(' · '.join(avisos))}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------------ home loop
+
+def _seed_host_counts_cache():
+    """Cache-only seed for the first home frame — never probes."""
+    if ui.GLOBAL_CACHE.get("host_counts") is None:
+        cached = _load_host_counts_cache()
+        if cached is not None:
+            ui.GLOBAL_CACHE.set("host_counts", cached)
 
 
 def menu():
     print()
     banner()
-    if first_run():
-        print()
-        print(bold(f"Primera vez acá → leé README.md (sección {platform_label()}) para saber qué esperar."))
-        write_app_config(auto_update=True)
-    update_badge = tui.with_progress("chequeando actualizaciones", launch_update_check, stream=sys.stderr,
-                                     final=lambda _r: "chequeando actualizaciones: listo")
-    # Drift regenerates a full staging (~2 s): cache it and refresh only after
-    # actions that can change it, instead of on every redraw.
-    drift = drift_state()
-    style = {"color": color, "bold": bold, "dim": dim}
+    # First frame is cache/absence only.  Slow observations belong to the explicit refresh
+    # action; onboarding is likewise never evaluated on this entry path.
+    _seed_host_counts_cache()
+    drift = ui.GLOBAL_CACHE.get("drift") or "unknown"
+    update_badge = ui.GLOBAL_CACHE.get("update_badge") or "sin revisar"
+    # The model panel owns a small validated disk cache. Reading it is deliberately
+    # allowed on the first frame; it does not launch a probe or touch a session.
+    try:
+        import setup_models
+        setup_models._cached_model_state()
+    except Exception:
+        pass
+    style = menu_style()
+    ctx = {"drift": drift, "update_badge": update_badge}
+    with tui.TerminalSession():
+        while True:
+            actions = visible_actions()
+            header = _home_header(ctx["drift"], ctx["update_badge"])
+            choice = tui.run_picker(_menu_rows(actions), style=style, header=header)
+            if not isinstance(choice, tui.Selected):
+                return 0
+            if _run_home_action(actions[choice.index].key, style, ctx) == "quit":
+                return 0
+
+
+def _run_home_action(key, style, ctx):
+    """One branch per stable key. Returns "quit" to end the session, anything else to stay."""
+    if key == "salir":
+        return "quit"
+    if key == "modo":
+        write_app_config(experto=not experto_activo())
+        return None
+    if key == "configurar":
+        if onboarding.run(_onboarding_ops(), style=style):
+            measure_hosts_visibly(refresh=True)
+            ctx["drift"] = drift_state()
+        return None
+    if key == "estado":
+        estado_panel(style, ctx)
+        return None
+    if key == "modelos":
+        ui.GLOBAL_CACHE.invalidate()
+        if run_tty([str(ROOT / "setup-models.sh")], operation="El asistente de modelos") != 0:
+            print(ui.err("El asistente de modelos terminó con error — mirá la salida de arriba."))
+        return None
+    if key == "actualizar":
+        # Each source may fail independently. Cached valid values stay visible and every
+        # error names a retry instead of leaking a child traceback into the TUI.
+        try:
+            ctx["update_badge"] = tui.with_progress(
+                "chequeando actualizaciones", launch_update_check, stream=sys.stderr,
+                final=lambda _r: "chequeando actualizaciones: listo")
+            ui.GLOBAL_CACHE.set("update_badge", ctx["update_badge"])
+        except Exception:
+            print(ui.warn("No pude actualizar las novedades; podés reintentar."), file=sys.stderr)
+        try:
+            measure_hosts_visibly(refresh=True)
+        except Exception:
+            print(ui.warn("No pude revisar tus CLIs; conservo lo último conocido. Reintentá."), file=sys.stderr)
+        try:
+            ctx["drift"] = tui.with_progress(
+                "revisando la instalación", drift_state, stream=sys.stderr,
+                final=lambda _r: "revisando la instalación: listo")
+            ui.GLOBAL_CACHE.set("drift", ctx["drift"])
+        except Exception:
+            print(ui.warn("No pude revisar la instalación; conservo lo último conocido. Reintentá."), file=sys.stderr)
+        return None
+    if key == "trabajo":
+        preferencias_menu(style)
+        return None
+    if key == "hosts":
+        hosts_menu(style)
+        return None
+    if key == "herramientas":
+        tools_menu()
+        return None
+    if key == "proponer":
+        tools_propose_menu()
+        return None
+    if key == "mcps":
+        mcp_menu()
+        return None
+    if key == "plugins":
+        plugins_menu()
+        return None
+    if key == "vault":
+        vault_menu()
+        return None
+    return None
+
+
+def estado_panel(style, ctx):
+    # Estado is a paint-only view. Measurements happen exclusively in Actualizar estado.
+    estado_lines = [ui.rule("Estado"), "", ui.kv("Instalación", ctx.get("drift", "unknown")),
+                    ui.kv("Actualización", ctx.get("update_badge", "sin revisar")),
+                    "", ui.muted("Para medir de nuevo, elegí Actualizar estado.")]
+    estado_style = {**style, "header_max_lines": 40}
+    auto = "sí" if auto_update_enabled() else "no"
+    choice = tui.run_picker(
+        (f"Actualizarme solo: {auto}", "Volver"),
+        style=estado_style, header="\n".join(estado_lines))
+    if isinstance(choice, tui.Selected) and choice.index == 0:
+        set_auto_update(not auto_update_enabled())
+
+
+# --------------------------------------------------------------- cómo trabaja
+
+def preferencias_menu(style):
+    """Autonomía y metodología. Las etiquetas de postura salen de POSTURAS (ADR-0054), que es
+    la única fuente: la doctrina del orquestador cita esas mismas cadenas."""
+    metodologias = (
+        ("sdd", "Escribir la spec primero", "define qué hay que hacer antes de tocar código"),
+        ("rdd", "Test en rojo primero", "nada se aprueba sin una prueba que falle antes"),
+        ("off", "Sin preferencia", "dejalo elegir según el pedido"),
+    )
     while True:
-        # F-03: this "=== SET-AGENTS sha === / drift: ... | update: ..." banner used to be
-        # print()ed to the normal screen right before `run_picker` switched to the alternate
-        # screen and cleared it -- invisible exactly while the user is choosing. It now also
-        # travels as the menu picker's `header=`, so it stays on screen inside the picker's own
-        # frame too.
-        menu_header = (
-            f"=== SET-AGENTS {short_sha()} ===\n"
-            f"drift: {DRIFT_BADGE[drift]()} | update: {color(update_badge, '36')} | "
-            + dim(f"auto-update: {'on' if auto_update_enabled() else 'off'}")
-        )
-        print()
-        print(menu_header)
-        # AC-29: Esc/Ctrl-C/EOF resolve to `None` INSIDE run_picker (never a raised
-        # EOFError/KeyboardInterrupt reaching here) -- treated the same as picking Salir.
-        choice = tui.run_picker(MENU_ITEMS, style=style, header=menu_header)
-        if not isinstance(choice, tui.Selected):
-            return 0
-        index = choice.index
-        if index == 0:
-            # Estado general: the doctor-all panel, formatted, as the toggle
-            # picker's header (F-03's lesson: print()s die with the alt-screen).
-            drift = drift_state()
-            status_data, estado_lines = tui.with_progress(
-                "relevando estado",
-                lambda: (lambda data: (data, _estado_general_lines(data)))(_status_data(rows=True)),
-                stream=sys.stderr, final=lambda _r: "relevando estado: listo")
-            estado_header = "\n".join([_status_machine_line(status_data), ""] + estado_lines)
-            toggle = tui.run_picker(
-                (f"Togglear auto-update (hoy: {'on' if auto_update_enabled() else 'off'})", "Volver"),
-                style=style, header=estado_header)
-            if isinstance(toggle, tui.Selected) and toggle.index == 0:
-                set_auto_update(not auto_update_enabled())
-        elif index == 1:
-            # gentle-ai-style onboarding: pick which AI CLI to install or apply
-            # the harness to; Esc backs out without running anything.
+        actual_p = postura_actual()
+        actual_m = metodologia_preferida() or "off"
+        p_label = next(label for key, label, _ in POSTURAS if key == actual_p)
+        m_label = next(label for key, label, _ in metodologias if key == actual_m)
+        header = "\n".join([
+            ui.rule("Cómo trabaja"),
+            "",
+            ui.kv("Autonomía", p_label, role="ok"),
+            ui.kv("Metodología", m_label, role="ok"),
+            "",
+        ])
+        choice = tui.run_picker(
+            ("Cambiar autonomía", "Cambiar metodología", "Volver"),
+            style=style, header=header)
+        if not isinstance(choice, tui.Selected) or choice.index == 2:
+            return
+        if choice.index == 0:
             picked = tui.run_picker(
-                [label for label, _ in HARNESS_CHOICES], style=style,
-                header="¿Qué CLI de IA querés instalar o aplicarle el harness?")
+                [f"{label} — {explicacion}" for _, label, explicacion in POSTURAS],
+                style=style, current=None,
+                header="\n".join([ui.rule("Cuánto te consulta"), "",
+                                  f"  {ui.muted('Cuánta libertad tiene el harness para actuar sin preguntarte.')}", ""]))
             if isinstance(picked, tui.Selected):
-                harness = HARNESS_CHOICES[picked.index][1]
-                if run_tty([str(ROOT / "install.sh"), "--harness", harness]) != 0:
-                    print(color("El instalador terminó con error — revisá la salida de arriba.", "31"))
-                drift = drift_state()
-        elif index == 2:
-            if cmd_update() == 0:
-                update_badge = "al día"
-            drift = drift_state()
-        elif index == 3:
-            if run_tty([str(ROOT / "setup-models.sh")]) != 0:
-                print(color("El wizard terminó con error — revisá la salida de arriba.", "31"))
-            drift = drift_state()
-        elif index == 4:
-            tools_menu()
-        elif index == 5:
-            tools_propose_menu()
-        elif index == 6:
-            mcp_menu()
-        elif index == 7:
-            plugins_menu()
-        elif index == 8:
-            vault_menu()
-        elif index == 9:
-            return 0
+                set_postura(POSTURA_KEYS[picked.index])
+                ui.GLOBAL_CACHE.invalidate()
+        elif choice.index == 1:
+            picked = tui.run_picker(
+                [f"{label} — {explicacion}" for _, label, explicacion in metodologias],
+                style=style,
+                header="\n".join([ui.rule("Con qué método"), "",
+                                  f"  {ui.muted('Qué disciplina le exige el harness a los agentes antes de dar algo por hecho.')}", ""]))
+            if isinstance(picked, tui.Selected):
+                set_metodologia(metodologias[picked.index][0])
+                ui.GLOBAL_CACHE.invalidate()
+
+
+# ------------------------------------------------------------------ otras CLIs
+
+HOST_LABELS = ui.HOST_TITLES
+
+HOST_STATE_LABEL = {
+    "vivo": "listo",
+    "ausente": "no está",
+    "unlistable": "sin sesión iniciada",
+    "sin lane": "todavía sin lane",
+}
+
+
+def hosts_menu(style):
+    """Los hosts dejan de ser una lista que se mira: acá se miden y se les elige modelo y
+    esfuerzo. Lo que no se puede hacer hoy (instalarles el harness) no se ofrece."""
+    while True:
+        try:
+            counts = measure_hosts()
+            rows = provider_registry.list_host_rows(model_counts=counts)
+        except Exception:
+            print(ui.err("No pude revisar las CLIs ahora mismo."))
+            return
+        labels = []
+        for host_id, state in rows:
+            detail = HOST_STATE_LABEL.get(state, state)
+            if state == "vivo":
+                detail = f"listo · {counts.get(host_id, 0)} modelos"
+            labels.append(f"{ui.pad(HOST_LABELS.get(host_id, host_id), 16)}{detail}")
+        labels.append("Volver")
+        header = "\n".join([
+            ui.rule("Otras CLIs"),
+            "",
+            f"  {ui.muted('Lo que hay en esta máquina. Elegí una para medirla o fijarle modelo.')}",
+            "",
+        ])
+        choice = tui.run_picker(labels, style=style, header=header)
+        if not isinstance(choice, tui.Selected) or choice.index == len(rows):
+            return
+        host_menu(style, rows[choice.index][0])
+
+
+def host_menu(style, host_id):
+    label = HOST_LABELS.get(host_id, host_id)
+    while True:
+        counts = measure_hosts()
+        state = provider_registry.resolve_host_state(host_id, model_count=counts.get(host_id))
+        adapter = host_adapters.get_adapter(host_id)
+        pinned = models_config.host_pin(host_id)
+        header_lines = [
+            ui.rule(label),
+            "",
+            ui.kv("Estado", HOST_STATE_LABEL.get(state, state),
+                  role="ok" if state == "vivo" else "warn"),
+            ui.kv("Modelos medidos", str(counts.get(host_id, 0))),
+            ui.kv("Modelo elegido", pinned.get("model") or "automático"),
+            ui.kv("Esfuerzo", pinned.get("effort") or "automático"),
+        ]
+        if adapter is not None and adapter.spawn_deferred_reason:
+            header_lines.append(ui.kv("Aviso", adapter.spawn_deferred_reason, role="warn"))
+        header_lines.append("")
+        items = ["Medir de nuevo", "Elegir modelo", "Elegir esfuerzo", "Volver"]
+        choice = tui.run_picker(items, style=style, header="\n".join(header_lines))
+        if not isinstance(choice, tui.Selected) or choice.index == 3:
+            return
+        if choice.index == 0:
+            measure_hosts_visibly(refresh=True)
+        elif choice.index == 1:
+            _host_pick_model(style, host_id, label, adapter)
+        elif choice.index == 2:
+            _host_pick_effort(style, host_id, label)
+
+
+def _host_pick_model(style, host_id, label, adapter):
+    if adapter is None:
+        print(ui.warn(f"{label} no tiene lane todavía — no hay modelo que fijar."))
+        return
+    models = sorted(tui.with_progress(f"listando modelos de {label}", adapter.probe_models,
+                                      stream=sys.stderr) or ())
+    if not models:
+        print(ui.warn(f"{label} no listó ningún modelo. Iniciá sesión en esa CLI y volvé a medir."))
+        return
+    current = models_config.host_pin(host_id).get("model")
+    picked = tui.run_picker(
+        [*models, "Automático (que elija SET)"], style=style, current=current,
+        header="\n".join([ui.rule(f"Modelo de {label}"), "",
+                          f"  {ui.muted('Sólo lo que esta CLI listó recién. Nada inventado.')}", ""]))
+    if not isinstance(picked, tui.Selected):
+        return
+    value = None if picked.index == len(models) else models[picked.index]
+    import setup_models
+    setup_models.write_host_pin_locked(host_id, "model", value)
+    print(ui.ok(f"Listo: {label} = {value or 'automático'}"))
+
+
+def _host_pick_effort(style, host_id, label):
+    current = models_config.host_pin(host_id).get("effort")
+    options = [*host_adapters.EFFORTS, "Automático (que elija SET)"]
+    picked = tui.run_picker(
+        options, style=style, current=current,
+        header="\n".join([ui.rule(f"Esfuerzo de {label}"), "",
+                          f"  {ui.muted('Cuánto piensa antes de responder. Más esfuerzo, más lento y más caro.')}", ""]))
+    if not isinstance(picked, tui.Selected):
+        return
+    value = None if picked.index == len(host_adapters.EFFORTS) else host_adapters.EFFORTS[picked.index]
+    import setup_models
+    setup_models.write_host_pin_locked(host_id, "effort", value)
+    print(ui.ok(f"Listo: esfuerzo de {label} = {value or 'automático'}"))
+
+
+# ------------------------------------------------------- onboarding operations
+
+def _onboarding_ops():
+    """The mutating callables the guided wizard is allowed to run. Passing them in (instead
+    of letting `onboarding.py` import them) is what keeps `patch.object(app, "cmd_...")`
+    working and keeps every mutation inside this module -- ADR-0066's extraction ceiling."""
+    return {
+        "host_rows": lambda: (provider_registry.list_host_rows(
+            model_counts=ui.GLOBAL_CACHE.get("host_counts") or {}),
+            ui.GLOBAL_CACHE.get("host_counts") or {}),
+        "install": lambda harness: run_tty([str(ROOT / "install.sh"), "--harness", harness]),
+        "set_postura": set_postura,
+        "set_metodologia": set_metodologia,
+        "postura_actual": postura_actual,
+        "metodologia_preferida": metodologia_preferida,
+    }
 
 
 # AC-02 (025/D1, ADR-0050) -- three groups, same criterion applied to each: what a
@@ -3971,6 +4408,8 @@ def _build_parser(advanced=False):
         ),
     )
     parser.add_argument("--status", action="store_true", help="estado en una línea (APP_STATUS ...)")
+    parser.add_argument("--model-state", action="store_true",
+                        help="estado de sesión observada, default SET, instalación y routing (solo lectura)")
     parser.add_argument("--route-explain", metavar="TASK_CLASS")
     parser.add_argument("--routing-report", action="store_true",
                         help=_hidden_help(advanced, "USO INTERNO (orquestador) -- reporte de latencia/retención "
@@ -4153,6 +4592,25 @@ def main():
         return 0
     parser = _build_parser(advanced=False)
     args = parser.parse_args()
+
+    # 049: This is deliberately a total, read-only grammar.  It must run before
+    # any dispatch that can write, install, probe routing, or enter the TUI.
+    if args.model_state:
+        allowed = {"model_state", "project", "json"}
+        if any(value != parser.get_default(name) for name, value in vars(args).items() if name not in allowed):
+            print("model-state: no se puede combinar con otra acción", file=sys.stderr)
+            return 2
+        try:
+            project = resolve_project_root(Path.cwd(), args.project)
+        except ValueError:
+            print("model-state: proyecto inválido", file=sys.stderr)
+            return 2
+        state = model_state.collect_model_state(ROOT, project=project)
+        if args.json:
+            print(json.dumps(state, ensure_ascii=False, separators=(",", ":")))
+        else:
+            print(model_state.render_human(state))
+        return 0
 
     # This gate is intentionally outside the ordinary routing modes.  It has no
     # credentials or mock fallback and performs no durable mutation while blocked.

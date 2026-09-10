@@ -1,0 +1,39 @@
+[
+  {
+    "host": "agy",
+    "detected": true,
+    "which": "/home/federico/.local/bin/agy",
+    "models": [],
+    "model_count": 0,
+    "state": "unlistable",
+    "materialize_sample": [
+      "agy",
+      "--print",
+      "--model",
+      "gemini-placeholder",
+      "--effort",
+      "medium"
+    ],
+    "spawn_deferred_reason": null
+  },
+  {
+    "host": "fx",
+    "detected": false,
+    "which": null,
+    "models": [],
+    "model_count": 0,
+    "state": "ausente",
+    "materialize_sample": null,
+    "spawn_deferred_reason": "SPAWN_DEFERRED: fx binary absent or probe contract unverified (measured 2026-08-26: which(fx)=None on this machine; Vercel Labs fx is experimental \u2014 no verified CLI id for probe_models yet)"
+  },
+  {
+    "host": "copilot",
+    "detected": true,
+    "which": "/home/federico/.local/bin/copilot",
+    "models": [],
+    "model_count": 0,
+    "state": "unlistable",
+    "materialize_sample": null,
+    "spawn_deferred_reason": null
+  }
+]

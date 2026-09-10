@@ -33,7 +33,52 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ai/scripts"))
 # that root.  The guard is test infrastructure only: production modules remain
 # unmodified and subprocesses inherit the relocated HOME/TMPDIR/STATE_DIR seams.
 _ORIGINAL_HOME = Path.home().resolve(strict=False)
-_TEST_SANDBOX_HANDLE = tempfile.TemporaryDirectory(prefix="set-agentes-unittest-")
+_SANDBOX_PREFIX = "set-agentes-unittest-"
+# A run that is KILLED leaves its sandbox behind: `TemporaryDirectory` cleans up through a
+# `weakref.finalize`, and no finalizer runs on SIGKILL -- which is what a CI timeout, a
+# `pkill`, or a laptop that dies mid-suite all deliver. Measured 2026-08-31: 35 orphaned
+# sandboxes from 13-17 days earlier, 5.9 GB, on a disk that had hit 99%.
+#
+# There is no in-process fix (SIGKILL cannot be caught), so each run sweeps the corpses of
+# earlier ones. One full day is the threshold: no suite runs anywhere near that long, so a
+# CONCURRENT run's sandbox -- seconds old -- can never be swept by mistake.
+_SANDBOX_MAX_AGE_SECONDS = 24 * 60 * 60
+
+
+def _sweep_stale_sandboxes(parent, *, now=None, max_age=_SANDBOX_MAX_AGE_SECONDS, keep=None):
+    """Delete this run's abandoned predecessors under `parent`. Returns the paths removed.
+
+    Deliberately narrow: only directories whose name starts with `_SANDBOX_PREFIX`, only
+    directly under `parent`, never a symlink, never `keep` (the live sandbox), and only past
+    `max_age`. Never raises -- a sandbox that cannot be removed (permissions, a live mount, a
+    race with another run) is skipped in silence, because failing to tidy up must never be
+    what breaks a test run."""
+    import time as _time
+    now = _time.time() if now is None else now
+    removed = []
+    try:
+        entries = list(Path(parent).iterdir())
+    except OSError:
+        return removed
+    for entry in entries:
+        if not entry.name.startswith(_SANDBOX_PREFIX) or entry == keep:
+            continue
+        try:
+            if entry.is_symlink() or not entry.is_dir():
+                continue
+            if now - entry.stat().st_mtime <= max_age:
+                continue
+        except OSError:
+            continue
+        try:
+            shutil.rmtree(entry)
+        except OSError:
+            continue
+        removed.append(entry)
+    return removed
+
+
+_TEST_SANDBOX_HANDLE = tempfile.TemporaryDirectory(prefix=_SANDBOX_PREFIX)
 _TEST_SANDBOX = Path(_TEST_SANDBOX_HANDLE.name).resolve(strict=False)
 _TEST_HOME = _TEST_SANDBOX / "home"
 _TEST_STATE_DIR = _TEST_SANDBOX / "state"
@@ -56,6 +101,11 @@ if _BWRAP is None and not _DESCENDANT_BOUNDARY_ACTIVE:
     print("descendant-boundary: off (bwrap not found)", file=sys.stderr)
 for _directory in (_TEST_HOME, _TEST_STATE_DIR, _TEST_TMPDIR, _TEST_CHILD_TMPDIR):
     _directory.mkdir(mode=0o700)
+# Sweep AFTER our own sandbox exists, so `keep` can name it and no run can delete itself.
+if os.environ.get("SET_AGENTS_TEST_NO_SWEEP") != "1":
+    _SWEPT = _sweep_stale_sandboxes(_TEST_SANDBOX.parent, keep=_TEST_SANDBOX)
+    if _SWEPT:
+        print(f"sandboxes huérfanos barridos: {len(_SWEPT)}", file=sys.stderr)
 os.environ.update({
     "HOME": str(_TEST_HOME),
     "TMPDIR": str(_TEST_TMPDIR),

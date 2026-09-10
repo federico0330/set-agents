@@ -1,18 +1,24 @@
 # Buenos días — digest del proyecto
 
 <!-- notas:auto -->
-_Ventana: desde `2026-08-24T00:00:00` · generado 2026-08-24T16:22:27+00:00_
+_Ventana: desde `2026-09-10T00:00:00` · generado 2026-09-10T17:05:00+00:00_
 
 ## Necesita tu decisión
 
-- _nada pendiente de tu decisión_ ✅
+- **049-identidad-honesta-modelos** — HUMAN_DECISION_REQUIRED: adversarial-judge FAIL J-049-001 (AC-09 verify.sh rc≠0; cannot green on C2+D2 candidate while 045-048 dirty tree remains unintegrated) and J-049-002 (contract quartet absent from candidate commit; hash taken from root). Options: (1) amend AC-09 to accept hermetic 049 gates already green, (2) land/integrate 045-048 then re-verify, (3) authorize formal waiver of verify for this feature close. (hace 0 días)
 
 ## Qué quedó listo
 
-- **038-tokens-literacy-and-project-label · PKG-1 · orchestrator** — Quedó cerrado el encargo 038. Podés ponerle un nombre libre al proyecto (se ve en las notas), la doctrina que se carga siempre es más corta, el plan tiene que nombrar la función madre con archivo y línea, y el informe de costo cuenta sesiones por encargo sin inventar tokens. No hay commit todavía.
-  - aprendimos: Compactar always-on no alcanza con un techo de líneas: hay que pinnear las frases en los mismos archivos del techo, porque Cursor no estaba en los tests viejos de doctrina. El reset vacío de project_label funciona y ahora tiene test.
-  - conviene ahora: Nada de implementación: el paquete está aceptado. El commit y el push quedan para cuando lo pidas.
-  - por qué ahora: Cerrar el estado ahora evita un digest mentiroso; commitear sin que lo pidas rompería la regla de git del repo.
+- **049-identidad-honesta-modelos · PKG-C2 · repair-agent** — La reparación del candidato aislado cerró los veintitrés hallazgos, pero el techo de líneas del ciclo no lo admite: el encargo queda bloqueado hasta que elijas cómo seguir.
+  - aprendimos: Cerrar veintitrés hallazgos de consola, caché, lock y subprocess en un solo pase supera con creces el techo medium de cien líneas aunque la fundación ya estuviera extendida.
+  - conviene ahora: Decidir entre autorizar el techo para este delta medido y seguir a la revisión delta, achicar el alcance con un respec, o aceptar el bloqueo.
+  - por qué ahora: Sin esa autorización, un segundo repair silencioso violaría el techo; sin techo waiveado no hay delta review ni integración.
+  - alternativa: Autorizar waiver del techo a 315 para este ciclo y continuar delta review; o respec/rescope del repair; o dejar BLOCKED.
+- **049-identidad-honesta-modelos · PKG-C2 · repair-agent** — El segundo repair del delta cerró los cuatro hallazgos restantes, pero el total de líneas quedó por encima del waiver que habías dado: hace falta ampliarlo o frenar.
+  - aprendimos: Un repair de delta obligatorio después de un waiver numérico fijo vuelve a chocar el techo si el número no cubre la segunda pasada.
+  - conviene ahora: Autorizar ampliar el waiver a 416 y seguir con la segunda delta review, o aceptar el bloqueo.
+  - por qué ahora: Sin el número actualizado no hay gate de techo en pass honesto.
+  - alternativa: Ampliar waiver a 416 y continuar; o dejar BLOCKED sin más repair.
 
 ## Qué se está haciendo
 
@@ -24,14 +30,22 @@ _Ventana: desde `2026-08-24T00:00:00` · generado 2026-08-24T16:22:27+00:00_
 
 ## Qué cambió en el software
 
-- **generacion-arboles** — Cursor target in build/install (032-cursor-como-runtime/C1)
-- **generacion-arboles** — Cursor target in build/install (032-cursor-como-runtime/C2)
-- **generacion-arboles** — bootstrap cursor rules (032-cursor-como-runtime/C2)
-- **generacion-arboles** — cursor target (032-cursor-como-runtime/C1)
+- **consola** — Apply/restore/pin writers share one lock; ModelState cache-first home; host refresh isolated; exact readback or pending_apply (049-identidad-honesta-modelos/PKG-C2)
+- **consola** — Apply/restore/pin writers share one lock; ModelState cache-first home; host refresh isolated; exact readback or pending_apply (049-identidad-honesta-modelos/PKG-C2)
+- **consola** — Integration tests prove honest model identity + isolated TTY observation on repaired C2 candidate (049-identidad-honesta-modelos/PKG-D2)
 
-## Quick-fixes
+## Decisiones nuevas
 
-- 040: repair eight stale file:line anchors in docs/modules (done)
+- **Última continuación aislada de PKG-C2** — Por autorización explícita del usuario, FOUNDATION_REF incorpora ai/scripts/tui.py como preexistente sin receipt y se concede una única instancia adicional para completar el candidato C2.
+- **Extender fundación C2 a dependencias integradas** — La reparación aislada puede versionar en una nueva FOUNDATION_REF las versiones actuales de ai/scripts/routing_core/service.py y ai/scripts/provider_registry.py como preexistentes sin receipt; no se atribuyen a 049 ni se transportan como delta C2.
+- **PKG-C2 repair ceiling exceeded after unique retry** — HUMAN_DECISION_REQUIRED: do not open a second repair cycle silently. Options require explicit user authorization: (a) waive/raise the frozen repair ceiling for this measured 315-line delta and continue delta review; (b) authorize a rescope/respec that shrinks the repair surface; (c) accept BLOCKED and stop 049 C2. No delta review, testing, accept, or PKG-D2 until that decision.
+- **Waiver del techo de reparación PKG-C2 a 315** — El usuario autorizó explícitamente el waiver del techo a 315 para este ciclo. No se abre un segundo repair. Se reabre el bloqueo, se registra repair-ceiling pass con evidencia del waiver, y se continúa delta review → testing → runtime QA → accept PKG-C2 → PKG-D2 sobre el delta ya producido.
+- **Segundo repair delta elevó el total a 416** — HUMAN_DECISION_REQUIRED: ampliar el waiver del techo de 315 a 416 para este ciclo (sin tercer repair), o dejar BLOCKED. Sin ampliar, no se puede registrar repair-ceiling pass ni continuar la segunda delta review.
+- **Waiver del techo PKG-C2 ampliado a 416** — Se amplía el waiver del techo a 416 para este ciclo. No hay tercer repair. Se registra repair-ceiling pass con ese total y se continúa la segunda delta review sobre ed7eeec.
+- **Waiver del techo PKG-C2 ampliado a 454** — Se amplía el waiver a 454 para este ciclo; sin cuarto repair de implementación amplia. Continuar 3ª delta review → testing → runtime → accept → D2.
+- **Ampliar frontier PKG-D2 tras FRONTIER_CAP_EXHAUSTED** — Reabrir con autorización del mandato de continuar el plan hasta completar los to-dos; frontier reset para cerrar reparación D2 sin ampliar producto.
+- **Waiver techo reparación PKG-D2 a 170** — Autorizar USER_WAIVER_EXTENDED budget 170 bajo el mandato de continuar el plan hasta completar to-dos; el delta es sólo fixture TTY + evidencia owned.
+- **049 bloqueado por juicio adversario en verify.sh** — Detener DONE. Pedir decisión humana: enmendar AC-09, integrar 045-048 primero, o waiver explícito de verify.
 <!-- /notas:auto -->
 
 ## Notas propias (contenido manual previo, preservado)

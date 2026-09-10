@@ -51,3 +51,8 @@
 | [042](042-reader-trace-aliases/spec.md) | --reader/--trace CLI aliases | Shipped | 2026-08-24 |
 | [043](043-mutate-cas-and-verification-ceilings/spec.md) | mutate file lock and verification waiver ceilings | Shipped | 2026-08-24 |
 | [044](044-cursor-token-honesty/spec.md) | Cursor Section 1 honesty (not measured) | Shipped | 2026-08-24 |
+| [045](045-consola-viva-e-instancia/spec.md) | Live console and local instance overlay | Approved | 2026-08-26 |
+| [046](046-hosts-descubiertos/spec.md) | Discovered hosts registry (PATH) | Approved | 2026-08-26 |
+| [047](047-lanes-agy-fx-copilot/spec.md) | Lanes: agy, fx, Copilot CLI | Approved | 2026-08-26 |
+| [048](048-consola-para-humanos/spec.md) | Console for humans | Approved | 2026-08-31 |
+| [049](049-identidad-honesta-modelos/spec.md) | Honest model identity and console convergence | Approved | 2026-09-09 |

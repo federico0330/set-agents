@@ -2,7 +2,7 @@
 
 _Generado por `feature-state.py`. Cada entrada trae la lectura para el cliente y la justificación de ingeniería. No editar a mano._
 
-Actualizado: 2026-08-24T16:22:26+00:00
+Actualizado: 2026-09-10T17:04:59+00:00
 
 [2026-08-24T15:41:36+00:00] PKG-1 · implementer · started · modelo cursor/grok-4.6 · effort high · spawns 1/8
 Cliente: Se implementó la etiqueta libre del proyecto, se achicó la doctrina que se carga siempre, se pidió que el plan nombre la función madre, y el informe de costo ahora cuenta sesiones por encargo sin inventar tokens.

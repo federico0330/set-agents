@@ -81,6 +81,15 @@ class Selected:
 
 
 @dataclass(frozen=True)
+class Marked:
+    """`reduce()` resolved a MULTI picker (`multi=True`): zero or more item indices, in
+    ascending order. Never produced by a single-selection picker, so no existing caller can
+    receive one by accident."""
+
+    indices: tuple[int, ...]
+
+
+@dataclass(frozen=True)
 class FreeText:
     """`reduce()` resolved the picker to a value the user typed, not one of `state.items`
     (or a bare free-text prompt — a picker constructed with `items=()`)."""
@@ -139,6 +148,11 @@ class PickerState:
     headers: frozenset[int] = frozenset()
     suffixes: tuple[str, ...] = ()
     current: str | None = None
+    # Multi-selection (default off). When `multi` is False every branch below behaves exactly
+    # as it did before the field existed -- that is what keeps the whole single-selection
+    # suite green without one test changing.
+    multi: bool = False
+    marked: frozenset[int] = frozenset()
 
 
 def reduce(state: PickerState, key: KeyEvent) -> PickerState:
@@ -179,21 +193,67 @@ def _step_cursor(state: PickerState, delta: int, *, indices: tuple[int, ...] | N
 
 def _reduce_navigate(state: PickerState, key: KeyEvent) -> PickerState:
     n = len(state.items)
-    if key.kind == "UP":
+    if key.kind in ("UP", "PAGEUP"):
         return state if n == 0 else _step_cursor(state, -1)
-    if key.kind == "DOWN":
+    if key.kind in ("DOWN", "PAGEDOWN"):
         return state if n == 0 else _step_cursor(state, 1)
-    if key.kind == "ENTER":
+    if key.kind == "HOME":
+        selectable = _selectable_indices(state)
+        return replace(state, cursor=selectable[0]) if selectable else state
+    if key.kind == "END":
+        selectable = _selectable_indices(state)
+        return replace(state, cursor=selectable[-1]) if selectable else state
+    if key.kind in ("ENTER", "RIGHT"):
+        if state.multi:
+            return replace(state, result=Marked(tuple(sorted(state.marked))))
         if n == 0 or state.cursor in state.headers:
             return state
         return replace(state, result=Selected(state.cursor))
-    if key.kind == "ESCAPE":
+    if key.kind in ("ESCAPE", "LEFT"):
         return replace(state, result=None)
     if key.kind == "SEARCH":
         return replace(state, mode="search", query="")
     if key.kind == "CHAR" and key.char:
+        # Vim navigation keys
+        if key.char == "k":
+            return state if n == 0 else _step_cursor(state, -1)
+        if key.char == "j":
+            return state if n == 0 else _step_cursor(state, 1)
+        if key.char == "h":
+            return replace(state, result=None)
+        if key.char == "l":
+            if state.multi:
+                return replace(state, result=Marked(tuple(sorted(state.marked))))
+            if n == 0 or state.cursor in state.headers:
+                return state
+            return replace(state, result=Selected(state.cursor))
+        if key.char == "q":
+            return replace(state, result=None)
+        # Space toggles the row under the cursor -- multi mode only. In single mode a space
+        # keeps falling through to the typeahead branch below, exactly as before.
+        if state.multi and key.char == " ":
+            return _toggle_mark(state, state.cursor)
+        # Direct numeric selection '1'..'9' -- a toggle when the picker is multi.
+        if key.char in "123456789":
+            selectable = _selectable_indices(state)
+            num_idx = int(key.char) - 1
+            if num_idx < len(selectable):
+                target = selectable[num_idx]
+                if state.multi:
+                    return _toggle_mark(state, target)
+                return replace(state, result=Selected(target))
         return _retarget_cursor(replace(state, mode="search", query=key.char), is_search=True)
     return state
+
+
+def _toggle_mark(state: PickerState, index: int) -> PickerState:
+    """Flip one row's mark. A section header is never markable (same rule that keeps it
+    unselectable in single mode)."""
+    if index in state.headers or not (0 <= index < len(state.items)):
+        return state
+    marked = set(state.marked)
+    marked.symmetric_difference_update({index})
+    return replace(state, marked=frozenset(marked))
 
 
 def _sanitize_paste(payload: str) -> str:
@@ -334,23 +394,31 @@ def decode_keys(buf: bytes) -> tuple[list[KeyEvent], bytes]:
                 if i + 2 >= n:
                     return events, buf[i:]
                 third = buf[i + 2]
-                if third in (0x41, 0x42):  # 'A' / 'B'
-                    events.append(KeyEvent("UP" if third == 0x41 else "DOWN"))
+                if third in (0x41, 0x42, 0x43, 0x44):  # 'A' / 'B' / 'C' / 'D'
+                    kind = "UP" if third == 0x41 else "DOWN" if third == 0x42 else "RIGHT" if third == 0x43 else "LEFT"
+                    events.append(KeyEvent(kind))
                     i += 3
                     continue
                 if second == 0x5B:
-                    # An unrecognized CSI sequence: consume through its final byte
-                    # (0x40-0x7e) rather than emitting UNKNOWN per-byte and risking a stray
-                    # 'A'/'B' inside its parameters being misread as an arrow key later.
+                    # Consume CSI sequence through its final byte (0x40-0x7e)
                     j = i + 2
                     while j < n and not (0x40 <= buf[j] <= 0x7E):
                         j += 1
                     if j >= n:
                         return events, buf[i:]
-                    events.append(KeyEvent("UNKNOWN"))
+                    final_byte = buf[j]
+                    if final_byte in (0x41, 0x42, 0x43, 0x44):
+                        kind = "UP" if final_byte == 0x41 else "DOWN" if final_byte == 0x42 else "RIGHT" if final_byte == 0x43 else "LEFT"
+                        events.append(KeyEvent(kind))
+                    elif final_byte == 0x48:
+                        events.append(KeyEvent("HOME"))
+                    elif final_byte == 0x46:
+                        events.append(KeyEvent("END"))
+                    else:
+                        events.append(KeyEvent("UNKNOWN"))
                     i = j + 1
                     continue
-                events.append(KeyEvent("UNKNOWN"))  # unrecognized SS3 (\x1bO<x>, x not A/B)
+                events.append(KeyEvent("UNKNOWN"))  # unrecognized SS3 (\x1bO<x>, x not A/B/C/D)
                 i += 3
                 continue
             events.append(KeyEvent("ESCAPE"))  # a real, standalone Escape keypress
@@ -422,6 +490,8 @@ _ALT_SCREEN_ON = "\x1b[?1049h"
 _ALT_SCREEN_OFF = "\x1b[?1049l"
 _PASTE_MODE_ON = "\x1b[?2004h"
 _PASTE_MODE_OFF = "\x1b[?2004l"
+_HIDE_CURSOR = "\x1b[?25l"
+_SHOW_CURSOR = "\x1b[?25h"
 
 
 def _is_tty(stream) -> bool:
@@ -482,6 +552,7 @@ class TerminalSession:
         self._raw = True
         self._write(_ALT_SCREEN_ON)
         self._write(_PASTE_MODE_ON)
+        self._write(_HIDE_CURSOR)
 
     def _restore(self) -> None:
         if not self._raw:
@@ -491,6 +562,7 @@ class TerminalSession:
             termios.tcsetattr(fd, termios.TCSADRAIN, self._original_attrs)
         except (OSError, ValueError, AttributeError):
             pass
+        self._write(_SHOW_CURSOR)
         self._write(_PASTE_MODE_OFF)
         self._write(_ALT_SCREEN_OFF)
         self._raw = False
@@ -676,9 +748,29 @@ _IDENTITY_STYLE = {
     "color": lambda text, code: text,
     "bold": lambda text: text,
     "dim": lambda text: text,
+    "accent": lambda text: text,
+    "ok": lambda text: text,
+    "warn": lambda text: text,
+    "inverse": lambda text: text,
 }
 
-_ESC_TIMEOUT_SECONDS = 0.05
+
+def format_header(header, style, *, max_lines=None) -> list[str]:
+    """First line accent (title); remaining lines dim. Preserves color if raw_header or already formatted."""
+    raw = [ln for ln in str(header).splitlines()]
+    if max_lines is not None:
+        raw = raw[:max_lines]
+    if not raw:
+        return []
+    if style.get("raw_header") or any("\x1b[" in ln for ln in raw):
+        return raw
+    accent = style.get("accent") or style.get("bold") or (lambda t: t)
+    dim = style.get("dim") or (lambda t: t)
+    out = [accent(raw[0])]
+    out.extend(dim(ln) for ln in raw[1:])
+    return out
+
+_ESC_TIMEOUT_SECONDS = 0.20
 
 
 def _read_chunk_posix(stdin, timeout):
@@ -762,8 +854,13 @@ def _render_items(lines: list[str], style, state: PickerState, indices: tuple[in
     `navigate`, or only the F-08 search matches) to `lines`. `cursor` is always an index into
     `items` (never into `indices` itself) -- shared by both modes so the same marker/bold-
     current-row logic and the same `_viewport_slice` clamp apply to both. Returns the
-    `[start, end)` window so the caller can draw ▲/▼ (AC-3.3) without recomputing it."""
+    `[start, end)` window so the caller can draw ▲/▼ (AC-3.3) without recomputing it.
+
+    Selected row uses inverse + accent when color is on; under NO_COLOR it falls back to
+    bold `›` so the picker stays usable without ANSI."""
     bold, dim = style["bold"], style["dim"]
+    accent = style.get("accent") or bold
+    inverse = style.get("inverse")
     total = len(indices)
     local_cursor = indices.index(state.cursor) if state.cursor in indices else 0
     start, end = _viewport_slice(local_cursor, total, rows_available)
@@ -771,16 +868,35 @@ def _render_items(lines: list[str], style, state: PickerState, indices: tuple[in
         index = indices[position]
         item = state.items[index]
         if index in state.headers:
-            lines.append(item)
+            lines.append(dim(item) if item else item)
             continue
-        marks = ["›"] if index == state.cursor else [" "]
-        if state.current is not None and item == state.current:
-            marks.append("●")
-        text = bold(item) if index == state.cursor else item
+        current_mark = ""
+        if state.multi:
+            # In a multi picker the leading glyph reports THIS row's mark, not "is this the
+            # value already in effect" -- there is no single current value to point at.
+            current_mark = "[x] " if index in state.marked else "[ ] "
+        elif state.current is not None and item == state.current:
+            current_mark = "● "
         suffix = ""
         if index < len(state.suffixes) and state.suffixes[index]:
             suffix = " " + dim(state.suffixes[index])
-        lines.append(f"{' '.join(marks)} {text}{suffix}")
+        if index == state.cursor:
+            row_styler = style.get("selected_row")
+            if row_styler is not None:
+                lines.append(row_styler(item, current_mark, suffix))
+            else:
+                body = f" › {current_mark}{item} "
+                painted = inverse(accent(body)) if inverse is not None else body
+                if painted != body:
+                    lines.append(painted + suffix)
+                else:
+                    lines.append(bold(f"› {current_mark}{item}") + suffix)
+        else:
+            item_styler = style.get("unselected_row")
+            if item_styler is not None:
+                lines.append(item_styler(item, current_mark, suffix))
+            else:
+                lines.append(f"   {current_mark}{item}{suffix}")
     return start, end
 
 
@@ -825,11 +941,10 @@ def _render(stdout, state: PickerState, style, prompt=None, header=None) -> None
 
     prefix: list[str] = []
     if header:
-        # F-03: the caller's decision context (MCP/status tables, the vault intro line, the
-        # drift/update banner) rendered INSIDE this picker's own frame, so it survives every
-        # redraw instead of being printed to the normal screen and erased the instant the
-        # alternate screen takes over -- exactly when the user needs it to decide.
-        prefix.extend(str(header).splitlines())
+        # F-03: decision context inside this picker's frame. First line is accent; rest dim.
+        # Callers that need a long doctor panel set style["header_max_lines"] high/None.
+        max_hdr = style.get("header_max_lines", None)
+        prefix.extend(format_header(header, style, max_lines=max_hdr))
         prefix.append("")
     if prompt:
         prefix.append(bold(prompt))
@@ -847,9 +962,13 @@ def _render(stdout, state: PickerState, style, prompt=None, header=None) -> None
         if not state.items:
             lines.append(dim("(sin opciones)"))
         lines.append(_position_caption(state, indices, start, end, dim))
-        hint = "↑↓ mover · Enter elegir · Esc cancelar"
-        if state.freetext_allowed or state.items:
-            hint += " · / buscar"
+        hint = style.get("hint")
+        if state.multi:
+            hint = style.get("multi_hint") or "↑↓ mover · espacio marca · Enter confirma · Esc cancela"
+        elif hint is None:
+            hint = "↑↓ mover · Enter elegir · Esc cancelar"
+            if state.freetext_allowed or state.items:
+                hint += " · / buscar"
         lines.append(dim(hint))
     elif state.mode == "search":
         # F-08: `/` now filters the visible list by substring/casefold of `query` instead of
@@ -875,6 +994,10 @@ def _render(stdout, state: PickerState, style, prompt=None, header=None) -> None
         lines.append(f"{dim('>')} {state.query}")
         lines.append(dim("Enter acepta · Esc cancela"))
 
+    if state.mode in ("search", "freetext"):
+        stdout.write(_SHOW_CURSOR)
+    else:
+        stdout.write(_HIDE_CURSOR)
     stdout.write("\x1b[H\x1b[J")
     stdout.write("\r\n".join(lines) + "\r\n")
     stdout.flush()
@@ -896,7 +1019,7 @@ def _initial_cursor(items: tuple[str, ...], headers: frozenset[int], current: st
     return 0
 
 
-def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=None, stderr=None, prompt=None, header=None, current=None, headers=(), suffixes=()):
+def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=None, stderr=None, prompt=None, header=None, current=None, headers=(), suffixes=(), multi=False, marked=()):
     """The render loop (layer 4). Returns `Selected(index)` | `FreeText(value)` | `None`
     (cancelled — Esc, Ctrl-C, or EOF). `style` is a dict of `color`/`bold`/`dim` callables
     (defaults to identity/passthrough, per the module docstring, so `tui.py` stays importable
@@ -948,6 +1071,8 @@ def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=
         headers=header_set,
         suffixes=suffix_t,
         current=current,
+        multi=bool(multi),
+        marked=frozenset(i for i in marked if 0 <= i < len(items) and i not in header_set),
     )
 
     if _ACTIVE_SESSION is not None:
@@ -956,7 +1081,7 @@ def run_picker(items, *, freetext_allowed=False, style=None, stdin=None, stdout=
         with TerminalSession(stdin=stdin, stdout=render_stdout):
             state = _drive_loop(state, stdin, render_stdout, resolved_style, prompt, header)
 
-    if isinstance(state.result, (Selected, FreeText)):
+    if isinstance(state.result, (Selected, FreeText, Marked)):
         return state.result
     return None
 
