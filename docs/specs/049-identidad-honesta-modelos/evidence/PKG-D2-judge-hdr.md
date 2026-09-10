@@ -5,4 +5,3 @@
 - **J-049-002:** Contractual quartet missing from C2/D2 commits; hash `sha256:47923adc…` computed from root where docs exist.
 - **Already green:** focused 049 unittests (19), build `--check`, D2 ownership, hermetic TTY runtime QA, C2 accepted with repair waivers.
 - **Human options:** amend AC-09 / integrate 045–048 first / explicit verify waiver for close.
-

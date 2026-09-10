@@ -1,7 +1,7 @@
 # PKG-C2 — Runtime QA (hermetic)
 
-**Date:** 2026-09-10  
-**Candidate:** `/tmp/set-agents-049-c2.YfrczU` @ `ff91f5538c3ee588b29a6b7267ad82439191b5c1`  
+**Date:** 2026-09-10
+**Candidate:** `/tmp/set-agents-049-c2.YfrczU` @ `ff91f5538c3ee588b29a6b7267ad82439191b5c1`
 **Scope:** cache-first home, apply/lock/restore behaviors (no live OpenCode TTY, no `Global/**`)
 
 ## Global boundary
@@ -18,7 +18,7 @@ No `Global/**` paths in the C2 repair delta.
 
 ## Check 1 — First frame / menu: zero measurement subprocesses (cache-seeded path)
 
-**Test:** `HomeFirstPaintTests.test_first_frame_is_cache_only_and_has_human_actions`  
+**Test:** `HomeFirstPaintTests.test_first_frame_is_cache_only_and_has_human_actions`
 **Also:** `ModelsPresentationTests.test_first_frame_seeds_host_counts_from_disk`
 
 ```bash

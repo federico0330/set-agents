@@ -1,8 +1,8 @@
 # PKG-D2 — Runtime QA (hermetic)
 
-**Date:** 2026-09-10  
-**Candidate:** `/tmp/set-agents-049-d2.OwbVs7` @ `9bc4e2d28b3007a63ba86dc98f87f4634ed8178e`  
-**Base ref:** `ff91f5538c3ee588b29a6b7267ad82439191b5c1`  
+**Date:** 2026-09-10
+**Candidate:** `/tmp/set-agents-049-d2.OwbVs7` @ `9bc4e2d28b3007a63ba86dc98f87f4634ed8178e`
+**Base ref:** `ff91f5538c3ee588b29a6b7267ad82439191b5c1`
 **Scope:** fake OpenCode 1.18.14 TTY observation, allow-list argv, sanitized env (no live OpenCode auth/login)
 
 ## Global boundary
