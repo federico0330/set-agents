@@ -46,11 +46,11 @@
 
 ## Quick-fixes recientes
 
+- 2026-09-12T01:06 — Anclas file:line vencidas fuera de docs/modules: ADR-0063 (diez anclas, seis de ellas del estado pre-034 que este mismo… (done)
 - 2026-08-24T16:21 — 040: repair eight stale file:line anchors in docs/modules (done)
 - 2026-08-18T02:48 — F-04 (020-honest-dashboard/P2-anclas-verificables) cerrado: verify.sh ahora pasa --profile go-zen a ./build.sh --output… (done)
 - 2026-08-18T02:48 — P1F-01 cerrado: fix validado — cmd_transition ya tiene try/except alrededor del pop de repair_entry, cubriendo el caso … (done)
 - 2026-08-12T15:24 — render_notes emitia trailing whitespace en la linea de un finding sin category ni summary, rompiendo git diff --check y… (done)
-- 2026-08-06T13:33 — Preserve explicit --project context in set_agents_app.py script mode by aliasing __main__ for lazy routing_cli imports (done)
 
 ## Decisiones
 

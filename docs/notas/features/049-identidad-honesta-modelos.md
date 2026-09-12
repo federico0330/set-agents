@@ -36,12 +36,12 @@
 - ruteo PKG-D: Route decision dec1_874f5386d86738581762fbe607c1dc46 was supplied; its resolved provider/model is not present in readab…
 - ruteo PKG-C2: Replacement explicitly chosen by user after unrecoverable dirty-worktree candidate identity; isolated Git reconstructio…
 - ruteo PKG-D2: Replacement integration package depends on the isolated PKG-C2 candidate chosen by the user.
-- [2026-09-10] delta-reviewer: ROUTING_UNAVAILABLE→BASE; close F01/SEC-001/SEC-002; no new findings preferred
 - [2026-09-10] runtime-verifier: ROUTING_UNAVAILABLE→BASE; evidence PKG-D2-tty.md + 19 tests
 - [2026-09-10] adversarial-judge: ROUTING_UNAVAILABLE→BASE; INTEGRATION; all packages accepted
 - [2026-09-10] adversarial-judge: ROUTING_UNAVAILABLE→BASE; tip 5076dd2; J-049-001/002 remediated
 - [2026-09-10] adversarial-judge: tip 95edc5654c218c0f7e8fa52d66cc015abcd6350f; J-049-003 fixed
 - [2026-09-10] adversarial-judge: JUDGE_PASS eaa1dfd8; tip 95edc5654c218c0f7e8fa52d66cc015abcd6350f
+- [2026-09-10] adversarial-judge: El re-juicio pasó porque el árbol integrado ya traía el cuarteto y el verify dejó de fallar por espacios al final de línea en evidence/PKG-C2-runtime-qa.md:3.
 - decisión: [[decisiones/2026-09-09 rehacer-pkg-c-desde-candidato-git-aislado|Rehacer PKG-C desde candidato Git aislado]]
 - decisión: [[decisiones/2026-09-09 fundación-preexistente-de-c2|Fundación preexistente de C2]]
 - decisión: [[decisiones/2026-09-09 navegación-tty-como-fundación-preexistente-de-c2|Navegación TTY como fundación preexistente de C2]]

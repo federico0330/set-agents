@@ -277,9 +277,10 @@ Diez ítems abiertos, cada uno con su fuente. Ninguno bloquea usar el harness.
    volver el repo privado.
 7. **Dos docs dicen que el repo es privado** y `gh` dice `PUBLIC`.
    *(`INSTALACION.md` línea 3, `TIPS-USO.md` sección "Bootstrap / compartir".)*
-   En el mismo `README.md` hay además un ancla vencida: cita el guard de `--no-skills` en
-   `set_agents_spawn.py:249-261` y hoy vive en las líneas 319-331. `check-anchors` sólo
-   vigila `docs/modules/`, así que la raíz del repo se le escapa.
+   Aparte, ningún gate vigila las anclas `file:line` fuera de `docs/modules/`:
+   `check-anchors` no mira ni la raíz del repo ni `docs/adr/`. Las dos que habían
+   vencido por eso ya se arreglaron el 2026-09-11, la del guard `--no-skills` en
+   `README.md` y las diez de ADR-0063, pero el agujero del verificador sigue abierto.
 8. **El vault configurado apunta a un directorio borrado.** `config.toml` tiene
    `vault = "/var/tmp/tmpb11obg_s/empresa/obsidian"`, que es un temporal de un test.
    El vault real es `~/iey/obsidian`.

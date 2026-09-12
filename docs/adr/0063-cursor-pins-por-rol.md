@@ -12,17 +12,24 @@
 ## Contexto
 
 032 eligió `model: inherit` en todos los agentes Cursor para que el harness no
-gastara una suscripción que el usuario no eligió en el picker. Medido y vigente:
+gastara una suscripción que el usuario no eligió en el picker.
 
-- Emisión: `generate.py:572-574` hardcodea `"model: inherit"`.
-- Validador: `generate.py:735-748` muere si no hay `\nmodel: inherit\n`.
-- Test: `tests/test_harness.py:14016-14022` `test_no_cursor_agent_pins_a_model`.
-- Doctrina: `generate.py:136-139` (“every role inherits the single model you
-  picked in Cursor”); `Global/cursor/AGENTS.md`; live
-  `Global/cursor/agents/implementer.md:4`.
-- `models.toml` **no tiene** clave `cursor` (`AREA_FIELDS` en
-  `models_config.py:39` es `claude/codex/codex_effort/opencode`).
-  `RUNTIMES` (`:44`) no incluye cursor.
+Estado medido el **2026-08-19, ANTES de esta decisión**. Las anclas de esta lista
+son del árbol de entonces y este mismo ADR las deroga: no describen el código de
+hoy. La columna derecha es dónde quedó cada cosa, re-medida el 2026-09-11.
+
+| Entonces (pre-034) | Hoy |
+|---|---|
+| Emisión: `generate.py:572-574` hardcodea `"model: inherit"` | `generate.py:593-596` emite `model: {row['cursor_model']}` |
+| Validador: `generate.py:735-748` muere si no hay `\nmodel: inherit\n` | `generate.py:756` `validate_cursor_target`; el inherit universal muere en `:817` y la doctrina inherit en `:771` |
+| Test: `tests/test_harness.py:14016-14022` `test_no_cursor_agent_pins_a_model` | mismo nombre, reescrito, `tests/test_harness.py:15377` |
+| Doctrina: `generate.py:136-139` (“every role inherits the single model you picked in Cursor”) | esa frase ya no se emite; `generate.py:771` mata el build si reaparece |
+| `models.toml` **no tiene** clave `cursor`; `AREA_FIELDS` (`models_config.py:39`) es `claude/codex/codex_effort/opencode` | la línea sigue siendo `:39` y ya incluye `"cursor"` |
+| `RUNTIMES` (`models_config.py:44`) no incluye cursor | sigue sin incluirlo, ahora en `models_config.py:50` |
+
+`Global/cursor/agents/implementer.md:4` sigue siendo la línea del modelo en el
+árbol generado, pero hoy dice el pin (`model: composer-2.5`), no `inherit`.
+`Global/cursor/AGENTS.md` idem.
 
 DEC-CURSOR-PIN: Federico eligió explícitamente que Cursor pinnee modelo por
 rol. Eso rompe 032 AC-06 a propósito. Docs de Cursor (citadas por 032,
@@ -39,7 +46,7 @@ sesión de architecture).
    `[catalog].cursor` es la lista cerrada de slugs **medidos**; un pin fuera
    de la lista hace `die` (fail-closed, patrón claude/codex). Cursor **no**
    entra a `RUNTIMES` ni a `SELECTED_RUNTIMES`. `--route-decide` y
-   `*_spawn.py` siguen prohibidos en el anfitrión (`generate.py:125-132`).
+   `*_spawn.py` siguen prohibidos en el anfitrión (`generate.py:130-133`).
 
 2. **`generate.py` emite `model: {cursor_model}`.** Deja de hardcodear
    `inherit`. Roles `code-rw` pinnean el barato de ADR-0060 (slug Cursor
@@ -53,8 +60,8 @@ sesión de architecture).
    comentario cita 034 y 032 AC-06 superseded. `inherit` universal pone el
    test en rojo.
 
-4. **Independencia.** `family()` (`models_config.py:560-568`) gana rama
-   `cursor_model`: `[families]` si hay entrada, si no el valor crudo.
+4. **Independencia.** `family()` (`models_config.py:711-729`) gana rama
+   `cursor_model` (`:719-728`): `[families]` si hay entrada, si no el valor crudo.
    Writer y `package-reviewer` / `adversarial-judge` no comparten familia.
    Si el catálogo Cursor medido no ofrece dos familias: pins de **modelo
    distinto** + evidencia no vacía en `record-subreview --evidence` /
@@ -71,7 +78,8 @@ sesión de architecture).
    o `writer_rung != "base"`) es override de invocación — **UNVERIFIED**
    (V-D03). Si V-D03 falla: `HUMAN_DECISION_REQUIRED`. **No** se pinnea
    `repair-agent` pesado. Las variantes `<role>@<tier>` son OpenCode-only
-   (`generate.py:581-585`); Cursor no genera `@balanced`/`@frontier`. No se
+   (emisión `generate.py:622`; el validador Cursor las rechaza en
+   `generate.py:776`); Cursor no genera `@balanced`/`@frontier`. No se
    vuelve a `inherit` universal si V-D01 no mide slugs: `HUMAN_DECISION_REQUIRED`
    con lo observado.
 
@@ -94,7 +102,7 @@ sesión de architecture).
 - **Pinnear `repair-agent` pesado en el frontmatter si V-D03 no da override.**
   Viola AC-D.1. El fallback es `HUMAN_DECISION_REQUIRED`, no un pin que
   haría pesados despachos que no son salvage.
-- **Promoción Cursor vía `<role>@<tier>`.** `generate.py:581-585` emite esas
+- **Promoción Cursor vía `<role>@<tier>`.** `generate.py:622` emite esas
   variantes solo a OpenCode. Cursor no las tiene.
 - **Mismo pin writer/reviewer “porque Cursor no tiene familias” sin evidencia
   en el panel.** ADR-0011 D3 exige degradación **ruidosa**, no silenciosa.
@@ -113,7 +121,19 @@ sesión de architecture).
 ## Evidencia
 
 `docs/specs/034-cuota-organica-y-writer-barato/design.md` §4.
-`generate.py:125-139`, `:572-574`, `:581-585`, `:735-748`.
-`tests/test_harness.py:14016-14022`.
-`models_config.py:39,44,560-568`.
-`Global/cursor/agents/implementer.md:4`.
+
+Anclas re-medidas el 2026-09-11 contra el árbol; las del estado pre-034 están en
+la tabla de Contexto y no se re-apuntan porque ese código ya no existe.
+
+- `generate.py:130-133` (prohibición de `--route-decide` en el anfitrión),
+  `:593-596` (emisión del pin), `:622` (variantes `@tier`, OpenCode-only),
+  `:756` `validate_cursor_target`, `:771`, `:776`, `:817-831`.
+- `tests/test_harness.py:15377` `test_no_cursor_agent_pins_a_model`;
+  `:15415` `test_mixed_inherit_on_audit_reviewer_is_forbidden_at_generate`
+  (034 SEC-001, posterior a este ADR).
+- `models_config.py:39` `AREA_FIELDS`, `:50` `RUNTIMES`, `:711-729` `family()`.
+- `Global/cursor/agents/implementer.md:4`.
+
+`check-anchors` sólo recorre `docs/modules/` (`feature_state_lib/check_anchors.py`),
+así que ningún gate vigila las anclas de los ADRs. Por eso estas vencieron en
+silencio.
