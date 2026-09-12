@@ -325,3 +325,4 @@ hasta hoy, no una promesa de paridad. Lo que no está en esta tabla no se midió
 - [INSTALACION.md](INSTALACION.md) — instalación en detalle y flags del instalador.
 - [TIPS-USO.md](TIPS-USO.md) — flujo de trabajo del harness (control plane, lanes, drift).
 - [COMO-CAMBIAR-MODELO.md](COMO-CAMBIAR-MODELO.md) — modelos por área/suscripción.
+- [README-WINDOWS.md](README-WINDOWS.md) — mudar la máquina a Windows sin perder estado, y el contraste specs-contra-código de qué está hecho y qué falta.
