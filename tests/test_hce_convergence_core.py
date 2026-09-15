@@ -1480,6 +1480,48 @@ class HceCycle3RepairTests(unittest.TestCase):
             payload = _parse_json(verify.stdout)
             self.assertEqual(payload["result"], "HCE_REGISTERED_VALID")
 
+    def test_verify_denies_unlinked_finding_close_after_consume(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
+            consume = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-consume-unlinked-close",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(consume.returncode, 0, consume.stdout + consume.stderr)
+            data = json.loads(state.read_text())
+            rev_after = data["revision"]
+            for finding in data["packages"][0]["findings"]:
+                if finding["id"] == "SVR-P1A1-001":
+                    finding["status"] = "closed"
+                    break
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 2, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertIn("unlinked", payload["error"].lower())
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
+
+    def test_convergence_policy_has_no_pathlib_or_subprocess(self):
+        policy_path = ROOT / "ai/scripts/feature_state_lib/convergence_policy.py"
+        source = policy_path.read_text()
+        self.assertNotIn("from pathlib import", source)
+        self.assertNotIn("import pathlib", source)
+        self.assertNotIn("import subprocess", source)
+        self.assertNotIn("from subprocess import", source)
+        self.assertNotIn("convergence_git", source)
+
     def test_replay_without_invocation_snapshot_denied(self):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)

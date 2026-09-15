@@ -132,6 +132,14 @@ def output_paths_b64(paths: list[str | bytes]) -> list[str]:
     return sorted(encoded)
 
 
+def measure_child_output_paths(
+    worktree: Path,
+    identity: dict[str, Any],
+) -> tuple[list[str], str]:
+    paths, _ = diff_paths_and_lines(worktree, identity["base_tree"], identity["candidate_tree"])
+    return output_paths_b64(paths), paths_digest_b64(paths)
+
+
 def _path_bytes_to_str(path_bytes: bytes) -> str:
     try:
         return path_bytes.decode("utf-8", "strict")

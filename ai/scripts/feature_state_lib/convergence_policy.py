@@ -10,7 +10,6 @@ import os
 import re
 import uuid
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 from feature_state_lib.convergence_constants import (
@@ -523,11 +522,47 @@ def _live_child_record_digest(pkg: dict[str, Any], package_id: str) -> str:
     return canonical_json_digest(receipt)
 
 
-def _fresh_child_output(worktree: Path, identity: dict[str, Any]) -> tuple[list[str], str]:
-    from feature_state_lib.convergence_git import diff_paths_and_lines, output_paths_b64, paths_digest_b64
+FreshChildOutputs = dict[str, tuple[list[str], str]]
 
-    paths, _ = diff_paths_and_lines(worktree, identity["base_tree"], identity["candidate_tree"])
-    return output_paths_b64(paths), paths_digest_b64(paths)
+
+def validate_verify_finding_evolution(exc: dict[str, Any], package: dict[str, Any]) -> None:
+    """Allow unchanged snapshot or exact linked-repair successor; deny unlinked drift."""
+    stored_by_id = {item["id"]: item for item in exc.get("finding_snapshot") or []}
+    live_by_id: dict[str, dict[str, Any]] = {}
+    for finding in package.get("findings", []):
+        if isinstance(finding, dict) and finding.get("id"):
+            live_by_id[finding["id"]] = finding
+    if set(live_by_id.keys()) != set(stored_by_id.keys()):
+        raise HceDenial("HCE_STALE", "finding set changed")
+    initial_batch = int(exc.get("parent_repair_batches_initial", 0))
+    live_batch = int((package.get("attempts") or {}).get("repair_batches", 0))
+    any_change = False
+    all_linked_successor = True
+    for fid, stored in stored_by_id.items():
+        live = live_by_id[fid]
+        if live.get("severity") != stored.get("severity"):
+            raise HceDenial("HCE_STALE", f"finding {fid} severity drift")
+        if live.get("verification_digest") != stored.get("verification_digest"):
+            raise HceDenial("HCE_STALE", f"finding {fid} verification_digest drift")
+        if live.get("definition_digest") != stored.get("definition_digest"):
+            raise HceDenial("HCE_STALE", f"finding {fid} definition_digest drift")
+        if live.get("verified_verdict") != "upheld":
+            raise HceDenial("HCE_STALE", f"finding {fid} verdict no longer upheld")
+        stored_status = stored.get("status")
+        stored_attempts = int(stored.get("repair_attempts", 0))
+        live_status = live.get("status")
+        live_attempts = int(live.get("repair_attempts", 0))
+        if live_status != stored_status or live_attempts != stored_attempts:
+            any_change = True
+        if live_status != "closed" or live_attempts != stored_attempts + 1:
+            all_linked_successor = False
+    if not any_change:
+        if live_batch != initial_batch:
+            raise HceDenial("HCE_STALE", "repair_batches changed without linked repair")
+        return
+    if all_linked_successor and live_batch == initial_batch + 1:
+        return
+    raise HceDenial("HCE_STALE", "unlinked finding evolution")
 
 
 def _compare_stored_children(
@@ -535,7 +570,7 @@ def _compare_stored_children(
     child_a: dict[str, Any],
     child_b: dict[str, Any],
     *,
-    worktree: Path | None = None,
+    fresh_child_outputs: FreshChildOutputs | None = None,
 ) -> None:
     stored_children = exc.get("children") or []
     if len(stored_children) != 2:
@@ -563,8 +598,11 @@ def _compare_stored_children(
                 raise HceDenial("HCE_STALE", f"{package_id} stored child missing {field}")
         if stored.get("candidate_commit") != live_identity.get("candidate_ref"):
             raise HceDenial("HCE_STALE", f"{package_id} stored candidate_commit drift")
-        if worktree is not None:
-            fresh_b64, fresh_digest = _fresh_child_output(worktree, live_identity)
+        if fresh_child_outputs is not None:
+            measured = fresh_child_outputs.get(package_id)
+            if measured is None:
+                raise HceDenial("HCE_STALE", f"{package_id} missing fresh child output measurement")
+            fresh_b64, fresh_digest = measured
             if stored.get("output_paths_b64") != fresh_b64:
                 raise HceDenial("HCE_STALE", f"{package_id} output_paths_b64 drift")
             if stored.get("output_paths_digest") != fresh_digest:
@@ -577,11 +615,13 @@ def rederive_frozen_binding(
     package: dict[str, Any],
     combined_live: dict[str, Any],
     *,
-    worktree: Path | None = None,
-    skip_finding_check: bool = False,
+    fresh_child_outputs: FreshChildOutputs | None = None,
+    allow_successor_finding_evolution: bool = False,
 ) -> None:
-    """Freshly rederive findings/receipts/panel/binding before authorize/consume."""
-    if not skip_finding_check:
+    """Freshly rederive findings/receipts/panel/binding before authorize/consume/verify."""
+    if allow_successor_finding_evolution:
+        validate_verify_finding_evolution(exc, package)
+    else:
         fresh_findings = finding_snapshot_from_package(package)
         stored_findings = exc.get("finding_snapshot") or []
         if canonical_json_digest({"items": stored_findings}) != canonical_json_digest({"items": fresh_findings}):
@@ -597,7 +637,7 @@ def rederive_frozen_binding(
     if not head_commit or not head_tree:
         raise HceDenial("HCE_STALE", "missing live HEAD identity")
     validate_receipt_chain(origin, child_a, child_b, head_commit=head_commit, head_tree=head_tree)
-    _compare_stored_children(exc, child_a, child_b, worktree=worktree)
+    _compare_stored_children(exc, child_a, child_b, fresh_child_outputs=fresh_child_outputs)
     stored = exc.get("combined_review_identity") or {}
     for key in ("candidate_commit", "candidate_tree", "paths_digest", "changed_lines", "base_commit", "base_tree"):
         if stored.get(key) != combined_live.get(key):
@@ -617,7 +657,7 @@ def validate_verify_outcome(
     combined_live: dict[str, Any],
     *,
     data: dict[str, Any] | None = None,
-    worktree: Path | None = None,
+    fresh_child_outputs: FreshChildOutputs | None = None,
 ) -> str:
     if exc.get("status") != "consumed":
         raise HceDenial("HCE_OUTCOME_INVALID", "outcome not consumed")
@@ -632,8 +672,8 @@ def validate_verify_outcome(
     if data is not None:
         rederive_frozen_binding(
             exc, data, package, combined_live,
-            worktree=worktree,
-            skip_finding_check=True,
+            fresh_child_outputs=fresh_child_outputs,
+            allow_successor_finding_evolution=True,
         )
     stored_combined = consumption.get("combined_review_identity") or {}
     if not isinstance(stored_combined, dict) or set(stored_combined) != COMBINED_IDENTITY_KEYS:

@@ -20,6 +20,7 @@ from feature_state_lib.convergence_git import (
     diff_paths_and_lines,
     git_common_dir,
     head_commit_and_tree,
+    measure_child_output_paths,
     measure_combined_identity,
     measure_original_identity,
     output_paths_b64,
@@ -213,6 +214,18 @@ def _live_combined(exc: dict[str, Any], worktree: Path) -> dict[str, Any]:
     return measure_combined_identity(worktree, base_commit)
 
 
+def _fresh_child_outputs(data: dict[str, Any], worktree: Path) -> dict[str, tuple[list[str], str]]:
+    packages = _package_map(data)
+    child_a = packages.get(CHILD_A_PACKAGE_ID)
+    child_b = packages.get(CHILD_B_PACKAGE_ID)
+    if not child_a or not child_b:
+        raise HceDenial("HCE_STALE", "missing fixed child packages")
+    return {
+        CHILD_A_PACKAGE_ID: measure_child_output_paths(worktree, child_a["candidate_identity"]),
+        CHILD_B_PACKAGE_ID: measure_child_output_paths(worktree, child_b["candidate_identity"]),
+    }
+
+
 def cmd_inspect_convergence(args: argparse.Namespace) -> int:
     try:
         state_path, worktree, repo, state_real, repo_real = _context(args)
@@ -244,7 +257,10 @@ def cmd_consume_convergence(args: argparse.Namespace) -> int:
             exc = get_exception(package, exception_id)
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             combined = _live_combined(exc, worktree)
-            rederive_frozen_binding(exc, data, package, combined, worktree=worktree)
+            rederive_frozen_binding(
+                exc, data, package, combined,
+                fresh_child_outputs=_fresh_child_outputs(data, worktree),
+            )
             validate_consume_ready(exc, combined)
             consumption = build_consumption(
                 exc,
@@ -315,7 +331,11 @@ def cmd_verify_convergence_outcome(args: argparse.Namespace) -> int:
         exc = get_exception(package, args.exception_id)
         validate_bindings_match(exc, state_real, repo_real, str(worktree))
         combined = _live_combined(exc, worktree)
-        outcome_id = validate_verify_outcome(exc, package, combined, data=data, worktree=worktree)
+        outcome_id = validate_verify_outcome(
+            exc, package, combined,
+            data=data,
+            fresh_child_outputs=_fresh_child_outputs(data, worktree),
+        )
         print_json(_success_payload(
             "HCE_REGISTERED_VALID", data, args.package_id, exc,
             outcome_id=outcome_id,
@@ -443,7 +463,10 @@ def cmd_authorize_convergence(args: argparse.Namespace) -> int:
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             check_clean_worktree(worktree)
             combined = _live_combined(exc, worktree)
-            rederive_frozen_binding(exc, data, package, combined, worktree=worktree)
+            rederive_frozen_binding(
+                exc, data, package, combined,
+                fresh_child_outputs=_fresh_child_outputs(data, worktree),
+            )
             validate_authorize_context(data, package, exc)
             exc["authorization"] = build_authorization(
                 exc,
