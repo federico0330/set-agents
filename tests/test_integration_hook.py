@@ -161,8 +161,9 @@ def _drive_to_receipt(repo, base_sha, candidate_sha, package_id="PKG-01", featur
 
 class IntegrationActionEndToEndTests(unittest.TestCase):
     def _wrapped_transition_command(self, package_id, state):
+        inner_fs = str((ROOT / "ai/scripts/feature-state.py").resolve())
         return [
-            "python3", "ai/scripts/feature-state.py", "transition", "INTEGRATION",
+            "python3", inner_fs, "transition", "INTEGRATION",
             "--package-id", package_id, "--actor", "test", "--state-file", str(state),
         ]
 

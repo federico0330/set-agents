@@ -21,7 +21,10 @@ from feature_state_lib import model, candidate_identity
 from feature_state_lib.model import StateError, now, package_by_id, package_accept_ready
 from feature_state_lib.cli_lifecycle import state_file_arg, output_state
 from feature_state_lib.cli_lifecycle import (
-    validate_hce_outcome_command, CONVERGENCE_RECEIPT_SCHEMA, hce_exception,
+    validate_hce_outcome_command,
+    CONVERGENCE_RECEIPT_SCHEMA,
+    hce_exception,
+    require_hce_registered_outcome,
 )
 
 
@@ -63,6 +66,7 @@ def cmd_record_receipt(args: argparse.Namespace) -> int:
         hce_ctx = validate_hce_outcome_command("record-receipt", args, package)
         if hce_ctx is not None:
             exc, outcome_id = hce_ctx
+            require_hce_registered_outcome(data, package, exc)
             errors = package_accept_ready(data, package, args.actor)
             if errors:
                 raise StateError("cannot record receipt: " + "; ".join(errors))

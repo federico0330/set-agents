@@ -38,7 +38,7 @@ def check(state_path, package_id, action):
         return True
     if action == "record-receipt":
         return True
-    errors = integration_ready(package)
+    errors = integration_ready(package, data=data)
     if errors:
         fail("integration blocked: " + "; ".join(errors))
     return True

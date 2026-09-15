@@ -1270,6 +1270,7 @@ def build_parser() -> argparse.ArgumentParser:
     testing.add_argument("--feature-id")
     testing.add_argument("--command", action="append")
     testing.add_argument("--evidence", default="")
+    testing.add_argument("--combined-commit", help="HCE parent: combined final candidate SHA")
     testing.set_defaults(func=cmd_record_testing)
 
     runtime = sub.add_parser("record-runtime-qa")
@@ -1282,6 +1283,7 @@ def build_parser() -> argparse.ArgumentParser:
     runtime.add_argument("--screenshot", action="append")
     runtime.add_argument("--check", action="append")
     runtime.add_argument("--evidence", default="")
+    runtime.add_argument("--combined-commit", help="HCE parent: combined final candidate SHA")
     runtime.set_defaults(func=cmd_record_runtime_qa)
 
     accept = sub.add_parser("accept-package")

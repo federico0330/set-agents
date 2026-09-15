@@ -29,6 +29,7 @@ from tests.test_hce_convergence_core import (  # noqa: E402
 from tests.test_hce_convergence_core import HceInspectVerifyReadOnlyTests  # noqa: E402
 
 INTEGRATION_ACTION = ROOT / "ai/scripts/integration_action.py"
+FEATURE_STATE_ABS = str((ROOT / "ai/scripts/feature-state.py").resolve())
 import coord_policy  # noqa: E402
 
 
@@ -287,6 +288,7 @@ class HceLifecycleReceiptTests(unittest.TestCase):
             rev = json.loads(state.read_text())["revision"]
             _run_fs(
                 "record-testing", PARENT_ID, "pass",
+                "--combined-commit", combined_sha,
                 "--actor", "orchestrator", "--event-id", "evt-receipt-testing",
                 "--expect-revision", str(rev),
                 cwd=repo, state_file=state, check=False,
@@ -294,6 +296,7 @@ class HceLifecycleReceiptTests(unittest.TestCase):
             rev = json.loads(state.read_text())["revision"]
             _run_fs(
                 "record-runtime-qa", PARENT_ID, "pass",
+                "--combined-commit", combined_sha,
                 "--actor", "orchestrator", "--event-id", "evt-receipt-runtime",
                 "--expect-revision", str(rev),
                 cwd=repo, state_file=state, check=False,
@@ -339,13 +342,322 @@ class HceLifecycleWrapperTests(unittest.TestCase):
             other_state.write_text(state.read_text())
             cmd = [
                 "python3", str(INTEGRATION_ACTION), str(state.resolve()), PARENT_ID, "record-receipt", "--",
-                "python3", "ai/scripts/feature-state.py", "record-receipt", PARENT_ID,
+                "python3", FEATURE_STATE_ABS, "record-receipt", PARENT_ID,
                 "--state-file", str(other_state.resolve()),
                 "--convergence-outcome-id", outcome_id,
             ]
             proc = subprocess.run(cmd, cwd=repo, env=os.environ.copy(), text=True, capture_output=True, check=False)
             self.assertNotEqual(proc.returncode, 0)
             self.assertIn("state-file", proc.stdout + proc.stderr)
+
+
+class HceLifecyclePanelFinalizeTests(unittest.TestCase):
+    def test_finalize_denies_allow_missing_for_hce(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, _ = _reentered_fixture(Path(td))
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "start-review-panel", PARENT_ID,
+                "--role", "package-reviewer", "--role", "security-auditor",
+                "--convergence-exception-id", exc_id,
+                "--actor", "orchestrator", "--event-id", "evt-am-start",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            for role in ("package-reviewer", "security-auditor"):
+                _run_fs(
+                    "record-subreview", PARENT_ID, role, "repair_required",
+                    "--convergence-exception-id", exc_id,
+                    "--actor", "orchestrator", "--event-id", f"evt-am-sub-{role}",
+                    "--expect-revision", str(rev),
+                    cwd=repo, state_file=state, check=False,
+                )
+                rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "finalize-review-panel", PARENT_ID, "repair_required",
+                "--convergence-exception-id", exc_id,
+                "--allow-missing",
+                "--actor", "orchestrator", "--event-id", "evt-am-final",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn("HCE_DENIED", _parse_json(proc.stdout)["error"])
+
+    def test_finalize_denies_blocked_subreview(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, _ = _reentered_fixture(Path(td))
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "start-review-panel", PARENT_ID,
+                "--role", "package-reviewer", "--role", "security-auditor",
+                "--convergence-exception-id", exc_id,
+                "--actor", "orchestrator", "--event-id", "evt-block-start",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "record-subreview", PARENT_ID, "package-reviewer", "repair_required",
+                "--convergence-exception-id", exc_id,
+                "--actor", "orchestrator", "--event-id", "evt-block-sub-pr",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "record-subreview", PARENT_ID, "security-auditor", "blocked",
+                "--convergence-exception-id", exc_id,
+                "--actor", "orchestrator", "--event-id", "evt-block-sub-sec",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "finalize-review-panel", PARENT_ID, "repair_required",
+                "--convergence-exception-id", exc_id,
+                "--actor", "orchestrator", "--event-id", "evt-block-final",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn("HCE_DENIED", _parse_json(proc.stdout)["error"])
+
+    def test_subreview_and_final_review_bind_convergence(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, _ = _reentered_fixture(Path(td))
+            panel_id = _panel_cycle(repo, state, exc_id, event_prefix="evt-bind")
+            data = json.loads(state.read_text())
+            panel = next(p for p in data["packages"][0]["review_panels"] if p["panel_id"] == panel_id)
+            for sub in panel["subreviews"]:
+                self.assertIn("convergence_binding", sub)
+                self.assertEqual(sub["convergence_binding"]["exception_id"], exc_id)
+            final_review = data["packages"][0]["reviews"][-1]
+            self.assertIn("convergence_binding", final_review)
+            self.assertEqual(final_review["convergence_binding"]["exception_id"], exc_id)
+
+
+class HceLifecycleOutcomeGuardTests(unittest.TestCase):
+    def test_unconsumed_hce_denies_ordinary_repair(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, _ = _reentered_fixture(Path(td))
+            _panel_cycle(repo, state, exc_id, event_prefix="evt-sec3")
+            rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "record-repair", PARENT_ID,
+                "--finding-id", FINDING_IDS[0],
+                "--changed-file", "src/foo.ts",
+                "--changed-lines", "1",
+                "--actor", "orchestrator",
+                "--event-id", "evt-sec3-repair",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn("HCE_DENIED", _parse_json(proc.stdout)["error"])
+
+    def test_linked_repair_denies_dirty_worktree(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, outcome_id, combined_sha = _consumed_fixture(Path(td))
+            (repo / "scripts/sync-vps/dirty-marker.ts").write_text("// dirty\n")
+            rev = json.loads(state.read_text())["revision"]
+            finding_args = []
+            for fid in FINDING_IDS:
+                finding_args.extend(["--finding-id", fid])
+            proc = _run_fs(
+                "record-repair", PARENT_ID,
+                *finding_args,
+                "--commit", combined_sha,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-dirty-repair",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn("HCE_DIRTY_WORKTREE", _parse_json(proc.stdout)["error"])
+
+    def test_linked_repair_denies_head_drift(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, outcome_id, combined_sha = _consumed_fixture(Path(td))
+            (repo / "scripts/sync-vps/drift-marker.ts").write_text("// drift\n")
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "drift"], cwd=repo, check=True)
+            rev = json.loads(state.read_text())["revision"]
+            finding_args = []
+            for fid in FINDING_IDS:
+                finding_args.extend(["--finding-id", fid])
+            proc = _run_fs(
+                "record-repair", PARENT_ID,
+                *finding_args,
+                "--commit", combined_sha,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-drift-repair",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            err = _parse_json(proc.stdout)["error"]
+            self.assertTrue("HCE_STALE" in err or "HEAD" in err)
+
+    def test_record_testing_requires_combined_commit(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, outcome_id, combined_sha = _consumed_fixture(Path(td))
+            rev = json.loads(state.read_text())["revision"]
+            finding_args = []
+            for fid in FINDING_IDS:
+                finding_args.extend(["--finding-id", fid])
+            _run_fs(
+                "record-repair", PARENT_ID, *finding_args,
+                "--commit", combined_sha,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator", "--event-id", "evt-test-repair",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            closed = []
+            for fid in FINDING_IDS:
+                closed.extend(["--closed-finding", fid])
+            _run_fs(
+                "record-delta-review", PARENT_ID, "pass",
+                *closed,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator", "--event-id", "evt-test-delta",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "record-testing", PARENT_ID, "pass",
+                "--actor", "orchestrator", "--event-id", "evt-test-no-commit",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn("HCE_DENIED", _parse_json(proc.stdout)["error"])
+
+
+class HceLifecycleWrapperSecurityTests(unittest.TestCase):
+    def test_coord_policy_denies_evil_wrapper_path(self):
+        evil = "/tmp/evil/ai/scripts/integration_action.py"
+        cmd = (
+            f"python3 {evil} /tmp/state.json {PARENT_ID} transition -- "
+            f"python3 ai/scripts/feature-state.py transition INTEGRATION --package-id {PARENT_ID}"
+        )
+        self.assertFalse(coord_policy.allowed(cmd))
+
+    def test_wrapper_rejects_smuggled_non_integration_transition(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, outcome_id, combined_sha = _consumed_fixture(Path(td))
+            rev = json.loads(state.read_text())["revision"]
+            finding_args = []
+            for fid in FINDING_IDS:
+                finding_args.extend(["--finding-id", fid])
+            _run_fs(
+                "record-repair", PARENT_ID, *finding_args,
+                "--commit", combined_sha,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator", "--event-id", "evt-wrap-repair",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            closed = []
+            for fid in FINDING_IDS:
+                closed.extend(["--closed-finding", fid])
+            _run_fs(
+                "record-delta-review", PARENT_ID, "pass",
+                *closed,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator", "--event-id", "evt-wrap-delta",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "record-testing", PARENT_ID, "pass",
+                "--combined-commit", combined_sha,
+                "--actor", "orchestrator", "--event-id", "evt-wrap-testing",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "record-runtime-qa", PARENT_ID, "pass",
+                "--combined-commit", combined_sha,
+                "--actor", "orchestrator", "--event-id", "evt-wrap-runtime",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "accept-package", PARENT_ID,
+                "--actor", "orchestrator", "--event-id", "evt-wrap-accept",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            rev = json.loads(state.read_text())["revision"]
+            _run_fs(
+                "record-receipt", PARENT_ID,
+                "--convergence-outcome-id", outcome_id,
+                "--actor", "orchestrator", "--event-id", "evt-wrap-receipt",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            inner = [
+                "python3", FEATURE_STATE_ABS, "transition", "DONE",
+                "--reason", "INTEGRATION", "--package-id", PARENT_ID,
+                "--state-file", str(state.resolve()),
+            ]
+            proc = subprocess.run(
+                ["python3", str(INTEGRATION_ACTION), str(state.resolve()), PARENT_ID, "transition", "--", *inner],
+                cwd=repo, env=os.environ.copy(), text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("only the INTEGRATION transition", proc.stdout + proc.stderr)
+
+    def test_wrapper_rejects_duplicate_state_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo, state, exc_id, outcome_id, _ = _consumed_fixture(Path(td))
+            other_state = Path(td) / "other.json"
+            other_state.write_text(state.read_text())
+            inner = [
+                "python3", FEATURE_STATE_ABS, "record-receipt", PARENT_ID,
+                "--state-file", str(state.resolve()),
+                "--state-file", str(other_state.resolve()),
+                "--convergence-outcome-id", outcome_id,
+            ]
+            proc = subprocess.run(
+                ["python3", str(INTEGRATION_ACTION), str(state.resolve()), PARENT_ID, "record-receipt", "--", *inner],
+                cwd=repo, env=os.environ.copy(), text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("state-file", proc.stdout + proc.stderr)
+
+    def test_wrapper_rejects_relative_inner_from_foreign_cwd(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            foreign = td_path / "foreign"
+            foreign.mkdir()
+            state = td_path / "state.json"
+            state.write_text("{}")
+            inner = [
+                "python3", "ai/scripts/feature-state.py", "transition", "INTEGRATION",
+                "--package-id", PARENT_ID, "--state-file", str(state.resolve()),
+            ]
+            proc = subprocess.run(
+                ["python3", str(INTEGRATION_ACTION), str(state.resolve()), PARENT_ID, "transition", "--", *inner],
+                cwd=foreign, env=os.environ.copy(), text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            combined = proc.stdout + proc.stderr
+            self.assertTrue(
+                "not allowed" in combined or "cannot read package state" in combined,
+                combined,
+            )
 
 
 class HceLifecycleE2eTests(unittest.TestCase):

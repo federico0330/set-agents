@@ -115,7 +115,7 @@ def rederive_and_compare(frozen: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     return matches, fresh
 
 
-def integration_ready(package: dict[str, Any]) -> list[str]:
+def integration_ready(package: dict[str, Any], *, data: dict[str, Any] | None = None) -> list[str]:
     """Preconditions for the `INTEGRATION` transition (docs/adr/0020-*.md),
     re-derived live -- never trusting a stored boolean. Mirrors
     `model.package_accept_ready`'s shape: a list of reasons, empty means
@@ -145,19 +145,20 @@ def integration_ready(package: dict[str, Any]) -> list[str]:
             errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")
         if errors:
             return errors
-        from pathlib import Path
-        from feature_state_lib.convergence_git import diff_paths_and_lines, resolve_tree
-
-        worktree = Path(exc.get("worktree_realpath") or Path.cwd())
-        base_tree = combined.get("base_tree")
-        candidate_commit = combined.get("candidate_commit")
-        if not base_tree or not candidate_commit:
-            errors.append("combined_review_identity incomplete for live re-derivation")
+        if data is None:
+            errors.append("HCE integration requires full state for registered-outcome verification")
             return errors
-        candidate_tree = resolve_tree(worktree, candidate_commit)
-        _, live_lines = diff_paths_and_lines(worktree, base_tree, candidate_tree)
-        if receipt.get("changed_lines") != live_lines:
-            errors.append("receipt.changed_lines no longer matches live combined diff")
+        try:
+            from feature_state_lib.cli_lifecycle import require_hce_registered_outcome
+
+            require_hce_registered_outcome(data, package, exc)
+        except Exception as exc_err:
+            from feature_state_lib.convergence_errors import HceDenial
+
+            if isinstance(exc_err, HceDenial):
+                errors.append(str(exc_err))
+            else:
+                errors.append(f"HCE registered outcome verification failed: {exc_err}")
         return errors
     if receipt.get("terminal_state") != "accepted":
         errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Deny-by-default command policy for read-only coordination."""
 
+import os
 import re
 import shlex
 import sys
@@ -597,22 +598,38 @@ def always_denied(command: str) -> bool:
     return bool(ALWAYS_DENY.search(command.strip()))
 
 
+def _trusted_integration_wrappers() -> set[Path]:
+    root = os.environ.get("SET_AGENTS_ROOT") or str(Path(__file__).resolve().parents[2])
+    trusted_cli = INTEGRATION_ACTION_CLI.replace("__SET_AGENTS_ROOT__", root)
+    wrappers = {Path(trusted_cli).expanduser().resolve()}
+    hooks = (Path.home() / ".claude/hooks/integration_action.py").expanduser()
+    try:
+        wrappers.add(hooks.resolve())
+    except OSError:
+        pass
+    return wrappers
+
+
+def _resolve_integration_wrapper(script: str) -> Path | None:
+    if script == "ai/scripts/integration_action.py":
+        root = os.environ.get("SET_AGENTS_ROOT") or str(Path(__file__).resolve().parents[2])
+        try:
+            return (Path(root) / "ai/scripts/integration_action.py").resolve()
+        except OSError:
+            return None
+    try:
+        return Path(script).expanduser().resolve()
+    except OSError:
+        return None
+
+
 def _integration_wrapper_allowed(argv: list[str]) -> bool:
-    """Trusted adjacent absolute integration_action.py wrapper (design.md:141)."""
+    """Trusted resolved integration_action.py wrapper only (design.md:141)."""
     if len(argv) < 7 or argv[0] not in {"python3", "python"} or "--" not in argv:
         return False
-    script = argv[1]
-    if script == "ai/scripts/integration_action.py":
-        outer = None
-    else:
-        try:
-            outer = Path(script).expanduser().resolve()
-        except OSError:
-            return False
-        if outer.name != "integration_action.py":
-            return False
-        if outer.parent.name != "scripts" or outer.parent.parent.name != "ai":
-            return False
+    outer = _resolve_integration_wrapper(argv[1])
+    if outer is None or outer not in _trusted_integration_wrappers():
+        return False
     action = argv[4]
     if action not in {"freeze-candidate", "record-receipt", "transition"}:
         return False
@@ -621,12 +638,15 @@ def _integration_wrapper_allowed(argv: list[str]) -> bool:
     if len(wrapped) < 3 or wrapped[0] not in {"python3", "python"}:
         return False
     inner = wrapped[1]
+    trusted_feature_state = (outer.parent / "feature-state.py").resolve()
     if inner == "ai/scripts/feature-state.py":
-        return True
-    if outer is None:
-        return False
+        try:
+            harness_root = outer.parent.parent.parent.resolve()
+            return (harness_root / "ai/scripts/feature-state.py").resolve() == trusted_feature_state
+        except OSError:
+            return False
     try:
-        return Path(inner).resolve() == (outer.parent / "feature-state.py").resolve()
+        return Path(inner).resolve() == trusted_feature_state
     except OSError:
         return False
 

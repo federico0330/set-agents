@@ -763,7 +763,12 @@ def validate_hce_outcome_command(
 
     exc = hce_exception(package)
     flag = getattr(args, "convergence_outcome_id", None)
-    if hce_outcome_active(exc):
+    if hce_panel_active(exc):
+        if not hce_outcome_active(exc):
+            raise HceDenial(
+                "HCE_DENIED",
+                f"{command} requires consumed convergence outcome before HCE successor lifecycle",
+            )
         if not flag:
             raise HceDenial("HCE_DENIED", f"{command} requires --convergence-outcome-id for consumed HCE parent")
         consumption = exc.get("consumption") or {}
@@ -774,3 +779,68 @@ def validate_hce_outcome_command(
     if flag:
         raise HceDenial("HCE_DENIED", f"{command} forbids --convergence-outcome-id on ordinary package")
     return None
+
+
+def require_hce_registered_outcome(
+    data: dict[str, Any],
+    package: dict[str, Any],
+    exc: dict[str, Any],
+) -> str:
+    """Fresh verify-convergence-outcome posture for linked repair/receipt/integration."""
+    from pathlib import Path
+
+    from feature_state_lib.convergence_constants import CHILD_A_PACKAGE_ID, CHILD_B_PACKAGE_ID
+    from feature_state_lib.convergence_errors import HceDenial
+    from feature_state_lib.convergence_git import (
+        check_clean_worktree,
+        measure_child_output_paths,
+        measure_combined_identity,
+        resolve_commit,
+    )
+    from feature_state_lib.convergence_policy import validate_verify_outcome, _package_map
+
+    if exc.get("status") != "consumed":
+        raise HceDenial("HCE_DENIED", "convergence outcome not consumed")
+    worktree = Path(exc.get("worktree_realpath") or Path.cwd())
+    origin = exc.get("repair_origin") or {}
+    base_commit = origin.get("candidate_ref")
+    if not base_commit:
+        raise HceDenial("HCE_STALE", "missing repair_origin candidate_ref")
+    check_clean_worktree(worktree)
+    combined_live = measure_combined_identity(worktree, base_commit)
+    head_commit = resolve_commit(worktree, "HEAD")
+    if head_commit != combined_live.get("candidate_commit"):
+        raise HceDenial("HCE_STALE", "HEAD must equal combined candidate_commit")
+    packages = _package_map(data)
+    child_a = packages.get(CHILD_A_PACKAGE_ID)
+    child_b = packages.get(CHILD_B_PACKAGE_ID)
+    if not child_a or not child_b:
+        raise HceDenial("HCE_STALE", "missing fixed child packages")
+    fresh_child_outputs = {
+        CHILD_A_PACKAGE_ID: measure_child_output_paths(worktree, child_a["candidate_identity"]),
+        CHILD_B_PACKAGE_ID: measure_child_output_paths(worktree, child_b["candidate_identity"]),
+    }
+    return validate_verify_outcome(
+        exc,
+        package,
+        combined_live,
+        data=data,
+        fresh_child_outputs=fresh_child_outputs,
+    )
+
+
+def validate_hce_combined_commit(
+    exc: dict[str, Any],
+    commit: str | None,
+    *,
+    command: str,
+) -> str:
+    from feature_state_lib.convergence_errors import HceDenial
+
+    combined = exc.get("combined_review_identity") or {}
+    expected = combined.get("candidate_commit")
+    if not commit:
+        raise HceDenial("HCE_DENIED", f"{command} requires --combined-commit for HCE parent")
+    if commit != expected:
+        raise HceDenial("HCE_STALE", "combined-commit must equal combined candidate_commit")
+    return expected

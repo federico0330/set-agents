@@ -17,7 +17,13 @@ from feature_state_lib.model import (
     StateError, now, parse_json_object, package_by_id, has_open_findings, package_accept_ready,
 )
 from feature_state_lib.cli_lifecycle import state_file_arg, output_state, block_with_reason, spec_drift
-from feature_state_lib.cli_lifecycle import validate_hce_outcome_command, build_convergence_binding
+from feature_state_lib.cli_lifecycle import (
+    validate_hce_outcome_command,
+    build_convergence_binding,
+    require_hce_registered_outcome,
+    validate_hce_combined_commit,
+    hce_panel_active,
+)
 
 
 def cmd_record_gate(args: argparse.Namespace) -> int:
@@ -233,6 +239,7 @@ def _record_hce_linked_repair(
         raise HceDenial("HCE_DENIED", "linked repair requires exactly ten original finding IDs once each")
     if any(item.get("outcome_id") == outcome_id for item in package.get("repairs", [])):
         raise HceDenial("HCE_REPLAY", "linked repair already recorded for this outcome")
+    require_hce_registered_outcome(data, package, exc)
     combined = exc.get("combined_review_identity") or {}
     worktree = Path(exc.get("worktree_realpath") or Path.cwd())
     base_commit = combined.get("base_commit")
@@ -480,12 +487,23 @@ def cmd_record_testing(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_TESTING":
             raise StateError(f"cannot record testing from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        exc = package.get("convergence_exception")
+        combined_commit = None
+        if hce_panel_active(exc):
+            combined_commit = validate_hce_combined_commit(
+                exc, getattr(args, "combined_commit", None), command="record-testing",
+            )
         result = {
             "status": args.status,
             "commands": args.command or [],
             "evidence": args.evidence,
             "at": now(),
         }
+        if combined_commit:
+            result["combined_commit"] = combined_commit
+            result["convergence_binding"] = build_convergence_binding(
+                exc, outcome_id=(exc.get("consumption") or {}).get("outcome_id"),
+            )
         package.setdefault("testing", []).append(result)
         if args.status == "pass":
             data["phase"] = "PACKAGE_RUNTIME_QA"
@@ -521,6 +539,12 @@ def cmd_record_runtime_qa(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_RUNTIME_QA":
             raise StateError(f"cannot record runtime QA from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        exc = package.get("convergence_exception")
+        combined_commit = None
+        if hce_panel_active(exc):
+            combined_commit = validate_hce_combined_commit(
+                exc, getattr(args, "combined_commit", None), command="record-runtime-qa",
+            )
         result = {
             "status": args.status,
             "url": args.url,
@@ -530,6 +554,11 @@ def cmd_record_runtime_qa(args: argparse.Namespace) -> int:
             "evidence": args.evidence,
             "at": now(),
         }
+        if combined_commit:
+            result["combined_commit"] = combined_commit
+            result["convergence_binding"] = build_convergence_binding(
+                exc, outcome_id=(exc.get("consumption") or {}).get("outcome_id"),
+            )
         package.setdefault("runtime_qa", []).append(result)
         if args.status == "pass":
             package["status"] = "runtime_qa_passed"
