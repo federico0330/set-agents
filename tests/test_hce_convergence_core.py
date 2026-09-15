@@ -1513,6 +1513,145 @@ class HceCycle3RepairTests(unittest.TestCase):
             self.assertIn("unlinked", payload["error"].lower())
             self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
 
+    def _consume_fixture(self, td_path: Path) -> tuple[Path, Path, str, dict, str]:
+        repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+        rev = json.loads(state.read_text())["revision"]
+        consume = _run_fs(
+            "consume-convergence", PARENT_ID,
+            "--exception-id", exc_id,
+            "--actor", "orchestrator",
+            "--event-id", f"evt-consume-{uuid.uuid4().hex[:8]}",
+            "--expect-revision", str(rev),
+            cwd=repo, state_file=state, check=False,
+        )
+        self.assertEqual(consume.returncode, 0, consume.stdout + consume.stderr)
+        data = json.loads(state.read_text())
+        outcome_id = data["packages"][0]["convergence_exception"]["consumption"]["outcome_id"]
+        return repo, state, exc_id, data, outcome_id
+
+    @staticmethod
+    def _spoof_linked_successor(parent: dict, *, repairs: list[dict] | None = None) -> None:
+        for finding in parent["findings"]:
+            finding["status"] = "closed"
+            finding["repair_attempts"] = int(finding.get("repair_attempts", 0)) + 1
+        parent.setdefault("attempts", {})["repair_batches"] = int(parent["attempts"].get("repair_batches", 0)) + 1
+        parent["repairs"] = repairs if repairs is not None else []
+
+    def _linked_repair_record(self, outcome_id: str, finding_ids: list[str] | None = None) -> dict:
+        return {
+            "finding_ids": finding_ids if finding_ids is not None else list(FINDING_IDS),
+            "changed_files": [PATH_DISCOVERY],
+            "verification": ["unit-test"],
+            "at": "2026-09-15T16:00:00+00:00",
+            "outcome_id": outcome_id,
+        }
+
+    def test_verify_denies_counter_spoof_all_closed_without_linked_repair(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, data, _outcome_id = self._consume_fixture(td_path)
+            rev_after = data["revision"]
+            parent = data["packages"][0]
+            self._spoof_linked_successor(parent, repairs=[])
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 2, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertIn("unlinked", payload["error"].lower())
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
+
+    def test_verify_allows_linked_repair_successor_after_consume(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, data, outcome_id = self._consume_fixture(td_path)
+            rev_after = data["revision"]
+            parent = data["packages"][0]
+            self._spoof_linked_successor(
+                parent,
+                repairs=[self._linked_repair_record(outcome_id)],
+            )
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertEqual(payload["result"], "HCE_REGISTERED_VALID")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
+
+    def test_verify_denies_linked_repair_wrong_finding_ids(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, data, outcome_id = self._consume_fixture(td_path)
+            rev_after = data["revision"]
+            parent = data["packages"][0]
+            self._spoof_linked_successor(
+                parent,
+                repairs=[self._linked_repair_record(outcome_id, finding_ids=FINDING_IDS[:9])],
+            )
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 2, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertIn("unlinked", payload["error"].lower())
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
+
+    def test_verify_denies_linked_repair_missing_outcome_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, data, outcome_id = self._consume_fixture(td_path)
+            rev_after = data["revision"]
+            parent = data["packages"][0]
+            repair = self._linked_repair_record(outcome_id)
+            repair.pop("outcome_id")
+            self._spoof_linked_successor(parent, repairs=[repair])
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 2, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertIn("unlinked", payload["error"].lower())
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
+
+    def test_verify_denies_linked_repair_mismatched_outcome_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, data, _outcome_id = self._consume_fixture(td_path)
+            rev_after = data["revision"]
+            parent = data["packages"][0]
+            self._spoof_linked_successor(
+                parent,
+                repairs=[self._linked_repair_record(str(uuid.uuid4()))],
+            )
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 2, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertIn("unlinked", payload["error"].lower())
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_after)
+
     def test_convergence_policy_has_no_pathlib_or_subprocess(self):
         policy_path = ROOT / "ai/scripts/feature_state_lib/convergence_policy.py"
         source = policy_path.read_text()

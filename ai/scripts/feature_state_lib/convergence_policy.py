@@ -525,6 +525,39 @@ def _live_child_record_digest(pkg: dict[str, Any], package_id: str) -> str:
 FreshChildOutputs = dict[str, tuple[list[str], str]]
 
 
+def _validate_linked_repair_successor(
+    exc: dict[str, Any],
+    package: dict[str, Any],
+    expected_finding_ids: set[str],
+) -> None:
+    """Require exactly one repairs[] record linked to the consumed outcome."""
+    consumption = exc.get("consumption")
+    if not isinstance(consumption, dict):
+        raise HceDenial("HCE_STALE", "unlinked finding evolution")
+    expected_outcome_id = consumption.get("outcome_id")
+    if not expected_outcome_id or not UUID_RE.match(str(expected_outcome_id)):
+        raise HceDenial("HCE_STALE", "unlinked finding evolution")
+    repairs = package.get("repairs")
+    if not isinstance(repairs, list) or not repairs:
+        raise HceDenial("HCE_STALE", "unlinked finding evolution")
+    linked: list[dict[str, Any]] = []
+    for repair in repairs:
+        if not isinstance(repair, dict):
+            raise HceDenial("HCE_STALE", "unlinked finding evolution")
+        finding_ids = repair.get("finding_ids")
+        if not isinstance(finding_ids, list):
+            raise HceDenial("HCE_STALE", "unlinked finding evolution")
+        if set(finding_ids) != expected_finding_ids:
+            continue
+        if repair.get("outcome_id") != expected_outcome_id:
+            raise HceDenial("HCE_STALE", "unlinked finding evolution")
+        linked.append(repair)
+    if len(linked) != 1:
+        raise HceDenial("HCE_STALE", "unlinked finding evolution")
+    if len(repairs) != 1:
+        raise HceDenial("HCE_STALE", "unlinked finding evolution")
+
+
 def validate_verify_finding_evolution(exc: dict[str, Any], package: dict[str, Any]) -> None:
     """Allow unchanged snapshot or exact linked-repair successor; deny unlinked drift."""
     stored_by_id = {item["id"]: item for item in exc.get("finding_snapshot") or []}
@@ -561,6 +594,7 @@ def validate_verify_finding_evolution(exc: dict[str, Any], package: dict[str, An
             raise HceDenial("HCE_STALE", "repair_batches changed without linked repair")
         return
     if all_linked_successor and live_batch == initial_batch + 1:
+        _validate_linked_repair_successor(exc, package, set(stored_by_id.keys()))
         return
     raise HceDenial("HCE_STALE", "unlinked finding evolution")
 
