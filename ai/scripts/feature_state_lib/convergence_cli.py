@@ -143,15 +143,10 @@ def _replay_invocation_matches(data: dict[str, Any], event: str, event_id: str, 
         if item.get("event_id") != event_id or item.get("event") != event:
             continue
         metadata = item.get("metadata") or {}
-        stored = metadata.get("invocation_snapshot") or {}
-        if stored:
-            return stored == snapshot
-        if event == "prepare-convergence":
-            return metadata.get("exception_id") is not None
-        if event == "reenter-convergence":
-            return metadata.get("binding_digest") is not None
-        if event == "authorize-convergence":
-            return metadata.get("binding_digest") is not None
+        stored = metadata.get("invocation_snapshot")
+        if not isinstance(stored, dict) or not stored:
+            return False
+        return stored == snapshot
     return False
 
 
@@ -249,7 +244,7 @@ def cmd_consume_convergence(args: argparse.Namespace) -> int:
             exc = get_exception(package, exception_id)
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             combined = _live_combined(exc, worktree)
-            rederive_frozen_binding(exc, data, package, combined)
+            rederive_frozen_binding(exc, data, package, combined, worktree=worktree)
             validate_consume_ready(exc, combined)
             consumption = build_consumption(
                 exc,
@@ -320,7 +315,7 @@ def cmd_verify_convergence_outcome(args: argparse.Namespace) -> int:
         exc = get_exception(package, args.exception_id)
         validate_bindings_match(exc, state_real, repo_real, str(worktree))
         combined = _live_combined(exc, worktree)
-        outcome_id = validate_verify_outcome(exc, package, combined, data=data)
+        outcome_id = validate_verify_outcome(exc, package, combined, data=data, worktree=worktree)
         print_json(_success_payload(
             "HCE_REGISTERED_VALID", data, args.package_id, exc,
             outcome_id=outcome_id,
@@ -448,7 +443,7 @@ def cmd_authorize_convergence(args: argparse.Namespace) -> int:
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             check_clean_worktree(worktree)
             combined = _live_combined(exc, worktree)
-            rederive_frozen_binding(exc, data, package, combined)
+            rederive_frozen_binding(exc, data, package, combined, worktree=worktree)
             validate_authorize_context(data, package, exc)
             exc["authorization"] = build_authorization(
                 exc,

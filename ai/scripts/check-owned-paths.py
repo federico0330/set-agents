@@ -137,6 +137,7 @@ def changed_files_from_git(baseline: str) -> list[str]:
 
 def _derive_owned_paths_from_children(exc: dict[str, Any]) -> list[str]:
     import base64
+    import binascii
 
     children = exc.get("children") or []
     if len(children) != 2:
@@ -144,7 +145,10 @@ def _derive_owned_paths_from_children(exc: dict[str, Any]) -> list[str]:
     owned: list[str] = []
     for child in sorted(children, key=lambda item: item.get("package_id", "")):
         for encoded in child.get("output_paths_b64", []):
-            owned.append(base64.b64decode(encoded).decode("utf-8"))
+            try:
+                owned.append(base64.b64decode(encoded, validate=True).decode("utf-8"))
+            except (binascii.Error, UnicodeDecodeError):
+                _hce_exit("HCE_STALE: malformed output_paths_b64")
     return sorted(owned)
 
 

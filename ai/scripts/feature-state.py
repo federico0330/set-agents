@@ -189,10 +189,10 @@ CAS_SENSITIVE_OPERATIONS = frozenset({
 
 
 @contextmanager
-def _state_file_lock(path: Path):
+def _state_file_lock(path: Path, *, hce: bool = False):
     """PR-11 (016 audit debt): exclusive lock for read-modify-write on feature JSON."""
     lock_path = path.with_suffix(path.suffix + ".lock")
-    if path.suffix == ".json" or str(path).endswith(".json"):
+    if hce and (path.suffix == ".json" or str(path).endswith(".json")):
         validate_canonical_lock_path(lock_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "a+", encoding="utf-8") as handle:
@@ -209,9 +209,10 @@ def mutate(
     operation: str,
     updater,
 ) -> tuple[dict[str, Any], bool]:
-    if operation in HCE_COMMANDS:
+    is_hce = operation in HCE_COMMANDS
+    if is_hce:
         validate_canonical_state_path(path)
-    with _state_file_lock(path):
+    with _state_file_lock(path, hce=is_hce):
         data = load_state(path)
         fail_if_invalid(data)
         expected = getattr(args, "expect_revision", None)

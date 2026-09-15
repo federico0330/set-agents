@@ -1389,5 +1389,199 @@ class HceSchemaValidationTests(unittest.TestCase):
             self.assertEqual(json.loads(state.read_text())["revision"], rev)
 
 
+class HceCycle3RepairTests(unittest.TestCase):
+    """RED/GREEN fixtures for cycle-3 findings HCE-CORE-002/006/007/008/010 and HCE-DELTA-003."""
+
+    def test_malformed_authorized_schema_rejects_bool_as_int_and_bad_provenance(self):
+        from feature_state_lib.model import validate_state
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceAuthorizeTests()._authorize_ready_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "authorize-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--authorized-by", "operator",
+                "--reason", "final panel bound",
+                "--approval-evidence", "panel-evidence",
+                "--actor", "orchestrator",
+                "--event-id", "evt-auth-schema",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            data = json.loads(state.read_text())
+            exc = data["packages"][0]["convergence_exception"]
+            exc["repair_origin"]["frozen_by"] = ""
+            exc["authorization"]["at"] = "2026-09-15T16:00:00"
+            exc["finding_snapshot"][0]["repair_attempts"] = True
+            errors = validate_state(data)
+            self.assertTrue(errors, "malformed authorized convergence must fail schema validation")
+            joined = "; ".join(errors)
+            self.assertIn("frozen_by", joined)
+            self.assertIn("UTC", joined)
+            self.assertIn("repair_attempts", joined)
+
+    def test_consume_denies_stored_child_receipt_tamper_with_rebound_binding(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            data = json.loads(state.read_text())
+            exc = data["packages"][0]["convergence_exception"]
+            exc["children"][0]["receipt"]["minted_by"] = "tampered-stored-child"
+            exc["binding_digest"] = compute_binding_digest(exc)
+            _write_state(state, data)
+            rev = data["revision"]
+            proc = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-stored-child-tamper",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload.get("code"), "HCE_STALE")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_verify_allows_legitimate_post_consumption_record_gate(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
+            consume = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-consume-verify-gate",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(consume.returncode, 0, consume.stdout + consume.stderr)
+            rev_after = json.loads(state.read_text())["revision"]
+            gate = _run_fs(
+                "record-gate", "lint", "pass",
+                "--package-id", PARENT_ID,
+                "--evidence", "post-consumption lint ok",
+                "--actor", "orchestrator",
+                "--event-id", "evt-post-consume-gate",
+                "--expect-revision", str(rev_after),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(gate.returncode, 0, gate.stdout + gate.stderr)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
+            payload = _parse_json(verify.stdout)
+            self.assertEqual(payload["result"], "HCE_REGISTERED_VALID")
+
+    def test_replay_without_invocation_snapshot_denied(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            _write_state(state, _minimal_state(state, repo, base_sha, original_sha))
+            first = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "approved workflow",
+                "--approval-evidence", "ticket-1",
+                "--actor", "orchestrator",
+                "--event-id", "evt-replay-no-snapshot",
+                "--expect-revision", "0",
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(first.returncode, 0)
+            data = json.loads(state.read_text())
+            for event in data["history"]:
+                if event.get("event_id") == "evt-replay-no-snapshot":
+                    event["metadata"].pop("invocation_snapshot", None)
+            _write_state(state, data)
+            rev = data["revision"]
+            second = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "approved workflow",
+                "--approval-evidence", "ticket-1",
+                "--actor", "orchestrator",
+                "--event-id", "evt-replay-no-snapshot",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(second.returncode, 2)
+            payload = _parse_json(second.stdout)
+            self.assertEqual(payload.get("code"), "HCE_REPLAY")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_ownership_malformed_base64_json_denial_exit2(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            data = json.loads(state.read_text())
+            data["packages"][0]["convergence_exception"]["children"][0]["output_paths_b64"] = ["!!!"]
+            _write_state(state, data)
+            proc = _run_owned(
+                "--state-file", str(state.resolve()),
+                "--package-id", PARENT_ID,
+                "--convergence-exception-id", exc_id,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertNotIn("Traceback", proc.stderr)
+            payload = _parse_json(proc.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertIn("malformed output_paths_b64", payload["error"])
+
+    def test_ordinary_create_package_accepts_relative_state_file(self):
+        import hashlib
+
+        def _run_relative(*args, cwd: Path):
+            return subprocess.run(
+                ["python3", str(FEATURE_STATE), *args],
+                cwd=cwd, env=os.environ.copy(), text=True, capture_output=True, check=False,
+            )
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            spec = td_path / "spec.md"
+            spec.write_text("# spec\n")
+            digest = hashlib.sha256(spec.read_bytes()).hexdigest()
+            axes_log = td_path / "axes-log.jsonl"
+            axes_rows = [
+                {"at": "2026-08-15T00:00:00Z", "feature_id": "feat-rel", "axis": axis,
+                 "stance": "deferred", "origin": "n/a", "reason": "not decided yet"}
+                for axis in ("data-store", "api-gateway", "deploy-platform", "audience", "embeddings",
+                             "realtime", "mobile", "auth", "cost", "legal")
+            ]
+            axes_log.write_text("\n".join(json.dumps(row, sort_keys=True) for row in axes_rows) + "\n")
+            init = _run_relative(
+                "init", "feat-rel", str(spec), digest,
+                "--state-file", "state.json",
+                "--approved-by", "test",
+                "--axes-log", str(axes_log),
+                "--risk-signal", "user-asked-full-pipeline",
+                cwd=td_path,
+            )
+            self.assertEqual(init.returncode, 0, init.stderr + init.stdout)
+            proc = _run_relative(
+                "create-package", "PKG-REL", "relative path objective",
+                "--state-file", "state.json",
+                "--complexity", "small",
+                "--ac", "AC-01",
+                "--task", "T1",
+                "--actor", "test",
+                cwd=td_path,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            self.assertNotIn("HCE_STATE_PATH_MISMATCH", proc.stdout + proc.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
