@@ -5,6 +5,7 @@ positional (PACKAGE_ID) since integration authority is package-scoped, never
 feature-scoped.
 """
 
+import json
 import re
 import subprocess
 import sys
@@ -12,8 +13,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from integration_gate import check  # noqa: E402
+from feature_state_lib.model import package_by_id  # noqa: E402
 
 FORBIDDEN_SYNTAX = re.compile(r"(?:>|>>|<|<<|\|\||&&|;|\|)|`|\$\(")
+WRAPPER = Path(__file__).resolve()
+TRUSTED_FEATURE_STATE = WRAPPER.parent / "feature-state.py"
 
 if len(sys.argv) < 4 or "--" not in sys.argv:
     raise SystemExit("usage: integration_action.py STATE PACKAGE_ID ACTION -- COMMAND")
@@ -22,13 +26,47 @@ separator = sys.argv.index("--")
 command = sys.argv[separator + 1:]
 check(state_path, package_id, action)
 
-allowed = {
+try:
+    canonical_state = Path(state_path).resolve()
+except OSError:
+    raise SystemExit("state path is not canonical")
+
+
+def _feature_state_script_allowed(script: str) -> bool:
+    if script == "ai/scripts/feature-state.py":
+        return True
+    try:
+        return Path(script).resolve() == TRUSTED_FEATURE_STATE.resolve()
+    except OSError:
+        return False
+
+
+def _state_file_matches(cmd: list[str]) -> bool:
+    try:
+        idx = cmd.index("--state-file")
+    except ValueError:
+        return False
+    if idx + 1 >= len(cmd):
+        return False
+    try:
+        return Path(cmd[idx + 1]).resolve() == canonical_state
+    except OSError:
+        return False
+
+
+allowed_actions = {
     "freeze-candidate": [("python3", "ai/scripts/feature-state.py", "freeze-candidate")],
     "record-receipt": [("python3", "ai/scripts/feature-state.py", "record-receipt")],
     "transition": [("python3", "ai/scripts/feature-state.py", "transition")],
 }
-if not command or not any(tuple(command[:len(prefix)]) == prefix for prefix in allowed[action]):
+if not command or command[0] != "python3" or len(command) < 3:
     raise SystemExit("command is not allowed for this integration action")
+if not _feature_state_script_allowed(command[1]):
+    raise SystemExit("command is not allowed for this integration action")
+if command[2] != allowed_actions[action][0][2]:
+    raise SystemExit("command is not allowed for this integration action")
+if not _state_file_matches(command):
+    raise SystemExit("command --state-file must match wrapper STATE exactly")
 if any(FORBIDDEN_SYNTAX.search(part) for part in command):
     raise SystemExit("unsafe shell syntax blocked")
 
@@ -38,6 +76,14 @@ if action in {"freeze-candidate", "record-receipt"}:
     # never a different one smuggled into the command past the gate check.
     if len(command) < 4 or command[3] != package_id:
         raise SystemExit(f"{action} command must target the checked package_id as its first positional")
+    if action == "freeze-candidate":
+        try:
+            data = json.loads(canonical_state.read_text(encoding="utf-8"))
+            package = package_by_id(data, package_id)
+        except Exception as exc:
+            raise SystemExit(f"cannot inspect package for HCE guard: {exc}") from exc
+        if package.get("convergence_exception"):
+            raise SystemExit("HCE parent forbids freeze-candidate through integration wrapper")
 if action == "transition":
     # The one shape this wrapper exists to gate: the command must actually BE the
     # INTEGRATION transition for this exact package -- never a free-form transition

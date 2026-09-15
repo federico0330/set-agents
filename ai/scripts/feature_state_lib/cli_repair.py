@@ -17,6 +17,7 @@ from feature_state_lib.model import (
     StateError, now, parse_json_object, package_by_id, has_open_findings, package_accept_ready,
 )
 from feature_state_lib.cli_lifecycle import state_file_arg, output_state, block_with_reason, spec_drift
+from feature_state_lib.cli_lifecycle import validate_hce_outcome_command, build_convergence_binding
 
 
 def cmd_record_gate(args: argparse.Namespace) -> int:
@@ -193,6 +194,99 @@ def validate_commit_ref(commit: str | None) -> tuple[str | None, bool]:
     raise StateError(f"--commit does not resolve to a real commit in this repo: {commit}")
 
 
+def _record_hce_linked_repair(
+    data: dict[str, Any],
+    package: dict[str, Any],
+    args: argparse.Namespace,
+    exc: dict[str, Any],
+    outcome_id: str,
+    commit: str,
+    commit_verified: bool,
+) -> bool:
+    from copy import deepcopy
+    from pathlib import Path
+
+    from feature_state_lib.cli_review import require_verified
+    from feature_state_lib.convergence_constants import ALL_FINDING_IDS, CIRCULAR_TASK
+    from feature_state_lib.convergence_errors import HceDenial
+    from feature_state_lib.convergence_git import diff_paths_and_lines, resolve_commit, resolve_tree
+
+    if args.changed_file:
+        raise HceDenial("HCE_DENIED", "linked repair forbids --changed-file")
+    if getattr(args, "changed_lines", None) is not None:
+        raise HceDenial("HCE_DENIED", "linked repair forbids --changed-lines")
+    if args.skip_delta:
+        raise HceDenial("HCE_DENIED", "linked repair forbids --skip-delta")
+    if not commit or len(commit) != 40:
+        raise HceDenial("HCE_DENIED", "linked repair requires full --commit SHA")
+    if not exc.get("final_panel_id"):
+        raise HceDenial("HCE_DENIED", "bound final panel required before linked repair")
+    panel = next(
+        (item for item in package.get("review_panels", [])
+         if item.get("panel_id") == exc.get("final_panel_id") and item.get("status") == "completed"),
+        None,
+    )
+    if not panel or panel.get("verdict") != "repair_required":
+        raise HceDenial("HCE_DENIED", "completed bound final panel with repair_required required")
+    ids = args.finding_id or []
+    if set(ids) != set(ALL_FINDING_IDS) or len(ids) != len(ALL_FINDING_IDS):
+        raise HceDenial("HCE_DENIED", "linked repair requires exactly ten original finding IDs once each")
+    if any(item.get("outcome_id") == outcome_id for item in package.get("repairs", [])):
+        raise HceDenial("HCE_REPLAY", "linked repair already recorded for this outcome")
+    combined = exc.get("combined_review_identity") or {}
+    worktree = Path(exc.get("worktree_realpath") or Path.cwd())
+    base_commit = combined.get("base_commit")
+    if not base_commit:
+        raise HceDenial("HCE_STALE", "missing combined base_commit")
+    resolved_commit = resolve_commit(worktree, commit)
+    if resolved_commit != combined.get("candidate_commit"):
+        raise HceDenial("HCE_STALE", "repair commit must equal combined candidate_commit")
+    base_tree = resolve_tree(worktree, base_commit)
+    candidate_tree = resolve_tree(worktree, resolved_commit)
+    changed_files, changed_lines = diff_paths_and_lines(worktree, base_tree, candidate_tree)
+    repaired = []
+    for finding_id in ids:
+        finding = next((item for item in package.get("findings", []) if item.get("id") == finding_id), None)
+        if not finding:
+            raise HceDenial("HCE_DENIED", f"unknown finding: {finding_id}")
+        if finding.get("status") == "refuted":
+            raise HceDenial("HCE_DENIED", f"cannot repair refuted finding: {finding_id}")
+        require_verified(package, finding_id, "repair it")
+        repaired.append(finding)
+    attempts = package.setdefault("attempts", {})
+    for finding in repaired:
+        finding["repair_attempts"] = finding.get("repair_attempts", 0) + 1
+        finding["status"] = "closed"
+    repair = {
+        "finding_ids": sorted(ids),
+        "changed_files": changed_files,
+        "changed_lines": changed_lines,
+        "verification": args.verification or [],
+        "at": now(),
+        "commit": resolved_commit,
+        "commit_verified": commit_verified,
+        "outcome_id": outcome_id,
+        "combined_review_identity": deepcopy(combined),
+        "convergence_binding": build_convergence_binding(exc, outcome_id=outcome_id),
+    }
+    package.setdefault("repairs", []).append(repair)
+    attempts["repair_batches"] = attempts.get("repair_batches", 0) + 1
+    data.setdefault("metrics", {}).setdefault("repair_batches", 0)
+    data["metrics"]["repair_batches"] += 1
+    circular = next((task for task in package.get("tasks", []) if task.get("id") == CIRCULAR_TASK), None)
+    if not circular or circular.get("status") != "planned":
+        raise HceDenial("HCE_DENIED", "exact circular task must remain planned until linked repair")
+    circular["status"] = "completed"
+    data["phase"] = "DELTA_REVIEW"
+    package["status"] = "delta_review_required"
+    model.record_event(
+        data, "record-repair", "PACKAGE_REPAIR", data["phase"], args.actor, args.package_id,
+        {"finding_ids": sorted(ids), "outcome_id": outcome_id, "commit_verified": commit_verified},
+        args.event_id,
+    )
+    return True
+
+
 def cmd_record_repair(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
     commit, commit_verified = validate_commit_ref(getattr(args, "commit", None))
@@ -202,6 +296,10 @@ def cmd_record_repair(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_REPAIR":
             raise StateError(f"cannot record repair from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_ctx = validate_hce_outcome_command("record-repair", args, package)
+        if hce_ctx is not None:
+            exc, outcome_id = hce_ctx
+            return _record_hce_linked_repair(data, package, args, exc, outcome_id, commit, commit_verified)
         # docs/adr/0023-*.md: freeze the repair ceiling on the FIRST record-repair of this
         # cycle (never reset here -- a new deep-review cycle starting fresh at PACKAGE_GATES
         # re-freezes candidate_identity, and the next repair after THAT will see a None
@@ -302,6 +400,21 @@ def cmd_record_delta_review(args: argparse.Namespace) -> int:
         if data["phase"] != "DELTA_REVIEW":
             raise StateError(f"cannot record delta review from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_ctx = validate_hce_outcome_command("record-delta-review", args, package)
+        if hce_ctx is not None:
+            from feature_state_lib.convergence_constants import ALL_FINDING_IDS
+            from feature_state_lib.convergence_errors import HceDenial
+
+            exc, outcome_id = hce_ctx
+            if args.new_finding:
+                raise HceDenial("HCE_DENIED", "HCE delta forbids --new-finding")
+            if args.requires_full_review:
+                raise HceDenial("HCE_DENIED", "HCE delta forbids --requires-full-review")
+            closed = args.closed_finding or []
+            if set(closed) != set(ALL_FINDING_IDS) or len(closed) != len(ALL_FINDING_IDS):
+                raise HceDenial("HCE_DENIED", "HCE delta must name exactly ten closed findings")
+            if args.verdict != "pass":
+                raise HceDenial("HCE_DENIED", "HCE delta must pass")
         new_findings = normalize_findings(args.new_finding or [])
         for finding_id in args.closed_finding or []:
             # The other exit from the open set.  Without this guard a `critical` finding
@@ -329,7 +442,11 @@ def cmd_record_delta_review(args: argparse.Namespace) -> int:
             "reason": args.reason,
             "at": now(),
         }
+        if hce_ctx is not None:
+            exc, outcome_id = hce_ctx
+            review["convergence_binding"] = build_convergence_binding(exc, outcome_id=outcome_id)
         package.setdefault("delta_reviews", []).append(review)
+        data.setdefault("metrics", {}).setdefault("delta_reviews", 0)
         data["metrics"]["delta_reviews"] += 1
         if args.verdict == "pass":
             if has_open_findings(package, {"critical", "high", "medium"}):

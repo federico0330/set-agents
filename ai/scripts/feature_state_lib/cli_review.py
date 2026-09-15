@@ -15,6 +15,9 @@ from feature_state_lib.model import (
     TERMINAL_FINDING_STATUSES,
 )
 from feature_state_lib.cli_lifecycle import state_file_arg, output_state, block_with_reason
+from feature_state_lib.cli_lifecycle import (
+    validate_hce_panel_command, build_convergence_binding,
+)
 from feature_state_lib.cli_repair import normalize_findings, FINDING_BOOKKEEPING
 
 
@@ -151,6 +154,7 @@ def cmd_record_subreview(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_REVIEW":
             raise StateError(f"cannot record subreview from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_exc = validate_hce_panel_command("record-subreview", args, package)
         panel = next((item for item in reversed(package.get("review_panels", [])) if item.get("status") == "in_progress"), None)
         if not panel:
             raise StateError("no active review panel")
@@ -168,6 +172,8 @@ def cmd_record_subreview(args: argparse.Namespace) -> int:
             "evidence": args.evidence,
             "at": now(),
         })
+        if hce_exc:
+            panel["convergence_binding"] = build_convergence_binding(hce_exc)
         for finding in findings:
             merge_finding(package, finding)
         model.record_event(data, "record-subreview", "PACKAGE_REVIEW", "PACKAGE_REVIEW", args.actor, args.package_id, {"role": args.role, "verdict": args.verdict, "finding_count": len(findings)}, args.event_id)
@@ -184,6 +190,7 @@ def cmd_finalize_review_panel(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_REVIEW":
             raise StateError(f"cannot finalize review panel from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_exc = validate_hce_panel_command("finalize-review-panel", args, package)
         panel = next((item for item in reversed(package.get("review_panels", [])) if item.get("status") == "in_progress"), None)
         if not panel:
             raise StateError("no active review panel")
@@ -193,6 +200,13 @@ def cmd_finalize_review_panel(args: argparse.Namespace) -> int:
         panel["status"] = "completed"
         panel["completed_at"] = now()
         panel["verdict"] = args.verdict
+        if hce_exc:
+            from feature_state_lib.convergence_errors import HceDenial
+            if args.verdict != "repair_required":
+                raise HceDenial("HCE_DENIED", "HCE final panel verdict must be repair_required")
+            if hce_exc.get("final_panel_id") != panel.get("panel_id"):
+                raise HceDenial("HCE_DENIED", "panel is not the bound final panel")
+            panel["convergence_binding"] = build_convergence_binding(hce_exc)
         # Findings still live when the panel closes.  `refuted` joins `closed` here so a
         # finding the verifier killed in cycle 1 cannot reappear in the cycle-2 panel —
         # dedup runs against everything seen, not against what survived.  `accepted`

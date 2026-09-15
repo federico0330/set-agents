@@ -65,6 +65,7 @@ from feature_state_lib.cli_lifecycle import (
     cmd_fail_task, cmd_resume, cmd_reopen, cmd_block, block_with_reason,
     cmd_amend_spec, cmd_supersede_package, cmd_record_axis,
     cmd_amend_package, MIN_AMEND_REASON_LEN,
+    validate_hce_panel_command, build_convergence_binding, HCE_PANEL_ROLES,
 )
 import feature_state_lib.cli_lifecycle as cli_lifecycle
 from feature_state_lib.cli_review import (
@@ -664,9 +665,15 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_REVIEW":
             raise StateError(f"cannot start review panel from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_exc = validate_hce_panel_command("start-review-panel", args, package)
         errors = package_review_ready(package)
         if errors:
             raise StateError("cannot start review panel: " + "; ".join(errors))
+        if hce_exc:
+            if set(roles) != set(HCE_PANEL_ROLES):
+                raise HceDenial("HCE_DENIED", "HCE panel must be exactly package-reviewer and security-auditor")
+            if hce_exc.get("final_panel_id"):
+                raise HceDenial("HCE_DENIED", "final panel already bound")
         required = persist_review_requirements(package)
         writers = [role for role in roles if role in NON_ACCEPTING_ACTORS]
         if writers:
@@ -712,8 +719,12 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
             "started_at": now(),
             "completed_at": None,
         }
+        if hce_exc:
+            panel["convergence_binding"] = build_convergence_binding(hce_exc)
+            hce_exc["final_panel_id"] = panel_id
         package.setdefault("review_panels", []).append(panel)
         attempts["deep_review_cycles"] = attempts.get("deep_review_cycles", 0) + 1
+        data.setdefault("metrics", {}).setdefault("package_reviews", 0)
         data["metrics"]["package_reviews"] += 1
         record_event(data, "start-review-panel", "PACKAGE_REVIEW", "PACKAGE_REVIEW", args.actor, args.package_id, {"panel_id": panel_id, "roles": panel["roles"]}, args.event_id)
         return True
@@ -1166,6 +1177,7 @@ def build_parser() -> argparse.ArgumentParser:
     panel.add_argument("--feature-id")
     panel.add_argument("--panel-id")
     panel.add_argument("--role", action="append")
+    panel.add_argument("--convergence-exception-id")
     panel.set_defaults(func=cmd_start_review_panel)
 
     subreview = sub.add_parser("record-subreview")
@@ -1176,6 +1188,7 @@ def build_parser() -> argparse.ArgumentParser:
     subreview.add_argument("--feature-id")
     subreview.add_argument("--finding", action="append")
     subreview.add_argument("--evidence", default="")
+    subreview.add_argument("--convergence-exception-id")
     subreview.set_defaults(func=cmd_record_subreview)
 
     finalize = sub.add_parser("finalize-review-panel")
@@ -1185,6 +1198,7 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--feature-id")
     finalize.add_argument("--allow-missing", action="store_true")
     finalize.add_argument("--evidence", default="")
+    finalize.add_argument("--convergence-exception-id")
     finalize.set_defaults(func=cmd_finalize_review_panel)
 
     extend = sub.add_parser("extend-review-panel")
@@ -1234,6 +1248,7 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--changed-lines", type=int,
                         help="docs/adr/0023-*.md: self-reported repair diff size, bookkeeping only -- "
                              "check-repair-ceiling.py independently re-measures before trusting it")
+    repair.add_argument("--convergence-outcome-id")
     repair.set_defaults(func=cmd_record_repair)
 
     delta = sub.add_parser("record-delta-review")
@@ -1245,6 +1260,7 @@ def build_parser() -> argparse.ArgumentParser:
     delta.add_argument("--new-finding", action="append")
     delta.add_argument("--requires-full-review", action="store_true")
     delta.add_argument("--reason", default="")
+    delta.add_argument("--convergence-outcome-id")
     delta.set_defaults(func=cmd_record_delta_review)
 
     testing = sub.add_parser("record-testing")
@@ -1286,6 +1302,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_state_args(receipt)
     receipt.add_argument("package_id")
     receipt.add_argument("--feature-id")
+    receipt.add_argument("--convergence-outcome-id")
     receipt.set_defaults(func=cmd_record_receipt)
 
     module_impact = sub.add_parser("record-module-impact")

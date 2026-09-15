@@ -27,13 +27,17 @@ def fail(message):
 def check(state_path, package_id, action):
     if action not in {"freeze-candidate", "record-receipt", "transition"}:
         fail("invalid integration action")
-    if action in {"freeze-candidate", "record-receipt"}:
-        return True
     try:
         data = json.loads(Path(state_path).read_text(encoding="utf-8"))
         package = package_by_id(data, package_id)
     except (OSError, json.JSONDecodeError, StateError) as exc:
         fail(f"integration blocked: cannot read package state: {exc}")
+    if action == "freeze-candidate":
+        if package.get("convergence_exception"):
+            fail("HCE parent forbids freeze-candidate through integration wrapper")
+        return True
+    if action == "record-receipt":
+        return True
     errors = integration_ready(package)
     if errors:
         fail("integration blocked: " + "; ".join(errors))

@@ -128,6 +128,37 @@ def integration_ready(package: dict[str, Any]) -> list[str]:
     if not receipt:
         errors.append("receipt is required")
         return errors
+    if receipt.get("schema") == "set-agentes.convergence-integration-receipt/v1":
+        exc = package.get("convergence_exception") or {}
+        combined = exc.get("combined_review_identity") or {}
+        for field in ("base_tree", "candidate_tree", "paths_digest", "generation", "candidate_commit", "changed_lines"):
+            if receipt.get(field) != combined.get(field):
+                errors.append(f"receipt.{field} does not match combined_review_identity.{field}")
+        if receipt.get("exception_id") != exc.get("exception_id"):
+            errors.append("receipt.exception_id does not match convergence_exception")
+        consumption = exc.get("consumption") or {}
+        if receipt.get("convergence_outcome_id") != consumption.get("outcome_id"):
+            errors.append("receipt.convergence_outcome_id mismatch")
+        if receipt.get("binding_digest") != exc.get("binding_digest"):
+            errors.append("receipt.binding_digest mismatch")
+        if receipt.get("terminal_state") != "accepted":
+            errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")
+        if errors:
+            return errors
+        from pathlib import Path
+        from feature_state_lib.convergence_git import diff_paths_and_lines, resolve_tree
+
+        worktree = Path(exc.get("worktree_realpath") or Path.cwd())
+        base_tree = combined.get("base_tree")
+        candidate_commit = combined.get("candidate_commit")
+        if not base_tree or not candidate_commit:
+            errors.append("combined_review_identity incomplete for live re-derivation")
+            return errors
+        candidate_tree = resolve_tree(worktree, candidate_commit)
+        _, live_lines = diff_paths_and_lines(worktree, base_tree, candidate_tree)
+        if receipt.get("changed_lines") != live_lines:
+            errors.append("receipt.changed_lines no longer matches live combined diff")
+        return errors
     if receipt.get("terminal_state") != "accepted":
         errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")
     frozen = package.get("candidate_identity")

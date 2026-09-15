@@ -229,8 +229,7 @@ class IntegrationActionEndToEndTests(unittest.TestCase):
             # targets a different package -- must be rejected before the subprocess runs.
             result = subprocess.run(
                 ["python3", str(INTEGRATION_ACTION), str(state), "PKG-01", "transition",
-                 "--", "python3", "ai/scripts/feature-state.py", "transition", "INTEGRATION",
-                 "--package-id", "PKG-99", "--actor", "test"],
+                 "--", *self._wrapped_transition_command("PKG-99", state)],
                 cwd=repo, text=True, capture_output=True, check=False,
             )
             self.assertNotEqual(result.returncode, 0)
@@ -240,10 +239,11 @@ class IntegrationActionEndToEndTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             repo, base_sha, candidate_sha = _make_scaffolded_repo(td)
             state = _drive_to_receipt(repo, base_sha, candidate_sha)
+            wrapped = self._wrapped_transition_command("PKG-01", state)
+            wrapped[3] = "DONE"
             result = subprocess.run(
                 ["python3", str(INTEGRATION_ACTION), str(state), "PKG-01", "transition",
-                 "--", "python3", "ai/scripts/feature-state.py", "transition", "DONE",
-                 "--package-id", "PKG-01", "--actor", "test"],
+                 "--", *wrapped],
                 cwd=repo, text=True, capture_output=True, check=False,
             )
             self.assertNotEqual(result.returncode, 0)

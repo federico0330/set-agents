@@ -691,3 +691,86 @@ def cmd_amend_package(args: argparse.Namespace) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     return cmd_next(args)
+
+
+HCE_PANEL_COMMANDS = frozenset({
+    "start-review-panel",
+    "record-subreview",
+    "finalize-review-panel",
+})
+HCE_OUTCOME_COMMANDS = frozenset({
+    "record-repair",
+    "record-delta-review",
+    "record-receipt",
+})
+HCE_PANEL_ROLES = ("package-reviewer", "security-auditor")
+CONVERGENCE_RECEIPT_SCHEMA = "set-agentes.convergence-integration-receipt/v1"
+
+
+def hce_exception(package: dict[str, Any]) -> dict[str, Any] | None:
+    exc = package.get("convergence_exception")
+    if isinstance(exc, dict) and exc.get("exception_id"):
+        return exc
+    return None
+
+
+def hce_panel_active(exc: dict[str, Any] | None) -> bool:
+    return bool(
+        exc
+        and exc.get("combined_review_identity")
+        and exc.get("status") in {"prepared", "authorized", "consumed"}
+    )
+
+
+def hce_outcome_active(exc: dict[str, Any] | None) -> bool:
+    consumption = (exc or {}).get("consumption")
+    return bool(exc and exc.get("status") == "consumed" and isinstance(consumption, dict) and consumption.get("outcome_id"))
+
+
+def build_convergence_binding(exc: dict[str, Any], *, outcome_id: str | None = None) -> dict[str, Any]:
+    from copy import deepcopy
+
+    binding: dict[str, Any] = {
+        "exception_id": exc["exception_id"],
+        "binding_digest": exc["binding_digest"],
+        "combined_review_identity": deepcopy(exc["combined_review_identity"]),
+        "outcome_id": outcome_id,
+    }
+    return binding
+
+
+def validate_hce_panel_command(command: str, args: argparse.Namespace, package: dict[str, Any]) -> dict[str, Any] | None:
+    from feature_state_lib.convergence_errors import HceDenial
+    from feature_state_lib.convergence_policy import get_exception
+
+    exc = hce_exception(package)
+    flag = getattr(args, "convergence_exception_id", None)
+    if hce_panel_active(exc):
+        if not flag:
+            raise HceDenial("HCE_DENIED", f"{command} requires --convergence-exception-id for active HCE parent")
+        return get_exception(package, flag)
+    if flag:
+        raise HceDenial("HCE_DENIED", f"{command} forbids --convergence-exception-id on ordinary package")
+    return None
+
+
+def validate_hce_outcome_command(
+    command: str,
+    args: argparse.Namespace,
+    package: dict[str, Any],
+) -> tuple[dict[str, Any], str] | None:
+    from feature_state_lib.convergence_errors import HceDenial
+
+    exc = hce_exception(package)
+    flag = getattr(args, "convergence_outcome_id", None)
+    if hce_outcome_active(exc):
+        if not flag:
+            raise HceDenial("HCE_DENIED", f"{command} requires --convergence-outcome-id for consumed HCE parent")
+        consumption = exc.get("consumption") or {}
+        outcome_id = consumption.get("outcome_id")
+        if flag != outcome_id:
+            raise HceDenial("HCE_OUTCOME_INVALID", "convergence_outcome_id mismatch")
+        return exc, outcome_id
+    if flag:
+        raise HceDenial("HCE_DENIED", f"{command} forbids --convergence-outcome-id on ordinary package")
+    return None
