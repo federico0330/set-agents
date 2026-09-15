@@ -113,12 +113,45 @@ def _deny(exc: HceDenial, data: dict[str, Any] | None = None, package_id: str | 
     return 2
 
 
-def _prepare_replay_matches(data: dict[str, Any], event_id: str, exc: dict[str, Any]) -> bool:
+def _invocation_snapshot(args: argparse.Namespace, command: str) -> dict[str, Any]:
+    snapshot: dict[str, Any] = {
+        "command": command,
+        "package_id": getattr(args, "package_id", None),
+        "actor": getattr(args, "actor", None),
+        "event_id": getattr(args, "event_id", None),
+    }
+    if command == "prepare-convergence":
+        snapshot.update({
+            "profile": getattr(args, "profile", None),
+            "authorized_by": getattr(args, "authorized_by", None),
+            "reason": getattr(args, "reason", None),
+            "approval_evidence": getattr(args, "approval_evidence", None),
+        })
+    elif command in {"reenter-convergence", "authorize-convergence", "consume-convergence"}:
+        snapshot["exception_id"] = getattr(args, "exception_id", None)
+    if command == "authorize-convergence":
+        snapshot.update({
+            "authorized_by": getattr(args, "authorized_by", None),
+            "reason": getattr(args, "reason", None),
+            "approval_evidence": getattr(args, "approval_evidence", None),
+        })
+    return snapshot
+
+
+def _replay_invocation_matches(data: dict[str, Any], event: str, event_id: str, snapshot: dict[str, Any]) -> bool:
     for item in data.get("history", []):
-        if item.get("event_id") != event_id or item.get("event") != "prepare-convergence":
+        if item.get("event_id") != event_id or item.get("event") != event:
             continue
         metadata = item.get("metadata") or {}
-        return metadata.get("exception_id") == exc.get("exception_id")
+        stored = metadata.get("invocation_snapshot") or {}
+        if stored:
+            return stored == snapshot
+        if event == "prepare-convergence":
+            return metadata.get("exception_id") is not None
+        if event == "reenter-convergence":
+            return metadata.get("binding_digest") is not None
+        if event == "authorize-convergence":
+            return metadata.get("binding_digest") is not None
     return False
 
 
@@ -129,11 +162,15 @@ def cmd_prepare_convergence(args: argparse.Namespace) -> int:
         state_path, worktree, repo, state_real, repo_real = _context(args)
         package_id = args.package_id
 
+        invocation = _invocation_snapshot(args, "prepare-convergence")
+
         def update(data: dict[str, Any]) -> bool:
             package = package_by_id(data, package_id)
             exc_existing = package.get("convergence_exception")
             if _replayed(data, "prepare-convergence", args.event_id):
-                if not exc_existing or not _prepare_replay_matches(data, args.event_id, exc_existing):
+                if not exc_existing or not _replay_invocation_matches(
+                    data, "prepare-convergence", args.event_id, invocation
+                ):
                     raise HceDenial("HCE_REPLAY", "event-id replay without matching snapshot")
                 return False
             fresh_original = measure_original_identity(worktree, package.get("candidate_identity") or {})
@@ -155,7 +192,7 @@ def cmd_prepare_convergence(args: argparse.Namespace) -> int:
             model.record_event(
                 data, "prepare-convergence", data["phase"], data["phase"],
                 args.actor, package_id,
-                {"exception_id": exc["exception_id"]},
+                {"exception_id": exc["exception_id"], "invocation_snapshot": invocation},
                 args.event_id,
             )
             return True
@@ -243,7 +280,11 @@ def cmd_consume_convergence(args: argparse.Namespace) -> int:
             model.record_event(
                 data, "consume-convergence", data["phase"], data["phase"],
                 args.actor, package_id,
-                {"exception_id": exception_id, "outcome_id": consumption["outcome_id"]},
+                {
+                    "exception_id": exception_id,
+                    "outcome_id": consumption["outcome_id"],
+                    "invocation_snapshot": _invocation_snapshot(args, "consume-convergence"),
+                },
                 args.event_id,
             )
             return True
@@ -279,7 +320,7 @@ def cmd_verify_convergence_outcome(args: argparse.Namespace) -> int:
         exc = get_exception(package, args.exception_id)
         validate_bindings_match(exc, state_real, repo_real, str(worktree))
         combined = _live_combined(exc, worktree)
-        outcome_id = validate_verify_outcome(exc, package, combined)
+        outcome_id = validate_verify_outcome(exc, package, combined, data=data)
         print_json(_success_payload(
             "HCE_REGISTERED_VALID", data, args.package_id, exc,
             outcome_id=outcome_id,
@@ -319,12 +360,15 @@ def cmd_reenter_convergence(args: argparse.Namespace) -> int:
         package_id = args.package_id
         exception_id = args.exception_id
 
+        invocation = _invocation_snapshot(args, "reenter-convergence")
+
         def update(data: dict[str, Any]) -> bool:
             package = package_by_id(data, package_id)
             exc = get_exception(package, exception_id)
             if _replayed(data, "reenter-convergence", args.event_id):
-                reentry = exc.get("reentry") or {}
-                if reentry.get("event_id") != args.event_id:
+                if not _replay_invocation_matches(
+                    data, "reenter-convergence", args.event_id, invocation
+                ):
                     raise HceDenial("HCE_REPLAY", "event-id replay without matching snapshot")
                 return False
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
@@ -360,7 +404,11 @@ def cmd_reenter_convergence(args: argparse.Namespace) -> int:
             model.record_event(
                 data, "reenter-convergence", from_phase, "PACKAGE_REVIEW",
                 args.actor, package_id,
-                {"exception_id": exception_id, "binding_digest": exc["binding_digest"]},
+                {
+                    "exception_id": exception_id,
+                    "binding_digest": exc["binding_digest"],
+                    "invocation_snapshot": invocation,
+                },
                 args.event_id,
             )
             return True
@@ -386,12 +434,15 @@ def cmd_authorize_convergence(args: argparse.Namespace) -> int:
         package_id = args.package_id
         exception_id = args.exception_id
 
+        invocation = _invocation_snapshot(args, "authorize-convergence")
+
         def update(data: dict[str, Any]) -> bool:
             package = package_by_id(data, package_id)
             exc = get_exception(package, exception_id)
             if _replayed(data, "authorize-convergence", args.event_id):
-                auth = exc.get("authorization") or {}
-                if auth.get("event_id") != args.event_id:
+                if not _replay_invocation_matches(
+                    data, "authorize-convergence", args.event_id, invocation
+                ):
                     raise HceDenial("HCE_REPLAY", "event-id replay without matching snapshot")
                 return False
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
@@ -412,7 +463,11 @@ def cmd_authorize_convergence(args: argparse.Namespace) -> int:
             model.record_event(
                 data, "authorize-convergence", data["phase"], data["phase"],
                 args.actor, package_id,
-                {"exception_id": exception_id, "binding_digest": exc["binding_digest"]},
+                {
+                    "exception_id": exception_id,
+                    "binding_digest": exc["binding_digest"],
+                    "invocation_snapshot": invocation,
+                },
                 args.event_id,
             )
             return True

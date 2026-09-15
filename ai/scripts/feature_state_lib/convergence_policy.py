@@ -60,11 +60,34 @@ COMBINED_IDENTITY_KEYS = frozenset({
     "paths_digest", "changed_lines",
 })
 
-RECEIPT_REQUIRED_FIELDS = (
+RECEIPT_SCHEMA = "set-agentes.integration-receipt/v1"
+RECEIPT_KEYS = frozenset({
     "schema", "package_id", "generation", "base_tree", "candidate_tree", "paths_digest",
     "review_verdict", "delta_review_verdict", "verifications_summary", "terminal_state",
     "minted_at", "minted_by",
-)
+})
+VERIFICATIONS_SUMMARY_KEYS = frozenset({"upheld", "refuted"})
+REPAIR_ORIGIN_KEYS = frozenset({
+    "baseline_ref", "candidate_ref", "base_tree", "candidate_tree", "paths_digest",
+    "changed_lines", "generation", "frozen_at", "frozen_by",
+})
+REPAIR_CEILING_KEYS = frozenset({"original_changed_lines", "budget_lines", "cap_source", "frozen_at"})
+PREPARATION_KEYS = frozenset({"at", "actor", "event_id", "authorized_by", "reason", "approval_evidence"})
+REENTRY_KEYS = frozenset({"at", "actor", "event_id"})
+AUTHORIZATION_KEYS = frozenset({
+    "at", "actor", "event_id", "authorized_by", "reason", "approval_evidence",
+    "panel_id", "binding_digest",
+})
+CONSUMPTION_KEYS = frozenset({
+    "outcome_id", "at", "actor", "event_id", "binding_digest",
+    "combined_review_identity", "panel_id", "committed_revision",
+})
+OWNERSHIP_ENTRY_KEYS = frozenset({"child_package_id", "owned_paths"})
+FINDING_MAP_ENTRY_KEYS = frozenset({"child_package_id", "finding_ids"})
+CANDIDATE_IDENTITY_KEYS = frozenset({
+    "baseline_ref", "candidate_ref", "base_tree", "candidate_tree", "paths_digest",
+    "changed_lines", "generation", "frozen_at", "frozen_by",
+})
 
 
 def canonical_json_digest(obj: dict[str, Any]) -> str:
@@ -323,6 +346,46 @@ def validate_reenter_context(data: dict[str, Any], package: dict[str, Any], exc:
         raise HceDenial("HCE_DENIED", f"reenter targets parent package {PARENT_PACKAGE_ID}")
 
 
+def _validate_receipt_exact(receipt: dict[str, Any], package_id: str, identity: dict[str, Any]) -> None:
+    if not isinstance(receipt, dict):
+        raise HceDenial("HCE_STALE", f"{package_id} receipt must be object")
+    unknown = set(receipt) - RECEIPT_KEYS
+    if unknown:
+        raise HceDenial("HCE_STALE", f"{package_id} receipt unknown keys: {sorted(unknown)}")
+    missing = RECEIPT_KEYS - set(receipt)
+    if missing:
+        raise HceDenial("HCE_STALE", f"{package_id} receipt missing keys: {sorted(missing)}")
+    if receipt.get("schema") != RECEIPT_SCHEMA:
+        raise HceDenial("HCE_STALE", f"{package_id} receipt schema mismatch")
+    if receipt.get("package_id") != package_id:
+        raise HceDenial("HCE_STALE", f"{package_id} receipt package_id mismatch")
+    if receipt.get("terminal_state") != "accepted":
+        raise HceDenial("HCE_STALE", f"{package_id} receipt not accepted")
+    if receipt.get("review_verdict") != "pass":
+        raise HceDenial("HCE_STALE", f"{package_id} receipt review_verdict must be pass")
+    if receipt.get("delta_review_verdict") != "pass":
+        raise HceDenial("HCE_STALE", f"{package_id} receipt delta_review_verdict must be pass")
+    summary = receipt.get("verifications_summary")
+    if not isinstance(summary, dict) or set(summary) != VERIFICATIONS_SUMMARY_KEYS:
+        raise HceDenial("HCE_STALE", f"{package_id} receipt verifications_summary shape mismatch")
+    for key in VERIFICATIONS_SUMMARY_KEYS:
+        if not isinstance(summary.get(key), int) or summary[key] < 0:
+            raise HceDenial("HCE_STALE", f"{package_id} receipt verifications_summary.{key} invalid")
+    for field in ("base_tree", "candidate_tree", "paths_digest", "generation"):
+        value = receipt.get(field)
+        if field in ("base_tree", "candidate_tree") and not SHA_RE.match(str(value)):
+            raise HceDenial("HCE_STALE", f"{package_id} receipt invalid {field}")
+        if field == "paths_digest" and not DIGEST_RE.match(str(value)):
+            raise HceDenial("HCE_STALE", f"{package_id} receipt invalid paths_digest")
+        if field == "generation" and (not isinstance(value, int) or value < 1):
+            raise HceDenial("HCE_STALE", f"{package_id} receipt invalid generation")
+        if value != identity.get(field):
+            raise HceDenial("HCE_STALE", f"{package_id} receipt mismatch on {field}")
+    for field in ("minted_at", "minted_by"):
+        if not isinstance(receipt.get(field), str) or not receipt[field]:
+            raise HceDenial("HCE_STALE", f"{package_id} receipt missing {field}")
+
+
 def validate_child_package(pkg: dict[str, Any], package_id: str) -> dict[str, Any]:
     if pkg.get("status") != "accepted":
         raise HceDenial("HCE_STALE", f"{package_id} must be accepted")
@@ -330,14 +393,12 @@ def validate_child_package(pkg: dict[str, Any], package_id: str) -> dict[str, An
     identity = pkg.get("candidate_identity")
     if not receipt or not identity:
         raise HceDenial("HCE_STALE", f"{package_id} missing receipt or candidate_identity")
-    if receipt.get("terminal_state") != "accepted":
-        raise HceDenial("HCE_STALE", f"{package_id} receipt not accepted")
-    for field in RECEIPT_REQUIRED_FIELDS:
-        if receipt.get(field) is None:
-            raise HceDenial("HCE_STALE", f"{package_id} receipt missing {field}")
-    for field in ("base_tree", "candidate_tree", "paths_digest", "generation"):
-        if receipt.get(field) != identity.get(field):
-            raise HceDenial("HCE_STALE", f"{package_id} receipt mismatch on {field}")
+    if not isinstance(identity, dict):
+        raise HceDenial("HCE_STALE", f"{package_id} candidate_identity must be object")
+    unknown_identity = set(identity) - CANDIDATE_IDENTITY_KEYS
+    if unknown_identity:
+        raise HceDenial("HCE_STALE", f"{package_id} candidate_identity unknown keys: {sorted(unknown_identity)}")
+    _validate_receipt_exact(receipt, package_id, identity)
     if identity.get("candidate_ref") and not SHA_RE.match(str(identity["candidate_ref"])):
         raise HceDenial("HCE_STALE", f"{package_id} invalid candidate_ref")
     return identity
@@ -439,6 +500,39 @@ def build_authorization(
     }
 
 
+def _live_child_record_digest(pkg: dict[str, Any], package_id: str) -> str:
+    receipt = pkg.get("receipt")
+    if not isinstance(receipt, dict):
+        raise HceDenial("HCE_STALE", f"{package_id} missing receipt")
+    return canonical_json_digest(receipt)
+
+
+def _compare_stored_children(
+    exc: dict[str, Any],
+    child_a: dict[str, Any],
+    child_b: dict[str, Any],
+) -> None:
+    stored_children = exc.get("children") or []
+    if len(stored_children) != 2:
+        raise HceDenial("HCE_STALE", "stored child records missing")
+    live_by_id = {CHILD_A_PACKAGE_ID: child_a, CHILD_B_PACKAGE_ID: child_b}
+    for stored in stored_children:
+        package_id = stored.get("package_id")
+        live_pkg = live_by_id.get(package_id)
+        if not live_pkg:
+            raise HceDenial("HCE_STALE", f"unexpected stored child {package_id}")
+        validate_child_package(live_pkg, package_id)
+        live_digest = _live_child_record_digest(live_pkg, package_id)
+        if stored.get("receipt_digest") != live_digest:
+            raise HceDenial("HCE_STALE", f"{package_id} receipt_digest drift")
+        identity = live_pkg["candidate_identity"]
+        for field in ("candidate_commit", "output_paths_digest"):
+            if stored.get(field) is None:
+                raise HceDenial("HCE_STALE", f"{package_id} stored child missing {field}")
+        if stored.get("candidate_commit") != identity.get("candidate_ref"):
+            raise HceDenial("HCE_STALE", f"{package_id} stored candidate_commit drift")
+
+
 def rederive_frozen_binding(
     exc: dict[str, Any],
     data: dict[str, Any],
@@ -461,6 +555,7 @@ def rederive_frozen_binding(
     if not head_commit or not head_tree:
         raise HceDenial("HCE_STALE", "missing live HEAD identity")
     validate_receipt_chain(origin, child_a, child_b, head_commit=head_commit, head_tree=head_tree)
+    _compare_stored_children(exc, child_a, child_b)
     stored = exc.get("combined_review_identity") or {}
     for key in ("candidate_commit", "candidate_tree", "paths_digest", "changed_lines", "base_commit", "base_tree"):
         if stored.get(key) != combined_live.get(key):
@@ -478,21 +573,38 @@ def validate_verify_outcome(
     exc: dict[str, Any],
     package: dict[str, Any],
     combined_live: dict[str, Any],
+    *,
+    data: dict[str, Any] | None = None,
 ) -> str:
     if exc.get("status") != "consumed":
         raise HceDenial("HCE_OUTCOME_INVALID", "outcome not consumed")
     consumption = exc.get("consumption")
     if not consumption or not consumption.get("outcome_id"):
         raise HceDenial("HCE_OUTCOME_INVALID", "missing consumption outcome_id")
+    if not isinstance(consumption, dict) or set(consumption) != CONSUMPTION_KEYS:
+        raise HceDenial("HCE_OUTCOME_INVALID", "consumption shape mismatch")
     outcome_id = consumption["outcome_id"]
     if not UUID_RE.match(str(outcome_id)):
         raise HceDenial("HCE_OUTCOME_INVALID", "invalid outcome_id format")
-    stored_combined = consumption.get("combined_review_identity") or exc.get("combined_review_identity") or {}
-    for key in ("candidate_commit", "candidate_tree", "paths_digest", "changed_lines"):
+    if data is not None:
+        rederive_frozen_binding(exc, data, package, combined_live)
+    stored_combined = consumption.get("combined_review_identity") or {}
+    if not isinstance(stored_combined, dict) or set(stored_combined) != COMBINED_IDENTITY_KEYS:
+        raise HceDenial("HCE_OUTCOME_INVALID", "consumption combined_review_identity shape mismatch")
+    for key in COMBINED_IDENTITY_KEYS:
         if stored_combined.get(key) != combined_live.get(key):
             raise HceDenial("HCE_OUTCOME_INVALID", f"live combined identity mismatch on {key}")
     if consumption.get("binding_digest") != exc.get("binding_digest"):
         raise HceDenial("HCE_OUTCOME_INVALID", "consumption binding_digest mismatch")
+    if consumption.get("panel_id") != exc.get("final_panel_id"):
+        raise HceDenial("HCE_OUTCOME_INVALID", "consumption panel_id mismatch")
+    auth = exc.get("authorization") or {}
+    if auth.get("panel_id") != exc.get("final_panel_id"):
+        raise HceDenial("HCE_OUTCOME_INVALID", "authorization panel linkage mismatch")
+    if auth.get("binding_digest") != exc.get("binding_digest"):
+        raise HceDenial("HCE_OUTCOME_INVALID", "authorization binding_digest mismatch")
+    if data is not None and consumption.get("committed_revision") != data.get("revision"):
+        raise HceDenial("HCE_OUTCOME_INVALID", "consumption committed_revision mismatch")
     gate = None
     for item in package.get("gates", []):
         if item.get("name") == "repair-ceiling":
@@ -502,20 +614,22 @@ def validate_verify_outcome(
         raise HceDenial("HCE_OUTCOME_INVALID", "missing required repair-ceiling gate")
     if gate.get("convergence_outcome_id") != outcome_id:
         raise HceDenial("HCE_OUTCOME_INVALID", "repair-ceiling gate outcome linkage mismatch")
+    expected_digest = compute_binding_digest(exc)
+    if exc.get("binding_digest") != expected_digest:
+        raise HceDenial("HCE_OUTCOME_INVALID", "binding_digest drift")
     return outcome_id
 
 
-def _validate_provenance_block(block: dict[str, Any] | None, label: str, required_keys: frozenset[str]) -> None:
-    if block is None:
-        return
+def _schema_errors(errors: list[str], package_id: str, label: str, block: Any, required_keys: frozenset[str]) -> None:
     if not isinstance(block, dict):
-        raise ValueError(f"{label} must be an object")
+        errors.append(f"{package_id}: {label} must be an object")
+        return
     unknown = set(block) - required_keys
     if unknown:
-        raise ValueError(f"{label} has unknown keys: {sorted(unknown)}")
+        errors.append(f"{package_id}: {label} unknown keys: {sorted(unknown)}")
     missing = required_keys - set(block)
     if missing:
-        raise ValueError(f"{label} missing keys: {sorted(missing)}")
+        errors.append(f"{package_id}: {label} missing keys: {sorted(missing)}")
 
 
 def validate_convergence_exception(exc: dict[str, Any], package_id: str) -> list[str]:
@@ -550,6 +664,26 @@ def validate_convergence_exception(exc: dict[str, Any], package_id: str) -> list
     wt = exc.get("worktree_realpath")
     if wt is not None and (not isinstance(wt, str) or not os.path.isabs(wt)):
         errors.append(f"{package_id}: worktree_realpath must be absolute path string or null")
+    _schema_errors(errors, package_id, "repair_origin", exc.get("repair_origin"), REPAIR_ORIGIN_KEYS)
+    origin = exc.get("repair_origin") or {}
+    if isinstance(origin, dict):
+        for field in ("baseline_ref", "candidate_ref", "base_tree", "candidate_tree"):
+            if field in origin and not SHA_RE.match(str(origin.get(field, ""))):
+                errors.append(f"{package_id}: repair_origin invalid {field}")
+        if "paths_digest" in origin and not DIGEST_RE.match(str(origin.get("paths_digest", ""))):
+            errors.append(f"{package_id}: repair_origin invalid paths_digest")
+        changed_lines = origin.get("changed_lines")
+        if changed_lines is not None and (not isinstance(changed_lines, int) or changed_lines < 0):
+            errors.append(f"{package_id}: repair_origin changed_lines invalid")
+    _schema_errors(errors, package_id, "repair_ceiling_initialization", exc.get("repair_ceiling_initialization"), REPAIR_CEILING_KEYS)
+    ceiling = exc.get("repair_ceiling_initialization") or {}
+    if isinstance(ceiling, dict):
+        if ceiling.get("original_changed_lines") != ORIGINAL_CHANGED_LINES:
+            errors.append(f"{package_id}: repair_ceiling_initialization original_changed_lines mismatch")
+        if ceiling.get("budget_lines") != BUDGET_LINES:
+            errors.append(f"{package_id}: repair_ceiling_initialization budget_lines mismatch")
+        if ceiling.get("cap_source") != CAP_SOURCE:
+            errors.append(f"{package_id}: repair_ceiling_initialization cap_source mismatch")
     finding_snapshot = exc.get("finding_snapshot")
     if not isinstance(finding_snapshot, list) or len(finding_snapshot) != len(ALL_FINDING_IDS):
         errors.append(f"{package_id}: finding_snapshot must contain ten findings")
@@ -560,16 +694,50 @@ def validate_convergence_exception(exc: dict[str, Any], package_id: str) -> list
                 continue
             if set(item) != FINDING_SNAPSHOT_KEYS:
                 errors.append(f"{package_id}: finding_snapshot item keys mismatch")
-    if exc.get("finding_map") != FINDING_MAP:
+            attempts = item.get("repair_attempts")
+            if attempts is not None and (not isinstance(attempts, int) or attempts < 0):
+                errors.append(f"{package_id}: finding_snapshot repair_attempts invalid")
+            for digest_key in ("verification_digest", "definition_digest"):
+                if digest_key in item and not DIGEST_RE.match(str(item[digest_key])):
+                    errors.append(f"{package_id}: finding_snapshot invalid {digest_key}")
+    finding_map = exc.get("finding_map")
+    if finding_map != FINDING_MAP:
         errors.append(f"{package_id}: finding_map must match profile constant")
-    if exc.get("ownership_snapshot") != OWNERSHIP_SNAPSHOT:
+    elif isinstance(finding_map, list):
+        for entry in finding_map:
+            if not isinstance(entry, dict) or set(entry) != FINDING_MAP_ENTRY_KEYS:
+                errors.append(f"{package_id}: finding_map entry shape mismatch")
+    ownership_snapshot = exc.get("ownership_snapshot")
+    if ownership_snapshot != OWNERSHIP_SNAPSHOT:
         errors.append(f"{package_id}: ownership_snapshot must match profile constant")
+    elif isinstance(ownership_snapshot, list):
+        for entry in ownership_snapshot:
+            if not isinstance(entry, dict) or set(entry) != OWNERSHIP_ENTRY_KEYS:
+                errors.append(f"{package_id}: ownership_snapshot entry shape mismatch")
     combined = exc.get("combined_review_identity")
+    if status == "prepared" and exc.get("reentry") is None:
+        if combined is not None:
+            errors.append(f"{package_id}: combined_review_identity must be null before reentry")
+        if exc.get("children"):
+            errors.append(f"{package_id}: children must be empty before reentry")
+        if exc.get("binding_digest") is not None:
+            errors.append(f"{package_id}: binding_digest must be null before reentry")
+        if exc.get("worktree_realpath") is not None:
+            errors.append(f"{package_id}: worktree_realpath must be null before reentry")
     if combined is not None:
         if not isinstance(combined, dict) or set(combined) != COMBINED_IDENTITY_KEYS:
             errors.append(f"{package_id}: combined_review_identity shape mismatch")
         elif combined.get("generation") != 2:
             errors.append(f"{package_id}: combined generation must be 2")
+        else:
+            for field in ("base_commit", "base_tree", "candidate_commit", "candidate_tree"):
+                if not SHA_RE.match(str(combined.get(field, ""))):
+                    errors.append(f"{package_id}: combined_review_identity invalid {field}")
+            if not DIGEST_RE.match(str(combined.get("paths_digest", ""))):
+                errors.append(f"{package_id}: combined_review_identity invalid paths_digest")
+            changed_lines = combined.get("changed_lines")
+            if not isinstance(changed_lines, int) or changed_lines < 0:
+                errors.append(f"{package_id}: combined_review_identity changed_lines invalid")
     children = exc.get("children")
     if not isinstance(children, list):
         errors.append(f"{package_id}: children must be array")
@@ -577,6 +745,12 @@ def validate_convergence_exception(exc: dict[str, Any], package_id: str) -> list
         for child in children:
             if not isinstance(child, dict) or set(child) != CHILD_RECORD_KEYS:
                 errors.append(f"{package_id}: child record shape mismatch")
+            elif not DIGEST_RE.match(str(child.get("receipt_digest", ""))):
+                errors.append(f"{package_id}: child receipt_digest invalid")
+            elif not DIGEST_RE.match(str(child.get("output_paths_digest", ""))):
+                errors.append(f"{package_id}: child output_paths_digest invalid")
+            elif not SHA_RE.match(str(child.get("candidate_commit", ""))):
+                errors.append(f"{package_id}: child candidate_commit invalid")
     binding = exc.get("binding_digest")
     if binding is not None and not DIGEST_RE.match(str(binding)):
         errors.append(f"{package_id}: invalid binding_digest")
@@ -584,15 +758,34 @@ def validate_convergence_exception(exc: dict[str, Any], package_id: str) -> list
         expected = compute_binding_digest(exc)
         if binding != expected:
             errors.append(f"{package_id}: binding_digest mismatch")
-    prep = exc.get("preparation")
-    if not isinstance(prep, dict):
-        errors.append(f"{package_id}: preparation required")
-    else:
-        for key in ("at", "actor", "event_id", "authorized_by", "reason", "approval_evidence"):
-            if not prep.get(key):
-                errors.append(f"{package_id}: preparation.{key} required")
-    if status in {"authorized", "consumed"} and not exc.get("authorization"):
-        errors.append(f"{package_id}: authorization required for status {status}")
-    if status == "consumed" and not exc.get("consumption"):
-        errors.append(f"{package_id}: consumption required for consumed status")
+    _schema_errors(errors, package_id, "preparation", exc.get("preparation"), PREPARATION_KEYS)
+    reentry = exc.get("reentry")
+    if reentry is not None:
+        _schema_errors(errors, package_id, "reentry", reentry, REENTRY_KEYS)
+    elif exc.get("children") or combined is not None:
+        errors.append(f"{package_id}: reentry required when children/combined are present")
+    authorization = exc.get("authorization")
+    if status in {"authorized", "consumed"}:
+        _schema_errors(errors, package_id, "authorization", authorization, AUTHORIZATION_KEYS)
+    elif authorization is not None:
+        errors.append(f"{package_id}: authorization must be null while prepared")
+    consumption = exc.get("consumption")
+    if status == "consumed":
+        _schema_errors(errors, package_id, "consumption", consumption, CONSUMPTION_KEYS)
+        if isinstance(consumption, dict):
+            if not UUID_RE.match(str(consumption.get("outcome_id", ""))):
+                errors.append(f"{package_id}: consumption outcome_id invalid")
+            stored_combined = consumption.get("combined_review_identity")
+            if not isinstance(stored_combined, dict) or set(stored_combined) != COMBINED_IDENTITY_KEYS:
+                errors.append(f"{package_id}: consumption combined_review_identity shape mismatch")
+            committed = consumption.get("committed_revision")
+            if not isinstance(committed, int) or committed < 1:
+                errors.append(f"{package_id}: consumption committed_revision invalid")
+    elif consumption is not None:
+        errors.append(f"{package_id}: consumption must be null before consumed status")
+    if status == "authorized" and consumption is not None:
+        errors.append(f"{package_id}: consumption must be null while authorized")
+    batches = exc.get("parent_repair_batches_initial")
+    if batches is not None and (not isinstance(batches, int) or batches < 0):
+        errors.append(f"{package_id}: parent_repair_batches_initial invalid")
     return errors

@@ -94,7 +94,7 @@ from feature_state_lib.convergence_cli import (
 )
 from feature_state_lib.convergence_constants import HCE_COMMANDS
 from feature_state_lib.convergence_errors import HceCommittedRenderFailed, HceDenial
-from feature_state_lib.convergence_git import validate_canonical_state_path
+from feature_state_lib.convergence_git import validate_canonical_lock_path, validate_canonical_state_path
 from feature_state_lib.render_modules import render_modules
 from feature_state_lib.parser import add_common_state_args, add_hce_mutation_args
 
@@ -192,6 +192,8 @@ CAS_SENSITIVE_OPERATIONS = frozenset({
 def _state_file_lock(path: Path):
     """PR-11 (016 audit debt): exclusive lock for read-modify-write on feature JSON."""
     lock_path = path.with_suffix(path.suffix + ".lock")
+    if path.suffix == ".json" or str(path).endswith(".json"):
+        validate_canonical_lock_path(lock_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "a+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -1490,9 +1492,21 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _reject_duplicate_hce_flags(argv: list[str]) -> None:
+    seen: set[str] = set()
+    for arg in argv[2:]:
+        if not arg.startswith("--"):
+            continue
+        flag = arg.split("=", 1)[0]
+        if flag in seen:
+            raise HceDenial("HCE_DENIED", f"duplicate option {flag}")
+        seen.add(flag)
+
+
 def _parse_hce_argv(argv: list[str]) -> argparse.Namespace:
     if len(argv) < 2 or argv[1] not in HCE_COMMANDS:
         raise ValueError("not an HCE command")
+    _reject_duplicate_hce_flags(argv)
     parser = build_parser()
     command = argv[1]
     subparser = parser._subparsers._group_actions[0].choices[command]

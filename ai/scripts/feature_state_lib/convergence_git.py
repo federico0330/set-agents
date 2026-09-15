@@ -36,34 +36,52 @@ def _run_git(args: list[str], cwd: Path) -> bytes:
     return proc.stdout
 
 
-def validate_canonical_state_path(path: Path) -> Path:
-    """Reject relative paths, .., symlink components, hardlinks, and lexical aliases."""
-    raw = str(path)
+def _validate_canonical_path_components(raw: str, *, label: str) -> Path:
     if not raw:
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "empty state path")
+        raise HceDenial("HCE_STATE_PATH_MISMATCH", f"empty {label}")
     if not os.path.isabs(raw):
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path must be absolute")
+        raise HceDenial("HCE_STATE_PATH_MISMATCH", f"{label} must be absolute")
     if ".." in Path(raw).parts:
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path must not contain ..")
+        raise HceDenial("HCE_STATE_PATH_MISMATCH", f"{label} must not contain ..")
     if os.path.islink(raw):
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path is a symlink")
+        raise HceDenial("HCE_STATE_PATH_MISMATCH", f"{label} is a symlink")
     resolved = Path(os.path.realpath(raw))
     if Path(os.path.abspath(raw)) != resolved:
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path is not canonical")
+        raise HceDenial("HCE_STATE_PATH_MISMATCH", f"{label} is not canonical")
     current = resolved
     while True:
         if os.path.islink(current):
-            raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path contains a symlink component")
+            raise HceDenial("HCE_STATE_PATH_MISMATCH", f"{label} contains a symlink component")
         parent = current.parent
         if parent == current:
             break
         current = parent
+    return resolved
+
+
+def validate_canonical_state_path(path: Path) -> Path:
+    """Reject relative paths, .., symlink components, hardlinks, and lexical aliases."""
+    raw = str(path)
+    resolved = _validate_canonical_path_components(raw, label="state path")
     try:
         stat = os.stat(raw, follow_symlinks=False)
     except OSError as exc:
         raise HceDenial("HCE_STATE_PATH_MISMATCH", f"cannot stat state path: {exc}") from exc
     if stat.st_nlink != 1:
         raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path is hardlinked")
+    return resolved
+
+
+def validate_canonical_lock_path(path: Path) -> Path:
+    """Reject noncanonical/symlink/hardlink lock paths before opening."""
+    raw = str(path)
+    resolved = _validate_canonical_path_components(raw, label="lock path")
+    if os.path.lexists(raw):
+        if os.path.islink(raw):
+            raise HceDenial("HCE_STATE_PATH_MISMATCH", "lock path is a symlink")
+        stat = os.stat(raw, follow_symlinks=False)
+        if stat.st_nlink != 1:
+            raise HceDenial("HCE_STATE_PATH_MISMATCH", "lock path is hardlinked")
     return resolved
 
 
@@ -97,16 +115,28 @@ def head_commit_and_tree(worktree: Path) -> tuple[str, str]:
     return commit, tree
 
 
-def paths_digest_b64(paths: list[str]) -> str:
+def paths_digest_b64(paths: list[str | bytes]) -> str:
+    raw_paths = [p.encode() if isinstance(p, str) else p for p in paths]
     records = b"".join(
-        len(p.encode()).to_bytes(8, "big") + p.encode()
-        for p in sorted(paths, key=lambda x: x.encode())
+        len(p).to_bytes(8, "big") + p
+        for p in sorted(raw_paths)
     )
     return "sha256:" + hashlib.sha256(records).hexdigest()
 
 
-def output_paths_b64(paths: list[str]) -> list[str]:
-    return sorted(base64.b64encode(p.encode()).decode("ascii") for p in paths)
+def output_paths_b64(paths: list[str | bytes]) -> list[str]:
+    encoded = []
+    for p in paths:
+        raw = p.encode() if isinstance(p, str) else p
+        encoded.append(base64.b64encode(raw).decode("ascii"))
+    return sorted(encoded)
+
+
+def _path_bytes_to_str(path_bytes: bytes) -> str:
+    try:
+        return path_bytes.decode("utf-8", "strict")
+    except UnicodeDecodeError as exc:
+        raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", "non-UTF8 path in git diff") from exc
 
 
 def _validate_mode(old_mode: str, new_mode: str, path: str) -> None:
@@ -120,8 +150,9 @@ def _validate_mode(old_mode: str, new_mode: str, path: str) -> None:
         raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", f"type change {old_mode}->{new_mode}: {path}")
 
 
-def _parse_raw_diff(raw: bytes) -> list[str]:
+def _parse_raw_diff(raw: bytes) -> tuple[list[str], list[bytes]]:
     paths: list[str] = []
+    raw_paths: list[bytes] = []
     parts = raw.split(b"\0")
     i = 0
     while i < len(parts):
@@ -130,24 +161,21 @@ def _parse_raw_diff(raw: bytes) -> list[str]:
             i += 1
             continue
         if not record.startswith(b":"):
-            i += 1
-            continue
+            raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", "malformed raw diff record")
         if i + 1 >= len(parts) or not parts[i + 1]:
             raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", "malformed raw diff record")
         header = record[1:].decode("ascii", "strict")
         path_bytes = parts[i + 1]
-        try:
-            path = path_bytes.decode("utf-8", "strict")
-        except UnicodeDecodeError as exc:
-            raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", "non-UTF8 path in raw diff") from exc
+        path = _path_bytes_to_str(path_bytes)
         fields = header.split()
         if len(fields) < 5:
             raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", f"malformed raw diff header: {path}")
         old_mode, new_mode = fields[0], fields[1]
         _validate_mode(old_mode, new_mode, path)
         paths.append(path)
+        raw_paths.append(path_bytes)
         i += 2
-    return paths
+    return paths, raw_paths
 
 
 def _parse_numstat(raw: bytes) -> int:
@@ -159,23 +187,21 @@ def _parse_numstat(raw: bytes) -> int:
         if not chunk:
             i += 1
             continue
-        if b"\t" in chunk:
-            fields = chunk.split(b"\t")
-            if len(fields) >= 3:
-                added, removed = fields[0], fields[1]
-                path = fields[2].decode("utf-8", "strict")
-                if added == b"-" or removed == b"-":
-                    raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", f"binary entry: {path}")
-                if added.isdigit():
-                    total_lines += int(added)
-                if removed.isdigit():
-                    total_lines += int(removed)
+        if b"\t" not in chunk:
+            raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", "malformed numstat record")
+        fields = chunk.split(b"\t")
+        if len(fields) < 3:
+            raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", "malformed numstat record")
+        added, removed, path_bytes = fields[0], fields[1], fields[2]
+        path = _path_bytes_to_str(path_bytes)
+        if added == b"-" or removed == b"-":
+            raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", f"binary entry: {path}")
+        if not added.isdigit() or not removed.isdigit():
+            raise HceDenial("HCE_UNSUPPORTED_GIT_ENTRY", f"malformed numstat counts: {path}")
+        total_lines += int(added) + int(removed)
+        i += 1
+        if i < len(parts) and parts[i] and b"\t" not in parts[i]:
             i += 1
-        else:
-            if i + 1 < len(parts):
-                i += 2
-            else:
-                i += 1
     return total_lines
 
 
@@ -186,13 +212,24 @@ def diff_paths_and_lines(worktree: Path, base_tree: str, candidate_tree: str) ->
     ]
     raw_out = _run_git([*common, "--raw", "-z"], worktree)
     numstat_out = _run_git([*common, "--numstat", "-z"], worktree)
-    paths = sorted(set(_parse_raw_diff(raw_out)))
+    paths, raw_paths = _parse_raw_diff(raw_out)
+    unique: dict[str, bytes] = {}
+    for path, raw in zip(paths, raw_paths):
+        unique[path] = raw
+    paths = sorted(unique)
     total_lines = _parse_numstat(numstat_out)
     return paths, total_lines
 
 
+def _under_profile_root(path: str) -> bool:
+    return path == PROFILE_SOURCE_ROOT or path.startswith(PROFILE_SOURCE_ROOT + "/")
+
+
 def check_clean_worktree(worktree: Path) -> None:
-    status = _run_git(["status", "--porcelain", "-z", "--untracked-files=all"], worktree)
+    status = _run_git(
+        ["status", "--porcelain", "-z", "--untracked-files=all", "--ignored"],
+        worktree,
+    )
     for entry in status.split(b"\0"):
         if not entry or len(entry) < 4:
             continue
@@ -200,8 +237,10 @@ def check_clean_worktree(worktree: Path) -> None:
         path = entry[3:].decode("utf-8", "errors=replace")
         if code.strip() and code != "??":
             raise HceDenial("HCE_DIRTY_WORKTREE", f"tracked dirt: {path}")
-        if code == "??" and (path.startswith(PROFILE_SOURCE_ROOT + "/") or path == PROFILE_SOURCE_ROOT):
+        if code == "??" and _under_profile_root(path):
             raise HceDenial("HCE_DIRTY_WORKTREE", f"untracked under profile root: {path}")
+        if code.strip() == "!!" and _under_profile_root(path):
+            raise HceDenial("HCE_DIRTY_WORKTREE", f"ignored dirt under profile root: {path}")
 
 
 def measure_original_identity(worktree: Path, identity: dict[str, Any]) -> dict[str, Any]:

@@ -1053,9 +1053,7 @@ class HceNegativeSecurityTests(unittest.TestCase):
             payload = _parse_json(verify.stdout)
             self.assertEqual(payload["code"], "HCE_OUTCOME_INVALID")
 
-    def test_ownership_mode_ignores_tampered_snapshot_for_owned_paths(self):
-        from feature_state_lib.convergence_constants import FOUR_PATH_UNION  # noqa: E402
-
+    def test_ownership_mode_denies_tampered_snapshot(self):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
@@ -1070,10 +1068,171 @@ class HceNegativeSecurityTests(unittest.TestCase):
                 "--convergence-exception-id", exc_id,
                 check=False,
             )
-            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
-            payload = _parse_json(proc.stdout.split("OWNERSHIP_PASS")[0].strip())
-            self.assertEqual(sorted(payload["owned_paths"]), sorted(FOUR_PATH_UNION))
-            self.assertNotIn("scripts/sync-vps/evil.ts", payload["owned_paths"])
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertIn("ownership_snapshot tampered", payload["error"])
+
+    def test_duplicate_cli_flags_denied(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            _write_state(state, _minimal_state(state, repo, base_sha, original_sha))
+            rev_before = json.loads(state.read_text())["revision"]
+            cmd = [
+                "python3", str(FEATURE_STATE),
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--profile", "WRONG/v1",
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-dup-flag",
+                "--expect-revision", "0",
+                "--state-file", str(state.resolve()),
+            ]
+            proc = subprocess.run(cmd, cwd=repo, env=os.environ.copy(), text=True, capture_output=True, check=False)
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_DENIED")
+            self.assertIn("duplicate option", payload["error"])
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_before)
+
+    def test_replay_mismatched_invocation_denied(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            _write_state(state, _minimal_state(state, repo, base_sha, original_sha))
+            first = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "approved workflow",
+                "--approval-evidence", "ticket-1",
+                "--actor", "orchestrator",
+                "--event-id", "evt-replay-mismatch",
+                "--expect-revision", "0",
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(first.returncode, 0)
+            rev = json.loads(state.read_text())["revision"]
+            second = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "DIFFERENT REASON",
+                "--approval-evidence", "ticket-1",
+                "--actor", "orchestrator",
+                "--event-id", "evt-replay-mismatch",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(second.returncode, 2)
+            payload = _parse_json(second.stdout)
+            self.assertEqual(payload["code"], "HCE_REPLAY")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_ignored_dirt_under_profile_root_denies_reenter(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, _ = _prepare_fixture(td_path)
+            (repo / ".gitignore").write_text("scripts/sync-vps/.cache/\n")
+            ignored = repo / "scripts/sync-vps/.cache"
+            ignored.mkdir(parents=True)
+            (ignored / "tmp.ts").write_text("ignored\n")
+            rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "reenter-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-ignored-dirt",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_DIRTY_WORKTREE")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_gitlink_raw_diff_denies(self):
+        from feature_state_lib.convergence_git import _parse_raw_diff  # noqa: E402
+        from feature_state_lib.convergence_errors import HceDenial  # noqa: E402
+
+        raw = (
+            b":000000 160000 0000000 "
+            + (b"a" * 40)
+            + b" A\0scripts/sync-vps/typescript-dispatch-resolver.ts\0"
+        )
+        with self.assertRaises(HceDenial) as ctx:
+            _parse_raw_diff(raw)
+        self.assertEqual(ctx.exception.token, "HCE_UNSUPPORTED_GIT_ENTRY")
+
+    def test_lock_symlink_denies_prepare_zero_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            real_dir = td_path / "real"
+            real_dir.mkdir()
+            real_state = real_dir / "state.json"
+            _write_state(real_state, _minimal_state(real_state, repo, base_sha, original_sha))
+            other_lock = td_path / "other.lock"
+            other_lock.write_text("held\n")
+            lock_path = real_dir / "state.json.lock"
+            lock_path.symlink_to(other_lock)
+            rev_before = json.loads(real_state.read_text())["revision"]
+            proc = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-lock-symlink",
+                "--expect-revision", "0",
+                cwd=repo, state_file=real_state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_STATE_PATH_MISMATCH")
+            self.assertEqual(json.loads(real_state.read_text())["revision"], rev_before)
+
+    def test_consume_replay_after_consumption_denies(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
+            consume = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-consume-once",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(consume.returncode, 0, consume.stdout + consume.stderr)
+            rev_after = json.loads(state.read_text())["revision"]
+            replay = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-consume-once",
+                "--expect-revision", str(rev_after),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(replay.returncode, 2)
+            payload = _parse_json(replay.stdout)
+            self.assertEqual(payload["code"], "HCE_REPLAY")
+
+    def test_malformed_numstat_denies_measurement(self):
+        from feature_state_lib.convergence_git import _parse_numstat  # noqa: E402
+        from feature_state_lib.convergence_errors import HceDenial  # noqa: E402
+
+        with self.assertRaises(HceDenial) as ctx:
+            _parse_numstat(b"not-a-numstat-record\0")
+        self.assertEqual(ctx.exception.token, "HCE_UNSUPPORTED_GIT_ENTRY")
 
     def test_missing_actor_returns_json_denial_not_usage(self):
         with tempfile.TemporaryDirectory() as td:
@@ -1174,6 +1333,60 @@ class HceSchemaValidationTests(unittest.TestCase):
             data["packages"][0]["convergence_exception"] = {"schema": SCHEMA, "evil": True}
             errors = validate_state(data)
             self.assertTrue(any("unknown keys" in err for err in errors))
+
+    def test_validate_state_rejects_prepared_record_with_later_fields(self):
+        from feature_state_lib.model import validate_state
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, _ = _prepare_fixture(td_path)
+            data = json.loads(state.read_text())
+            exc = data["packages"][0]["convergence_exception"]
+            exc["authorization"] = {"at": "2026-09-15T16:00:00+00:00", "actor": "x"}
+            errors = validate_state(data)
+            self.assertTrue(any("authorization must be null while prepared" in err for err in errors))
+
+    def test_child_receipt_unknown_key_denies_reenter(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id, _ = _prepare_fixture(td_path)
+            data = json.loads(state.read_text())
+            data["packages"][1]["receipt"]["evil"] = True
+            _write_state(state, data)
+            rev = data["revision"]
+            proc = _run_fs(
+                "reenter-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-bad-receipt",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_consume_denies_stored_child_digest_drift(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            data = json.loads(state.read_text())
+            data["packages"][1]["receipt"]["minted_by"] = "tampered"
+            _write_state(state, data)
+            rev = data["revision"]
+            proc = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-child-drift",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_STALE")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
 
 
 if __name__ == "__main__":
