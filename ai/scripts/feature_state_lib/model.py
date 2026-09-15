@@ -543,6 +543,11 @@ def validate_state(data: dict[str, Any]) -> list[str]:
                 changed = repair.get("changed_lines")
                 if isinstance(changed, int) and isinstance(budget_lines, int) and changed > budget_lines:
                     errors.append(f"{pid}: repair changed_lines ({changed}) exceeds repair_ceiling.budget_lines ({budget_lines})")
+        exc = package.get("convergence_exception")
+        if exc is not None:
+            from feature_state_lib.convergence_policy import validate_convergence_exception
+
+            errors.extend(validate_convergence_exception(exc, pid))
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")

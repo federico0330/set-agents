@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -15,16 +14,17 @@ from feature_state_lib.convergence_constants import (
     PARENT_PACKAGE_ID,
     PROFILE,
 )
-from feature_state_lib.convergence_errors import HceDenial
+from feature_state_lib.convergence_errors import HceCommittedRenderFailed, HceDenial
 from feature_state_lib.convergence_git import (
     check_clean_worktree,
     diff_paths_and_lines,
     git_common_dir,
     head_commit_and_tree,
     measure_combined_identity,
+    measure_original_identity,
     output_paths_b64,
     paths_digest_b64,
-    resolve_realpath,
+    validate_canonical_state_path,
 )
 from feature_state_lib.convergence_policy import (
     build_authorization,
@@ -32,7 +32,9 @@ from feature_state_lib.convergence_policy import (
     build_prepared_exception,
     canonical_json_digest,
     compute_binding_digest,
+    finding_snapshot_from_package,
     get_exception,
+    rederive_frozen_binding,
     validate_authorize_context,
     validate_bindings_match,
     validate_child_output_paths,
@@ -66,19 +68,16 @@ def _require_mutation_args(args: argparse.Namespace) -> None:
         raise HceDenial("HCE_DENIED", "missing --event-id")
     if getattr(args, "expect_revision", None) is None:
         raise HceDenial("HCE_DENIED", "missing --expect-revision")
+    if int(args.expect_revision) < 0:
+        raise HceDenial("HCE_DENIED", "expect-revision must be non-negative")
 
 
 def _canonical_state_path(path: Path) -> Path:
-    resolved = resolve_realpath(path)
-    if path.is_symlink() or os.path.islink(str(path)):
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path is a symlink")
-    if resolved != path.resolve():
-        raise HceDenial("HCE_STATE_PATH_MISMATCH", "state path is not canonical")
-    return resolved
+    return validate_canonical_state_path(path)
 
 
 def _worktree_from_cwd() -> Path:
-    return resolve_realpath(Path.cwd())
+    return Path.cwd().resolve()
 
 
 def _context(args: argparse.Namespace) -> tuple[Path, Path, Path, str, str]:
@@ -114,6 +113,15 @@ def _deny(exc: HceDenial, data: dict[str, Any] | None = None, package_id: str | 
     return 2
 
 
+def _prepare_replay_matches(data: dict[str, Any], event_id: str, exc: dict[str, Any]) -> bool:
+    for item in data.get("history", []):
+        if item.get("event_id") != event_id or item.get("event") != "prepare-convergence":
+            continue
+        metadata = item.get("metadata") or {}
+        return metadata.get("exception_id") == exc.get("exception_id")
+    return False
+
+
 def cmd_prepare_convergence(args: argparse.Namespace) -> int:
     try:
         validate_profile(getattr(args, "profile", None))
@@ -122,15 +130,20 @@ def cmd_prepare_convergence(args: argparse.Namespace) -> int:
         package_id = args.package_id
 
         def update(data: dict[str, Any]) -> bool:
-            if _replayed(data, "prepare-convergence", args.event_id):
-                return False
             package = package_by_id(data, package_id)
-            validate_prepare_context(data, package)
+            exc_existing = package.get("convergence_exception")
+            if _replayed(data, "prepare-convergence", args.event_id):
+                if not exc_existing or not _prepare_replay_matches(data, args.event_id, exc_existing):
+                    raise HceDenial("HCE_REPLAY", "event-id replay without matching snapshot")
+                return False
+            fresh_original = measure_original_identity(worktree, package.get("candidate_identity") or {})
+            validate_prepare_context(data, package, fresh_original)
             exc = build_prepared_exception(
                 state_realpath=state_real,
                 repo_realpath=repo_real,
                 worktree_realpath=None,
                 package=package,
+                fresh_original=fresh_original,
                 actor=args.actor,
                 event_id=args.event_id,
                 authorized_by=args.authorized_by,
@@ -199,6 +212,7 @@ def cmd_consume_convergence(args: argparse.Namespace) -> int:
             exc = get_exception(package, exception_id)
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             combined = _live_combined(exc, worktree)
+            rederive_frozen_binding(exc, data, package, combined)
             validate_consume_ready(exc, combined)
             consumption = build_consumption(
                 exc,
@@ -247,6 +261,8 @@ def cmd_consume_convergence(args: argparse.Namespace) -> int:
             budget_lines=exc.get("repair_ceiling_initialization", {}).get("budget_lines"),
         ))
         return 0
+    except HceCommittedRenderFailed:
+        raise
     except HceDenial as err:
         try:
             data = model.load_state(state_file_arg(args))
@@ -262,7 +278,8 @@ def cmd_verify_convergence_outcome(args: argparse.Namespace) -> int:
         package = package_by_id(data, args.package_id)
         exc = get_exception(package, args.exception_id)
         validate_bindings_match(exc, state_real, repo_real, str(worktree))
-        outcome_id = validate_verify_outcome(exc)
+        combined = _live_combined(exc, worktree)
+        outcome_id = validate_verify_outcome(exc, package, combined)
         print_json(_success_payload(
             "HCE_REGISTERED_VALID", data, args.package_id, exc,
             outcome_id=outcome_id,
@@ -303,10 +320,13 @@ def cmd_reenter_convergence(args: argparse.Namespace) -> int:
         exception_id = args.exception_id
 
         def update(data: dict[str, Any]) -> bool:
-            if _replayed(data, "reenter-convergence", args.event_id):
-                return False
             package = package_by_id(data, package_id)
             exc = get_exception(package, exception_id)
+            if _replayed(data, "reenter-convergence", args.event_id):
+                reentry = exc.get("reentry") or {}
+                if reentry.get("event_id") != args.event_id:
+                    raise HceDenial("HCE_REPLAY", "event-id replay without matching snapshot")
+                return False
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             validate_reenter_context(data, package, exc)
             packages = _package_map(data)
@@ -315,9 +335,9 @@ def cmd_reenter_convergence(args: argparse.Namespace) -> int:
             if not child_a or not child_b:
                 raise HceDenial("HCE_STALE", "missing fixed child packages")
             origin = exc.get("repair_origin") or {}
-            validate_receipt_chain(origin, child_a, child_b)
+            head_commit, head_tree = head_commit_and_tree(worktree)
+            validate_receipt_chain(origin, child_a, child_b, head_commit=head_commit, head_tree=head_tree)
             combined = measure_combined_identity(worktree, origin["candidate_ref"])
-            head_commit, _head_tree = head_commit_and_tree(worktree)
             validate_combined_measurement(combined, origin, head_commit)
             child_records = [
                 _child_record(worktree, child_a, CHILD_A_PACKAGE_ID),
@@ -367,18 +387,17 @@ def cmd_authorize_convergence(args: argparse.Namespace) -> int:
         exception_id = args.exception_id
 
         def update(data: dict[str, Any]) -> bool:
-            if _replayed(data, "authorize-convergence", args.event_id):
-                return False
             package = package_by_id(data, package_id)
             exc = get_exception(package, exception_id)
+            if _replayed(data, "authorize-convergence", args.event_id):
+                auth = exc.get("authorization") or {}
+                if auth.get("event_id") != args.event_id:
+                    raise HceDenial("HCE_REPLAY", "event-id replay without matching snapshot")
+                return False
             validate_bindings_match(exc, state_real, repo_real, str(worktree))
             check_clean_worktree(worktree)
-            origin = exc.get("repair_origin") or {}
-            combined = measure_combined_identity(worktree, origin.get("candidate_ref"))
-            stored = exc.get("combined_review_identity") or {}
-            for key in ("candidate_commit", "candidate_tree", "paths_digest", "changed_lines"):
-                if stored.get(key) != combined.get(key):
-                    raise HceDenial("HCE_STALE", f"combined identity drift on {key}")
+            combined = _live_combined(exc, worktree)
+            rederive_frozen_binding(exc, data, package, combined)
             validate_authorize_context(data, package, exc)
             exc["authorization"] = build_authorization(
                 exc,

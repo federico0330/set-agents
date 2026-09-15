@@ -29,3 +29,17 @@ class HceDenial(Exception):
             payload["revision"] = revision
         payload.update(self.fields)
         return payload
+
+
+class HceCommittedRenderFailed(HceDenial):
+    """State committed but post-replace rendering failed."""
+
+    def __init__(self, reason: str, *, outcome_id: str, revision: int, **fields: object) -> None:
+        super().__init__(
+            "HCE_COMMITTED_RENDER_FAILED",
+            reason,
+            state_committed=True,
+            outcome_id=outcome_id,
+            revision=revision,
+            **fields,
+        )

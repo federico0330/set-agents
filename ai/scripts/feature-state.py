@@ -92,9 +92,11 @@ from feature_state_lib.convergence_cli import (
     cmd_consume_convergence,
     cmd_verify_convergence_outcome,
 )
-from feature_state_lib.convergence_errors import HceDenial
+from feature_state_lib.convergence_constants import HCE_COMMANDS
+from feature_state_lib.convergence_errors import HceCommittedRenderFailed, HceDenial
+from feature_state_lib.convergence_git import validate_canonical_state_path
 from feature_state_lib.render_modules import render_modules
-from feature_state_lib.parser import add_common_state_args
+from feature_state_lib.parser import add_common_state_args, add_hce_mutation_args
 
 
 # `replayed`/`record_event`/`mutate` stay physically defined in this file (see
@@ -167,9 +169,6 @@ def record_event(
     return True
 
 
-    return client, tech
-
-
 CAS_SENSITIVE_OPERATIONS = frozenset({
     "transition",
     "record-spawn",
@@ -208,6 +207,8 @@ def mutate(
     operation: str,
     updater,
 ) -> tuple[dict[str, Any], bool]:
+    if operation in HCE_COMMANDS:
+        validate_canonical_state_path(path)
     with _state_file_lock(path):
         data = load_state(path)
         fail_if_invalid(data)
@@ -222,10 +223,28 @@ def mutate(
             fail_if_invalid(data)
             atomic_write(path, data)
             only = data.get("feature_id")
-            render_status(path)
-            render_bitacora(path, only_feature=only)
-            render_notes(path, only_feature=only)
-            render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
+            try:
+                render_status(path)
+                render_bitacora(path, only_feature=only)
+                render_notes(path, only_feature=only)
+                render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
+            except Exception as exc:
+                if operation == "consume-convergence":
+                    package_id = getattr(args, "package_id", None)
+                    package = package_by_id(data, package_id) if package_id else None
+                    exc_obj = (package or {}).get("convergence_exception") or {}
+                    consumption = exc_obj.get("consumption") or {}
+                    outcome_id = consumption.get("outcome_id")
+                    if outcome_id:
+                        raise HceCommittedRenderFailed(
+                            str(exc),
+                            outcome_id=outcome_id,
+                            revision=int(data.get("revision", 0)),
+                            feature_id=data.get("feature_id"),
+                            package_id=package_id,
+                            exception_id=getattr(args, "exception_id", None),
+                        ) from exc
+                raise
     return data, before != data
 
 
@@ -1422,8 +1441,8 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("--out")
     graph.set_defaults(func=cmd_graph)
 
-    prepare_conv = sub.add_parser("prepare-convergence")
-    add_common_state_args(prepare_conv)
+    prepare_conv = sub.add_parser("prepare-convergence", add_help=False)
+    add_hce_mutation_args(prepare_conv)
     prepare_conv.add_argument("package_id")
     prepare_conv.add_argument("--profile", required=True)
     prepare_conv.add_argument("--authorized-by", required=True)
@@ -1431,14 +1450,14 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_conv.add_argument("--approval-evidence", required=True)
     prepare_conv.set_defaults(func=cmd_prepare_convergence)
 
-    reenter_conv = sub.add_parser("reenter-convergence")
-    add_common_state_args(reenter_conv)
+    reenter_conv = sub.add_parser("reenter-convergence", add_help=False)
+    add_hce_mutation_args(reenter_conv)
     reenter_conv.add_argument("package_id")
     reenter_conv.add_argument("--exception-id", required=True)
     reenter_conv.set_defaults(func=cmd_reenter_convergence)
 
-    authorize_conv = sub.add_parser("authorize-convergence")
-    add_common_state_args(authorize_conv)
+    authorize_conv = sub.add_parser("authorize-convergence", add_help=False)
+    add_hce_mutation_args(authorize_conv)
     authorize_conv.add_argument("package_id")
     authorize_conv.add_argument("--exception-id", required=True)
     authorize_conv.add_argument("--authorized-by", required=True)
@@ -1446,19 +1465,19 @@ def build_parser() -> argparse.ArgumentParser:
     authorize_conv.add_argument("--approval-evidence", required=True)
     authorize_conv.set_defaults(func=cmd_authorize_convergence)
 
-    inspect_conv = sub.add_parser("inspect-convergence")
+    inspect_conv = sub.add_parser("inspect-convergence", add_help=False)
     inspect_conv.add_argument("package_id")
     inspect_conv.add_argument("--state-file")
     inspect_conv.add_argument("--exception-id", required=True)
     inspect_conv.set_defaults(func=cmd_inspect_convergence)
 
-    consume_conv = sub.add_parser("consume-convergence")
-    add_common_state_args(consume_conv)
+    consume_conv = sub.add_parser("consume-convergence", add_help=False)
+    add_hce_mutation_args(consume_conv)
     consume_conv.add_argument("package_id")
     consume_conv.add_argument("--exception-id", required=True)
     consume_conv.set_defaults(func=cmd_consume_convergence)
 
-    verify_conv = sub.add_parser("verify-convergence-outcome")
+    verify_conv = sub.add_parser("verify-convergence-outcome", add_help=False)
     verify_conv.add_argument("package_id")
     verify_conv.add_argument("--state-file")
     verify_conv.add_argument("--exception-id", required=True)
@@ -1471,12 +1490,46 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def _parse_hce_argv(argv: list[str]) -> argparse.Namespace:
+    if len(argv) < 2 or argv[1] not in HCE_COMMANDS:
+        raise ValueError("not an HCE command")
     parser = build_parser()
-    args = parser.parse_args()
+    command = argv[1]
+    subparser = parser._subparsers._group_actions[0].choices[command]
+    try:
+        args, unknown = subparser.parse_known_args(argv[2:])
+    except SystemExit as exc:
+        raise HceDenial("HCE_DENIED", "invalid arguments") from exc
+    if unknown:
+        raise HceDenial("HCE_DENIED", f"unknown arguments: {' '.join(unknown)}")
+    if not getattr(args, "state_file", None):
+        raise HceDenial("HCE_DENIED", "missing --state-file")
+    if getattr(args, "expect_revision", None) is not None and int(args.expect_revision) < 0:
+        raise HceDenial("HCE_DENIED", "expect-revision must be non-negative")
+    args.func = subparser.get_default("func")
+    return args
+
+
+def main() -> int:
+    argv = sys.argv
+    if len(argv) > 1 and argv[1] in HCE_COMMANDS:
+        try:
+            args = _parse_hce_argv(argv)
+        except HceDenial as exc:
+            print_json(exc.to_payload())
+            return 2
+        except SystemExit:
+            print_json({"ok": False, "error": "HCE_DENIED: invalid arguments", "code": "HCE_DENIED"})
+            return 2
+    else:
+        parser = build_parser()
+        args = parser.parse_args()
     model.RENDER_SKIP = bool(getattr(args, "no_render", False))
     try:
         return args.func(args)
+    except HceCommittedRenderFailed as exc:
+        print_json(exc.to_payload())
+        return 2
     except HceDenial as exc:
         print_json(exc.to_payload())
         return 2

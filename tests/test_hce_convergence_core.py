@@ -21,8 +21,11 @@ sys.path.insert(0, str(ROOT / "ai/scripts"))
 from feature_state_lib.convergence_git import (  # noqa: E402
     git_common_dir,
     measure_combined_identity,
+    measure_original_identity,
+    paths_digest_b64,
 )
 from feature_state_lib import candidate_identity  # noqa: E402
+from feature_state_lib.convergence_constants import SCHEMA  # noqa: E402
 from feature_state_lib.convergence_policy import (  # noqa: E402
     canonical_json_digest,
     compute_binding_digest,
@@ -99,9 +102,9 @@ def _make_hce_repo(td: Path) -> tuple[Path, str, str, str, str]:
     base_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
     base_tree = _git("rev-parse", f"{base_sha}^{{tree}}", cwd=repo).stdout.strip()
 
-    # Original parent candidate: discovery files only
-    (sync / "source-discovery.ts").write_text("// discovery v1\n" * 20)
-    (tests_dir / "source-discovery.test.ts").write_text("// discovery test v1\n" * 10)
+    # Original parent candidate: discovery files only (336 added lines for profile constant)
+    (sync / "source-discovery.ts").write_text("// discovery v1\n" * 252)
+    (tests_dir / "source-discovery.test.ts").write_text("// discovery test v1\n" * 84)
     _git("add", "-A", cwd=repo)
     _git("commit", "-q", "-m", "original-parent", cwd=repo)
     original_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
@@ -127,6 +130,8 @@ def _make_hce_repo(td: Path) -> tuple[Path, str, str, str, str]:
 
 
 def _finding(id_: str) -> dict:
+    evidence_obj = {"id": id_, "evidence": f"evidence for {id_}"}
+    definition_obj = {"id": id_, "required_outcome": "fix", "severity": "high"}
     return {
         "id": id_,
         "severity": "high",
@@ -142,26 +147,34 @@ def _finding(id_: str) -> dict:
         "verified_by": "finding-verifier",
         "verified_verdict": "upheld",
         "repair_attempts": 0,
-        "verification_digest": _canonical_digest({"id": id_, "evidence": f"evidence for {id_}"}),
-        "definition_digest": _canonical_digest({"id": id_, "required_outcome": "fix"}),
+        "verification_digest": _canonical_digest(evidence_obj),
+        "definition_digest": _canonical_digest(definition_obj),
     }
+
+
+def _derive_original_identity(repo: Path, base_sha: str, original_sha: str) -> dict:
+    seed = {
+        "baseline_ref": base_sha,
+        "candidate_ref": original_sha,
+        "generation": 1,
+        "frozen_at": "2026-09-15T12:45:54+00:00",
+        "frozen_by": "gate-runner",
+    }
+    prev = os.getcwd()
+    os.chdir(repo)
+    try:
+        measured = measure_original_identity(repo, seed)
+    finally:
+        os.chdir(prev)
+    measured["generation"] = 1
+    measured["frozen_at"] = seed["frozen_at"]
+    measured["frozen_by"] = seed["frozen_by"]
+    return measured
 
 
 def _minimal_state(state_path: Path, repo: Path, base_sha: str, original_sha: str, revision: int = 0) -> dict:
-    original_tree = _git("rev-parse", f"{original_sha}^{{tree}}", cwd=repo).stdout.strip()
-    base_tree = _git("rev-parse", f"{base_sha}^{{tree}}", cwd=repo).stdout.strip()
-    changed_paths = [PATH_DISCOVERY, PATH_DISCOVERY_TEST]
-    candidate_identity = {
-        "baseline_ref": base_sha,
-        "candidate_ref": original_sha,
-        "base_tree": base_tree,
-        "candidate_tree": original_tree,
-        "paths_digest": "sha256:" + hashlib.sha256("\n".join(sorted(changed_paths)).encode()).hexdigest(),
-        "changed_lines": 336,
-        "frozen_at": "2026-09-15T12:45:54+00:00",
-        "frozen_by": "gate-runner",
-        "generation": 1,
-    }
+    candidate_identity = _derive_original_identity(repo, base_sha, original_sha)
+    assert candidate_identity["changed_lines"] == 336, candidate_identity["changed_lines"]
     parent = {
         "package_id": PARENT_ID,
         "objective": "P1A1 discovery",
@@ -408,55 +421,36 @@ class HceCanonicalPathTests(unittest.TestCase):
 
 class HceInspectVerifyReadOnlyTests(unittest.TestCase):
     def _authorized_fixture(self, td_path: Path) -> tuple[Path, Path, str]:
-        repo, base_sha, original_sha, _child_a_sha, _combined_sha = _make_hce_repo(td_path)
-        state = td_path / "state.json"
-        data = _minimal_state(state, repo, base_sha, original_sha)
+        repo, state, exc_id, _ = _reentered_fixture(td_path)
+        data = json.loads(state.read_text())
         parent = data["packages"][0]
-        exc_id = str(uuid.uuid4())
-        combined_live = measure_combined_identity(repo, original_sha)
-        combined = {k: v for k, v in combined_live.items() if k != "changed_paths"}
-        from feature_state_lib.convergence_constants import FINDING_MAP, OWNERSHIP_SNAPSHOT  # noqa: E402
-        exc = {
-            "schema": "set-agentes.convergence-exception/v1",
-            "exception_id": exc_id,
-            "profile": PROFILE,
-            "feature_id": FEATURE_ID,
-            "parent_package_id": PARENT_ID,
-            "status": "authorized",
-            "state_file_realpath": str(state.resolve()),
-            "repository_common_dir_realpath": str(git_common_dir(repo)),
-            "worktree_realpath": str(repo.resolve()),
-            "repair_origin": deepcopy(parent["candidate_identity"]),
-            "repair_ceiling_initialization": {
-                "original_changed_lines": 336,
-                "budget_lines": 168,
-                "cap_source": "complexity:high",
-                "frozen_at": "2026-09-15T14:00:00+00:00",
-            },
-            "finding_snapshot": finding_snapshot_from_package(parent),
-            "parent_repair_batches_initial": 0,
-            "finding_map": deepcopy(FINDING_MAP),
-            "ownership_snapshot": deepcopy(OWNERSHIP_SNAPSHOT),
-            "children": [],
-            "combined_review_identity": combined,
-            "binding_digest": None,
-            "preparation": {"at": "2026-09-15T14:00:00+00:00", "actor": "a", "event_id": "e",
-                            "authorized_by": "op", "reason": "r", "approval_evidence": "ev"},
-            "reentry": None,
-            "final_panel_id": "panel-final",
-            "authorization": None,
-            "consumption": None,
-        }
-        exc["binding_digest"] = compute_binding_digest(exc)
-        exc["authorization"] = {
-            "at": "2026-09-15T14:01:00+00:00", "actor": "a", "event_id": "e2",
-            "authorized_by": "op", "reason": "r", "approval_evidence": "ev",
-            "panel_id": "panel-final", "binding_digest": exc["binding_digest"],
-        }
-        parent["convergence_exception"] = exc
+        panel_id = "SVR-P1A1-FINAL-PANEL"
+        parent["review_panels"].append({
+            "panel_id": panel_id,
+            "status": "completed",
+            "verdict": "repair_required",
+            "started_at": "2026-09-15T15:00:00+00:00",
+            "completed_at": "2026-09-15T15:30:00+00:00",
+            "roles": ["package-reviewer", "security-auditor"],
+            "subreviews": [],
+        })
+        parent["convergence_exception"]["final_panel_id"] = panel_id
         parent["status"] = "repair_required"
         data["phase"] = "PACKAGE_REPAIR"
         _write_state(state, data)
+        rev = data["revision"]
+        proc = _run_fs(
+            "authorize-convergence", PARENT_ID,
+            "--exception-id", exc_id,
+            "--authorized-by", "operator",
+            "--reason", "final panel bound",
+            "--approval-evidence", "panel-evidence",
+            "--actor", "orchestrator",
+            "--event-id", "evt-authorize-fixture",
+            "--expect-revision", str(rev),
+            cwd=repo, state_file=state, check=False,
+        )
+        assert proc.returncode == 0, proc.stderr + proc.stdout
         return repo, state, exc_id
 
     def test_inspect_returns_eligible_without_revision_change(self):
@@ -495,12 +489,13 @@ class HceConsumeReplayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
             proc = _run_fs(
                 "consume-convergence", PARENT_ID,
                 "--exception-id", exc_id,
                 "--actor", "orchestrator",
                 "--event-id", "evt-consume-1",
-                "--expect-revision", "0",
+                "--expect-revision", str(rev),
                 cwd=repo, state_file=state, check=False,
             )
             self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
@@ -829,19 +824,356 @@ class HceDirtyWorktreeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev_before = json.loads(state.read_text())["revision"]
             (repo / "scripts/sync-vps/dirty.ts").write_text("dirty\n")
             proc = _run_fs(
                 "consume-convergence", PARENT_ID,
                 "--exception-id", exc_id,
                 "--actor", "orchestrator",
                 "--event-id", "evt-dirty",
-                "--expect-revision", "0",
+                "--expect-revision", str(rev_before),
                 cwd=repo, state_file=state, check=False,
             )
             self.assertEqual(proc.returncode, 2)
             payload = _parse_json(proc.stdout)
             self.assertIn("HCE_DIRTY_WORKTREE", payload["error"])
+            self.assertEqual(json.loads(state.read_text())["revision"], rev_before)
+
+
+class HceNegativeSecurityTests(unittest.TestCase):
+    def test_parent_symlink_alias_denies_prepare_zero_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            real_dir = td_path / "real"
+            real_dir.mkdir()
+            real_state = real_dir / "state.json"
+            _write_state(real_state, _minimal_state(real_state, repo, base_sha, original_sha))
+            alias_dir = td_path / "alias"
+            alias_dir.symlink_to(real_dir)
+            alias_state = alias_dir / "state.json"
+            rev_before = json.loads(real_state.read_text())["revision"]
+            proc = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-parent-symlink",
+                "--expect-revision", "0",
+                cwd=repo, state_file=alias_state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["code"], "HCE_STATE_PATH_MISMATCH")
+            self.assertEqual(json.loads(real_state.read_text())["revision"], rev_before)
+
+    def test_hardlinked_state_path_denies_prepare(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            primary = td_path / "state-primary.json"
+            _write_state(primary, _minimal_state(primary, repo, base_sha, original_sha))
+            hardlink = td_path / "state-hardlink.json"
+            os.link(primary, hardlink)
+            rev_before = json.loads(primary.read_text())["revision"]
+            proc = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-hardlink",
+                "--expect-revision", "0",
+                cwd=repo, state_file=hardlink, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_STATE_PATH_MISMATCH")
+            self.assertEqual(json.loads(primary.read_text())["revision"], rev_before)
+
+    def test_symlink_git_entry_denies_reenter(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo = td_path / "worktree"
+            sync = repo / "scripts/sync-vps"
+            tests_dir = sync / "__tests__"
+            tests_dir.mkdir(parents=True)
+            _git("init", "-q", cwd=repo)
+            _git("config", "user.email", "hce@test.local", cwd=repo)
+            _git("config", "user.name", "HCE Test", cwd=repo)
+            (repo / "README.md").write_text("base\n")
+            _git("add", "-A", cwd=repo)
+            _git("commit", "-q", "-m", "base", cwd=repo)
+            base_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+            (sync / "source-discovery.ts").write_text("// discovery v1\n" * 252)
+            (tests_dir / "source-discovery.test.ts").write_text("// discovery test v1\n" * 84)
+            _git("add", "-A", cwd=repo)
+            _git("commit", "-q", "-m", "original-parent", cwd=repo)
+            original_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+            (sync / "owned-target.ts").write_text("// target\n")
+            (sync / "typescript-dispatch-resolver.ts").symlink_to("owned-target.ts")
+            (tests_dir / "typescript-dispatch-resolver.test.ts").write_text("// resolver test\n" * 8)
+            _git("add", "-A", cwd=repo)
+            _git("commit", "-q", "-m", "child-a-symlink", cwd=repo)
+            child_a_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+            (sync / "source-discovery.ts").write_text("// discovery v2 combined\n" * 25)
+            (tests_dir / "source-discovery.test.ts").write_text("// discovery test v2\n" * 12)
+            _git("add", "-A", cwd=repo)
+            _git("commit", "-q", "-m", "child-b-final", cwd=repo)
+            combined_sha = _git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+            state = td_path / "state.json"
+            data = _minimal_state(state, repo, base_sha, original_sha)
+            _attach_accepted_children(data, repo, original_sha, child_a_sha, combined_sha)
+            _write_state(state, data)
+            prep = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-prepare-symlink",
+                "--expect-revision", "0",
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(prep.returncode, 0, prep.stdout + prep.stderr)
+            exc_id = _parse_json(prep.stdout)["exception_id"]
+            rev = json.loads(state.read_text())["revision"]
+            proc = _run_fs(
+                "reenter-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-symlink-entry",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_UNSUPPORTED_GIT_ENTRY")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_prepare_denies_extra_planned_task(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            data = _minimal_state(state, repo, base_sha, original_sha)
+            data["packages"][0]["tasks"].append(
+                {"id": "extra-task", "status": "planned", "blockers": [], "local_validations": []}
+            )
+            _write_state(state, data)
+            proc = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-extra-task",
+                "--expect-revision", "0",
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_DENIED")
             self.assertEqual(json.loads(state.read_text())["revision"], 0)
+
+    def test_prepare_denies_invented_finding_digest(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            data = _minimal_state(state, repo, base_sha, original_sha)
+            data["packages"][0]["findings"][0]["verification_digest"] = "sha256:" + "a" * 64
+            _write_state(state, data)
+            proc = _run_fs(
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--actor", "orchestrator",
+                "--event-id", "evt-bad-digest",
+                "--expect-revision", "0",
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_DENIED")
+            self.assertEqual(json.loads(state.read_text())["revision"], 0)
+
+    def test_consume_denies_finding_snapshot_tamper(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            data = json.loads(state.read_text())
+            data["packages"][0]["findings"][0]["status"] = "closed"
+            _write_state(state, data)
+            rev = data["revision"]
+            proc = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-tamper-finding",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(proc.returncode, 2)
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload.get("code"), "HCE_STALE")
+            self.assertEqual(json.loads(state.read_text())["revision"], rev)
+
+    def test_verify_denies_missing_ceiling_gate_linkage(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
+            consume = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-consume-verify",
+                "--expect-revision", str(rev),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(consume.returncode, 0, consume.stdout + consume.stderr)
+            data = json.loads(state.read_text())
+            data["packages"][0]["gates"] = []
+            _write_state(state, data)
+            verify = _run_fs(
+                "verify-convergence-outcome", PARENT_ID,
+                "--exception-id", exc_id,
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(verify.returncode, 2)
+            payload = _parse_json(verify.stdout)
+            self.assertEqual(payload["code"], "HCE_OUTCOME_INVALID")
+
+    def test_ownership_mode_ignores_tampered_snapshot_for_owned_paths(self):
+        from feature_state_lib.convergence_constants import FOUR_PATH_UNION  # noqa: E402
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            data = json.loads(state.read_text())
+            data["packages"][0]["convergence_exception"]["ownership_snapshot"].append(
+                {"child_package_id": "EVIL", "owned_paths": ["scripts/sync-vps/evil.ts"]}
+            )
+            _write_state(state, data)
+            proc = _run_owned(
+                "--state-file", str(state.resolve()),
+                "--package-id", PARENT_ID,
+                "--convergence-exception-id", exc_id,
+                check=False,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            payload = _parse_json(proc.stdout.split("OWNERSHIP_PASS")[0].strip())
+            self.assertEqual(sorted(payload["owned_paths"]), sorted(FOUR_PATH_UNION))
+            self.assertNotIn("scripts/sync-vps/evil.ts", payload["owned_paths"])
+
+    def test_missing_actor_returns_json_denial_not_usage(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            _write_state(state, _minimal_state(state, repo, base_sha, original_sha))
+            cmd = [
+                "python3", str(FEATURE_STATE),
+                "prepare-convergence", PARENT_ID,
+                "--profile", PROFILE,
+                "--authorized-by", "operator",
+                "--reason", "r",
+                "--approval-evidence", "e",
+                "--event-id", "evt-no-actor",
+                "--expect-revision", "0",
+                "--state-file", str(state.resolve()),
+            ]
+            proc = subprocess.run(cmd, cwd=repo, env=os.environ.copy(), text=True, capture_output=True, check=False)
+            self.assertEqual(proc.returncode, 2)
+            self.assertNotIn("usage:", proc.stderr.lower())
+            payload = _parse_json(proc.stdout)
+            self.assertEqual(payload["code"], "HCE_DENIED")
+            self.assertEqual(json.loads(state.read_text())["revision"], 0)
+
+    def test_committed_render_failure_reports_recovery_metadata(self):
+        import argparse
+        import importlib.util
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, state, exc_id = HceInspectVerifyReadOnlyTests()._authorized_fixture(td_path)
+            rev = json.loads(state.read_text())["revision"]
+            spec = importlib.util.spec_from_file_location("feature_state_main", FEATURE_STATE)
+            fs_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(fs_mod)
+            args = argparse.Namespace(
+                state_file=str(state.resolve()),
+                expect_revision=rev,
+                actor="orchestrator",
+                event_id="evt-render-fail",
+                package_id=PARENT_ID,
+                exception_id=exc_id,
+                no_render=False,
+            )
+
+            def _mark_consumed(data: dict) -> bool:
+                package = fs_mod.package_by_id(data, PARENT_ID)
+                exc = package["convergence_exception"]
+                exc["status"] = "consumed"
+                exc["consumption"] = {
+                    "outcome_id": str(uuid.uuid4()),
+                    "at": "2026-09-15T16:00:00+00:00",
+                    "actor": "orchestrator",
+                    "event_id": "evt-render-fail",
+                    "binding_digest": exc.get("binding_digest"),
+                    "combined_review_identity": exc.get("combined_review_identity"),
+                    "panel_id": exc.get("final_panel_id"),
+                    "committed_revision": int(data.get("revision", 0)) + 1,
+                }
+                return True
+
+            with patch.object(fs_mod, "render_status", side_effect=RuntimeError("render boom")):
+                with patch.object(fs_mod, "render_bitacora"):
+                    with patch.object(fs_mod, "render_notes"):
+                        with patch.object(fs_mod, "render_modules"):
+                            with self.assertRaises(fs_mod.HceCommittedRenderFailed) as ctx:
+                                fs_mod.mutate(state, args, "consume-convergence", _mark_consumed)
+            err = ctx.exception
+            self.assertEqual(err.token, "HCE_COMMITTED_RENDER_FAILED")
+            self.assertTrue(err.fields.get("state_committed"))
+            self.assertIn("outcome_id", err.fields)
+            data = json.loads(state.read_text())
+            self.assertEqual(data["packages"][0]["convergence_exception"]["status"], "consumed")
+            replay = _run_fs(
+                "consume-convergence", PARENT_ID,
+                "--exception-id", exc_id,
+                "--actor", "orchestrator",
+                "--event-id", "evt-render-fail-replay",
+                "--expect-revision", str(data["revision"]),
+                cwd=repo, state_file=state, check=False,
+            )
+            self.assertEqual(replay.returncode, 2)
+            replay_payload = _parse_json(replay.stdout)
+            self.assertEqual(replay_payload["code"], "HCE_REPLAY")
+
+
+class HceSchemaValidationTests(unittest.TestCase):
+    def test_validate_state_rejects_unknown_convergence_key(self):
+        from feature_state_lib.model import validate_state
+
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            repo, base_sha, original_sha, _, _ = _make_hce_repo(td_path)
+            state = td_path / "state.json"
+            data = _minimal_state(state, repo, base_sha, original_sha)
+            data["packages"][0]["convergence_exception"] = {"schema": SCHEMA, "evil": True}
+            errors = validate_state(data)
+            self.assertTrue(any("unknown keys" in err for err in errors))
 
 
 if __name__ == "__main__":
