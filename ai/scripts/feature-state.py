@@ -84,6 +84,15 @@ from feature_state_lib.cli_reporting import (
 )
 from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
 from feature_state_lib.cli_modules import cmd_record_module_impact, cmd_module_impact_detect, cmd_check_anchors
+from feature_state_lib.convergence_cli import (
+    cmd_prepare_convergence,
+    cmd_reenter_convergence,
+    cmd_authorize_convergence,
+    cmd_inspect_convergence,
+    cmd_consume_convergence,
+    cmd_verify_convergence_outcome,
+)
+from feature_state_lib.convergence_errors import HceDenial
 from feature_state_lib.render_modules import render_modules
 from feature_state_lib.parser import add_common_state_args
 
@@ -1413,6 +1422,48 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("--out")
     graph.set_defaults(func=cmd_graph)
 
+    prepare_conv = sub.add_parser("prepare-convergence")
+    add_common_state_args(prepare_conv)
+    prepare_conv.add_argument("package_id")
+    prepare_conv.add_argument("--profile", required=True)
+    prepare_conv.add_argument("--authorized-by", required=True)
+    prepare_conv.add_argument("--reason", required=True)
+    prepare_conv.add_argument("--approval-evidence", required=True)
+    prepare_conv.set_defaults(func=cmd_prepare_convergence)
+
+    reenter_conv = sub.add_parser("reenter-convergence")
+    add_common_state_args(reenter_conv)
+    reenter_conv.add_argument("package_id")
+    reenter_conv.add_argument("--exception-id", required=True)
+    reenter_conv.set_defaults(func=cmd_reenter_convergence)
+
+    authorize_conv = sub.add_parser("authorize-convergence")
+    add_common_state_args(authorize_conv)
+    authorize_conv.add_argument("package_id")
+    authorize_conv.add_argument("--exception-id", required=True)
+    authorize_conv.add_argument("--authorized-by", required=True)
+    authorize_conv.add_argument("--reason", required=True)
+    authorize_conv.add_argument("--approval-evidence", required=True)
+    authorize_conv.set_defaults(func=cmd_authorize_convergence)
+
+    inspect_conv = sub.add_parser("inspect-convergence")
+    inspect_conv.add_argument("package_id")
+    inspect_conv.add_argument("--state-file")
+    inspect_conv.add_argument("--exception-id", required=True)
+    inspect_conv.set_defaults(func=cmd_inspect_convergence)
+
+    consume_conv = sub.add_parser("consume-convergence")
+    add_common_state_args(consume_conv)
+    consume_conv.add_argument("package_id")
+    consume_conv.add_argument("--exception-id", required=True)
+    consume_conv.set_defaults(func=cmd_consume_convergence)
+
+    verify_conv = sub.add_parser("verify-convergence-outcome")
+    verify_conv.add_argument("package_id")
+    verify_conv.add_argument("--state-file")
+    verify_conv.add_argument("--exception-id", required=True)
+    verify_conv.set_defaults(func=cmd_verify_convergence_outcome)
+
     # Available on every subcommand: defer STATUS/bitacora/notes regeneration
     # for high-frequency intra-phase writes; sync-notes always renders anyway.
     for item in sub.choices.values():
@@ -1426,6 +1477,9 @@ def main() -> int:
     model.RENDER_SKIP = bool(getattr(args, "no_render", False))
     try:
         return args.func(args)
+    except HceDenial as exc:
+        print_json(exc.to_payload())
+        return 2
     except (OSError, json.JSONDecodeError, StateError) as exc:
         print_json({"ok": False, "error": str(exc)})
         return 2

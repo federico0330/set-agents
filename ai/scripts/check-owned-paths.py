@@ -135,18 +135,53 @@ def changed_files_from_git(baseline: str) -> list[str]:
     return changed
 
 
+def _hce_changed_paths(data: dict[str, Any], package: dict[str, Any], exception_id: str) -> list[str]:
+    exc = package.get("convergence_exception")
+    if not exc or exc.get("exception_id") != exception_id:
+        raise SystemExit(json.dumps({"ok": False, "error": "HCE_DENIED: unknown convergence exception"}, sort_keys=True))
+    combined = exc.get("combined_review_identity") or {}
+    origin = exc.get("repair_origin") or {}
+    base_tree = origin.get("candidate_tree")
+    candidate_tree = combined.get("candidate_tree")
+    worktree = exc.get("worktree_realpath")
+    if not base_tree or not candidate_tree or not worktree:
+        raise SystemExit(json.dumps({"ok": False, "error": "HCE_STALE: incomplete convergence binding"}, sort_keys=True))
+    result = subprocess.run(
+        ["git", "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--name-only", "-z", base_tree, candidate_tree],
+        cwd=worktree,
+        capture_output=True,
+        text=False,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(json.dumps({"ok": False, "error": "HCE_GIT_UNAVAILABLE: cannot diff combined identity"}, sort_keys=True))
+    return sorted(p.decode("utf-8") for p in result.stdout.split(b"\0") if p)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state-file", required=True)
     parser.add_argument("--package-id", required=True)
     parser.add_argument("--baseline")
     parser.add_argument("--changed-file", action="append")
+    parser.add_argument("--convergence-exception-id")
     args = parser.parse_args()
+
+    if args.convergence_exception_id and (args.baseline or args.changed_file):
+        print(json.dumps({"ok": False, "error": "HCE_DENIED: baseline/changed-file overrides forbidden in convergence mode"}, sort_keys=True))
+        return 2
 
     data = load_state(Path(args.state_file))
     package = package_by_id(data, args.package_id)
-    changed = args.changed_file or changed_files_from_git(args.baseline or "HEAD")
-    owned = package.get("owned_paths", package.get("ownershipPaths", [])) + package.get("shared_paths", [])
+    if args.convergence_exception_id:
+        changed = _hce_changed_paths(data, package, args.convergence_exception_id)
+        owned = []
+        exc = package["convergence_exception"]
+        for entry in exc.get("ownership_snapshot") or []:
+            owned.extend(entry.get("owned_paths") or [])
+    else:
+        changed = args.changed_file or changed_files_from_git(args.baseline or "HEAD")
+        owned = package.get("owned_paths", package.get("ownershipPaths", [])) + package.get("shared_paths", [])
     read_only = package.get("read_only_paths", [])
     violations = []
     read_only_violations = []
