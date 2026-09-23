@@ -44,6 +44,8 @@ active-profile
 # sees. Never curated, never committed either way.
 tools.local.toml
 tools.proposals.json
+# ADR-0077: project expertise overlay (optional packs). Lives at PROJECT_ROOT.
+packs.local.toml
 
 # ADR-0047: the harness's own working state is not the product. The path stays
 # ai/state/ at runtime (every one of the eleven ai/scripts/ modules that read it is

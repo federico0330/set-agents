@@ -20,6 +20,12 @@ from typing import Any
 from feature_state_lib import model, candidate_identity
 from feature_state_lib.model import StateError, now, package_by_id, package_accept_ready
 from feature_state_lib.cli_lifecycle import state_file_arg, output_state
+from feature_state_lib.cli_lifecycle import (
+    validate_hce_outcome_command,
+    CONVERGENCE_RECEIPT_SCHEMA,
+    hce_exception,
+    require_hce_registered_outcome,
+)
 
 
 def cmd_freeze_candidate(args: argparse.Namespace) -> int:
@@ -29,6 +35,9 @@ def cmd_freeze_candidate(args: argparse.Namespace) -> int:
         if data["phase"] not in {"PACKAGE_GATES", "PACKAGE_REPAIR"}:
             raise StateError(f"cannot freeze candidate from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        if hce_exception(package):
+            from feature_state_lib.convergence_errors import HceDenial
+            raise HceDenial("HCE_DENIED", "HCE parent forbids freeze-candidate refreeze")
         frozen = candidate_identity.freeze(args.baseline, args.candidate_ref or "HEAD")
         previous = package.get("candidate_identity") or {}
         # A repair cycle re-freezes: generation bumps so the receipt (and any later
@@ -54,6 +63,44 @@ def cmd_record_receipt(args: argparse.Namespace) -> int:
         if data["phase"] not in {"PACKAGE_RUNTIME_QA", "PACKAGE_ACCEPTED"}:
             raise StateError(f"cannot record receipt from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_ctx = validate_hce_outcome_command("record-receipt", args, package)
+        if hce_ctx is not None:
+            exc, outcome_id = hce_ctx
+            require_hce_registered_outcome(data, package, exc)
+            errors = package_accept_ready(data, package, args.actor)
+            if errors:
+                raise StateError("cannot record receipt: " + "; ".join(errors))
+            combined = exc.get("combined_review_identity") or {}
+            consumption = exc.get("consumption") or {}
+            review_verdict = package["reviews"][-1].get("verdict") if package.get("reviews") else None
+            delta_review_verdict = package["delta_reviews"][-1].get("verdict") if package.get("delta_reviews") else None
+            upheld = sum(len(item.get("upheld", [])) for item in package.get("verifications", []))
+            refuted = sum(len(item.get("refuted", [])) for item in package.get("verifications", []))
+            package["receipt"] = {
+                "schema": CONVERGENCE_RECEIPT_SCHEMA,
+                "package_id": args.package_id,
+                "generation": combined.get("generation"),
+                "base_tree": combined.get("base_tree"),
+                "candidate_tree": combined.get("candidate_tree"),
+                "paths_digest": combined.get("paths_digest"),
+                "review_verdict": review_verdict,
+                "delta_review_verdict": delta_review_verdict,
+                "verifications_summary": {"upheld": upheld, "refuted": refuted},
+                "terminal_state": "accepted",
+                "minted_at": now(),
+                "minted_by": args.actor,
+                "exception_id": exc["exception_id"],
+                "convergence_outcome_id": outcome_id,
+                "binding_digest": exc.get("binding_digest"),
+                "candidate_commit": combined.get("candidate_commit"),
+                "changed_lines": combined.get("changed_lines"),
+            }
+            model.record_event(
+                data, "record-receipt", data["phase"], data["phase"], args.actor, args.package_id,
+                {"generation": combined.get("generation"), "convergence_outcome_id": outcome_id},
+                args.event_id,
+            )
+            return True
         frozen = package.get("candidate_identity")
         if not frozen:
             raise StateError("record-receipt requires a prior freeze-candidate")

@@ -784,6 +784,32 @@ user ends up paying for the pipeline's progress by typing "dale, continuá".
   sanctioned tool-catalog channel below.
 - Delegate gates to `gate-runner`; delegate all repairs to `repair-agent` or another fresh mutating agent.
 
+## Project auto-setup — who owns what (ADR-0077)
+
+There is **no** dedicated “self-programming” / auto-setup subagent. Ownership is split:
+
+| Layer | Owner |
+|---|---|
+| Detect legacy state / missing project profile / session-close hygiene | **You (orchestrator)** |
+| Deterministic harness verbs | **You**, via allowlisted CLI |
+| Judgmental project overlay (`packs.local.toml`, stack → `--tools-propose`) | **`project-bootstrapper`** |
+| Approve new catalog entries / sudo | **Human only** (`--tools-approve`) |
+
+**Do without asking the user to type the command:**
+
+1. On `resume`/`next`/`status`, legacy feature state auto-migrates. If you still see
+   `LEGACY_SCHEMA` / missing `schema_version`, run
+   `python3 ai/scripts/feature-state.py migrate-legacy-state --state-file <path>` yourself
+   (backup is created). Never open a `HUMAN_DECISION_REQUIRED` only to ask “¿migro?”.
+2. Session / encargo close: park out-of-scope improvements with
+   `python3 ai/scripts/feature-state.py log-deferred --summary "..." --why-deferred "..."`.
+   Do **not** put them in `Conviene ahora` / next-step narration — `describe_next_step` ignores
+   the deferred log by design.
+3. Role-to-role handoffs that must outlive a spawn: `bus-post` / `bus-list` under
+   `ai/state/bus/` — no relay agent in between.
+4. First work in a project with no meaningful `packs.local.toml`: spawn **`project-bootstrapper`**
+   once to program the project overlay. You do not invent pack lists yourself.
+
 ## Tool catalog — resolve first, record always (ADR-0025)
 
 When the task needs a CLI from the curated catalog (`tools.toml`: vercel, gh, supabase, docker, jq, ...)

@@ -216,7 +216,20 @@ def cmd_record_axis(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
-    data = load_state(path)
+    from feature_state_lib.cli_migrate import is_legacy_state, load_state_auto_migrate
+    # ADR-0077: validate stays diagnostic by default; --auto-migrate upgrades first.
+    if getattr(args, "auto_migrate", False):
+        data = load_state_auto_migrate(path)
+    else:
+        data = load_state(path)
+        if is_legacy_state(data):
+            print_json({
+                "ok": False,
+                "errors": ["LEGACY_SCHEMA: run migrate-legacy-state (or validate --auto-migrate)"],
+                "state_file": str(path),
+                "legacy": True,
+            })
+            return 2
     errors = validate_state(data)
     axes_log = data.get("axes_log")
     if axes_log:
@@ -232,7 +245,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
-    data = load_state(path)
+    from feature_state_lib.cli_migrate import load_state_auto_migrate
+    data = load_state_auto_migrate(path)
     fail_if_invalid(data)
     # AC-04 (020-honest-dashboard, ADR-0040): the same predicate/threshold AC-01/AC-03
     # read (model.blocked_days/model.stale_days) -- a command that told a different truth
@@ -250,7 +264,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_next(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
-    data = load_state(path)
+    from feature_state_lib.cli_migrate import load_state_auto_migrate
+    data = load_state_auto_migrate(path)
     fail_if_invalid(data)
     payload = {"ok": True, "state_file": str(path), "next": next_transition(data)}
     # ADR-0028: warn (never fail) on contract drift — the key is absent when clean,

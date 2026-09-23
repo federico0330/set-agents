@@ -1,0 +1,5 @@
+id = "data"
+tier = "optional"
+summary = "Pipelines, schemas, and data quality gates"
+skills = []
+tools = ["jq"]

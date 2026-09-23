@@ -216,7 +216,20 @@ def cmd_record_axis(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
-    data = load_state(path)
+    from feature_state_lib.cli_migrate import is_legacy_state, load_state_auto_migrate
+    # ADR-0077: validate stays diagnostic by default; --auto-migrate upgrades first.
+    if getattr(args, "auto_migrate", False):
+        data = load_state_auto_migrate(path)
+    else:
+        data = load_state(path)
+        if is_legacy_state(data):
+            print_json({
+                "ok": False,
+                "errors": ["LEGACY_SCHEMA: run migrate-legacy-state (or validate --auto-migrate)"],
+                "state_file": str(path),
+                "legacy": True,
+            })
+            return 2
     errors = validate_state(data)
     axes_log = data.get("axes_log")
     if axes_log:
@@ -232,7 +245,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
-    data = load_state(path)
+    from feature_state_lib.cli_migrate import load_state_auto_migrate
+    data = load_state_auto_migrate(path)
     fail_if_invalid(data)
     # AC-04 (020-honest-dashboard, ADR-0040): the same predicate/threshold AC-01/AC-03
     # read (model.blocked_days/model.stale_days) -- a command that told a different truth
@@ -250,7 +264,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_next(args: argparse.Namespace) -> int:
     path = state_file_arg(args)
-    data = load_state(path)
+    from feature_state_lib.cli_migrate import load_state_auto_migrate
+    data = load_state_auto_migrate(path)
     fail_if_invalid(data)
     payload = {"ok": True, "state_file": str(path), "next": next_transition(data)}
     # ADR-0028: warn (never fail) on contract drift — the key is absent when clean,
@@ -691,3 +706,156 @@ def cmd_amend_package(args: argparse.Namespace) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     return cmd_next(args)
+
+
+HCE_PANEL_COMMANDS = frozenset({
+    "start-review-panel",
+    "record-subreview",
+    "finalize-review-panel",
+})
+HCE_OUTCOME_COMMANDS = frozenset({
+    "record-repair",
+    "record-delta-review",
+    "record-receipt",
+})
+HCE_PANEL_ROLES = ("package-reviewer", "security-auditor")
+CONVERGENCE_RECEIPT_SCHEMA = "set-agentes.convergence-integration-receipt/v1"
+
+
+def hce_exception(package: dict[str, Any]) -> dict[str, Any] | None:
+    exc = package.get("convergence_exception")
+    if isinstance(exc, dict) and exc.get("exception_id"):
+        return exc
+    return None
+
+
+def hce_panel_active(exc: dict[str, Any] | None) -> bool:
+    return bool(
+        exc
+        and exc.get("combined_review_identity")
+        and exc.get("status") in {"prepared", "authorized", "consumed"}
+    )
+
+
+def hce_outcome_active(exc: dict[str, Any] | None) -> bool:
+    consumption = (exc or {}).get("consumption")
+    return bool(exc and exc.get("status") == "consumed" and isinstance(consumption, dict) and consumption.get("outcome_id"))
+
+
+def build_convergence_binding(exc: dict[str, Any], *, outcome_id: str | None = None) -> dict[str, Any]:
+    from copy import deepcopy
+
+    binding: dict[str, Any] = {
+        "exception_id": exc["exception_id"],
+        "binding_digest": exc["binding_digest"],
+        "combined_review_identity": deepcopy(exc["combined_review_identity"]),
+        "outcome_id": outcome_id,
+    }
+    return binding
+
+
+def validate_hce_panel_command(command: str, args: argparse.Namespace, package: dict[str, Any]) -> dict[str, Any] | None:
+    from feature_state_lib.convergence_errors import HceDenial
+    from feature_state_lib.convergence_policy import get_exception
+
+    exc = hce_exception(package)
+    flag = getattr(args, "convergence_exception_id", None)
+    if hce_panel_active(exc):
+        if not flag:
+            raise HceDenial("HCE_DENIED", f"{command} requires --convergence-exception-id for active HCE parent")
+        return get_exception(package, flag)
+    if flag:
+        raise HceDenial("HCE_DENIED", f"{command} forbids --convergence-exception-id on ordinary package")
+    return None
+
+
+def validate_hce_outcome_command(
+    command: str,
+    args: argparse.Namespace,
+    package: dict[str, Any],
+) -> tuple[dict[str, Any], str] | None:
+    from feature_state_lib.convergence_errors import HceDenial
+
+    exc = hce_exception(package)
+    flag = getattr(args, "convergence_outcome_id", None)
+    if hce_panel_active(exc):
+        if not hce_outcome_active(exc):
+            raise HceDenial(
+                "HCE_DENIED",
+                f"{command} requires consumed convergence outcome before HCE successor lifecycle",
+            )
+        if not flag:
+            raise HceDenial("HCE_DENIED", f"{command} requires --convergence-outcome-id for consumed HCE parent")
+        consumption = exc.get("consumption") or {}
+        outcome_id = consumption.get("outcome_id")
+        if flag != outcome_id:
+            raise HceDenial("HCE_OUTCOME_INVALID", "convergence_outcome_id mismatch")
+        return exc, outcome_id
+    if flag:
+        raise HceDenial("HCE_DENIED", f"{command} forbids --convergence-outcome-id on ordinary package")
+    return None
+
+
+def require_hce_registered_outcome(
+    data: dict[str, Any],
+    package: dict[str, Any],
+    exc: dict[str, Any],
+) -> str:
+    """Fresh verify-convergence-outcome posture for linked repair/receipt/integration."""
+    from pathlib import Path
+
+    from feature_state_lib.convergence_constants import CHILD_A_PACKAGE_ID, CHILD_B_PACKAGE_ID
+    from feature_state_lib.convergence_errors import HceDenial
+    from feature_state_lib.convergence_git import (
+        check_clean_worktree,
+        measure_child_output_paths,
+        measure_combined_identity,
+        resolve_commit,
+    )
+    from feature_state_lib.convergence_policy import validate_verify_outcome, _package_map
+
+    if exc.get("status") != "consumed":
+        raise HceDenial("HCE_DENIED", "convergence outcome not consumed")
+    worktree = Path(exc.get("worktree_realpath") or Path.cwd())
+    origin = exc.get("repair_origin") or {}
+    base_commit = origin.get("candidate_ref")
+    if not base_commit:
+        raise HceDenial("HCE_STALE", "missing repair_origin candidate_ref")
+    check_clean_worktree(worktree)
+    combined_live = measure_combined_identity(worktree, base_commit)
+    head_commit = resolve_commit(worktree, "HEAD")
+    if head_commit != combined_live.get("candidate_commit"):
+        raise HceDenial("HCE_STALE", "HEAD must equal combined candidate_commit")
+    packages = _package_map(data)
+    child_a = packages.get(CHILD_A_PACKAGE_ID)
+    child_b = packages.get(CHILD_B_PACKAGE_ID)
+    if not child_a or not child_b:
+        raise HceDenial("HCE_STALE", "missing fixed child packages")
+    fresh_child_outputs = {
+        CHILD_A_PACKAGE_ID: measure_child_output_paths(worktree, child_a["candidate_identity"]),
+        CHILD_B_PACKAGE_ID: measure_child_output_paths(worktree, child_b["candidate_identity"]),
+    }
+    return validate_verify_outcome(
+        exc,
+        package,
+        combined_live,
+        data=data,
+        fresh_child_outputs=fresh_child_outputs,
+    )
+
+
+def validate_hce_combined_commit(
+    exc: dict[str, Any],
+    commit: str | None,
+    *,
+    command: str,
+) -> str:
+    from feature_state_lib.convergence_errors import HceDenial
+
+    combined = exc.get("combined_review_identity") or {}
+    expected = combined.get("candidate_commit")
+    if not commit:
+        raise HceDenial("HCE_DENIED", f"{command} requires --combined-commit for HCE parent")
+    if commit != expected:
+        raise HceDenial("HCE_STALE", "combined-commit must equal combined candidate_commit")
+    return expected

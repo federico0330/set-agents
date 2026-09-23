@@ -1,0 +1,5 @@
+id = "software-engineering"
+tier = "always_on"
+summary = "SDD/BDD, ownership, repair loop, code literacy"
+skills = ["sdd", "bdd", "repair-loop", "feature-contract", "request-triage"]
+tools = ["git", "rg", "python3"]

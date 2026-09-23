@@ -3829,6 +3829,7 @@ class Action:
 
 HOME_ACTIONS = (
     Action("estado", "Estado", "qué tenés instalado y qué falta"),
+    Action("perfil", "Perfil de trabajo", "packs del proyecto vs global"),
     Action("configurar", "Configurar", "poné a punto tus CLIs de IA"),
     Action("modelos", "Modelos", "quién responde y con cuánto esfuerzo"),
     Action("trabajo", "Forma de trabajo", "cuánto te consulta y con qué método"),
@@ -4077,6 +4078,9 @@ def _run_home_action(key, style, ctx):
     if key == "estado":
         estado_panel(style, ctx)
         return None
+    if key == "perfil":
+        perfil_panel(style, ctx)
+        return None
     if key == "modelos":
         ui.GLOBAL_CACHE.invalidate()
         if run_tty([str(ROOT / "setup-models.sh")], operation="El asistente de modelos") != 0:
@@ -4130,9 +4134,31 @@ def _run_home_action(key, style, ctx):
 
 def estado_panel(style, ctx):
     # Estado is a paint-only view. Measurements happen exclusively in Actualizar estado.
-    estado_lines = [ui.rule("Estado"), "", ui.kv("Instalación", ctx.get("drift", "unknown")),
-                    ui.kv("Actualización", ctx.get("update_badge", "sin revisar")),
-                    "", ui.muted("Para medir de nuevo, elegí Actualizar estado.")]
+    # ADR-0077: name the three overlay layers so project vs global is never ambiguous.
+    try:
+        import packs_config
+        project = PROJECT_ROOT or find_project_root(Path.cwd())
+        profile = packs_config.resolve_profile(harness_root=ROOT, project_root=project)
+        overlay_lines = packs_config.profile_lines(profile)
+    except Exception:
+        overlay_lines = [
+            "Capas (ADR-0077):",
+            "  Global (harness): tools.toml + packs always_on",
+            "  Máquina/clone: tools.local.toml en HARNESS_HOME",
+            "  Proyecto: packs.local.toml en PROJECT_ROOT",
+        ]
+    machine_tools = ROOT / "tools.local.toml"
+    tools_line = f"tools.local.toml (máquina): {'presente' if machine_tools.is_file() else 'ausente'}"
+    estado_lines = [
+        ui.rule("Estado"), "",
+        ui.kv("Instalación", ctx.get("drift", "unknown")),
+        ui.kv("Actualización", ctx.get("update_badge", "sin revisar")),
+        "",
+        *overlay_lines,
+        tools_line,
+        "",
+        ui.muted("Para medir de nuevo, elegí Actualizar estado."),
+    ]
     estado_style = {**style, "header_max_lines": 40}
     auto = "sí" if auto_update_enabled() else "no"
     choice = tui.run_picker(
@@ -4140,6 +4166,21 @@ def estado_panel(style, ctx):
         style=estado_style, header="\n".join(estado_lines))
     if isinstance(choice, tui.Selected) and choice.index == 0:
         set_auto_update(not auto_update_enabled())
+
+
+def perfil_panel(style, ctx):
+    """ADR-0077: Perfil de trabajo — packs activos y tools faltantes, capas nombradas."""
+    import packs_config
+    project = PROJECT_ROOT or find_project_root(Path.cwd())
+    profile = packs_config.resolve_profile(harness_root=ROOT, project_root=project)
+    lines = [ui.rule("Perfil de trabajo"), ""] + packs_config.profile_lines(profile)
+    lines += [
+        "",
+        ui.muted("Quién setea el overlay de proyecto: project-bootstrapper (ADR-0077)."),
+        ui.muted("El orquestador detecta y dispara; no hay agente auto-setup aparte."),
+    ]
+    tui.run_picker(("Volver",), style={**style, "header_max_lines": 48},
+                   header="\n".join(lines))
 
 
 # --------------------------------------------------------------- cómo trabaja
