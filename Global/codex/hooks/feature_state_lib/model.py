@@ -532,10 +532,22 @@ def validate_state(data: dict[str, Any]) -> list[str]:
         # place), so these should never actually fire in normal operation.
         receipt = package.get("receipt")
         if receipt:
-            candidate = package.get("candidate_identity") or {}
-            for field in ("base_tree", "candidate_tree", "paths_digest"):
-                if receipt.get(field) != candidate.get(field):
-                    errors.append(f"{pid}: receipt.{field} does not match candidate_identity.{field}")
+            if receipt.get("schema") == "set-agentes.convergence-integration-receipt/v1":
+                exc = package.get("convergence_exception") or {}
+                combined = exc.get("combined_review_identity") or {}
+                for field in ("base_tree", "candidate_tree", "paths_digest", "generation", "candidate_commit", "changed_lines"):
+                    if receipt.get(field) != combined.get(field):
+                        errors.append(f"{pid}: receipt.{field} does not match combined_review_identity.{field}")
+                if receipt.get("exception_id") != exc.get("exception_id"):
+                    errors.append(f"{pid}: receipt.exception_id does not match convergence_exception")
+                consumption = exc.get("consumption") or {}
+                if receipt.get("convergence_outcome_id") != consumption.get("outcome_id"):
+                    errors.append(f"{pid}: receipt.convergence_outcome_id mismatch")
+            else:
+                candidate = package.get("candidate_identity") or {}
+                for field in ("base_tree", "candidate_tree", "paths_digest"):
+                    if receipt.get(field) != candidate.get(field):
+                        errors.append(f"{pid}: receipt.{field} does not match candidate_identity.{field}")
         ceiling = package.get("repair_ceiling")
         if ceiling:
             budget_lines = ceiling.get("budget_lines")
@@ -543,6 +555,11 @@ def validate_state(data: dict[str, Any]) -> list[str]:
                 changed = repair.get("changed_lines")
                 if isinstance(changed, int) and isinstance(budget_lines, int) and changed > budget_lines:
                     errors.append(f"{pid}: repair changed_lines ({changed}) exceeds repair_ceiling.budget_lines ({budget_lines})")
+        exc = package.get("convergence_exception")
+        if exc is not None:
+            from feature_state_lib.convergence_policy import validate_convergence_exception
+
+            errors.extend(validate_convergence_exception(exc, pid))
     current = data.get("current_package_id")
     if current is not None and current not in package_ids:
         errors.append(f"current_package_id references missing package: {current}")
@@ -817,9 +834,41 @@ def tasks_complete(package: dict[str, Any]) -> bool:
     return bool(tasks) and all(task.get("status") == "completed" for task in tasks)
 
 
+def _hce_panel_tasks_ready(package: dict[str, Any]) -> bool:
+    from feature_state_lib.convergence_constants import CIRCULAR_TASK
+
+    tasks = package.get("tasks", [])
+    if not tasks:
+        return False
+    circular = None
+    for task in tasks:
+        task_id = task.get("id")
+        status = task.get("status")
+        if task_id == CIRCULAR_TASK:
+            circular = task
+            if status != "planned":
+                return False
+            continue
+        if status != "completed":
+            return False
+    return circular is not None
+
+
+def _hce_panel_readiness(package: dict[str, Any]) -> bool:
+    exc = package.get("convergence_exception")
+    return bool(
+        isinstance(exc, dict)
+        and exc.get("combined_review_identity")
+        and exc.get("status") in {"prepared", "authorized", "consumed"}
+    )
+
+
 def package_review_ready(package: dict[str, Any]) -> list[str]:
     errors = []
-    if not tasks_complete(package):
+    if _hce_panel_readiness(package):
+        if not _hce_panel_tasks_ready(package):
+            errors.append("tasks are not all completed")
+    elif not tasks_complete(package):
         errors.append("tasks are not all completed")
     if failing_required_gates(package):
         errors.append("required gates are missing or failing")

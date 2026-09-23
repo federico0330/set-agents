@@ -21,6 +21,9 @@ from feature_state_lib.render_status import status_root, render_status
 from feature_state_lib.render_bitacora import read_jsonl, render_bitacora, NARRATIVE_LOG
 from feature_state_lib.render_notes import slugify, DECISIONS_LOG
 
+# ADR-0077: session-close improvements land here — never in describe_next_step.
+DEFERRED_LOG = "deferred-log.jsonl"
+
 
 def cmd_render_status(args: argparse.Namespace) -> int:
     anchor = Path(args.state_dir or "ai/state") / "features" / "_anchor.json"
@@ -162,6 +165,28 @@ def cmd_log_decision(args: argparse.Namespace) -> int:
             handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
     model.render_notes(log_path.parent / "features" / "_anchor.json")
     print_json({"ok": True, "log_file": str(log_path), "entry": entry, "deduped": duplicate is not None})
+    return 0
+
+
+def cmd_log_deferred(args: argparse.Namespace) -> int:
+    """ADR-0077 session-close: park an out-of-scope improvement without reopening work.
+
+    Appends to ai/state/deferred-log.jsonl. ``describe_next_step`` must never read
+    this file — deferred items are not the next step of the live feature.
+    """
+    log_path = Path(args.log_file) if args.log_file else Path("ai/state") / DEFERRED_LOG
+    entry = {
+        "at": now(),
+        "summary": args.summary,
+        "why_deferred": args.why_deferred or "",
+        "feature_id": args.feature_id or "",
+        "package_id": args.package_id or "",
+        "actor": args.actor,
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, sort_keys=True, ensure_ascii=False) + "\n")
+    print_json({"ok": True, "log_file": str(log_path), "entry": entry})
     return 0
 
 

@@ -135,18 +135,109 @@ def changed_files_from_git(baseline: str) -> list[str]:
     return changed
 
 
+def _derive_owned_paths_from_children(exc: dict[str, Any]) -> list[str]:
+    import base64
+    import binascii
+
+    children = exc.get("children") or []
+    if len(children) != 2:
+        _hce_exit("HCE_STALE: stored child records missing")
+    owned: list[str] = []
+    for child in sorted(children, key=lambda item: item.get("package_id", "")):
+        for encoded in child.get("output_paths_b64", []):
+            try:
+                owned.append(base64.b64decode(encoded, validate=True).decode("utf-8"))
+            except (binascii.Error, UnicodeDecodeError):
+                _hce_exit("HCE_STALE: malformed output_paths_b64")
+    return sorted(owned)
+
+
+def _hce_changed_paths(
+    data: dict[str, Any],
+    package: dict[str, Any],
+    exception_id: str,
+    state_file: Path,
+) -> list[str]:
+    from feature_state_lib.convergence_constants import FOUR_PATH_UNION, OWNERSHIP_SNAPSHOT
+    from feature_state_lib.convergence_git import measure_combined_identity
+    from feature_state_lib.convergence_policy import validate_bindings_match
+
+    exc = package.get("convergence_exception")
+    if not exc or exc.get("exception_id") != exception_id:
+        _hce_exit("HCE_DENIED: unknown convergence exception")
+    if exc.get("ownership_snapshot") != OWNERSHIP_SNAPSHOT:
+        _hce_exit("HCE_STALE: ownership_snapshot tampered")
+    worktree_raw = exc.get("worktree_realpath")
+    if not worktree_raw:
+        _hce_exit("HCE_STALE: worktree binding missing")
+    worktree = Path(worktree_raw)
+    origin = exc.get("repair_origin") or {}
+    base_commit = origin.get("candidate_ref")
+    if not base_commit:
+        raise SystemExit(json.dumps({"ok": False, "error": "HCE_STALE: missing repair origin"}, sort_keys=True))
+    state_path = state_file.resolve()
+    repo = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if repo.returncode != 0:
+        _hce_exit("HCE_GIT_UNAVAILABLE: cannot resolve repository")
+    common = repo.stdout.strip()
+    common_path = Path(common) if Path(common).is_absolute() else (worktree / common).resolve()
+    try:
+        validate_bindings_match(exc, str(state_path), str(common_path), str(worktree.resolve()))
+        combined = measure_combined_identity(worktree, base_commit)
+    except Exception as exc_err:
+        token = getattr(exc_err, "token", "HCE_STALE")
+        reason = str(exc_err)
+        _hce_exit(f"{token}: {reason}")
+    stored = exc.get("combined_review_identity") or {}
+    for key in ("candidate_commit", "candidate_tree", "paths_digest"):
+        if stored.get(key) != combined.get(key):
+            _hce_exit(f"HCE_STALE: combined identity mismatch on {key}")
+    paths = combined.get("changed_paths") or []
+    if sorted(paths) != sorted(FOUR_PATH_UNION):
+        _hce_exit("HCE_STALE: changed path union mismatch")
+    return sorted(paths)
+
+
+def _hce_exit(message: str) -> None:
+    print(json.dumps({"ok": False, "error": message}, sort_keys=True))
+    raise SystemExit(2)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state-file", required=True)
     parser.add_argument("--package-id", required=True)
     parser.add_argument("--baseline")
     parser.add_argument("--changed-file", action="append")
+    parser.add_argument("--convergence-exception-id")
     args = parser.parse_args()
+
+    if args.convergence_exception_id and (args.baseline or args.changed_file):
+        print(json.dumps({"ok": False, "error": "HCE_DENIED: baseline/changed-file overrides forbidden in convergence mode"}, sort_keys=True))
+        return 2
 
     data = load_state(Path(args.state_file))
     package = package_by_id(data, args.package_id)
-    changed = args.changed_file or changed_files_from_git(args.baseline or "HEAD")
-    owned = package.get("owned_paths", package.get("ownershipPaths", [])) + package.get("shared_paths", [])
+    if args.convergence_exception_id:
+        exc = package.get("convergence_exception")
+        if not exc or exc.get("exception_id") != args.convergence_exception_id:
+            print(json.dumps({"ok": False, "error": "HCE_DENIED: unknown convergence exception"}, sort_keys=True))
+            return 2
+        changed = _hce_changed_paths(data, package, args.convergence_exception_id, Path(args.state_file))
+        owned = _derive_owned_paths_from_children(exc)
+        from feature_state_lib.convergence_constants import FOUR_PATH_UNION
+        if sorted(owned) != sorted(FOUR_PATH_UNION):
+            print(json.dumps({"ok": False, "error": "HCE_STALE: derived ownership union mismatch"}, sort_keys=True))
+            return 2
+    else:
+        changed = args.changed_file or changed_files_from_git(args.baseline or "HEAD")
+        owned = package.get("owned_paths", package.get("ownershipPaths", [])) + package.get("shared_paths", [])
     read_only = package.get("read_only_paths", [])
     violations = []
     read_only_violations = []

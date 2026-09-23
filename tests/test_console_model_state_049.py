@@ -24,7 +24,7 @@ class HomeFirstPaintTests(unittest.TestCase):
         update.assert_not_called(); hosts.assert_not_called(); drift.assert_not_called(); first.assert_not_called()
         labels = picker.call_args.args[0]
         self.assertEqual(tuple(labels[:7]), tuple(app._menu_rows(app.visible_actions(False)))[:7])
-        for expected in ("Estado", "Configurar", "Modelos", "Forma de trabajo", "Actualizar estado", "Modo experto", "Salir"):
+        for expected in ("Estado", "Perfil de trabajo", "Configurar", "Modelos", "Forma de trabajo", "Actualizar estado", "Modo experto", "Salir"):
             self.assertTrue(any(expected in row for row in labels))
 
     def test_refresh_failure_keeps_cache_and_is_retryable(self):

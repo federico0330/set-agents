@@ -1,0 +1,5 @@
+id = "security"
+tier = "always_on"
+summary = "Threat-aware review and fail-closed tool discovery"
+skills = ["audit-diff"]
+tools = ["git"]

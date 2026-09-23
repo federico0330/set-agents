@@ -80,9 +80,11 @@ from feature_state_lib.cli_repair import (
     FINDING_BOOKKEEPING, COMMIT_SHA_RE, GIT_TIMEOUT_SECONDS,
 )
 from feature_state_lib.cli_reporting import (
-    cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_sync_notes, cmd_digest,
-    run_dry_workflow, cmd_dry_run, cmd_spawns,
+    cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_log_deferred,
+    cmd_sync_notes, run_dry_workflow, cmd_dry_run, cmd_spawns, cmd_digest,
 )
+from feature_state_lib.cli_migrate import cmd_migrate_legacy_state
+from feature_state_lib.cli_bus import cmd_bus_post, cmd_bus_list
 from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
 from feature_state_lib.cli_modules import cmd_record_module_impact, cmd_module_impact_detect, cmd_check_anchors
 from feature_state_lib.convergence_cli import (
@@ -1055,6 +1057,12 @@ def build_parser() -> argparse.ArgumentParser:
         item = sub.add_parser(name)
         item.add_argument("feature_id", nargs="?")
         item.add_argument("--state-file")
+        if name == "validate":
+            item.add_argument(
+                "--auto-migrate",
+                action="store_true",
+                help="ADR-0077: upgrade legacy schema before validating",
+            )
         item.set_defaults(func=func)
 
     transition = sub.add_parser("transition")
@@ -1434,6 +1442,44 @@ def build_parser() -> argparse.ArgumentParser:
     decision.add_argument("--actor", default="orchestrator")
     decision.add_argument("--log-file")
     decision.set_defaults(func=cmd_log_decision)
+
+    deferred = sub.add_parser(
+        "log-deferred",
+        help="ADR-0077: park out-of-scope improvements at session close (never next-step)",
+    )
+    deferred.add_argument("--summary", required=True)
+    deferred.add_argument("--why-deferred", dest="why_deferred", default="")
+    deferred.add_argument("--feature-id")
+    deferred.add_argument("--package-id")
+    deferred.add_argument("--actor", default="orchestrator")
+    deferred.add_argument("--log-file")
+    deferred.set_defaults(func=cmd_log_deferred)
+
+    migrate = sub.add_parser(
+        "migrate-legacy-state",
+        help="ADR-0077: legacy schema → v1 with backup (resume/next/status also auto-migrate)",
+    )
+    migrate.add_argument("feature_id", nargs="?")
+    migrate.add_argument("--state-file")
+    migrate.add_argument("--dry-run", action="store_true")
+    migrate.set_defaults(func=cmd_migrate_legacy_state)
+
+    bus_post = sub.add_parser("bus-post", help="ADR-0077: append to ai/state/bus/<topic>.jsonl")
+    bus_post.add_argument("--topic", required=True)
+    bus_post.add_argument("--from", dest="from_role", required=True)
+    bus_post.add_argument("--to", dest="to_role", required=True)
+    bus_post.add_argument("--body", required=True)
+    bus_post.add_argument("--feature-id")
+    bus_post.add_argument("--package-id")
+    bus_post.add_argument("--state-dir")
+    bus_post.set_defaults(func=cmd_bus_post)
+
+    bus_list = sub.add_parser("bus-list", help="ADR-0077: read ai/state/bus/<topic>.jsonl")
+    bus_list.add_argument("--topic", required=True)
+    bus_list.add_argument("--to", dest="to_role")
+    bus_list.add_argument("--limit", default=50)
+    bus_list.add_argument("--state-dir")
+    bus_list.set_defaults(func=cmd_bus_list)
 
     notes = sub.add_parser("sync-notes")
     notes.add_argument("--state-dir")

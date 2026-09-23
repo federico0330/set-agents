@@ -65,6 +65,7 @@ from feature_state_lib.cli_lifecycle import (
     cmd_fail_task, cmd_resume, cmd_reopen, cmd_block, block_with_reason,
     cmd_amend_spec, cmd_supersede_package, cmd_record_axis,
     cmd_amend_package, MIN_AMEND_REASON_LEN,
+    validate_hce_panel_command, build_convergence_binding, HCE_PANEL_ROLES,
 )
 import feature_state_lib.cli_lifecycle as cli_lifecycle
 from feature_state_lib.cli_review import (
@@ -79,13 +80,26 @@ from feature_state_lib.cli_repair import (
     FINDING_BOOKKEEPING, COMMIT_SHA_RE, GIT_TIMEOUT_SECONDS,
 )
 from feature_state_lib.cli_reporting import (
-    cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_sync_notes, cmd_digest,
-    run_dry_workflow, cmd_dry_run, cmd_spawns,
+    cmd_render_status, cmd_log_quickfix, cmd_log_narrative, cmd_log_decision, cmd_log_deferred,
+    cmd_sync_notes, run_dry_workflow, cmd_dry_run, cmd_spawns, cmd_digest,
 )
+from feature_state_lib.cli_migrate import cmd_migrate_legacy_state
+from feature_state_lib.cli_bus import cmd_bus_post, cmd_bus_list
 from feature_state_lib.cli_integration import cmd_freeze_candidate, cmd_record_receipt
 from feature_state_lib.cli_modules import cmd_record_module_impact, cmd_module_impact_detect, cmd_check_anchors
+from feature_state_lib.convergence_cli import (
+    cmd_prepare_convergence,
+    cmd_reenter_convergence,
+    cmd_authorize_convergence,
+    cmd_inspect_convergence,
+    cmd_consume_convergence,
+    cmd_verify_convergence_outcome,
+)
+from feature_state_lib.convergence_constants import HCE_COMMANDS
+from feature_state_lib.convergence_errors import HceCommittedRenderFailed, HceDenial
+from feature_state_lib.convergence_git import validate_canonical_lock_path, validate_canonical_state_path
 from feature_state_lib.render_modules import render_modules
-from feature_state_lib.parser import add_common_state_args
+from feature_state_lib.parser import add_common_state_args, add_hce_mutation_args
 
 
 # `replayed`/`record_event`/`mutate` stay physically defined in this file (see
@@ -158,9 +172,6 @@ def record_event(
     return True
 
 
-    return client, tech
-
-
 CAS_SENSITIVE_OPERATIONS = frozenset({
     "transition",
     "record-spawn",
@@ -181,9 +192,11 @@ CAS_SENSITIVE_OPERATIONS = frozenset({
 
 
 @contextmanager
-def _state_file_lock(path: Path):
+def _state_file_lock(path: Path, *, hce: bool = False):
     """PR-11 (016 audit debt): exclusive lock for read-modify-write on feature JSON."""
     lock_path = path.with_suffix(path.suffix + ".lock")
+    if hce and (path.suffix == ".json" or str(path).endswith(".json")):
+        validate_canonical_lock_path(lock_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "a+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -199,7 +212,10 @@ def mutate(
     operation: str,
     updater,
 ) -> tuple[dict[str, Any], bool]:
-    with _state_file_lock(path):
+    is_hce = operation in HCE_COMMANDS
+    if is_hce:
+        validate_canonical_state_path(path)
+    with _state_file_lock(path, hce=is_hce):
         data = load_state(path)
         fail_if_invalid(data)
         expected = getattr(args, "expect_revision", None)
@@ -213,10 +229,28 @@ def mutate(
             fail_if_invalid(data)
             atomic_write(path, data)
             only = data.get("feature_id")
-            render_status(path)
-            render_bitacora(path, only_feature=only)
-            render_notes(path, only_feature=only)
-            render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
+            try:
+                render_status(path)
+                render_bitacora(path, only_feature=only)
+                render_notes(path, only_feature=only)
+                render_modules(path, only_feature=only)  # AC-19 (ADR-0036): opt-in, never blocks a mutation
+            except Exception as exc:
+                if operation == "consume-convergence":
+                    package_id = getattr(args, "package_id", None)
+                    package = package_by_id(data, package_id) if package_id else None
+                    exc_obj = (package or {}).get("convergence_exception") or {}
+                    consumption = exc_obj.get("consumption") or {}
+                    outcome_id = consumption.get("outcome_id")
+                    if outcome_id:
+                        raise HceCommittedRenderFailed(
+                            str(exc),
+                            outcome_id=outcome_id,
+                            revision=int(data.get("revision", 0)),
+                            feature_id=data.get("feature_id"),
+                            package_id=package_id,
+                            exception_id=getattr(args, "exception_id", None),
+                        ) from exc
+                raise
     return data, before != data
 
 
@@ -633,9 +667,15 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
         if data["phase"] != "PACKAGE_REVIEW":
             raise StateError(f"cannot start review panel from phase {data['phase']}")
         package = package_by_id(data, args.package_id)
+        hce_exc = validate_hce_panel_command("start-review-panel", args, package)
         errors = package_review_ready(package)
         if errors:
             raise StateError("cannot start review panel: " + "; ".join(errors))
+        if hce_exc:
+            if set(roles) != set(HCE_PANEL_ROLES):
+                raise HceDenial("HCE_DENIED", "HCE panel must be exactly package-reviewer and security-auditor")
+            if hce_exc.get("final_panel_id"):
+                raise HceDenial("HCE_DENIED", "final panel already bound")
         required = persist_review_requirements(package)
         writers = [role for role in roles if role in NON_ACCEPTING_ACTORS]
         if writers:
@@ -681,8 +721,12 @@ def cmd_start_review_panel(args: argparse.Namespace) -> int:
             "started_at": now(),
             "completed_at": None,
         }
+        if hce_exc:
+            panel["convergence_binding"] = build_convergence_binding(hce_exc)
+            hce_exc["final_panel_id"] = panel_id
         package.setdefault("review_panels", []).append(panel)
         attempts["deep_review_cycles"] = attempts.get("deep_review_cycles", 0) + 1
+        data.setdefault("metrics", {}).setdefault("package_reviews", 0)
         data["metrics"]["package_reviews"] += 1
         record_event(data, "start-review-panel", "PACKAGE_REVIEW", "PACKAGE_REVIEW", args.actor, args.package_id, {"panel_id": panel_id, "roles": panel["roles"]}, args.event_id)
         return True
@@ -1013,6 +1057,12 @@ def build_parser() -> argparse.ArgumentParser:
         item = sub.add_parser(name)
         item.add_argument("feature_id", nargs="?")
         item.add_argument("--state-file")
+        if name == "validate":
+            item.add_argument(
+                "--auto-migrate",
+                action="store_true",
+                help="ADR-0077: upgrade legacy schema before validating",
+            )
         item.set_defaults(func=func)
 
     transition = sub.add_parser("transition")
@@ -1135,6 +1185,7 @@ def build_parser() -> argparse.ArgumentParser:
     panel.add_argument("--feature-id")
     panel.add_argument("--panel-id")
     panel.add_argument("--role", action="append")
+    panel.add_argument("--convergence-exception-id")
     panel.set_defaults(func=cmd_start_review_panel)
 
     subreview = sub.add_parser("record-subreview")
@@ -1145,6 +1196,7 @@ def build_parser() -> argparse.ArgumentParser:
     subreview.add_argument("--feature-id")
     subreview.add_argument("--finding", action="append")
     subreview.add_argument("--evidence", default="")
+    subreview.add_argument("--convergence-exception-id")
     subreview.set_defaults(func=cmd_record_subreview)
 
     finalize = sub.add_parser("finalize-review-panel")
@@ -1154,6 +1206,7 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--feature-id")
     finalize.add_argument("--allow-missing", action="store_true")
     finalize.add_argument("--evidence", default="")
+    finalize.add_argument("--convergence-exception-id")
     finalize.set_defaults(func=cmd_finalize_review_panel)
 
     extend = sub.add_parser("extend-review-panel")
@@ -1203,6 +1256,7 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--changed-lines", type=int,
                         help="docs/adr/0023-*.md: self-reported repair diff size, bookkeeping only -- "
                              "check-repair-ceiling.py independently re-measures before trusting it")
+    repair.add_argument("--convergence-outcome-id")
     repair.set_defaults(func=cmd_record_repair)
 
     delta = sub.add_parser("record-delta-review")
@@ -1214,6 +1268,7 @@ def build_parser() -> argparse.ArgumentParser:
     delta.add_argument("--new-finding", action="append")
     delta.add_argument("--requires-full-review", action="store_true")
     delta.add_argument("--reason", default="")
+    delta.add_argument("--convergence-outcome-id")
     delta.set_defaults(func=cmd_record_delta_review)
 
     testing = sub.add_parser("record-testing")
@@ -1223,6 +1278,7 @@ def build_parser() -> argparse.ArgumentParser:
     testing.add_argument("--feature-id")
     testing.add_argument("--command", action="append")
     testing.add_argument("--evidence", default="")
+    testing.add_argument("--combined-commit", help="HCE parent: combined final candidate SHA")
     testing.set_defaults(func=cmd_record_testing)
 
     runtime = sub.add_parser("record-runtime-qa")
@@ -1235,6 +1291,7 @@ def build_parser() -> argparse.ArgumentParser:
     runtime.add_argument("--screenshot", action="append")
     runtime.add_argument("--check", action="append")
     runtime.add_argument("--evidence", default="")
+    runtime.add_argument("--combined-commit", help="HCE parent: combined final candidate SHA")
     runtime.set_defaults(func=cmd_record_runtime_qa)
 
     accept = sub.add_parser("accept-package")
@@ -1255,6 +1312,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_state_args(receipt)
     receipt.add_argument("package_id")
     receipt.add_argument("--feature-id")
+    receipt.add_argument("--convergence-outcome-id")
     receipt.set_defaults(func=cmd_record_receipt)
 
     module_impact = sub.add_parser("record-module-impact")
@@ -1385,6 +1443,44 @@ def build_parser() -> argparse.ArgumentParser:
     decision.add_argument("--log-file")
     decision.set_defaults(func=cmd_log_decision)
 
+    deferred = sub.add_parser(
+        "log-deferred",
+        help="ADR-0077: park out-of-scope improvements at session close (never next-step)",
+    )
+    deferred.add_argument("--summary", required=True)
+    deferred.add_argument("--why-deferred", dest="why_deferred", default="")
+    deferred.add_argument("--feature-id")
+    deferred.add_argument("--package-id")
+    deferred.add_argument("--actor", default="orchestrator")
+    deferred.add_argument("--log-file")
+    deferred.set_defaults(func=cmd_log_deferred)
+
+    migrate = sub.add_parser(
+        "migrate-legacy-state",
+        help="ADR-0077: legacy schema → v1 with backup (resume/next/status also auto-migrate)",
+    )
+    migrate.add_argument("feature_id", nargs="?")
+    migrate.add_argument("--state-file")
+    migrate.add_argument("--dry-run", action="store_true")
+    migrate.set_defaults(func=cmd_migrate_legacy_state)
+
+    bus_post = sub.add_parser("bus-post", help="ADR-0077: append to ai/state/bus/<topic>.jsonl")
+    bus_post.add_argument("--topic", required=True)
+    bus_post.add_argument("--from", dest="from_role", required=True)
+    bus_post.add_argument("--to", dest="to_role", required=True)
+    bus_post.add_argument("--body", required=True)
+    bus_post.add_argument("--feature-id")
+    bus_post.add_argument("--package-id")
+    bus_post.add_argument("--state-dir")
+    bus_post.set_defaults(func=cmd_bus_post)
+
+    bus_list = sub.add_parser("bus-list", help="ADR-0077: read ai/state/bus/<topic>.jsonl")
+    bus_list.add_argument("--topic", required=True)
+    bus_list.add_argument("--to", dest="to_role")
+    bus_list.add_argument("--limit", default=50)
+    bus_list.add_argument("--state-dir")
+    bus_list.set_defaults(func=cmd_bus_list)
+
     notes = sub.add_parser("sync-notes")
     notes.add_argument("--state-dir")
     notes.add_argument("--notes-dir")
@@ -1413,6 +1509,48 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("--out")
     graph.set_defaults(func=cmd_graph)
 
+    prepare_conv = sub.add_parser("prepare-convergence", add_help=False)
+    add_hce_mutation_args(prepare_conv)
+    prepare_conv.add_argument("package_id")
+    prepare_conv.add_argument("--profile", required=True)
+    prepare_conv.add_argument("--authorized-by", required=True)
+    prepare_conv.add_argument("--reason", required=True)
+    prepare_conv.add_argument("--approval-evidence", required=True)
+    prepare_conv.set_defaults(func=cmd_prepare_convergence)
+
+    reenter_conv = sub.add_parser("reenter-convergence", add_help=False)
+    add_hce_mutation_args(reenter_conv)
+    reenter_conv.add_argument("package_id")
+    reenter_conv.add_argument("--exception-id", required=True)
+    reenter_conv.set_defaults(func=cmd_reenter_convergence)
+
+    authorize_conv = sub.add_parser("authorize-convergence", add_help=False)
+    add_hce_mutation_args(authorize_conv)
+    authorize_conv.add_argument("package_id")
+    authorize_conv.add_argument("--exception-id", required=True)
+    authorize_conv.add_argument("--authorized-by", required=True)
+    authorize_conv.add_argument("--reason", required=True)
+    authorize_conv.add_argument("--approval-evidence", required=True)
+    authorize_conv.set_defaults(func=cmd_authorize_convergence)
+
+    inspect_conv = sub.add_parser("inspect-convergence", add_help=False)
+    inspect_conv.add_argument("package_id")
+    inspect_conv.add_argument("--state-file")
+    inspect_conv.add_argument("--exception-id", required=True)
+    inspect_conv.set_defaults(func=cmd_inspect_convergence)
+
+    consume_conv = sub.add_parser("consume-convergence", add_help=False)
+    add_hce_mutation_args(consume_conv)
+    consume_conv.add_argument("package_id")
+    consume_conv.add_argument("--exception-id", required=True)
+    consume_conv.set_defaults(func=cmd_consume_convergence)
+
+    verify_conv = sub.add_parser("verify-convergence-outcome", add_help=False)
+    verify_conv.add_argument("package_id")
+    verify_conv.add_argument("--state-file")
+    verify_conv.add_argument("--exception-id", required=True)
+    verify_conv.set_defaults(func=cmd_verify_convergence_outcome)
+
     # Available on every subcommand: defer STATUS/bitacora/notes regeneration
     # for high-frequency intra-phase writes; sync-notes always renders anyway.
     for item in sub.choices.values():
@@ -1420,12 +1558,61 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def _reject_duplicate_hce_flags(argv: list[str]) -> None:
+    seen: set[str] = set()
+    for arg in argv[2:]:
+        if not arg.startswith("--"):
+            continue
+        flag = arg.split("=", 1)[0]
+        if flag in seen:
+            raise HceDenial("HCE_DENIED", f"duplicate option {flag}")
+        seen.add(flag)
+
+
+def _parse_hce_argv(argv: list[str]) -> argparse.Namespace:
+    if len(argv) < 2 or argv[1] not in HCE_COMMANDS:
+        raise ValueError("not an HCE command")
+    _reject_duplicate_hce_flags(argv)
     parser = build_parser()
-    args = parser.parse_args()
+    command = argv[1]
+    subparser = parser._subparsers._group_actions[0].choices[command]
+    try:
+        args, unknown = subparser.parse_known_args(argv[2:])
+    except SystemExit as exc:
+        raise HceDenial("HCE_DENIED", "invalid arguments") from exc
+    if unknown:
+        raise HceDenial("HCE_DENIED", f"unknown arguments: {' '.join(unknown)}")
+    if not getattr(args, "state_file", None):
+        raise HceDenial("HCE_DENIED", "missing --state-file")
+    if getattr(args, "expect_revision", None) is not None and int(args.expect_revision) < 0:
+        raise HceDenial("HCE_DENIED", "expect-revision must be non-negative")
+    args.func = subparser.get_default("func")
+    return args
+
+
+def main() -> int:
+    argv = sys.argv
+    if len(argv) > 1 and argv[1] in HCE_COMMANDS:
+        try:
+            args = _parse_hce_argv(argv)
+        except HceDenial as exc:
+            print_json(exc.to_payload())
+            return 2
+        except SystemExit:
+            print_json({"ok": False, "error": "HCE_DENIED: invalid arguments", "code": "HCE_DENIED"})
+            return 2
+    else:
+        parser = build_parser()
+        args = parser.parse_args()
     model.RENDER_SKIP = bool(getattr(args, "no_render", False))
     try:
         return args.func(args)
+    except HceCommittedRenderFailed as exc:
+        print_json(exc.to_payload())
+        return 2
+    except HceDenial as exc:
+        print_json(exc.to_payload())
+        return 2
     except (OSError, json.JSONDecodeError, StateError) as exc:
         print_json({"ok": False, "error": str(exc)})
         return 2

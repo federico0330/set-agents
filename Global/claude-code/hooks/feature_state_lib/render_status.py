@@ -175,6 +175,9 @@ def describe_next_step(data: dict[str, Any], mark_stale: bool = True) -> str:
       feature that died of quota exhaustion TODAY reads as "in progress" until it
       crosses the same staleness threshold the digest already uses elsewhere.
 
+    ADR-0077: this function never reads ``deferred-log.jsonl``. Session-close
+    improvements parked via ``log-deferred`` are not the live feature's next step.
+
     `mark_stale=False` for the digest's "Qué falta" bit (`render_notes._pending_bits`):
     that surface already marks staleness once, in "Qué se está haciendo"
     (`⚠️ estancada hace N días`, cli_reporting.cmd_digest) -- appending it again here

@@ -27,11 +27,18 @@ GENERIC=(
   feature_state_lib/cli_review.py
   feature_state_lib/cli_repair.py
   feature_state_lib/cli_reporting.py
+  feature_state_lib/cli_migrate.py
+  feature_state_lib/cli_bus.py
   feature_state_lib/parser.py
   feature_state_lib/candidate_identity.py
   feature_state_lib/cli_integration.py
   feature_state_lib/cli_modules.py
   feature_state_lib/render_modules.py
+  feature_state_lib/convergence_cli.py
+  feature_state_lib/convergence_constants.py
+  feature_state_lib/convergence_errors.py
+  feature_state_lib/convergence_git.py
+  feature_state_lib/convergence_policy.py
   check-owned-paths.py classify-risk.py check-repair-ceiling.py mcp.sh e2e.sh loop.sh audit-readonly.sh brave-cdp-mcp.sh
 )
 

@@ -115,7 +115,7 @@ def rederive_and_compare(frozen: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     return matches, fresh
 
 
-def integration_ready(package: dict[str, Any]) -> list[str]:
+def integration_ready(package: dict[str, Any], *, data: dict[str, Any] | None = None) -> list[str]:
     """Preconditions for the `INTEGRATION` transition (docs/adr/0020-*.md),
     re-derived live -- never trusting a stored boolean. Mirrors
     `model.package_accept_ready`'s shape: a list of reasons, empty means
@@ -127,6 +127,38 @@ def integration_ready(package: dict[str, Any]) -> list[str]:
     receipt = package.get("receipt")
     if not receipt:
         errors.append("receipt is required")
+        return errors
+    if receipt.get("schema") == "set-agentes.convergence-integration-receipt/v1":
+        exc = package.get("convergence_exception") or {}
+        combined = exc.get("combined_review_identity") or {}
+        for field in ("base_tree", "candidate_tree", "paths_digest", "generation", "candidate_commit", "changed_lines"):
+            if receipt.get(field) != combined.get(field):
+                errors.append(f"receipt.{field} does not match combined_review_identity.{field}")
+        if receipt.get("exception_id") != exc.get("exception_id"):
+            errors.append("receipt.exception_id does not match convergence_exception")
+        consumption = exc.get("consumption") or {}
+        if receipt.get("convergence_outcome_id") != consumption.get("outcome_id"):
+            errors.append("receipt.convergence_outcome_id mismatch")
+        if receipt.get("binding_digest") != exc.get("binding_digest"):
+            errors.append("receipt.binding_digest mismatch")
+        if receipt.get("terminal_state") != "accepted":
+            errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")
+        if errors:
+            return errors
+        if data is None:
+            errors.append("HCE integration requires full state for registered-outcome verification")
+            return errors
+        try:
+            from feature_state_lib.cli_lifecycle import require_hce_registered_outcome
+
+            require_hce_registered_outcome(data, package, exc)
+        except Exception as exc_err:
+            from feature_state_lib.convergence_errors import HceDenial
+
+            if isinstance(exc_err, HceDenial):
+                errors.append(str(exc_err))
+            else:
+                errors.append(f"HCE registered outcome verification failed: {exc_err}")
         return errors
     if receipt.get("terminal_state") != "accepted":
         errors.append(f"receipt terminal_state is {receipt.get('terminal_state')!r}, not accepted")

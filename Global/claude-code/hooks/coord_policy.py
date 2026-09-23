@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Deny-by-default command policy for read-only coordination."""
 
+import os
 import re
 import shlex
 import sys
+from pathlib import Path
 from urllib.parse import urlparse
 
 # Keep the full marker in source artifacts. install.py replaces this exact byte
@@ -20,6 +22,7 @@ CLAUDE_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/claude_code_spawn.py"
 # (retiring MODEL_STATIC_FALLBACK as the normal path, ADR-0030's stated gap).
 OPENCODE_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/opencode_spawn.py"
 CODEX_SPAWN_CLI = "__SET_AGENTS_ROOT__/ai/scripts/codex_spawn.py"
+INTEGRATION_ACTION_CLI = "__SET_AGENTS_ROOT__/ai/scripts/integration_action.py"
 
 SAFE = [
     # Sanctioned mutation channel: the state CLI validates every transition and
@@ -595,6 +598,59 @@ def always_denied(command: str) -> bool:
     return bool(ALWAYS_DENY.search(command.strip()))
 
 
+def _trusted_integration_wrappers() -> set[Path]:
+    root = os.environ.get("SET_AGENTS_ROOT") or str(Path(__file__).resolve().parents[2])
+    trusted_cli = INTEGRATION_ACTION_CLI.replace("__SET_AGENTS_ROOT__", root)
+    wrappers = {Path(trusted_cli).expanduser().resolve()}
+    hooks = (Path.home() / ".claude/hooks/integration_action.py").expanduser()
+    try:
+        wrappers.add(hooks.resolve())
+    except OSError:
+        pass
+    return wrappers
+
+
+def _resolve_integration_wrapper(script: str) -> Path | None:
+    if script == "ai/scripts/integration_action.py":
+        root = os.environ.get("SET_AGENTS_ROOT") or str(Path(__file__).resolve().parents[2])
+        try:
+            return (Path(root) / "ai/scripts/integration_action.py").resolve()
+        except OSError:
+            return None
+    try:
+        return Path(script).expanduser().resolve()
+    except OSError:
+        return None
+
+
+def _integration_wrapper_allowed(argv: list[str]) -> bool:
+    """Trusted resolved integration_action.py wrapper only (design.md:141)."""
+    if len(argv) < 7 or argv[0] not in {"python3", "python"} or "--" not in argv:
+        return False
+    outer = _resolve_integration_wrapper(argv[1])
+    if outer is None or outer not in _trusted_integration_wrappers():
+        return False
+    action = argv[4]
+    if action not in {"freeze-candidate", "record-receipt", "transition"}:
+        return False
+    sep = argv.index("--")
+    wrapped = argv[sep + 1 :]
+    if len(wrapped) < 3 or wrapped[0] not in {"python3", "python"}:
+        return False
+    inner = wrapped[1]
+    trusted_feature_state = (outer.parent / "feature-state.py").resolve()
+    if inner == "ai/scripts/feature-state.py":
+        try:
+            harness_root = outer.parent.parent.parent.resolve()
+            return (harness_root / "ai/scripts/feature-state.py").resolve() == trusted_feature_state
+        except OSError:
+            return False
+    try:
+        return Path(inner).resolve() == trusted_feature_state
+    except OSError:
+        return False
+
+
 def _transition_blocks_integration(argv: list[str]) -> bool:
     """A `feature-state.py transition` invocation whose resolved `to_phase`
     positional is INTEGRATION must go through the wrapped `integration_action.py`
@@ -761,6 +817,8 @@ def allowed(command: str) -> bool:
     if _contains_tools_approve(argv):
         return False
     if _argv_allowed(argv):
+        return True
+    if _integration_wrapper_allowed(argv):
         return True
     if _tools_channel_allowed(argv):
         return True

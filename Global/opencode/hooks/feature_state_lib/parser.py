@@ -13,3 +13,10 @@ def add_common_state_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--expect-revision", type=int)
     parser.add_argument("--actor", default="orchestrator")
     parser.add_argument("--event-id")
+
+
+def add_hce_mutation_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--state-file")
+    parser.add_argument("--expect-revision", type=int)
+    parser.add_argument("--actor")
+    parser.add_argument("--event-id")

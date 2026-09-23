@@ -1,0 +1,5 @@
+id = "embedded"
+tier = "optional"
+summary = "Firmware and embedded bring-up"
+skills = []
+tools = []
